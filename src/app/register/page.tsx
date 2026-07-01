@@ -23,11 +23,11 @@ export default function RegisterPage() {
     setError("");
 
     if (password !== confirmPassword) {
-      setError("Las contraseñas no coinciden.");
+      setError("Passwords do not match.");
       return;
     }
     if (password.length < 6) {
-      setError("La contraseña tiene que tener al menos 6 caracteres.");
+      setError("Password must be at least 6 characters.");
       return;
     }
 
@@ -48,7 +48,7 @@ export default function RegisterPage() {
       return;
     }
 
-    // Si Supabase exige confirmación de email, no hay sesión todavía.
+    // If Supabase requires email confirmation, there is no session yet.
     if (data.session) {
       router.push("/dashboard");
     } else {
@@ -63,15 +63,15 @@ export default function RegisterPage() {
           <div className="inline-flex items-center justify-center w-14 h-14 rounded-full border border-red-100 bg-red-50 mb-4">
             <Mail size={24} className="text-red-600" />
           </div>
-          <h2 className="text-[22px] font-black text-zinc-900 mb-2">Revisá tu email</h2>
+          <h2 className="text-[22px] font-black text-zinc-900 mb-2">Check your email</h2>
           <p className="text-[14px] text-zinc-500 mb-6">
-            Te mandamos un link de confirmación a <strong>{email}</strong>. Confirmá tu cuenta y después ingresá con tu email y contraseña.
+            We sent a confirmation link to <strong>{email}</strong>. Confirm your account and then log in with your email and password.
           </p>
           <Link
             href="/login"
             className="inline-block w-full bg-red-600 hover:bg-red-500 transition-all text-white font-bold py-[12px] rounded-xl text-[14px] tracking-wide uppercase"
           >
-            Ir a Login
+            Go to Login
           </Link>
         </div>
       </main>

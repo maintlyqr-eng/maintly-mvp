@@ -1,10 +1,9 @@
 "use client";
 
 import Image from "next/image";
-import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Mail, Lock, Eye, EyeOff, User } from "lucide-react";
+import { Mail, Lock, Eye, EyeOff, User, AlertCircle } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 
 export default function LoginPage() {
@@ -20,21 +19,12 @@ export default function LoginPage() {
     setError("");
     setLoading(true);
 
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
 
     setLoading(false);
 
     if (error) {
-      if (error.message.toLowerCase().includes("email not confirmed")) {
-        setError("Tenés que confirmar tu email antes de poder ingresar.");
-      } else if (error.message.toLowerCase().includes("invalid login")) {
-        setError("Email o contraseña incorrectos.");
-      } else {
-        setError(error.message);
-      }
+      setError("Incorrect email or password. Please try again.");
       return;
     }
 
@@ -71,68 +61,70 @@ export default function LoginPage() {
           </div>
 
           <form onSubmit={handleLogin}>
-            {/* Email */}
-            <div className="mb-4">
-              <label className="text-[12px] font-bold text-zinc-700">Email address</label>
-              <div className="relative mt-1">
-                <Mail size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
-                <input
-                  type="email"
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="Enter your email"
-                  className="w-full rounded-xl border border-zinc-200 pl-10 pr-3 py-[12px] text-[14px] outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500/20 transition-all"
-                />
-              </div>
+          {/* Email */}
+          <div className="mb-4">
+            <label className="text-[12px] font-bold text-zinc-700">Email address</label>
+            <div className="relative mt-1">
+              <Mail size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
+              <input
+                type="email"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="Enter your email"
+                className="w-full rounded-xl border border-zinc-200 pl-10 pr-3 py-[12px] text-[14px] outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500/20 transition-all"
+              />
             </div>
+          </div>
 
-            {/* Password */}
-            <div className="mb-3">
-              <label className="text-[12px] font-bold text-zinc-700">Password</label>
-              <div className="relative mt-1">
-                <Lock size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
-                <input
-                  type={showPassword ? "text" : "password"}
-                  required
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Enter your password"
-                  className="w-full rounded-xl border border-zinc-200 pl-10 pr-10 py-[12px] text-[14px] outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500/20 transition-all"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600"
-                >
-                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                </button>
-              </div>
+          {/* Password */}
+          <div className="mb-3">
+            <label className="text-[12px] font-bold text-zinc-700">Password</label>
+            <div className="relative mt-1">
+              <Lock size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
+              <input
+                type={showPassword ? "text" : "password"}
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Enter your password"
+                className="w-full rounded-xl border border-zinc-200 pl-10 pr-10 py-[12px] text-[14px] outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500/20 transition-all"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600"
+              >
+                {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+              </button>
             </div>
+          </div>
 
-            {/* Remember + forgot */}
-            <div className="flex items-center justify-between mb-5">
-              <label className="flex items-center gap-2 text-[12px] text-zinc-600 cursor-pointer">
-                <input type="checkbox" className="rounded border-zinc-300 text-red-600 focus:ring-red-500" />
-                Remember me
-              </label>
-              <a href="#" className="text-[12px] text-red-600 hover:text-red-700 font-semibold">Forgot password?</a>
+          {/* Remember + forgot */}
+          <div className="flex items-center justify-between mb-5">
+            <label className="flex items-center gap-2 text-[12px] text-zinc-600 cursor-pointer">
+              <input type="checkbox" className="rounded border-zinc-300 text-red-600 focus:ring-red-500" />
+              Remember me
+            </label>
+            <a href="#" className="text-[12px] text-red-600 hover:text-red-700 font-semibold">Forgot password?</a>
+          </div>
+
+          {/* Error */}
+          {error && (
+            <div className="mb-4 rounded-lg bg-red-50 border border-red-200 px-3 py-2 flex items-center gap-2 text-[12px] text-red-700">
+              <AlertCircle size={14} className="shrink-0" />
+              {error}
             </div>
+          )}
 
-            {error && (
-              <div className="mb-4 rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-[12px] text-red-700">
-                {error}
-              </div>
-            )}
-
-            {/* Login button */}
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full bg-red-600 hover:bg-red-500 active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed transition-all text-white font-bold py-[13px] rounded-xl text-[14px] tracking-wide uppercase shadow-md shadow-red-900/20"
-            >
-              {loading ? "Logging in..." : "Login"}
-            </button>
+          {/* Login button */}
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full bg-red-600 hover:bg-red-500 active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed transition-all text-white font-bold py-[13px] rounded-xl text-[14px] tracking-wide uppercase shadow-md shadow-red-900/20"
+          >
+            {loading ? "Logging in..." : "Login"}
+          </button>
           </form>
 
           {/* Divider */}
@@ -143,11 +135,7 @@ export default function LoginPage() {
           </div>
 
           {/* Google */}
-          <button
-            type="button"
-            title="Próximamente"
-            className="w-full flex items-center justify-center gap-3 border border-zinc-200 hover:bg-zinc-50 transition-colors py-[12px] rounded-xl text-[13px] font-semibold text-zinc-700 opacity-60 cursor-not-allowed"
-          >
+          <button className="w-full flex items-center justify-center gap-3 border border-zinc-200 hover:bg-zinc-50 transition-colors py-[12px] rounded-xl text-[13px] font-semibold text-zinc-700">
             <svg width="18" height="18" viewBox="0 0 18 18">
               <path fill="#4285F4" d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84c-.21 1.13-.84 2.08-1.8 2.72v2.26h2.92c1.7-1.57 2.68-3.88 2.68-6.62z"/>
               <path fill="#34A853" d="M9 18c2.43 0 4.47-.81 5.96-2.18l-2.92-2.26c-.81.54-1.84.86-3.04.86-2.34 0-4.32-1.58-5.03-3.71H.96v2.33C2.44 15.98 5.48 18 9 18z"/>
@@ -160,12 +148,12 @@ export default function LoginPage() {
           {/* Create account */}
           <p className="text-center text-[13px] text-zinc-500 mt-6">
             New to Maintly?{" "}
-            <Link href="/register" className="text-red-600 hover:text-red-700 font-bold">Create an account</Link>
+            <a href="/register" className="text-red-600 hover:text-red-700 font-bold">Create an account</a>
           </p>
 
           {/* Browse without account */}
           <p className="text-center text-[12px] text-zinc-400 mt-3">
-            <Link href="/" className="hover:text-zinc-600 underline">Continue browsing without an account</Link>
+            <a href="/" className="hover:text-zinc-600 underline">Continue browsing without an account</a>
           </p>
             </div>
           </div>
