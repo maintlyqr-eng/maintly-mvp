@@ -1,9 +1,34 @@
 "use client";
 
 import Image from "next/image";
-import { ArrowRight, ShieldCheck, Camera, Keyboard, User, ChevronDown, Globe, Clock, TrendingUp } from "lucide-react";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { ArrowRight, ShieldCheck, Camera, Keyboard, User, ChevronDown, Globe, Clock, TrendingUp, LogOut, LayoutGrid } from "lucide-react";
+import { supabase } from "@/lib/supabase";
 
 export default function HomePage() {
+  const router = useRouter();
+  const [loggedIn, setLoggedIn] = useState(false);
+  const [userName, setUserName] = useState("");
+  const [userInitials, setUserInitials] = useState("");
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) {
+        setLoggedIn(true);
+        const name = session.user.user_metadata?.name || session.user.email || "User";
+        setUserName(name.split(" ")[0]);
+        const parts = name.split(" ");
+        setUserInitials(parts.map((p: string) => p[0]).join("").toUpperCase().slice(0, 2));
+      }
+    });
+  }, []);
+
+  async function handleLogout() {
+    await supabase.auth.signOut();
+    setLoggedIn(false);
+  }
+
   return (
     <main className="relative h-screen overflow-hidden bg-white text-zinc-900 flex flex-col">
 
@@ -29,9 +54,20 @@ export default function HomePage() {
           ))}
         </div>
 
-        <a href="/login" className="flex items-center gap-2 bg-red-600 hover:bg-red-500 text-white font-black tracking-wide rounded-xl transition-all shadow-md shadow-red-900/20 uppercase px-5 py-2" style={{fontSize:'clamp(10px,0.75vw,12px)'}}>
-          <User size={13} /> Login
-        </a>
+        {loggedIn ? (
+          <div className="flex items-center gap-2">
+            <a href="/dashboard" className="flex items-center gap-2 bg-zinc-900 hover:bg-zinc-800 text-white font-black tracking-wide rounded-xl transition-all shadow-md px-4 py-2" style={{fontSize:'clamp(10px,0.75vw,12px)'}}>
+              <LayoutGrid size={13} /> {userName}
+            </a>
+            <button onClick={handleLogout} className="flex items-center gap-1.5 text-zinc-500 hover:text-red-600 transition-colors border border-zinc-200 rounded-xl px-3 py-2" style={{fontSize:'clamp(10px,0.75vw,12px)'}}>
+              <LogOut size={13} />
+            </button>
+          </div>
+        ) : (
+          <a href="/login" className="flex items-center gap-2 bg-red-600 hover:bg-red-500 text-white font-black tracking-wide rounded-xl transition-all shadow-md shadow-red-900/20 uppercase px-5 py-2" style={{fontSize:'clamp(10px,0.75vw,12px)'}}>
+            <User size={13} /> Login
+          </a>
+        )}
       </nav>
 
       {/* ════ HERO ════ */}
