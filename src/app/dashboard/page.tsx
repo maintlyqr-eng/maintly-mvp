@@ -64,8 +64,9 @@ function MiniSparkline({ color }: { color: string }) {
 export default function DashboardPage() {
   const router = useRouter();
   const [calendarMonth] = useState("May 2026");
-  const [userName, setUserName] = useState("...");
-  const [userInitials, setUserInitials] = useState("?");
+  const [userName, setUserName] = useState("");
+  const [userInitials, setUserInitials] = useState("");
+  const [authChecked, setAuthChecked] = useState(false);
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
@@ -76,10 +77,13 @@ export default function DashboardPage() {
         setUserName(name);
         const parts = name.split(" ");
         setUserInitials(parts.map((p: string) => p[0]).join("").toUpperCase().slice(0, 2));
+        setAuthChecked(true);
       }
     });
     return () => subscription.unsubscribe();
   }, [router]);
+
+  if (!authChecked) return null;
 
   // calendario simple estático (días del mes)
   const calendarDays = [
