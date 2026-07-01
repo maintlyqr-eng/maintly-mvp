@@ -64,8 +64,8 @@ export default function HomePage() {
             </button>
           </div>
         ) : (
-          <a href="/login" className="flex items-center gap-2 bg-red-600 hover:bg-red-500 text-white font-black tracking-wide rounded-xl transition-all shadow-md shadow-red-900/20 uppercase px-5 py-2" style={{fontSize:'clamp(10px,0.75vw,12px)'}}>
-            <User size={13} /> Login
+          <a href="/dashboard" className="flex items-center gap-2 bg-red-600 hover:bg-red-500 text-white font-black tracking-wide rounded-xl transition-all shadow-md shadow-red-900/20 uppercase px-5 py-2" style={{fontSize:'clamp(10px,0.75vw,12px)'}}>
+            <User size={13} /> Mechanic Login
           </a>
         )}
       </nav>
@@ -160,24 +160,6 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* ── MECHANIC LOGIN ── */}
-        <div className="w-full max-w-[540px] rounded-2xl border border-zinc-200 bg-white/92 backdrop-blur-sm shadow-sm flex items-center justify-between gap-4" style={{marginTop:'1.5vh', padding:'clamp(10px,1.3vh,16px) clamp(14px,1.5vw,22px)'}}>
-          <div className="flex items-center gap-3">
-            <div className="rounded-full border border-zinc-200 bg-zinc-50 flex items-center justify-center text-zinc-400 shrink-0" style={{width:'clamp(28px,2.5vw,36px)', height:'clamp(28px,2.5vw,36px)'}}>
-              <ShieldCheck style={{width:'clamp(12px,1vw,15px)', height:'clamp(12px,1vw,15px)'}} />
-            </div>
-            <div className="text-left">
-              <p className="font-black text-zinc-900 tracking-wide uppercase leading-tight" style={{fontSize:'clamp(10px,0.8vw,12px)'}}>Mechanic / Company Access</p>
-              <p className="text-zinc-400 leading-tight mt-[1px]" style={{fontSize:'clamp(8px,0.65vw,10px)'}}>Create services, manage assets and grow your business.</p>
-            </div>
-          </div>
-          <div className="flex flex-col items-end gap-1 shrink-0">
-            <a href="/dashboard" className="flex items-center gap-2 rounded-xl bg-red-600 hover:bg-red-500 active:scale-[0.98] transition-all text-white whitespace-nowrap shadow-md shadow-red-900/20 uppercase font-black tracking-wide" style={{fontSize:'clamp(8px,0.65vw,10px)', padding:'clamp(6px,0.8vh,9px) clamp(12px,1.2vw,18px)'}}>
-              <User style={{width:'clamp(10px,0.85vw,13px)', height:'clamp(10px,0.85vw,13px)'}} /> Mechanic Login
-            </a>
-            <a href="/dashboard" className="text-zinc-400 hover:text-zinc-600 transition-colors" style={{fontSize:'clamp(8px,0.65vw,10px)'}}>Create Account ›</a>
-          </div>
-        </div>
 
         {/* ── PILLARS ── */}
         <div className="w-full max-w-[540px] grid grid-cols-4 rounded-2xl overflow-hidden border border-zinc-200 bg-white/92 backdrop-blur-sm shadow-sm" style={{marginTop:'1.2vh'}}>
