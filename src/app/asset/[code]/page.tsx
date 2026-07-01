@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import {
   ShieldCheck, Calendar, Gauge, Wrench, CheckCircle2, MapPin,
-  Hash, Fuel, AlertCircle, ChevronDown, ChevronUp
+  Hash, Fuel, AlertCircle, ChevronDown, ChevronUp, UserCircle2
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 
@@ -41,6 +41,8 @@ type AssetData = {
   location: string | null;
 };
 
+type MechanicInfo = { name: string };
+
 type ServiceRecord = {
   id: string;
   service_date: string;
@@ -48,6 +50,7 @@ type ServiceRecord = {
   km_hours: number | null;
   notes: string | null;
   created_at: string;
+  mechanics: MechanicInfo | MechanicInfo[] | null;
 };
 
 function formatDate(dateStr: string) {
@@ -100,7 +103,7 @@ export default function AssetPublicPage() {
       // 3. Load service records
       const { data: serviceRows } = await supabase
         .from("service_records")
-        .select("id, service_date, service_type, km_hours, notes, created_at")
+        .select("id, service_date, service_type, km_hours, notes, created_at, mechanics(name)")
         .eq("asset_id", qrRow.asset_id)
         .order("service_date", { ascending: false });
 
@@ -128,9 +131,9 @@ export default function AssetPublicPage() {
         </div>
         <h1 className="text-[20px] font-black text-zinc-900 mb-2">QR Code Not Found</h1>
         <p className="text-[14px] text-zinc-500 max-w-xs">This QR code doesn&apos;t match any asset in our system. It may have been removed or is invalid.</p>
-        <div className="mt-8 flex items-center gap-2">
-          <Image src="/images/qr-gear.png" alt="Maintly" width={32} height={32} className="object-contain" />
-          <Image src="/images/Maintly.png" alt="Maintly" width={90} height={90} className="object-contain w-[90px] h-auto" />
+        <div className="mt-8 flex items-center gap-0">
+          <Image src="/images/qr-gear.png" alt="Maintly" width={64} height={64} className="object-contain mt-2" />
+          <Image src="/images/Maintly.png" alt="Maintly" width={140} height={140} className="object-contain w-[140px] h-auto -ml-4 mt-2" />
         </div>
       </div>
     );
@@ -145,10 +148,10 @@ export default function AssetPublicPage() {
 
       {/* ── HEADER ── */}
       <div className="bg-white border-b border-zinc-200 px-4 py-3 flex items-center justify-between sticky top-0 z-10 shadow-sm">
-        <div className="flex items-center gap-2">
-          <Image src="/images/qr-gear.png" alt="Maintly" width={32} height={32} className="object-contain" priority />
-          <Image src="/images/Maintly.png" alt="Maintly" width={90} height={90} className="object-contain w-[90px] h-auto -ml-1" priority />
-        </div>
+        <a href="/" className="flex items-center gap-0">
+          <Image src="/images/qr-gear.png" alt="Maintly" width={64} height={64} className="object-contain mt-2" />
+          <Image src="/images/Maintly.png" alt="Maintly" width={140} height={140} className="object-contain w-[140px] h-auto -ml-4 mt-2" />
+        </a>
         <div className="flex items-center gap-1.5 text-[11px] text-zinc-500 font-medium">
           <ShieldCheck size={13} className="text-red-500" />
           Verified Record
@@ -161,7 +164,7 @@ export default function AssetPublicPage() {
         <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm overflow-hidden">
           <div className="bg-gradient-to-br from-zinc-900 to-zinc-800 px-5 py-5 flex items-center gap-4">
             <div className="w-16 h-16 rounded-xl bg-white/10 border border-white/20 flex items-center justify-center shrink-0 overflow-hidden">
-              <Image src={assetImg} alt={assetName} width={44} height={44} className="object-contain" priority />
+              <Image src={assetImg} alt={assetName} width={44} height={44} className="object-contain" />
             </div>
             <div className="min-w-0">
               <p className="text-[11px] font-bold text-zinc-400 tracking-[0.15em] uppercase mb-0.5">
@@ -282,7 +285,7 @@ export default function AssetPublicPage() {
                               <span className="text-[10px] font-bold text-red-600 bg-red-50 px-2 py-[2px] rounded-full">Latest</span>
                             )}
                           </div>
-                          <div className="flex items-center gap-3 mt-1">
+                          <div className="flex items-center gap-3 mt-1 flex-wrap">
                             <span className="flex items-center gap-1 text-[11px] text-zinc-500">
                               <Calendar size={11} /> {formatDate(svc.service_date)}
                             </span>
@@ -292,6 +295,15 @@ export default function AssetPublicPage() {
                               </span>
                             )}
                           </div>
+                          {(() => {
+                            const mech = Array.isArray(svc.mechanics) ? svc.mechanics[0] : svc.mechanics;
+                            return mech?.name ? (
+                              <div className="flex items-center gap-1 mt-1">
+                                <UserCircle2 size={11} className="text-zinc-400 shrink-0" />
+                                <span className="text-[11px] text-zinc-400">{mech.name}</span>
+                              </div>
+                            ) : null;
+                          })()}
                         </div>
 
                         <div className="text-zinc-300 shrink-0">
