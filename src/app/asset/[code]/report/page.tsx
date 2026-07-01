@@ -116,13 +116,6 @@ export default function AssetReportPage() {
     load();
   }, [code]);
 
-  useEffect(() => {
-    if (!loading && !notFound) {
-      const t = setTimeout(() => window.print(), 900);
-      return () => clearTimeout(t);
-    }
-  }, [loading, notFound]);
-
   if (loading) return (
     <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh", fontFamily: "Arial, sans-serif" }}>
       <div>
