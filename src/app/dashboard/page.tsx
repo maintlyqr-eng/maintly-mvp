@@ -11,16 +11,16 @@ import {
 import { supabase } from "@/lib/supabase";
 
 const navItems = [
-  { icon: LayoutGrid, label: "Dashboard", active: true },
-  { icon: FileText, label: "My Services" },
-  { icon: Box, label: "Assets" },
-  { icon: QrCode, label: "QR Codes" },
-  { icon: Users, label: "Customers" },
-  { icon: BarChart3, label: "Reports" },
-  { icon: CalendarIcon, label: "Calendar" },
-  { icon: Mail, label: "Messages", badge: 2 },
-  { icon: FolderOpen, label: "Document Library" },
-  { icon: Settings, label: "Settings" },
+  { icon: LayoutGrid, label: "Dashboard", href: "/dashboard", active: true },
+  { icon: FileText, label: "My Services", href: "/dashboard/services" },
+  { icon: Box, label: "Assets", href: "/dashboard/assets" },
+  { icon: QrCode, label: "QR Codes", href: "#" },
+  { icon: Users, label: "Customers", href: "#" },
+  { icon: BarChart3, label: "Reports", href: "#" },
+  { icon: CalendarIcon, label: "Calendar", href: "#" },
+  { icon: Mail, label: "Messages", href: "#", badge: 2 },
+  { icon: FolderOpen, label: "Document Library", href: "#" },
+  { icon: Settings, label: "Settings", href: "#" },
 ];
 
 const assetTypeImg: Record<string, string> = {
@@ -168,7 +168,7 @@ export default function DashboardPage() {
           {navItems.map((item) => (
             <a
               key={item.label}
-              href="#"
+              href={item.href}
               className={`flex items-center justify-between gap-3 px-3 py-[9px] rounded-lg mb-1 text-[13px] font-medium transition-colors ${
                 item.active
                   ? "bg-red-50 text-red-600 border-l-[3px] border-red-600 -ml-[1px]"
@@ -257,9 +257,9 @@ export default function DashboardPage() {
 
           {/* Add service button row */}
           <div className="flex justify-end mb-5 -mt-2">
-            <button className="flex items-center gap-2 bg-red-600 hover:bg-red-500 active:scale-[0.98] transition-all text-white text-[13px] font-bold px-4 py-[10px] rounded-xl shadow-sm">
+            <a href="/dashboard/services" className="flex items-center gap-2 bg-red-600 hover:bg-red-500 active:scale-[0.98] transition-all text-white text-[13px] font-bold px-4 py-[10px] rounded-xl shadow-sm">
               <Plus size={15} /> Add Service
-            </button>
+            </a>
           </div>
 
           <div className="grid grid-cols-1 xl:grid-cols-[1fr_320px] gap-5">
