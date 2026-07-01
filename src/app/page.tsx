@@ -52,10 +52,10 @@ export default function HomePage() {
 
       {/* ════ NAVBAR ════ */}
       <nav className="relative z-50 flex items-center justify-between pl-3 pr-8 bg-transparent border-b border-white/10 shrink-0" style={{height:'7vh'}}>
-        <div className="flex items-center gap-0">
+        <a href="/" className="flex items-center gap-0">
           <Image src="/images/qr-gear.png" alt="Maintly" width={105} height={105} className="object-contain drop-shadow-md shrink-0 mt-5" priority />
           <Image src="/images/Maintly.png" alt="Maintly" width={1080} height={1080} className="object-contain w-[230px] h-auto -ml-14 mt-7" priority />
-        </div>
+        </a>
 
         <div className="hidden md:flex items-center gap-10">
           {["Product","How It Works","Industries","Pricing","Resources","API","About"].map((item) => (

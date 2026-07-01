@@ -169,10 +169,10 @@ export default function DashboardPage() {
       {/* ════ SIDEBAR ════ */}
       <aside className="w-[230px] bg-white border-r border-zinc-200 flex flex-col shrink-0">
 
-        <div className="flex items-center px-3 py-3">
+        <Link href="/" className="flex items-center px-3 py-3">
           <Image src="/images/qr-gear.png" alt="Maintly" width={72} height={72} className="object-contain drop-shadow-md shrink-0 mt-4" priority />
           <Image src="/images/Maintly.png" alt="Maintly" width={1080} height={1080} className="object-contain w-[155px] h-auto -ml-9 mt-5" priority />
-        </div>
+        </Link>
 
         <nav className="flex-1 px-3">
           {navItems.map((item) => (
