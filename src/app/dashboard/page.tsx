@@ -53,6 +53,14 @@ const upcomingTasks = [
   { asset: "Ford Ranger XLT", type: "Customer Follow-up", date: "30 May", urgency: "In 6 days", urgent: false, color: "bg-blue-50 text-blue-500" },
 ];
 
+type AssetInfo = {
+  brand: string | null;
+  model: string | null;
+  nickname: string | null;
+  asset_type: string;
+  vin_serial: string | null;
+};
+
 type RealService = {
   id: string;
   service_date: string;
@@ -60,13 +68,7 @@ type RealService = {
   km_hours: number | null;
   notes: string | null;
   asset_id: string;
-  assets: {
-    brand: string | null;
-    model: string | null;
-    nickname: string | null;
-    asset_type: string;
-    vin_serial: string | null;
-  } | null;
+  assets: AssetInfo[] | null;
 };
 
 function MiniSparkline({ color }: { color: string }) {
@@ -116,7 +118,7 @@ export default function DashboardPage() {
               .order("service_date", { ascending: false })
               .limit(6);
 
-            setRealServices((svcs as RealService[]) ?? []);
+            setRealServices((svcs as unknown as RealService[]) ?? []);
 
             const { count } = await supabase
               .from("service_records")
@@ -270,7 +272,7 @@ export default function DashboardPage() {
                   { label: "TOTAL SERVICES", value: totalServices, icon: CalendarIcon, color: "bg-red-50 text-red-500" },
                   { label: "TOTAL ASSETS", value: totalAssets, icon: Box, color: "bg-blue-50 text-blue-500" },
                   { label: "LAST SERVICE", value: realServices[0] ? new Date(realServices[0].service_date + "T00:00:00").toLocaleDateString("en-US", { day: "numeric", month: "short" }) : "—", icon: CheckCircle2, color: "bg-green-50 text-green-500" },
-                  { label: "LAST KM / HRS", value: realServices[0]?.km_hours != null ? realServices[0].km_hours.toLocaleString() : "—", icon: BarChart3, color: "bg-amber-50 text-amber-500" },
+                  { label: "LAST KM / HRS", value: (realServices[0]?.km_hours ?? null) != null ? String(realServices[0].km_hours) : "—", icon: BarChart3, color: "bg-amber-50 text-amber-500" },
                 ].map(({ label, value, icon: Icon, color }) => (
                   <div key={label} className="bg-white rounded-2xl border border-zinc-200 p-4 shadow-sm">
                     <div className={`w-9 h-9 rounded-xl flex items-center justify-center mb-3 ${color}`}>
@@ -309,7 +311,7 @@ export default function DashboardPage() {
                       </tr>
                     ) : (
                       realServices.map((s) => {
-                        const asset = s.assets;
+                        const asset = Array.isArray(s.assets) ? (s.assets[0] ?? null) : null;
                         const assetName = asset?.nickname || [asset?.brand, asset?.model].filter(Boolean).join(" ") || "Asset";
                         const assetSerial = asset?.vin_serial || s.asset_id.slice(0, 8).toUpperCase();
                         const assetImg = assetTypeImg[asset?.asset_type ?? ""] ?? "/images/pickup.png";
