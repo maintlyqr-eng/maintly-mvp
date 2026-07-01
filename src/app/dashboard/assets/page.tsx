@@ -608,11 +608,19 @@ export default function AssetsPage() {
                           <p className="text-[11px] font-mono text-zinc-600 truncate mb-2">/asset/{code}</p>
                           <button
                             onClick={() => copyLink(code)}
-                            className="flex items-center gap-1.5 text-[11px] font-bold text-red-600 hover:text-red-700"
+                            className="flex items-center gap-1.5 text-[11px] font-bold text-red-600 hover:text-red-700 mb-2"
                           >
                             {copiedCode === code ? <Check size={12} /> : <Copy size={12} />}
                             {copiedCode === code ? "Copied" : "Copy link"}
                           </button>
+                          <a
+                            href={`/asset/${code}/report`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-1.5 text-[11px] font-bold text-zinc-500 hover:text-zinc-800"
+                          >
+                            <FileText size={12} /> View Report
+                          </a>
                         </div>
                       </div>
                     ) : (
