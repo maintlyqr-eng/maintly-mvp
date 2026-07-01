@@ -1,35 +1,22 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowRight, ShieldCheck, Camera, Keyboard, User, ChevronDown, Globe, Clock, TrendingUp, LogOut, LayoutGrid } from "lucide-react";
-import { supabase } from "@/lib/supabase";
+import { ArrowRight, ShieldCheck, Camera, Keyboard, User, ChevronDown, Globe, Clock, TrendingUp } from "lucide-react";
 
 export default function HomePage() {
   const router = useRouter();
-  const [loggedIn, setLoggedIn] = useState(false);
-  const [userName, setUserName] = useState("");
-  const [userInitials, setUserInitials] = useState("");
+  const [qrCode, setQrCode] = useState("");
 
-  useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session) {
-        setLoggedIn(true);
-        const name = session.user.user_metadata?.name || session.user.email || "User";
-        setUserName(name.split(" ")[0]);
-        const parts = name.split(" ");
-        setUserInitials(parts.map((p: string) => p[0]).join("").toUpperCase().slice(0, 2));
-      } else {
-        setLoggedIn(false);
-      }
-    });
-    return () => subscription.unsubscribe();
-  }, []);
+  function handleGoToAsset() {
+    const code = qrCode.trim();
+    if (!code) return;
+    router.push(`/asset/${code}`);
+  }
 
-  async function handleLogout() {
-    await supabase.auth.signOut();
-    setLoggedIn(false);
+  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === "Enter") handleGoToAsset();
   }
 
   return (
@@ -42,13 +29,18 @@ export default function HomePage() {
       <div className="absolute inset-0 z-0 bg-white/15 pointer-events-none" />
 
       {/* ════ NAVBAR ════ */}
-      <nav className="relative z-50 flex items-center justify-between pl-3 pr-8 bg-transparent border-b border-white/10 shrink-0" style={{height:'7vh'}}>
-        <div className="flex items-center gap-0">
-          <Image src="/images/qr-gear.png" alt="Maintly" width={105} height={105} className="object-contain drop-shadow-md shrink-0 mt-5" priority />
-          <Image src="/images/Maintly.png" alt="Maintly" width={1080} height={1080} className="object-contain w-[230px] h-auto -ml-14 mt-7" priority />
+      <nav className="relative z-50 flex items-center justify-between px-8 bg-transparent border-b border-white/10 shrink-0" style={{height:'7vh'}}>
+        <div className="flex items-center gap-3">
+          <Image src="/images/qr-gear.png" alt="Maintly" width={52} height={52} className="object-contain drop-shadow-md" />
+          <div>
+            <span className="font-black tracking-tight leading-none" style={{fontSize:'clamp(18px,2vw,26px)'}}>
+              <span className="text-zinc-900">MAIN</span><span className="text-red-600">TLY</span>
+            </span>
+            <p className="tracking-[0.2em] text-zinc-500 font-semibold leading-none mt-[2px]" style={{fontSize:'clamp(6px,0.5vw,8px)'}}>MAINTENANCE. TRACKED.</p>
+          </div>
         </div>
 
-        <div className="hidden md:flex items-center gap-10">
+        <div className="hidden md:flex items-center gap-6">
           {["Product","How It Works","Industries","Pricing","Resources","API","About"].map((item) => (
             <a key={item} href="#" className="text-zinc-700 hover:text-zinc-900 font-medium transition-colors flex items-center gap-[3px]" style={{fontSize:'clamp(11px,0.85vw,13px)'}}>
               {item}
@@ -57,20 +49,9 @@ export default function HomePage() {
           ))}
         </div>
 
-        {loggedIn ? (
-          <div className="flex items-center gap-2">
-            <a href="/dashboard" className="flex items-center gap-2 bg-zinc-900 hover:bg-zinc-800 text-white font-black tracking-wide rounded-xl transition-all shadow-md px-4 py-2" style={{fontSize:'clamp(10px,0.75vw,12px)'}}>
-              <LayoutGrid size={13} /> {userName}
-            </a>
-            <button onClick={handleLogout} className="flex items-center gap-1.5 text-zinc-500 hover:text-red-600 transition-colors border border-zinc-200 rounded-xl px-3 py-2" style={{fontSize:'clamp(10px,0.75vw,12px)'}}>
-              <LogOut size={13} />
-            </button>
-          </div>
-        ) : (
-          <a href="/login" className="flex items-center gap-2 bg-red-600 hover:bg-red-500 text-white font-black tracking-wide rounded-xl transition-all shadow-md shadow-red-900/20 uppercase px-5 py-2" style={{fontSize:'clamp(10px,0.75vw,12px)'}}>
-            <User size={13} /> Mechanic Login
-          </a>
-        )}
+        <a href="/login" className="flex items-center gap-2 bg-red-600 hover:bg-red-500 text-white font-black tracking-wide rounded-xl transition-all shadow-md shadow-red-900/20 uppercase px-5 py-2" style={{fontSize:'clamp(10px,0.75vw,12px)'}}>
+          <User size={13} /> Login
+        </a>
       </nav>
 
       {/* ════ HERO ════ */}
@@ -130,11 +111,18 @@ export default function HomePage() {
             <div className="w-full flex gap-2">
               <input
                 type="text"
-                placeholder="e.g. MTLY-AB12-CD34"
+                value={qrCode}
+                onChange={(e) => setQrCode(e.target.value)}
+                onKeyDown={handleKeyDown}
+                placeholder="Paste your code here"
                 className="flex-1 rounded-xl bg-zinc-50 border border-zinc-200 focus:border-red-500 outline-none px-3 text-zinc-700 placeholder:text-zinc-400 transition-all"
                 style={{fontSize:'clamp(9px,0.7vw,11px)', padding:'clamp(7px,0.9vh,11px) 12px'}}
               />
-              <button className="rounded-xl bg-red-600 hover:bg-red-500 active:scale-[0.98] transition-all px-3 flex items-center justify-center shrink-0 shadow-md shadow-red-900/20">
+              <button
+                onClick={handleGoToAsset}
+                disabled={!qrCode.trim()}
+                className="rounded-xl bg-red-600 hover:bg-red-500 active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed transition-all px-3 flex items-center justify-center shrink-0 shadow-md shadow-red-900/20"
+              >
                 <ArrowRight className="text-white" style={{width:'clamp(12px,1.1vw,16px)', height:'clamp(12px,1.1vw,16px)'}} />
               </button>
             </div>
@@ -163,6 +151,24 @@ export default function HomePage() {
           </div>
         </div>
 
+        {/* ── MECHANIC LOGIN ── */}
+        <div className="w-full max-w-[540px] rounded-2xl border border-zinc-200 bg-white/92 backdrop-blur-sm shadow-sm flex items-center justify-between gap-4" style={{marginTop:'1.5vh', padding:'clamp(10px,1.3vh,16px) clamp(14px,1.5vw,22px)'}}>
+          <div className="flex items-center gap-3">
+            <div className="rounded-full border border-zinc-200 bg-zinc-50 flex items-center justify-center text-zinc-400 shrink-0" style={{width:'clamp(28px,2.5vw,36px)', height:'clamp(28px,2.5vw,36px)'}}>
+              <ShieldCheck style={{width:'clamp(12px,1vw,15px)', height:'clamp(12px,1vw,15px)'}} />
+            </div>
+            <div className="text-left">
+              <p className="font-black text-zinc-900 tracking-wide uppercase leading-tight" style={{fontSize:'clamp(10px,0.8vw,12px)'}}>Mechanic / Company Access</p>
+              <p className="text-zinc-400 leading-tight mt-[1px]" style={{fontSize:'clamp(8px,0.65vw,10px)'}}>Create services, manage assets and grow your business.</p>
+            </div>
+          </div>
+          <div className="flex flex-col items-end gap-1 shrink-0">
+            <a href="/login" className="flex items-center gap-2 rounded-xl bg-red-600 hover:bg-red-500 active:scale-[0.98] transition-all text-white whitespace-nowrap shadow-md shadow-red-900/20 uppercase font-black tracking-wide" style={{fontSize:'clamp(8px,0.65vw,10px)', padding:'clamp(6px,0.8vh,9px) clamp(12px,1.2vw,18px)'}}>
+              <User style={{width:'clamp(10px,0.85vw,13px)', height:'clamp(10px,0.85vw,13px)'}} /> Mechanic Login
+            </a>
+            <a href="/register" className="text-zinc-400 hover:text-zinc-600 transition-colors" style={{fontSize:'clamp(8px,0.65vw,10px)'}}>Create Account ›</a>
+          </div>
+        </div>
 
         {/* ── PILLARS ── */}
         <div className="w-full max-w-[540px] grid grid-cols-4 rounded-2xl overflow-hidden border border-zinc-200 bg-white/92 backdrop-blur-sm shadow-sm" style={{marginTop:'1.2vh'}}>
