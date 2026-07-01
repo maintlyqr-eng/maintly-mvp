@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import {
   LayoutGrid, FileText, Box, QrCode, Users, BarChart3, Calendar as CalendarIcon,
   Mail, FolderOpen, Settings, Search, Bell, ChevronDown, Plus, MoreVertical,
-  CheckCircle2, Clock, TrendingUp, TrendingDown, Crown, ChevronLeft, ChevronRight
+  CheckCircle2, Clock, Crown, ChevronLeft, ChevronRight
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 
@@ -23,34 +23,45 @@ const navItems = [
   { icon: Settings, label: "Settings" },
 ];
 
-const stats = [
-  { label: "TOTAL SERVICES", value: "128", change: "+18%", up: true, icon: CalendarIcon, color: "bg-red-50 text-red-500" },
-  { label: "COMPLETED", value: "112", change: "+22%", up: true, icon: CheckCircle2, color: "bg-green-50 text-green-500" },
-  { label: "PENDING", value: "14", change: "-7%", up: false, icon: Clock, color: "bg-amber-50 text-amber-500" },
-  { label: "TOTAL HOURS", value: "245.6 h", change: "+16%", up: true, icon: BarChart3, color: "bg-blue-50 text-blue-500" },
-];
+const assetTypeImg: Record<string, string> = {
+  automotive: "/images/pickup.png",
+  motorcycle: "/images/moto.png",
+  generator: "/images/generador.png",
+  machinery: "/images/excavator.png",
+  marine: "/images/barco.png",
+  aviation: "/images/avion.png",
+};
 
-const recentServices = [
-  { asset: "Aggreko XAVB 1000", id: "AGGREKO-1000-01", type: "50A Service", typeColor: "bg-red-100 text-red-700", date: "24 May 2026", time: "09:10 am", hours: "4.2 h", status: "Completed", img: "/images/generador.png" },
-  { asset: "Ford Ranger XLT", id: "1FTFW1ET5BFA00001", type: "General Service", typeColor: "bg-blue-100 text-blue-700", date: "23 May 2026", time: "02:30 pm", hours: "1.8 h", status: "Completed", img: "/images/pickup.png" },
-  { asset: "Yamaha R1", id: "YAMAHA-R1-2020", type: "Oil Change", typeColor: "bg-amber-100 text-amber-700", date: "22 May 2026", time: "11:15 am", hours: "0.9 h", status: "Completed", img: "/images/moto.png" },
-  { asset: "Excavator PC200", id: "CAT-320D-EX01", type: "500 Hour Service", typeColor: "bg-purple-100 text-purple-700", date: "21 May 2026", time: "08:45 am", hours: "6.5 h", status: "Completed", img: "/images/excavator.png" },
-  { asset: "Sea Ray Sundancer", id: "SR-320-2019", type: "Engine Check", typeColor: "bg-cyan-100 text-cyan-700", date: "20 May 2026", time: "03:20 pm", hours: "2.1 h", status: "Completed", img: "/images/barco.png" },
-  { asset: "Cessna Citation CJ4", id: "N525CJ", type: "Inspection", typeColor: "bg-blue-100 text-blue-700", date: "18 May 2026", time: "01:00 pm", hours: "3.7 h", status: "Pending", img: "/images/avion.png" },
-];
+const typeColors: Record<string, string> = {
+  "Oil Change":       "bg-amber-100 text-amber-700",
+  "Service":          "bg-blue-100 text-blue-700",
+  "General Service":  "bg-blue-100 text-blue-700",
+  "Repair":           "bg-red-100 text-red-700",
+  "Inspection":       "bg-purple-100 text-purple-700",
+  "Filter Change":    "bg-green-100 text-green-700",
+  "Tire Change":      "bg-cyan-100 text-cyan-700",
+  "Brake Service":    "bg-orange-100 text-orange-700",
+  "50A Service":      "bg-red-100 text-red-700",
+  "50B Service":      "bg-orange-100 text-orange-700",
+  "500 Hour Service": "bg-purple-100 text-purple-700",
+  "Engine Check":     "bg-cyan-100 text-cyan-700",
+};
 
-const upcomingTasks = [
-  { asset: "Aggreko XAVB 1000", type: "50B Service", date: "25 May", urgency: "Tomorrow", urgent: true, color: "bg-red-50 text-red-500" },
-  { asset: "Caterpillar 320D", type: "500 Hour Service", date: "28 May", urgency: "In 4 days", urgent: false, color: "bg-amber-50 text-amber-500" },
-  { asset: "Ford Ranger XLT", type: "Customer Follow-up", date: "30 May", urgency: "In 6 days", urgent: false, color: "bg-blue-50 text-blue-500" },
-];
-
-const miniStats = [
-  { label: "SERVICES COMPLETED", value: "38", change: "+12%", color: "#16a34a" },
-  { label: "HOURS WORKED", value: "72.4 h", change: "+12%", color: "#2563eb" },
-  { label: "NEW ASSETS", value: "16", change: "+8%", color: "#7c3aed" },
-  { label: "CUSTOMERS", value: "24", change: "+5%", color: "#ea580c" },
-];
+type RealService = {
+  id: string;
+  service_date: string;
+  service_type: string;
+  km_hours: number | null;
+  notes: string | null;
+  asset_id: string;
+  assets: {
+    brand: string | null;
+    model: string | null;
+    nickname: string | null;
+    asset_type: string;
+    vin_serial: string | null;
+  } | null;
+};
 
 function MiniSparkline({ color }: { color: string }) {
   const points = "0,28 10,24 20,26 30,20 40,22 50,15 60,17 70,10 80,12 90,5 100,8";
@@ -67,6 +78,9 @@ export default function DashboardPage() {
   const [userName, setUserName] = useState("");
   const [userInitials, setUserInitials] = useState("");
   const [authChecked, setAuthChecked] = useState(false);
+  const [realServices, setRealServices] = useState<RealService[]>([]);
+  const [totalAssets, setTotalAssets] = useState(0);
+  const [totalServices, setTotalServices] = useState(0);
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
@@ -78,6 +92,34 @@ export default function DashboardPage() {
         const parts = name.split(" ");
         setUserInitials(parts.map((p: string) => p[0]).join("").toUpperCase().slice(0, 2));
         setAuthChecked(true);
+
+        (async () => {
+          const { data: userAssets } = await supabase
+            .from("assets")
+            .select("id")
+            .eq("user_id", session.user.id);
+
+          const assetIds = (userAssets ?? []).map((a: { id: string }) => a.id);
+          setTotalAssets(assetIds.length);
+
+          if (assetIds.length > 0) {
+            const { data: svcs } = await supabase
+              .from("service_records")
+              .select("id, service_date, service_type, km_hours, notes, asset_id, assets(brand, model, nickname, asset_type, vin_serial)")
+              .in("asset_id", assetIds)
+              .order("service_date", { ascending: false })
+              .limit(6);
+
+            setRealServices((svcs as RealService[]) ?? []);
+
+            const { count } = await supabase
+              .from("service_records")
+              .select("*", { count: "exact", head: true })
+              .in("asset_id", assetIds);
+
+            setTotalServices(count ?? 0);
+          }
+        })();
       }
     });
     return () => subscription.unsubscribe();
@@ -218,17 +260,18 @@ export default function DashboardPage() {
             <div>
               {/* Stats cards */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-5">
-                {stats.map(({ label, value, change, up, icon: Icon, color }) => (
+                {[
+                  { label: "TOTAL SERVICES", value: totalServices, icon: CalendarIcon, color: "bg-red-50 text-red-500" },
+                  { label: "TOTAL ASSETS", value: totalAssets, icon: Box, color: "bg-blue-50 text-blue-500" },
+                  { label: "LAST SERVICE", value: realServices[0] ? new Date(realServices[0].service_date + "T00:00:00").toLocaleDateString("en-US", { day: "numeric", month: "short" }) : "—", icon: CheckCircle2, color: "bg-green-50 text-green-500" },
+                  { label: "LAST KM / HRS", value: realServices[0]?.km_hours != null ? realServices[0].km_hours.toLocaleString() : "—", icon: BarChart3, color: "bg-amber-50 text-amber-500" },
+                ].map(({ label, value, icon: Icon, color }) => (
                   <div key={label} className="bg-white rounded-2xl border border-zinc-200 p-4 shadow-sm">
                     <div className={`w-9 h-9 rounded-xl flex items-center justify-center mb-3 ${color}`}>
                       <Icon size={16} />
                     </div>
                     <p className="text-[9px] font-bold text-zinc-400 tracking-wide">{label}</p>
                     <p className="text-[24px] font-black text-zinc-900 mt-1">{value}</p>
-                    <div className={`flex items-center gap-1 text-[10px] font-semibold mt-1 ${up ? "text-green-600" : "text-red-500"}`}>
-                      {up ? <TrendingUp size={11} /> : <TrendingDown size={11} />}
-                      {change} from last 30 days
-                    </div>
                   </div>
                 ))}
               </div>
@@ -252,40 +295,56 @@ export default function DashboardPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {recentServices.map((s, i) => (
-                      <tr key={i} className="border-t border-zinc-100">
-                        <td className="py-3 pr-3">
-                          <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-lg bg-zinc-50 border border-zinc-100 flex items-center justify-center shrink-0 overflow-hidden">
-                              <Image src={s.img} alt={s.asset} width={32} height={32} className="object-contain" />
-                            </div>
-                            <div>
-                              <p className="text-[12.5px] font-bold text-zinc-800 leading-tight">{s.asset}</p>
-                              <p className="text-[10px] text-zinc-400 leading-tight font-mono">{s.id}</p>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="py-3 pr-3">
-                          <span className={`text-[10.5px] font-semibold px-2 py-[3px] rounded-full ${s.typeColor}`}>{s.type}</span>
-                        </td>
-                        <td className="py-3 pr-3">
-                          <p className="text-[12px] text-zinc-700">{s.date}</p>
-                          <p className="text-[10px] text-zinc-400">{s.time}</p>
-                        </td>
-                        <td className="py-3 pr-3 text-[12px] text-zinc-700 font-medium">{s.hours}</td>
-                        <td className="py-3 pr-3">
-                          <span className={`flex items-center gap-1 text-[11px] font-semibold ${s.status === "Completed" ? "text-green-600" : "text-amber-600"}`}>
-                            {s.status === "Completed" ? <CheckCircle2 size={12} /> : <Clock size={12} />}
-                            {s.status}
-                          </span>
-                        </td>
-                        <td className="py-3 text-right">
-                          <button className="text-zinc-300 hover:text-zinc-600 transition-colors">
-                            <MoreVertical size={15} />
-                          </button>
+                    {realServices.length === 0 ? (
+                      <tr>
+                        <td colSpan={6} className="py-10 text-center text-zinc-400 text-[13px]">
+                          No services recorded yet.
                         </td>
                       </tr>
-                    ))}
+                    ) : (
+                      realServices.map((s) => {
+                        const asset = s.assets;
+                        const assetName = asset?.nickname || [asset?.brand, asset?.model].filter(Boolean).join(" ") || "Asset";
+                        const assetSerial = asset?.vin_serial || s.asset_id.slice(0, 8).toUpperCase();
+                        const assetImg = assetTypeImg[asset?.asset_type ?? ""] ?? "/images/pickup.png";
+                        const typeColor = typeColors[s.service_type] ?? "bg-zinc-100 text-zinc-700";
+                        const dateStr = new Date(s.service_date + "T00:00:00").toLocaleDateString("en-US", { day: "numeric", month: "short", year: "numeric" });
+                        return (
+                          <tr key={s.id} className="border-t border-zinc-100">
+                            <td className="py-3 pr-3">
+                              <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-lg bg-zinc-50 border border-zinc-100 flex items-center justify-center shrink-0 overflow-hidden">
+                                  <Image src={assetImg} alt={assetName} width={32} height={32} className="object-contain" />
+                                </div>
+                                <div>
+                                  <p className="text-[12.5px] font-bold text-zinc-800 leading-tight">{assetName}</p>
+                                  <p className="text-[10px] text-zinc-400 leading-tight font-mono">{assetSerial}</p>
+                                </div>
+                              </div>
+                            </td>
+                            <td className="py-3 pr-3">
+                              <span className={`text-[10.5px] font-semibold px-2 py-[3px] rounded-full ${typeColor}`}>{s.service_type}</span>
+                            </td>
+                            <td className="py-3 pr-3">
+                              <p className="text-[12px] text-zinc-700">{dateStr}</p>
+                            </td>
+                            <td className="py-3 pr-3 text-[12px] text-zinc-700 font-medium">
+                              {s.km_hours != null ? s.km_hours.toLocaleString() : "—"}
+                            </td>
+                            <td className="py-3 pr-3">
+                              <span className="flex items-center gap-1 text-[11px] font-semibold text-green-600">
+                                <CheckCircle2 size={12} /> Completed
+                              </span>
+                            </td>
+                            <td className="py-3 text-right">
+                              <button className="text-zinc-300 hover:text-zinc-600 transition-colors">
+                                <MoreVertical size={15} />
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
                   </tbody>
                 </table>
               </div>
@@ -365,12 +424,14 @@ export default function DashboardPage() {
                   </button>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
-                  {miniStats.map((s) => (
+                  {[
+                    { label: "SERVICES COMPLETED", value: totalServices, color: "#16a34a" },
+                    { label: "TOTAL ASSETS", value: totalAssets, color: "#2563eb" },
+                  ].map((s) => (
                     <div key={s.label}>
                       <p className="text-[8.5px] font-bold text-zinc-400 tracking-wide">{s.label}</p>
                       <div className="flex items-center gap-2">
                         <p className="text-[18px] font-black text-zinc-900">{s.value}</p>
-                        <span className="text-[10px] font-semibold" style={{ color: s.color }}>{s.change}</span>
                       </div>
                       <MiniSparkline color={s.color} />
                     </div>
