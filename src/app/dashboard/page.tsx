@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import {
   LayoutGrid, FileText, Box, QrCode, Users, BarChart3, Calendar as CalendarIcon,
   Mail, FolderOpen, Settings, Search, Bell, ChevronDown, Plus, MoreVertical,
-  CheckCircle2, Clock, Crown, ChevronLeft, ChevronRight
+  CheckCircle2, Crown, ChevronLeft, ChevronRight
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 
@@ -46,6 +46,12 @@ const typeColors: Record<string, string> = {
   "500 Hour Service": "bg-purple-100 text-purple-700",
   "Engine Check":     "bg-cyan-100 text-cyan-700",
 };
+
+const upcomingTasks = [
+  { asset: "Aggreko XAVB 1000", type: "50B Service", date: "25 May", urgency: "Tomorrow", urgent: true, color: "bg-red-50 text-red-500" },
+  { asset: "Caterpillar 320D", type: "500 Hour Service", date: "28 May", urgency: "In 4 days", urgent: false, color: "bg-amber-50 text-amber-500" },
+  { asset: "Ford Ranger XLT", type: "Customer Follow-up", date: "30 May", urgency: "In 6 days", urgent: false, color: "bg-blue-50 text-blue-500" },
+];
 
 type RealService = {
   id: string;
