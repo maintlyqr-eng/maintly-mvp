@@ -6,7 +6,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   LayoutGrid, FileText, Box, QrCode, Users, BarChart3, Calendar as CalendarIcon,
-  Mail, FolderOpen, Settings, Bell, ChevronDown, Plus, X, Copy, Check, LogOut, Crown, Wrench
+  Mail, FolderOpen, Settings, Bell, ChevronDown, Plus, X, Copy, Check, LogOut, Crown, Wrench, History, CheckCircle2
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 
@@ -44,6 +44,24 @@ const assetTypeOptions = [
 ];
 
 const fuelTypeOptions = ["Gasoline", "Diesel", "Electric", "Hybrid", "Other"];
+
+type ServiceRecord = {
+  id: string;
+  service_date: string;
+  service_type: string;
+  km_hours: number | null;
+  notes: string | null;
+};
+
+const typeColors: Record<string, string> = {
+  "Oil Change":    "bg-amber-100 text-amber-700",
+  Service:         "bg-blue-100 text-blue-700",
+  Repair:          "bg-red-100 text-red-700",
+  Inspection:      "bg-purple-100 text-purple-700",
+  "Filter Change": "bg-green-100 text-green-700",
+  "Tire Change":   "bg-cyan-100 text-cyan-700",
+  "Brake Service": "bg-orange-100 text-orange-700",
+};
 
 type QrRow = { code: string };
 
@@ -101,6 +119,12 @@ export default function AssetsPage() {
   const [plate, setPlate] = useState("");
   const [fuelType, setFuelType] = useState("");
   const [location, setLocation] = useState("");
+
+  // History modal
+  const [showHistoryModal, setShowHistoryModal] = useState(false);
+  const [historyAsset, setHistoryAsset] = useState<AssetRow | null>(null);
+  const [historyServices, setHistoryServices] = useState<ServiceRecord[]>([]);
+  const [loadingHistory, setLoadingHistory] = useState(false);
 
   // Add Service modal
   const [showServiceForm, setShowServiceForm] = useState(false);
@@ -173,6 +197,20 @@ export default function AssetsPage() {
     setFuelType("");
     setLocation("");
     setFormError("");
+  }
+
+  async function openHistory(asset: AssetRow) {
+    setHistoryAsset(asset);
+    setHistoryServices([]);
+    setShowHistoryModal(true);
+    setLoadingHistory(true);
+    const { data } = await supabase
+      .from("service_records")
+      .select("id, service_date, service_type, km_hours, notes")
+      .eq("asset_id", asset.id)
+      .order("service_date", { ascending: false });
+    setHistoryServices((data as ServiceRecord[]) ?? []);
+    setLoadingHistory(false);
   }
 
   function openAddService(assetId: string) {
@@ -422,13 +460,21 @@ export default function AssetsPage() {
                       </div>
                     </div>
 
-                    {/* Add Service button */}
-                    <button
-                      onClick={() => openAddService(a.id)}
-                      className="w-full flex items-center justify-center gap-2 border border-red-200 text-red-600 hover:bg-red-50 active:scale-[0.98] transition-all text-[12px] font-bold py-[8px] rounded-xl mb-3"
-                    >
-                      <Wrench size={13} /> Add Service
-                    </button>
+                    {/* Action buttons */}
+                    <div className="flex gap-2 mb-3">
+                      <button
+                        onClick={() => openAddService(a.id)}
+                        className="flex-1 flex items-center justify-center gap-1.5 border border-red-200 text-red-600 hover:bg-red-50 active:scale-[0.98] transition-all text-[12px] font-bold py-[8px] rounded-xl"
+                      >
+                        <Wrench size={13} /> Add Service
+                      </button>
+                      <button
+                        onClick={() => openHistory(a)}
+                        className="flex-1 flex items-center justify-center gap-1.5 border border-zinc-200 text-zinc-600 hover:bg-zinc-50 active:scale-[0.98] transition-all text-[12px] font-bold py-[8px] rounded-xl"
+                      >
+                        <History size={13} /> View History
+                      </button>
+                    </div>
 
                     {/* QR section */}
                     {code ? (
@@ -464,6 +510,73 @@ export default function AssetsPage() {
           <p className="text-center text-[11px] text-zinc-400 mt-8">© 2026 Maintly. All rights reserved.</p>
         </div>
       </div>
+
+      {/* ════ HISTORY MODAL ════ */}
+      {showHistoryModal && historyAsset && (
+        <div className="fixed inset-0 z-50 bg-zinc-900/40 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[85vh] flex flex-col">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-200 shrink-0">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-zinc-100 flex items-center justify-center shrink-0">
+                  <History size={15} className="text-zinc-600" />
+                </div>
+                <div>
+                  <h2 className="text-[16px] font-black text-zinc-900">Service History</h2>
+                  <p className="text-[11px] text-zinc-400 leading-none">{assetDisplayName(historyAsset)}</p>
+                </div>
+              </div>
+              <button onClick={() => setShowHistoryModal(false)} className="text-zinc-400 hover:text-zinc-700"><X size={18} /></button>
+            </div>
+
+            <div className="overflow-y-auto flex-1 px-6 py-4">
+              {loadingHistory ? (
+                <p className="text-center text-[13px] text-zinc-400 py-8">Loading history...</p>
+              ) : historyServices.length === 0 ? (
+                <div className="text-center py-10">
+                  <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-zinc-100 mb-3">
+                    <History size={20} className="text-zinc-400" />
+                  </div>
+                  <p className="text-[13px] text-zinc-500 mb-1">No services recorded yet.</p>
+                  <p className="text-[11px] text-zinc-400">Use &quot;Add Service&quot; to log the first one.</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {historyServices.map((s) => (
+                    <div key={s.id} className="border border-zinc-100 rounded-xl p-4">
+                      <div className="flex items-start justify-between gap-3 mb-1">
+                        <span className={`text-[11px] font-semibold px-2 py-[3px] rounded-full ${typeColors[s.service_type] ?? "bg-zinc-100 text-zinc-700"}`}>
+                          {s.service_type}
+                        </span>
+                        <div className="flex items-center gap-1 text-[11px] text-green-600 font-semibold shrink-0">
+                          <CheckCircle2 size={12} /> Completed
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-4 mt-2">
+                        <span className="text-[12px] text-zinc-700 font-medium">{s.service_date}</span>
+                        {s.km_hours != null && (
+                          <span className="text-[11px] text-zinc-400">{s.km_hours} km/hrs</span>
+                        )}
+                      </div>
+                      {s.notes && (
+                        <p className="text-[11px] text-zinc-500 mt-2 leading-relaxed">{s.notes}</p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="px-6 py-4 border-t border-zinc-100 shrink-0">
+              <button
+                onClick={() => { setShowHistoryModal(false); openAddService(historyAsset.id); }}
+                className="w-full flex items-center justify-center gap-2 bg-red-600 hover:bg-red-500 text-white font-bold text-[13px] py-[11px] rounded-xl transition-all"
+              >
+                <Wrench size={14} /> Add New Service
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ════ NEW ASSET MODAL ════ */}
       {showForm && (
