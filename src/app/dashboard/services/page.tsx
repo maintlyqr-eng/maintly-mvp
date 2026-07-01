@@ -212,12 +212,12 @@ export default function ServicesPage() {
 
       {/* ════ SIDEBAR ════ */}
       <aside className="w-[230px] bg-white border-r border-zinc-200 flex flex-col shrink-0">
-        <div className="flex flex-col items-center px-4 pt-2 pb-0">
-          <Image src="/images/qr-gear.png" alt="Maintly logo" width={1080} height={1080} className="object-contain w-[92px] h-auto" />
-          <Image src="/images/Maintly.png" alt="Maintly" width={1080} height={1080} className="object-contain w-[200px] h-auto -mt-10" />
+        <div className="flex items-center px-3 py-3">
+          <Image src="/images/qr-gear.png" alt="Maintly" width={72} height={72} className="object-contain drop-shadow-md shrink-0 mt-4" priority />
+          <Image src="/images/Maintly.png" alt="Maintly" width={1080} height={1080} className="object-contain w-[155px] h-auto -ml-9 mt-5" priority />
         </div>
 
-        <nav className="flex-1 px-3 -mt-4">
+        <nav className="flex-1 px-3">
           {navItems.map((item) => (
             <Link
               key={item.label}
