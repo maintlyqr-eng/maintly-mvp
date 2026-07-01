@@ -6,7 +6,8 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   LayoutGrid, FileText, Box, QrCode, Users, BarChart3, Calendar as CalendarIcon,
-  Mail, FolderOpen, Settings, Bell, ChevronDown, Plus, X, Copy, Check, LogOut, Crown, Wrench, History, CheckCircle2, UserCircle2
+  Mail, FolderOpen, Settings, Bell, ChevronDown, Plus, X, Copy, Check, LogOut, Crown,
+  Wrench, Pencil, History, CheckCircle2, UserCircle2, Camera, Gauge
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 
@@ -45,15 +46,17 @@ const assetTypeOptions = [
 
 const fuelTypeOptions = ["Gasoline", "Diesel", "Electric", "Hybrid", "Other"];
 
-const typeColors: Record<string, string> = {
-  "Oil Change":    "bg-amber-100 text-amber-700",
-  Service:         "bg-blue-100 text-blue-700",
-  Repair:          "bg-red-100 text-red-700",
-  Inspection:      "bg-purple-100 text-purple-700",
-  "Filter Change": "bg-green-100 text-green-700",
-  "Tire Change":   "bg-cyan-100 text-cyan-700",
-  "Brake Service": "bg-orange-100 text-orange-700",
+const typeColors: Record<string, { bg: string; text: string }> = {
+  "Oil Change":    { bg: "bg-amber-100",  text: "text-amber-700" },
+  Service:         { bg: "bg-blue-100",   text: "text-blue-700" },
+  Repair:          { bg: "bg-red-100",    text: "text-red-700" },
+  Inspection:      { bg: "bg-purple-100", text: "text-purple-700" },
+  "Filter Change": { bg: "bg-green-100",  text: "text-green-700" },
+  "Tire Change":   { bg: "bg-cyan-100",   text: "text-cyan-700" },
+  "Brake Service": { bg: "bg-orange-100", text: "text-orange-700" },
 };
+
+type QrRow = { code: string };
 
 type MechanicInfo = { name: string };
 
@@ -66,8 +69,6 @@ type ServiceRecord = {
   mechanics: MechanicInfo | MechanicInfo[] | null;
 };
 
-type QrRow = { code: string };
-
 type AssetRow = {
   id: string;
   asset_type: string;
@@ -79,6 +80,7 @@ type AssetRow = {
   plate: string | null;
   fuel_type: string | null;
   location: string | null;
+  photo_url: string | null;
   created_at: string;
   qr_codes: QrRow[] | QrRow | null;
 };
@@ -98,6 +100,11 @@ function genCode() {
   return raw.replace(/-/g, "").slice(0, 10);
 }
 
+function formatDate(dateStr: string) {
+  const d = new Date(dateStr + "T00:00:00");
+  return d.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
+}
+
 export default function AssetsPage() {
   const router = useRouter();
   const [checkingAuth, setCheckingAuth] = useState(true);
@@ -107,7 +114,7 @@ export default function AssetsPage() {
   const [assets, setAssets] = useState<AssetRow[]>([]);
   const [loadingAssets, setLoadingAssets] = useState(true);
 
-  // New Asset modal
+  // ── New Asset modal ──
   const [showForm, setShowForm] = useState(false);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState("");
@@ -122,14 +129,10 @@ export default function AssetsPage() {
   const [plate, setPlate] = useState("");
   const [fuelType, setFuelType] = useState("");
   const [location, setLocation] = useState("");
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [photoPreview, setPhotoPreview] = useState<string>("");
 
-  // History modal
-  const [showHistoryModal, setShowHistoryModal] = useState(false);
-  const [historyAsset, setHistoryAsset] = useState<AssetRow | null>(null);
-  const [historyServices, setHistoryServices] = useState<ServiceRecord[]>([]);
-  const [loadingHistory, setLoadingHistory] = useState(false);
-
-  // Add Service modal
+  // ── Add Service modal ──
   const [showServiceForm, setShowServiceForm] = useState(false);
   const [svcAssetId, setSvcAssetId] = useState("");
   const [svcType, setSvcType] = useState("Oil Change");
@@ -139,12 +142,34 @@ export default function AssetsPage() {
   const [svcSaving, setSvcSaving] = useState(false);
   const [svcError, setSvcError] = useState("");
 
+  // ── History modal ──
+  const [showHistoryModal, setShowHistoryModal] = useState(false);
+  const [historyAssetName, setHistoryAssetName] = useState("");
+  const [historyRecords, setHistoryRecords] = useState<ServiceRecord[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+
+  // ── Edit Asset modal ──
+  const [showEditForm, setShowEditForm] = useState(false);
+  const [editingAsset, setEditingAsset] = useState<AssetRow | null>(null);
+  const [editSaving, setEditSaving] = useState(false);
+  const [editError, setEditError] = useState("");
+  const [editBrand, setEditBrand] = useState("");
+  const [editModel, setEditModel] = useState("");
+  const [editNickname, setEditNickname] = useState("");
+  const [editVin, setEditVin] = useState("");
+  const [editYear, setEditYear] = useState("");
+  const [editPlate, setEditPlate] = useState("");
+  const [editFuelType, setEditFuelType] = useState("");
+  const [editLocation, setEditLocation] = useState("");
+  const [editPhotoFile, setEditPhotoFile] = useState<File | null>(null);
+  const [editPhotoPreview, setEditPhotoPreview] = useState<string>("");
+
   async function loadAssets(uid: string) {
     setLoadingAssets(true);
     const { data } = await supabase
       .from("assets")
       .select(
-        "id, asset_type, brand, model, nickname, vin_serial, year, plate, fuel_type, location, created_at, qr_codes(code)"
+        "id, asset_type, brand, model, nickname, vin_serial, year, plate, fuel_type, location, photo_url, created_at, qr_codes(code)"
       )
       .eq("created_by", uid)
       .order("created_at", { ascending: false });
@@ -199,21 +224,9 @@ export default function AssetsPage() {
     setPlate("");
     setFuelType("");
     setLocation("");
+    setPhotoFile(null);
+    setPhotoPreview("");
     setFormError("");
-  }
-
-  async function openHistory(asset: AssetRow) {
-    setHistoryAsset(asset);
-    setHistoryServices([]);
-    setShowHistoryModal(true);
-    setLoadingHistory(true);
-    const { data } = await supabase
-      .from("service_records")
-      .select("id, service_date, service_type, km_hours, notes, mechanics(name)")
-      .eq("asset_id", asset.id)
-      .order("service_date", { ascending: false });
-    setHistoryServices((data as unknown as ServiceRecord[]) ?? []);
-    setLoadingHistory(false);
   }
 
   function openAddService(assetId: string) {
@@ -224,6 +237,47 @@ export default function AssetsPage() {
     setSvcNotes("");
     setSvcError("");
     setShowServiceForm(true);
+  }
+
+  async function openHistory(a: AssetRow) {
+    setHistoryAssetName(assetDisplayName(a));
+    setHistoryRecords([]);
+    setHistoryLoading(true);
+    setShowHistoryModal(true);
+    const { data } = await supabase
+      .from("service_records")
+      .select("id, service_date, service_type, km_hours, notes, mechanics(name)")
+      .eq("asset_id", a.id)
+      .order("service_date", { ascending: false });
+    setHistoryRecords((data as unknown as ServiceRecord[]) ?? []);
+    setHistoryLoading(false);
+  }
+
+  function openEdit(a: AssetRow) {
+    setEditingAsset(a);
+    setEditBrand(a.brand ?? "");
+    setEditModel(a.model ?? "");
+    setEditNickname(a.nickname ?? "");
+    setEditVin(a.vin_serial ?? "");
+    setEditYear(a.year ? String(a.year) : "");
+    setEditPlate(a.plate ?? "");
+    setEditFuelType(a.fuel_type ?? "");
+    setEditLocation(a.location ?? "");
+    setEditPhotoFile(null);
+    setEditPhotoPreview(a.photo_url ?? "");
+    setEditError("");
+    setShowEditForm(true);
+  }
+
+  async function uploadPhoto(file: File, assetId: string): Promise<string | null> {
+    const ext = file.name.split(".").pop() ?? "jpg";
+    const path = `${assetId}.${ext}`;
+    const { error } = await supabase.storage
+      .from("asset-photos")
+      .upload(path, file, { upsert: true });
+    if (error) return null;
+    const { data } = supabase.storage.from("asset-photos").getPublicUrl(path);
+    return data.publicUrl;
   }
 
   async function handleCreateAsset(e: React.FormEvent) {
@@ -260,6 +314,14 @@ export default function AssetsPage() {
       return;
     }
 
+    // Upload photo if provided
+    if (photoFile) {
+      const photoUrl = await uploadPhoto(photoFile, newAsset.id);
+      if (photoUrl) {
+        await supabase.from("assets").update({ photo_url: photoUrl }).eq("id", newAsset.id);
+      }
+    }
+
     const code = genCode();
     const { error: qrError } = await supabase
       .from("qr_codes")
@@ -275,6 +337,44 @@ export default function AssetsPage() {
 
     resetForm();
     setShowForm(false);
+    await loadAssets(mechanicId);
+  }
+
+  async function handleEditAsset(e: React.FormEvent) {
+    e.preventDefault();
+    if (!editingAsset) return;
+    setEditError("");
+    setEditSaving(true);
+
+    let photoUrl = editingAsset.photo_url;
+    if (editPhotoFile) {
+      const url = await uploadPhoto(editPhotoFile, editingAsset.id);
+      if (url) photoUrl = url;
+    }
+
+    const { error } = await supabase
+      .from("assets")
+      .update({
+        brand: editBrand.trim() || null,
+        model: editModel.trim() || null,
+        nickname: editNickname.trim() || null,
+        vin_serial: editVin.trim() || null,
+        year: editYear ? parseInt(editYear, 10) : null,
+        plate: editPlate.trim() || null,
+        fuel_type: editFuelType || null,
+        location: editLocation.trim() || null,
+        photo_url: photoUrl,
+      })
+      .eq("id", editingAsset.id);
+
+    setEditSaving(false);
+
+    if (error) {
+      setEditError(error.message);
+      return;
+    }
+
+    setShowEditForm(false);
     await loadAssets(mechanicId);
   }
 
@@ -350,10 +450,10 @@ export default function AssetsPage() {
 
       {/* ════ SIDEBAR ════ */}
       <aside className="w-[230px] bg-white border-r border-zinc-200 flex flex-col shrink-0">
-        <Link href="/" className="flex flex-col items-center px-4 pt-2 pb-0">
+        <div className="flex flex-col items-center px-4 pt-2 pb-0">
           <Image src="/images/qr-gear.png" alt="Maintly logo" width={1080} height={1080} className="object-contain w-[92px] h-auto" />
           <Image src="/images/Maintly.png" alt="Maintly" width={1080} height={1080} className="object-contain w-[200px] h-auto -mt-10" />
-        </Link>
+        </div>
 
         <nav className="flex-1 px-3 -mt-4">
           {navItems.map((item) => (
@@ -454,28 +554,42 @@ export default function AssetsPage() {
                   <div key={a.id} className="bg-white rounded-2xl border border-zinc-200 shadow-sm p-5 flex flex-col">
                     {/* Asset header */}
                     <div className="flex items-center gap-3 mb-3">
+                      {/* Photo or icon */}
                       <div className="w-12 h-12 rounded-xl bg-zinc-50 border border-zinc-100 flex items-center justify-center shrink-0 overflow-hidden">
-                        <Image src={img} alt={label} width={36} height={36} className="object-contain" />
+                        {a.photo_url ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={a.photo_url} alt={label} className="w-full h-full object-cover" />
+                        ) : (
+                          <Image src={img} alt={label} width={36} height={36} className="object-contain" />
+                        )}
                       </div>
                       <div className="min-w-0 flex-1">
                         <p className="text-[14px] font-bold text-zinc-900 leading-tight truncate">{label}</p>
                         <p className="text-[11px] text-zinc-400 leading-tight">{a.year ? a.year + " · " : ""}{a.plate || a.vin_serial || "—"}</p>
                       </div>
+                      {/* Edit button */}
+                      <button
+                        onClick={() => openEdit(a)}
+                        className="p-1.5 rounded-lg text-zinc-400 hover:text-red-600 hover:bg-red-50 transition-colors shrink-0"
+                        title="Edit asset"
+                      >
+                        <Pencil size={14} />
+                      </button>
                     </div>
 
                     {/* Action buttons */}
-                    <div className="flex gap-2 mb-3">
-                      <button
-                        onClick={() => openAddService(a.id)}
-                        className="flex-1 flex items-center justify-center gap-1.5 border border-red-200 text-red-600 hover:bg-red-50 active:scale-[0.98] transition-all text-[12px] font-bold py-[8px] rounded-xl"
-                      >
-                        <Wrench size={13} /> Add Service
-                      </button>
+                    <div className="grid grid-cols-2 gap-2 mb-3">
                       <button
                         onClick={() => openHistory(a)}
-                        className="flex-1 flex items-center justify-center gap-1.5 border border-zinc-200 text-zinc-600 hover:bg-zinc-50 active:scale-[0.98] transition-all text-[12px] font-bold py-[8px] rounded-xl"
+                        className="flex items-center justify-center gap-1.5 border border-zinc-200 text-zinc-600 hover:bg-zinc-50 active:scale-[0.98] transition-all text-[12px] font-bold py-[8px] rounded-xl"
                       >
-                        <History size={13} /> View History
+                        <History size={13} /> History
+                      </button>
+                      <button
+                        onClick={() => openAddService(a.id)}
+                        className="flex items-center justify-center gap-1.5 border border-red-200 text-red-600 hover:bg-red-50 active:scale-[0.98] transition-all text-[12px] font-bold py-[8px] rounded-xl"
+                      >
+                        <Wrench size={13} /> Add Service
                       </button>
                     </div>
 
@@ -513,81 +627,6 @@ export default function AssetsPage() {
           <p className="text-center text-[11px] text-zinc-400 mt-8">© 2026 Maintly. All rights reserved.</p>
         </div>
       </div>
-
-      {/* ════ HISTORY MODAL ════ */}
-      {showHistoryModal && historyAsset && (
-        <div className="fixed inset-0 z-50 bg-zinc-900/40 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[85vh] flex flex-col">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-200 shrink-0">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-xl bg-zinc-100 flex items-center justify-center shrink-0">
-                  <History size={15} className="text-zinc-600" />
-                </div>
-                <div>
-                  <h2 className="text-[16px] font-black text-zinc-900">Service History</h2>
-                  <p className="text-[11px] text-zinc-400 leading-none">{assetDisplayName(historyAsset)}</p>
-                </div>
-              </div>
-              <button onClick={() => setShowHistoryModal(false)} className="text-zinc-400 hover:text-zinc-700"><X size={18} /></button>
-            </div>
-
-            <div className="overflow-y-auto flex-1 px-6 py-4">
-              {loadingHistory ? (
-                <p className="text-center text-[13px] text-zinc-400 py-8">Loading history...</p>
-              ) : historyServices.length === 0 ? (
-                <div className="text-center py-10">
-                  <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-zinc-100 mb-3">
-                    <History size={20} className="text-zinc-400" />
-                  </div>
-                  <p className="text-[13px] text-zinc-500 mb-1">No services recorded yet.</p>
-                  <p className="text-[11px] text-zinc-400">Use &quot;Add Service&quot; to log the first one.</p>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {historyServices.map((s) => {
-                    const mech = Array.isArray(s.mechanics) ? s.mechanics[0] : s.mechanics;
-                    const mechName = mech?.name ?? "Unknown mechanic";
-                    return (
-                      <div key={s.id} className="border border-zinc-100 rounded-xl p-4">
-                        <div className="flex items-start justify-between gap-3 mb-2">
-                          <span className={`text-[11px] font-semibold px-2 py-[3px] rounded-full ${typeColors[s.service_type] ?? "bg-zinc-100 text-zinc-700"}`}>
-                            {s.service_type}
-                          </span>
-                          <div className="flex items-center gap-1 text-[11px] text-green-600 font-semibold shrink-0">
-                            <CheckCircle2 size={12} /> Completed
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-4 mb-2">
-                          <span className="text-[12px] text-zinc-700 font-medium">{s.service_date}</span>
-                          {s.km_hours != null && (
-                            <span className="text-[11px] text-zinc-400">{s.km_hours} km/hrs</span>
-                          )}
-                        </div>
-                        {s.notes && (
-                          <p className="text-[11px] text-zinc-500 mb-2 leading-relaxed">{s.notes}</p>
-                        )}
-                        <div className="flex items-center gap-1.5 pt-2 border-t border-zinc-100">
-                          <UserCircle2 size={12} className="text-zinc-400 shrink-0" />
-                          <span className="text-[11px] text-zinc-500">{mechName}</span>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-
-            <div className="px-6 py-4 border-t border-zinc-100 shrink-0">
-              <button
-                onClick={() => { setShowHistoryModal(false); openAddService(historyAsset.id); }}
-                className="w-full flex items-center justify-center gap-2 bg-red-600 hover:bg-red-500 text-white font-bold text-[13px] py-[11px] rounded-xl transition-all"
-              >
-                <Wrench size={14} /> Add New Service
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* ════ NEW ASSET MODAL ════ */}
       {showForm && (
@@ -647,9 +686,44 @@ export default function AssetsPage() {
                 </div>
               </div>
 
-              <div className="mb-5">
+              <div className="mb-4">
                 <label className="text-[12px] font-bold text-zinc-700">Location (optional)</label>
                 <input type="text" value={location} onChange={(e) => setLocation(e.target.value)} placeholder="e.g. Main shop" className="w-full mt-1 rounded-xl border border-zinc-200 px-3 py-[10px] text-[13px] outline-none focus:border-red-500" />
+              </div>
+
+              {/* Photo upload */}
+              <div className="mb-5">
+                <label className="text-[12px] font-bold text-zinc-700">Photo (optional)</label>
+                <div className="mt-1 flex items-center gap-3">
+                  <label className="flex items-center gap-2 cursor-pointer border border-zinc-200 hover:border-red-400 rounded-xl px-4 py-[10px] text-[12px] font-bold text-zinc-600 hover:text-red-600 transition-colors">
+                    <Camera size={14} />
+                    {photoFile ? "Change photo" : "Upload photo"}
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => {
+                        const f = e.target.files?.[0] ?? null;
+                        setPhotoFile(f);
+                        if (f) setPhotoPreview(URL.createObjectURL(f));
+                        else setPhotoPreview("");
+                      }}
+                    />
+                  </label>
+                  {photoPreview && (
+                    <div className="relative w-14 h-14 rounded-xl overflow-hidden border border-zinc-200 shrink-0">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={photoPreview} alt="Preview" className="w-full h-full object-cover" />
+                      <button
+                        type="button"
+                        onClick={() => { setPhotoFile(null); setPhotoPreview(""); }}
+                        className="absolute top-0.5 right-0.5 w-4 h-4 bg-zinc-900/60 rounded-full flex items-center justify-center text-white"
+                      >
+                        <X size={9} />
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
 
               {formError && (
@@ -660,6 +734,114 @@ export default function AssetsPage() {
                 <button type="button" onClick={() => setShowForm(false)} className="flex-1 border border-zinc-200 text-zinc-700 font-bold py-[11px] rounded-xl text-[13px] hover:bg-zinc-50">Cancel</button>
                 <button type="submit" disabled={saving} className="flex-1 bg-red-600 hover:bg-red-500 disabled:opacity-60 transition-all text-white font-bold py-[11px] rounded-xl text-[13px]">
                   {saving ? "Creating..." : "Create & Generate QR"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ════ EDIT ASSET MODAL ════ */}
+      {showEditForm && editingAsset && (
+        <div className="fixed inset-0 z-50 bg-zinc-900/40 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-200">
+              <div>
+                <h2 className="text-[16px] font-black text-zinc-900">Edit Asset</h2>
+                <p className="text-[11px] text-zinc-400 mt-0.5">{assetDisplayName(editingAsset)}</p>
+              </div>
+              <button onClick={() => setShowEditForm(false)} className="text-zinc-400 hover:text-zinc-700"><X size={18} /></button>
+            </div>
+
+            <form onSubmit={handleEditAsset} className="px-6 py-5">
+              <div className="grid grid-cols-2 gap-3 mb-4">
+                <div>
+                  <label className="text-[12px] font-bold text-zinc-700">Brand</label>
+                  <input type="text" value={editBrand} onChange={(e) => setEditBrand(e.target.value)} placeholder="e.g. Ford" className="w-full mt-1 rounded-xl border border-zinc-200 px-3 py-[10px] text-[13px] outline-none focus:border-red-500" />
+                </div>
+                <div>
+                  <label className="text-[12px] font-bold text-zinc-700">Model</label>
+                  <input type="text" value={editModel} onChange={(e) => setEditModel(e.target.value)} placeholder="e.g. Ranger XLT" className="w-full mt-1 rounded-xl border border-zinc-200 px-3 py-[10px] text-[13px] outline-none focus:border-red-500" />
+                </div>
+              </div>
+
+              <div className="mb-4">
+                <label className="text-[12px] font-bold text-zinc-700">Nickname</label>
+                <input type="text" value={editNickname} onChange={(e) => setEditNickname(e.target.value)} placeholder="e.g. Work Truck #2" className="w-full mt-1 rounded-xl border border-zinc-200 px-3 py-[10px] text-[13px] outline-none focus:border-red-500" />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 mb-4">
+                <div>
+                  <label className="text-[12px] font-bold text-zinc-700">VIN / Serial</label>
+                  <input type="text" value={editVin} onChange={(e) => setEditVin(e.target.value)} className="w-full mt-1 rounded-xl border border-zinc-200 px-3 py-[10px] text-[13px] outline-none focus:border-red-500" />
+                </div>
+                <div>
+                  <label className="text-[12px] font-bold text-zinc-700">Year</label>
+                  <input type="number" value={editYear} onChange={(e) => setEditYear(e.target.value)} placeholder="2024" className="w-full mt-1 rounded-xl border border-zinc-200 px-3 py-[10px] text-[13px] outline-none focus:border-red-500" />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 mb-4">
+                <div>
+                  <label className="text-[12px] font-bold text-zinc-700">Plate</label>
+                  <input type="text" value={editPlate} onChange={(e) => setEditPlate(e.target.value)} className="w-full mt-1 rounded-xl border border-zinc-200 px-3 py-[10px] text-[13px] outline-none focus:border-red-500" />
+                </div>
+                <div>
+                  <label className="text-[12px] font-bold text-zinc-700">Fuel type</label>
+                  <select value={editFuelType} onChange={(e) => setEditFuelType(e.target.value)} className="w-full mt-1 rounded-xl border border-zinc-200 px-3 py-[10px] text-[13px] outline-none focus:border-red-500">
+                    <option value="">—</option>
+                    {fuelTypeOptions.map((f) => <option key={f} value={f}>{f}</option>)}
+                  </select>
+                </div>
+              </div>
+
+              <div className="mb-4">
+                <label className="text-[12px] font-bold text-zinc-700">Location</label>
+                <input type="text" value={editLocation} onChange={(e) => setEditLocation(e.target.value)} placeholder="e.g. Main shop" className="w-full mt-1 rounded-xl border border-zinc-200 px-3 py-[10px] text-[13px] outline-none focus:border-red-500" />
+              </div>
+
+              {/* Photo upload / preview */}
+              <div className="mb-5">
+                <label className="text-[12px] font-bold text-zinc-700">Photo</label>
+                <div className="mt-1 flex items-center gap-3">
+                  <label className="flex items-center gap-2 cursor-pointer border border-zinc-200 hover:border-red-400 rounded-xl px-4 py-[10px] text-[12px] font-bold text-zinc-600 hover:text-red-600 transition-colors">
+                    <Camera size={14} />
+                    {editPhotoFile ? "Change photo" : editPhotoPreview ? "Replace photo" : "Upload photo"}
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => {
+                        const f = e.target.files?.[0] ?? null;
+                        setEditPhotoFile(f);
+                        if (f) setEditPhotoPreview(URL.createObjectURL(f));
+                      }}
+                    />
+                  </label>
+                  {editPhotoPreview && (
+                    <div className="relative w-14 h-14 rounded-xl overflow-hidden border border-zinc-200 shrink-0">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={editPhotoPreview} alt="Preview" className="w-full h-full object-cover" />
+                      <button
+                        type="button"
+                        onClick={() => { setEditPhotoFile(null); setEditPhotoPreview(""); }}
+                        className="absolute top-0.5 right-0.5 w-4 h-4 bg-zinc-900/60 rounded-full flex items-center justify-center text-white"
+                      >
+                        <X size={9} />
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {editError && (
+                <div className="mb-4 rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-[12px] text-red-700">{editError}</div>
+              )}
+
+              <div className="flex gap-3">
+                <button type="button" onClick={() => setShowEditForm(false)} className="flex-1 border border-zinc-200 text-zinc-700 font-bold py-[11px] rounded-xl text-[13px] hover:bg-zinc-50">Cancel</button>
+                <button type="submit" disabled={editSaving} className="flex-1 bg-red-600 hover:bg-red-500 disabled:opacity-60 transition-all text-white font-bold py-[11px] rounded-xl text-[13px]">
+                  {editSaving ? "Saving..." : "Save Changes"}
                 </button>
               </div>
             </form>
@@ -719,6 +901,87 @@ export default function AssetsPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ════ HISTORY MODAL ════ */}
+      {showHistoryModal && (
+        <div className="fixed inset-0 z-50 bg-zinc-900/40 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[85vh] flex flex-col">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-200 shrink-0">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-zinc-100 flex items-center justify-center">
+                  <History size={15} className="text-zinc-600" />
+                </div>
+                <div>
+                  <h2 className="text-[16px] font-black text-zinc-900">Service History</h2>
+                  <p className="text-[11px] text-zinc-400 leading-none">{historyAssetName}</p>
+                </div>
+              </div>
+              <button onClick={() => setShowHistoryModal(false)} className="text-zinc-400 hover:text-zinc-700"><X size={18} /></button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto px-6 py-4">
+              {historyLoading ? (
+                <div className="flex items-center justify-center py-10">
+                  <div className="w-6 h-6 border-2 border-red-600 border-t-transparent rounded-full animate-spin" />
+                </div>
+              ) : historyRecords.length === 0 ? (
+                <div className="text-center py-10">
+                  <div className="inline-flex items-center justify-center w-12 h-12 rounded-full border border-zinc-100 bg-zinc-50 mb-3">
+                    <Wrench size={20} className="text-zinc-300" />
+                  </div>
+                  <p className="text-[13px] text-zinc-400">No service records yet for this asset.</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {historyRecords.map((svc, idx) => {
+                    const tc = typeColors[svc.service_type] ?? { bg: "bg-zinc-100", text: "text-zinc-700" };
+                    const isLatest = idx === 0;
+                    const mech = Array.isArray(svc.mechanics) ? svc.mechanics[0] : svc.mechanics;
+                    return (
+                      <div key={svc.id} className="flex gap-3 p-3 rounded-xl bg-zinc-50 border border-zinc-100">
+                        {/* Timeline dot */}
+                        <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 mt-0.5 ${isLatest ? "bg-red-600" : "bg-zinc-200"}`}>
+                          {isLatest
+                            ? <CheckCircle2 size={14} className="text-white" />
+                            : <Wrench size={12} className="text-zinc-500" />
+                          }
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap mb-1">
+                            <span className={`text-[11px] font-bold px-2 py-[2px] rounded-full ${tc.bg} ${tc.text}`}>
+                              {svc.service_type}
+                            </span>
+                            {isLatest && (
+                              <span className="text-[10px] font-bold text-red-600 bg-red-50 px-2 py-[2px] rounded-full">Latest</span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-3 flex-wrap">
+                            <span className="text-[11px] text-zinc-500">{formatDate(svc.service_date)}</span>
+                            {svc.km_hours != null && (
+                              <span className="flex items-center gap-1 text-[11px] text-zinc-500">
+                                <Gauge size={10} /> {svc.km_hours.toLocaleString()} km/hrs
+                              </span>
+                            )}
+                          </div>
+                          {mech?.name && (
+                            <div className="flex items-center gap-1 mt-1">
+                              <UserCircle2 size={11} className="text-zinc-400" />
+                              <span className="text-[11px] text-zinc-500">{mech.name}</span>
+                            </div>
+                          )}
+                          {svc.notes && (
+                            <p className="text-[11px] text-zinc-500 mt-1.5 leading-relaxed bg-white rounded-lg px-2.5 py-2 border border-zinc-100">{svc.notes}</p>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}

@@ -15,6 +15,7 @@ type AssetData = {
   plate: string | null;
   fuel_type: string | null;
   location: string | null;
+  photo_url: string | null;
 };
 
 type MechanicInfo = { name: string };
@@ -55,6 +56,17 @@ const svcColors: Record<string, string> = {
   "Brake Service": "#ea580c",
 };
 
+const svcIcons: Record<string, string> = {
+  "Oil Change":    "🛢",
+  Service:         "🔧",
+  Repair:          "🔨",
+  Inspection:      "🔍",
+  "Filter Change": "🗂",
+  "Tire Change":   "⭕",
+  "Brake Service": "🛑",
+  Other:           "⚙",
+};
+
 const assetTypeLabel: Record<string, string> = {
   automotive: "Automotive",
   motorcycle: "Motorcycle",
@@ -84,7 +96,7 @@ export default function AssetReportPage() {
 
       const { data: assetData } = await supabase
         .from("assets")
-        .select("id, asset_type, brand, model, nickname, vin_serial, year, plate, fuel_type, location")
+        .select("id, asset_type, brand, model, nickname, vin_serial, year, plate, fuel_type, location, photo_url")
         .eq("id", qrRow.asset_id).single();
       if (!assetData) { setNotFound(true); setLoading(false); return; }
 
@@ -180,8 +192,8 @@ export default function AssetReportPage() {
 
         {/* ── HERO TITLE ── */}
         <div style={{ padding: "18px 24px 14px", background: "linear-gradient(135deg, #fff 55%, #fef2f2 100%)", borderBottom: "1px solid #f4f4f5" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-            <div>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 16 }}>
+            <div style={{ flex: 1 }}>
               <h1 style={{ fontSize: 30, fontWeight: 900, lineHeight: 1.1, color: "#111", margin: 0 }}>
                 MAINTENANCE<br />
                 <span style={{ color: "#dc2626" }}>HISTORY REPORT</span>
@@ -203,6 +215,18 @@ export default function AssetReportPage() {
                 ))}
               </div>
             </div>
+
+            {/* Asset photo (if available) */}
+            {asset.photo_url && (
+              <div style={{ flexShrink: 0 }}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={asset.photo_url}
+                  alt={assetName}
+                  style={{ width: 130, height: 100, objectFit: "cover", borderRadius: 10, border: "1.5px solid #e4e4e7", boxShadow: "0 2px 8px rgba(0,0,0,0.08)" }}
+                />
+              </div>
+            )}
           </div>
         </div>
 
@@ -269,6 +293,7 @@ export default function AssetReportPage() {
                   const mech = Array.isArray(s.mechanics) ? s.mechanics[0] : s.mechanics;
                   const mechName = mech?.name ?? "—";
                   const col = svcColors[s.service_type] ?? "#6b7280";
+                  const icon = svcIcons[s.service_type] ?? "⚙";
                   const isLatest = idx === 0;
                   return (
                     <tr key={s.id} style={{ borderBottom: "1px solid #f0f0f0", verticalAlign: "top" }}>
@@ -282,9 +307,20 @@ export default function AssetReportPage() {
                         {s.km_hours != null ? `⏱ ${s.km_hours.toLocaleString()} hrs` : "—"}
                       </td>
                       <td style={{ padding: "9px 8px" }}>
-                        <span style={{ background: col + "20", color: col, padding: "3px 8px", borderRadius: 20, fontWeight: 700, fontSize: 9, whiteSpace: "nowrap" }}>
-                          {s.service_type}
-                        </span>
+                        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                          <div style={{
+                            width: 22, height: 22, borderRadius: "50%",
+                            background: col + "22",
+                            border: `1.5px solid ${col}`,
+                            display: "flex", alignItems: "center", justifyContent: "center",
+                            fontSize: 11, flexShrink: 0, lineHeight: 1
+                          }}>
+                            {icon}
+                          </div>
+                          <span style={{ color: col, fontWeight: 700, fontSize: 9.5, whiteSpace: "nowrap" }}>
+                            {s.service_type}
+                          </span>
+                        </div>
                         {isLatest && (
                           <div style={{ fontSize: 8, color: "#dc2626", fontWeight: 700, marginTop: 3 }}>● LATEST</div>
                         )}
