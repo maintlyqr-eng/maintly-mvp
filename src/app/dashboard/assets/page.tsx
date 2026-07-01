@@ -6,7 +6,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   LayoutGrid, FileText, Box, QrCode, Users, BarChart3, Calendar as CalendarIcon,
-  Mail, FolderOpen, Settings, Bell, ChevronDown, Plus, X, Copy, Check, LogOut, Crown, Wrench, History, CheckCircle2
+  Mail, FolderOpen, Settings, Bell, ChevronDown, Plus, X, Copy, Check, LogOut, Crown, Wrench, History, CheckCircle2, UserCircle2
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 
@@ -45,14 +45,6 @@ const assetTypeOptions = [
 
 const fuelTypeOptions = ["Gasoline", "Diesel", "Electric", "Hybrid", "Other"];
 
-type ServiceRecord = {
-  id: string;
-  service_date: string;
-  service_type: string;
-  km_hours: number | null;
-  notes: string | null;
-};
-
 const typeColors: Record<string, string> = {
   "Oil Change":    "bg-amber-100 text-amber-700",
   Service:         "bg-blue-100 text-blue-700",
@@ -61,6 +53,17 @@ const typeColors: Record<string, string> = {
   "Filter Change": "bg-green-100 text-green-700",
   "Tire Change":   "bg-cyan-100 text-cyan-700",
   "Brake Service": "bg-orange-100 text-orange-700",
+};
+
+type MechanicInfo = { name: string };
+
+type ServiceRecord = {
+  id: string;
+  service_date: string;
+  service_type: string;
+  km_hours: number | null;
+  notes: string | null;
+  mechanics: MechanicInfo | MechanicInfo[] | null;
 };
 
 type QrRow = { code: string };
@@ -206,10 +209,10 @@ export default function AssetsPage() {
     setLoadingHistory(true);
     const { data } = await supabase
       .from("service_records")
-      .select("id, service_date, service_type, km_hours, notes")
+      .select("id, service_date, service_type, km_hours, notes, mechanics(name)")
       .eq("asset_id", asset.id)
       .order("service_date", { ascending: false });
-    setHistoryServices((data as ServiceRecord[]) ?? []);
+    setHistoryServices((data as unknown as ServiceRecord[]) ?? []);
     setLoadingHistory(false);
   }
 
@@ -541,27 +544,35 @@ export default function AssetsPage() {
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {historyServices.map((s) => (
-                    <div key={s.id} className="border border-zinc-100 rounded-xl p-4">
-                      <div className="flex items-start justify-between gap-3 mb-1">
-                        <span className={`text-[11px] font-semibold px-2 py-[3px] rounded-full ${typeColors[s.service_type] ?? "bg-zinc-100 text-zinc-700"}`}>
-                          {s.service_type}
-                        </span>
-                        <div className="flex items-center gap-1 text-[11px] text-green-600 font-semibold shrink-0">
-                          <CheckCircle2 size={12} /> Completed
+                  {historyServices.map((s) => {
+                    const mech = Array.isArray(s.mechanics) ? s.mechanics[0] : s.mechanics;
+                    const mechName = mech?.name ?? "Unknown mechanic";
+                    return (
+                      <div key={s.id} className="border border-zinc-100 rounded-xl p-4">
+                        <div className="flex items-start justify-between gap-3 mb-2">
+                          <span className={`text-[11px] font-semibold px-2 py-[3px] rounded-full ${typeColors[s.service_type] ?? "bg-zinc-100 text-zinc-700"}`}>
+                            {s.service_type}
+                          </span>
+                          <div className="flex items-center gap-1 text-[11px] text-green-600 font-semibold shrink-0">
+                            <CheckCircle2 size={12} /> Completed
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-4 mb-2">
+                          <span className="text-[12px] text-zinc-700 font-medium">{s.service_date}</span>
+                          {s.km_hours != null && (
+                            <span className="text-[11px] text-zinc-400">{s.km_hours} km/hrs</span>
+                          )}
+                        </div>
+                        {s.notes && (
+                          <p className="text-[11px] text-zinc-500 mb-2 leading-relaxed">{s.notes}</p>
+                        )}
+                        <div className="flex items-center gap-1.5 pt-2 border-t border-zinc-100">
+                          <UserCircle2 size={12} className="text-zinc-400 shrink-0" />
+                          <span className="text-[11px] text-zinc-500">{mechName}</span>
                         </div>
                       </div>
-                      <div className="flex items-center gap-4 mt-2">
-                        <span className="text-[12px] text-zinc-700 font-medium">{s.service_date}</span>
-                        {s.km_hours != null && (
-                          <span className="text-[11px] text-zinc-400">{s.km_hours} km/hrs</span>
-                        )}
-                      </div>
-                      {s.notes && (
-                        <p className="text-[11px] text-zinc-500 mt-2 leading-relaxed">{s.notes}</p>
-                      )}
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>
