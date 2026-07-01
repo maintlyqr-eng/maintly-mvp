@@ -58,7 +58,7 @@ type RealService = {
   km_hours: number | null;
   notes: string | null;
   asset_id: string;
-  assets: AssetInfo[] | null;
+  assets: AssetInfo | AssetInfo[] | null;
 };
 
 function MiniSparkline({ color }: { color: string }) {
@@ -301,7 +301,7 @@ export default function DashboardPage() {
                     </thead>
                     <tbody>
                       {realServices.map((s) => {
-                        const asset = Array.isArray(s.assets) ? s.assets[0] ?? null : null;
+                        const asset = Array.isArray(s.assets) ? s.assets[0] ?? null : (s.assets as AssetInfo | null);
                         const img = asset ? assetTypeImg[asset.asset_type] ?? "/images/pickup.png" : "/images/pickup.png";
                         const label = asset?.nickname || [asset?.brand, asset?.model].filter(Boolean).join(" ") || "Unknown asset";
                         return (
