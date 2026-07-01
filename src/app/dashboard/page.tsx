@@ -153,14 +153,9 @@ export default function DashboardPage() {
       ════════════════════════════════ */}
       <aside className="w-[230px] bg-white border-r border-zinc-200 flex flex-col shrink-0">
         {/* Logo */}
-        <div className="flex items-center gap-2 px-5 py-5">
-          <Image src="/images/qr-gear.png" alt="Maintly" width={36} height={36} className="object-contain" />
-          <div>
-            <span className="text-[16px] font-black tracking-tight leading-none">
-              <span className="text-zinc-900">MAINT</span><span className="text-red-600">LY</span>
-            </span>
-            <p className="text-[8px] text-zinc-400 leading-none mt-1">Maintenance. Tracked.</p>
-          </div>
+        <div className="flex items-center px-3 py-3">
+          <Image src="/images/qr-gear.png" alt="Maintly" width={72} height={72} className="object-contain drop-shadow-md shrink-0 mt-4" priority />
+          <Image src="/images/Maintly.png" alt="Maintly" width={1080} height={1080} className="object-contain w-[155px] h-auto -ml-9 mt-5" priority />
         </div>
 
         {/* Nav */}
