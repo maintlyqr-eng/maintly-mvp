@@ -152,9 +152,19 @@ export default function AssetPublicPage() {
           <Image src="/images/qr-gear.png" alt="Maintly" width={64} height={64} className="object-contain mt-2" />
           <Image src="/images/Maintly.png" alt="Maintly" width={140} height={140} className="object-contain w-[140px] h-auto -ml-4 mt-2" />
         </a>
-        <div className="flex items-center gap-1.5 text-[11px] text-zinc-500 font-medium">
-          <ShieldCheck size={13} className="text-red-500" />
-          Verified Record
+        <div className="flex items-center gap-3">
+          <a
+            href={`/asset/${code}/report`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-1.5 bg-red-600 hover:bg-red-500 text-white text-[11px] font-bold px-3 py-1.5 rounded-lg transition-colors"
+          >
+            📄 Download Report
+          </a>
+          <div className="flex items-center gap-1.5 text-[11px] text-zinc-500 font-medium">
+            <ShieldCheck size={13} className="text-red-500" />
+            Verified Record
+          </div>
         </div>
       </div>
 
