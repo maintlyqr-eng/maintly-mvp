@@ -68,18 +68,17 @@ export default function DashboardPage() {
   const [userInitials, setUserInitials] = useState("?");
 
   useEffect(() => {
-    async function checkAuth() {
-      const { data: { session } } = await supabase.auth.getSession();
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       if (!session) {
         router.push("/login");
-        return;
+      } else {
+        const name = session.user.user_metadata?.name || session.user.email || "User";
+        setUserName(name);
+        const parts = name.split(" ");
+        setUserInitials(parts.map((p: string) => p[0]).join("").toUpperCase().slice(0, 2));
       }
-      const name = session.user.user_metadata?.name || session.user.email || "User";
-      setUserName(name);
-      const parts = name.split(" ");
-      setUserInitials(parts.map((p: string) => p[0]).join("").toUpperCase().slice(0, 2));
-    }
-    checkAuth();
+    });
+    return () => subscription.unsubscribe();
   }, [router]);
 
   // calendario simple estático (días del mes)

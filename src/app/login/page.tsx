@@ -15,9 +15,10 @@ export default function LoginPage() {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       if (session) router.push("/dashboard");
     });
+    return () => subscription.unsubscribe();
   }, [router]);
 
   async function handleLogin(e: React.FormEvent) {

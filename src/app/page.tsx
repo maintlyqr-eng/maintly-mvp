@@ -13,15 +13,18 @@ export default function HomePage() {
   const [userInitials, setUserInitials] = useState("");
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       if (session) {
         setLoggedIn(true);
         const name = session.user.user_metadata?.name || session.user.email || "User";
         setUserName(name.split(" ")[0]);
         const parts = name.split(" ");
         setUserInitials(parts.map((p: string) => p[0]).join("").toUpperCase().slice(0, 2));
+      } else {
+        setLoggedIn(false);
       }
     });
+    return () => subscription.unsubscribe();
   }, []);
 
   async function handleLogout() {
