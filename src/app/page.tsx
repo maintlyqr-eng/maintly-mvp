@@ -54,9 +54,9 @@ export default function HomePage() {
       <nav className="relative z-50 flex items-center justify-between pl-3 pr-8 bg-transparent border-b border-white/10 shrink-0" style={{height:'7vh'}}>
         <a href="/" className="flex items-center">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/images/qr-gear.png" alt="Maintly" style={{width: 52, height: 52, objectFit: "contain"}} />
+          <img src="/images/qr-gear.png" alt="Maintly" style={{width: 64, height: 64, objectFit: "contain"}} />
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/images/Maintly.png" alt="" style={{width: 110, objectFit: "contain", marginLeft: -12}} />
+          <img src="/images/Maintly.png" alt="" style={{width: 140, objectFit: "contain", marginLeft: -16}} />
         </a>
 
         <div className="hidden md:flex items-center gap-10">

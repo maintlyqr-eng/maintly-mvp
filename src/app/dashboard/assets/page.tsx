@@ -451,9 +451,9 @@ export default function AssetsPage() {
       <aside className="w-[230px] bg-white border-r border-zinc-200 flex flex-col shrink-0">
         <Link href="/" className="flex items-center px-4 py-2">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/images/qr-gear.png" alt="Maintly" style={{width: 52, height: 52, objectFit: "contain"}} />
+          <img src="/images/qr-gear.png" alt="Maintly" style={{width: 64, height: 64, objectFit: "contain"}} />
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/images/Maintly.png" alt="" style={{width: 110, objectFit: "contain", marginLeft: -12}} />
+          <img src="/images/Maintly.png" alt="" style={{width: 140, objectFit: "contain", marginLeft: -16}} />
         </Link>
 
         <nav className="flex-1 px-3 -mt-4">
