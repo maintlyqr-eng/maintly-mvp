@@ -212,9 +212,10 @@ export default function ServicesPage() {
 
       {/* ════ SIDEBAR ════ */}
       <aside className="w-[230px] bg-white border-r border-zinc-200 flex flex-col shrink-0">
-        <Link href="/" className="flex flex-col items-center px-4 pt-2 pb-0">
-          <Image src="/images/qr-gear.png" alt="Maintly logo" width={1080} height={1080} className="object-contain w-[92px] h-auto" />
-          <Image src="/images/Maintly.png" alt="Maintly" width={1080} height={1080} className="object-contain w-[200px] h-auto -mt-10" />
+        <Link href="/" className="flex items-center gap-1.5 px-4 py-4">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/images/qr-gear.png" alt="" className="h-7 w-auto" />
+          <span className="font-black text-zinc-900 tracking-wider text-[17px] leading-none">MAIN<span className="text-red-600">TLY</span></span>
         </Link>
 
         <nav className="flex-1 px-3 -mt-4">

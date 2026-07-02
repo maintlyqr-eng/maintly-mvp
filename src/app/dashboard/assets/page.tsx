@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -29,10 +28,10 @@ const serviceTypeOptions = ["Oil Change", "Service", "Repair", "Inspection", "Fi
 const assetTypeImg: Record<string, string> = {
   automotive: "/images/pickup.png",
   motorcycle: "/images/moto.png",
-  generator: "/images/generador.png",
-  machinery: "/images/excavator.png",
-  marine: "/images/barco.png",
-  aviation: "/images/avion.png",
+  generator:  "/images/generador.png",
+  machinery:  "/images/excavator.png",
+  marine:     "/images/barco.png",
+  aviation:   "/images/avion.png",
 };
 
 const assetTypeOptions = [
@@ -450,9 +449,10 @@ export default function AssetsPage() {
 
       {/* ════ SIDEBAR ════ */}
       <aside className="w-[230px] bg-white border-r border-zinc-200 flex flex-col shrink-0">
-        <div className="flex flex-col items-center px-4 pt-2 pb-0">
-          <Image src="/images/qr-gear.png" alt="Maintly logo" width={1080} height={1080} className="object-contain w-[92px] h-auto" />
-          <Image src="/images/Maintly.png" alt="Maintly" width={1080} height={1080} className="object-contain w-[200px] h-auto -mt-10" />
+        <div className="flex items-center gap-1.5 px-4 py-4">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/images/qr-gear.png" alt="" className="h-7 w-auto" />
+          <span className="font-black text-zinc-900 tracking-wider text-[17px] leading-none">MAIN<span className="text-red-600">TLY</span></span>
         </div>
 
         <nav className="flex-1 px-3 -mt-4">
@@ -549,7 +549,7 @@ export default function AssetsPage() {
               {assets.map((a) => {
                 const code = getQrCode(a);
                 const label = assetDisplayName(a);
-                const img = assetTypeImg[a.asset_type] ?? "/images/pickup.png";
+                const imgSrc = assetTypeImg[a.asset_type] ?? "/images/pickup.png";
                 return (
                   <div key={a.id} className="bg-white rounded-2xl border border-zinc-200 shadow-sm p-5 flex flex-col">
                     {/* Asset header */}
@@ -560,7 +560,8 @@ export default function AssetsPage() {
                           // eslint-disable-next-line @next/next/no-img-element
                           <img src={a.photo_url} alt={label} className="w-full h-full object-cover" />
                         ) : (
-                          <Image src={img} alt={label} width={36} height={36} className="object-contain" />
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={imgSrc} alt={label} className="w-9 h-9 object-contain" />
                         )}
                       </div>
                       <div className="min-w-0 flex-1">

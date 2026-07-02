@@ -169,9 +169,10 @@ export default function DashboardPage() {
       {/* ════ SIDEBAR ════ */}
       <aside className="w-[230px] bg-white border-r border-zinc-200 flex flex-col shrink-0">
 
-        <Link href="/" className="flex items-center px-3 py-3">
-          <Image src="/images/qr-gear.png" alt="Maintly" width={72} height={72} className="object-contain drop-shadow-md shrink-0 mt-4" priority />
-          <Image src="/images/Maintly.png" alt="Maintly" width={1080} height={1080} className="object-contain w-[155px] h-auto -ml-9 mt-5" priority />
+        <Link href="/" className="flex items-center gap-1.5 px-4 py-4">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/images/qr-gear.png" alt="" className="h-7 w-auto" />
+          <span className="font-black text-zinc-900 tracking-wider text-[17px] leading-none">MAIN<span className="text-red-600">TLY</span></span>
         </Link>
 
         <nav className="flex-1 px-3">
