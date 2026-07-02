@@ -159,7 +159,7 @@ export default function AssetReportPage() {
         <button onClick={() => window.print()} style={{ background: "#dc2626", color: "#fff", border: "none", borderRadius: 8, padding: "10px 20px", fontWeight: 700, cursor: "pointer", fontSize: 13, boxShadow: "0 2px 8px rgba(220,38,38,.35)" }}>
           🖨️ Print / Save PDF
         </button>
-        <button onClick={() => history.back()} style={{ background: "#fff", color: "#52525b", border: "1px solid #e4e4e7", borderRadius: 8, padding: "10px 16px", fontWeight: 700, cursor: "pointer", fontSize: 13 }}>
+        <button onClick={() => window.close()} style={{ background: "#fff", color: "#52525b", border: "1px solid #e4e4e7", borderRadius: 8, padding: "10px 16px", fontWeight: 700, cursor: "pointer", fontSize: 13 }}>
           ← Back
         </button>
       </div>
