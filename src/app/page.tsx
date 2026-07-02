@@ -51,12 +51,12 @@ export default function HomePage() {
       <div className="absolute inset-0 z-0 bg-white/15 pointer-events-none" />
 
       {/* ════ NAVBAR ════ */}
-      <nav className="relative z-50 flex items-center justify-between pl-3 pr-8 bg-transparent border-b border-white/10 shrink-0" style={{height:'7vh'}}>
+      <nav className="relative z-50 flex items-center justify-between pl-3 pr-8 bg-transparent border-b border-white/10 shrink-0" style={{height:'9vh'}}>
         <a href="/" className="flex items-center">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/images/qr-gear.png" alt="Maintly" style={{width: 64, height: 64, objectFit: "contain"}} />
+          <img src="/images/qr-gear.png" alt="Maintly" style={{width: 84, height: 84, objectFit: "contain"}} />
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/images/Maintly.png" alt="" style={{width: 140, objectFit: "contain", marginLeft: -16}} />
+          <img src="/images/Maintly.png" alt="" style={{width: 175, objectFit: "contain", marginLeft: -20}} />
         </a>
 
         <div className="hidden md:flex items-center gap-10">
