@@ -205,6 +205,12 @@ export default function HomePage() {
           <span className="text-red-400" style={{fontSize:'clamp(6px,0.5vw,7px)'}}>•</span>
           <span className="tracking-[0.2em] text-zinc-400 font-semibold uppercase" style={{fontSize:'clamp(6.5px,0.55vw,8px)'}}>Maintenance. Tracked.</span>
           <span className="text-red-400" style={{fontSize:'clamp(6px,0.5vw,7px)'}}>•</span>
+          <a href="/terms" className="tracking-[0.2em] text-zinc-400 hover:text-red-500 font-semibold uppercase transition-colors" style={{fontSize:'clamp(6.5px,0.55vw,8px)'}}>Terms</a>
+          <span className="text-red-400" style={{fontSize:'clamp(6px,0.5vw,7px)'}}>•</span>
+          <a href="/privacy" className="tracking-[0.2em] text-zinc-400 hover:text-red-500 font-semibold uppercase transition-colors" style={{fontSize:'clamp(6.5px,0.55vw,8px)'}}>Privacy</a>
+          <span className="text-red-400" style={{fontSize:'clamp(6px,0.5vw,7px)'}}>•</span>
+          <a href="/cookies" className="tracking-[0.2em] text-zinc-400 hover:text-red-500 font-semibold uppercase transition-colors" style={{fontSize:'clamp(6.5px,0.55vw,8px)'}}>Cookies</a>
+          <span className="text-red-400" style={{fontSize:'clamp(6px,0.5vw,7px)'}}>•</span>
           <span className="tracking-[0.2em] text-zinc-400 font-semibold uppercase" style={{fontSize:'clamp(6.5px,0.55vw,8px)'}}>All Rights Reserved</span>
         </div>
 
