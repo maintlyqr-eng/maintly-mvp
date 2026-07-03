@@ -9,9 +9,10 @@ import {
   Plus, BookMarked, LogIn, X, ChevronRight
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { formatDateDMY } from "@/lib/date";
 
 const assetTypeImg: Record<string, string> = {
-  automotive: "/images/pickup.png",
+  automotive: "/images/car.png",
   motorcycle: "/images/moto.png",
   generator:  "/images/generador.png",
   machinery:  "/images/excavator.png",
@@ -44,8 +45,7 @@ type ServiceRecord = {
 };
 
 function formatDate(dateStr: string) {
-  const d = new Date(dateStr + "T00:00:00");
-  return d.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
+  return formatDateDMY(dateStr);
 }
 function todayStr() {
   return new Date().toISOString().split("T")[0];
@@ -215,7 +215,7 @@ export default function AssetPublicPage() {
   }
 
   const assetName = asset.nickname || [asset.brand, asset.model].filter(Boolean).join(" ") || "Asset";
-  const assetImg  = assetTypeImg[asset.asset_type] ?? "/images/pickup.png";
+  const assetImg  = assetTypeImg[asset.asset_type] ?? "/images/car.png";
 
   return (
     <div className="min-h-screen bg-zinc-50 pb-32">
@@ -487,7 +487,7 @@ export default function AssetPublicPage() {
 
               {/* Date (auto) */}
               <div className="rounded-xl bg-zinc-50 border border-zinc-200 px-4 py-3 text-[12px] text-zinc-500">
-                Service date will be recorded automatically as today, {new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}.
+                Service date will be recorded automatically as today, {formatDateDMY(todayStr())}.
               </div>
 
               {/* KM / Hours */}

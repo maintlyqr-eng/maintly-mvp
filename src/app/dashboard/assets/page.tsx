@@ -9,6 +9,7 @@ import {
   Wrench, Pencil, History, CheckCircle2, UserCircle2, Camera, Gauge, Menu
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { formatDateDMY } from "@/lib/date";
 
 const navItems = [
   { icon: LayoutGrid, label: "Dashboard", href: "/dashboard" },
@@ -27,7 +28,7 @@ const navItems = [
 const serviceTypeOptions = ["Oil Change", "Service", "Repair", "Inspection", "Filter Change", "Tire Change", "Brake Service", "Other"];
 
 const assetTypeImg: Record<string, string> = {
-  automotive: "/images/pickup.png",
+  automotive: "/images/car.png",
   motorcycle: "/images/moto.png",
   generator:  "/images/generador.png",
   machinery:  "/images/excavator.png",
@@ -101,8 +102,7 @@ function genCode() {
 }
 
 function formatDate(dateStr: string) {
-  const d = new Date(dateStr + "T00:00:00");
-  return d.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
+  return formatDateDMY(dateStr);
 }
 
 export default function AssetsPage() {
@@ -609,7 +609,7 @@ export default function AssetsPage() {
               {assets.map((a) => {
                 const code = getQrCode(a);
                 const label = assetDisplayName(a);
-                const imgSrc = assetTypeImg[a.asset_type] ?? "/images/pickup.png";
+                const imgSrc = assetTypeImg[a.asset_type] ?? "/images/car.png";
                 return (
                   <div key={a.id} className="bg-white rounded-2xl border border-zinc-200 shadow-sm p-5 flex flex-col">
                     {/* Asset header */}
@@ -944,7 +944,7 @@ export default function AssetsPage() {
               </div>
 
               <div className="rounded-xl bg-zinc-50 border border-zinc-200 px-3 py-2.5 text-[12px] text-zinc-500">
-                Service date will be recorded automatically as today, {new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}.
+                Service date will be recorded automatically as today, {formatDateDMY(new Date().toISOString().slice(0, 10))}.
               </div>
 
               <div>

@@ -10,6 +10,7 @@ import {
   Wrench, CheckCircle2, MoreVertical, Menu
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { formatDateDMY } from "@/lib/date";
 import { computeReminderStatus, REMINDER_STATUS_LABEL, REMINDER_STATUS_COLOR } from "@/lib/reminders";
 
 const navItems = [
@@ -36,7 +37,7 @@ const typeColors: Record<string, string> = {
 };
 
 const assetTypeImg: Record<string, string> = {
-  automotive: "/images/pickup.png",
+  automotive: "/images/car.png",
   motorcycle: "/images/moto.png",
   generator: "/images/generador.png",
   machinery: "/images/excavator.png",
@@ -463,7 +464,7 @@ export default function ServicesPage() {
                 <tbody>
                   {filtered.map((row) => {
                     const asset = getAsset(row);
-                    const img = asset ? assetTypeImg[asset.asset_type] ?? "/images/pickup.png" : "/images/pickup.png";
+                    const img = asset ? assetTypeImg[asset.asset_type] ?? "/images/car.png" : "/images/car.png";
                     const label = asset?.nickname || [asset?.brand, asset?.model].filter(Boolean).join(" ") || "Unknown asset";
                     const hasReminder = row.next_due_date != null || row.next_due_km_hours != null;
                     const reminderStatus = computeReminderStatus({
@@ -488,7 +489,7 @@ export default function ServicesPage() {
                         <td className="px-3 py-3">
                           <span className={`text-[10.5px] font-semibold px-2 py-[3px] rounded-full ${typeColors[row.service_type] ?? "bg-zinc-100 text-zinc-700"}`}>{row.service_type}</span>
                         </td>
-                        <td className="px-3 py-3 text-[12px] text-zinc-700">{row.service_date}</td>
+                        <td className="px-3 py-3 text-[12px] text-zinc-700">{formatDateDMY(row.service_date)}</td>
                         <td className="px-3 py-3 text-[12px] text-zinc-700 font-medium">{row.km_hours ?? "—"}</td>
                         <td className="px-3 py-3 text-[11px] text-zinc-500 max-w-[180px] truncate">{row.notes || "—"}</td>
                         <td className="px-3 py-3">
@@ -584,7 +585,7 @@ export default function ServicesPage() {
               </div>
 
               <div className="rounded-xl bg-zinc-50 border border-zinc-200 px-3 py-2.5 text-[12px] text-zinc-500">
-                Service date will be recorded automatically as today, {new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}.
+                Service date will be recorded automatically as today, {formatDateDMY(new Date().toISOString().slice(0, 10))}.
               </div>
 
               <div>
@@ -638,7 +639,7 @@ export default function ServicesPage() {
                     const label = a?.nickname || [a?.brand, a?.model].filter(Boolean).join(" ") || "Unknown asset";
                     return (
                       <p className="text-[11px] text-zinc-400 truncate">
-                        {label} · {reminderRow.service_type} on {reminderRow.service_date}
+                        {label} · {reminderRow.service_type} on {formatDateDMY(reminderRow.service_date)}
                       </p>
                     );
                   })()}

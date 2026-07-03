@@ -11,6 +11,7 @@ import {
   ScanLine, Wrench, AlertCircle, Menu, X
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { formatDateDMY } from "@/lib/date";
 import { computeReminderStatus, REMINDER_STATUS_LABEL, REMINDER_STATUS_COLOR, type ReminderStatus } from "@/lib/reminders";
 
 const navItems = [
@@ -38,7 +39,7 @@ const typeColors: Record<string, string> = {
 };
 
 const assetTypeImg: Record<string, string> = {
-  automotive: "/images/pickup.png",
+  automotive: "/images/car.png",
   motorcycle:  "/images/moto.png",
   generator:   "/images/generador.png",
   machinery:   "/images/excavator.png",
@@ -505,7 +506,7 @@ export default function DashboardPage() {
                     <tbody>
                       {realServices.map((s) => {
                         const asset = Array.isArray(s.assets) ? s.assets[0] ?? null : (s.assets as AssetInfo | null);
-                        const img = asset ? assetTypeImg[asset.asset_type] ?? "/images/pickup.png" : "/images/pickup.png";
+                        const img = asset ? assetTypeImg[asset.asset_type] ?? "/images/car.png" : "/images/car.png";
                         const label = asset?.nickname || [asset?.brand, asset?.model].filter(Boolean).join(" ") || "Unknown asset";
                         return (
                           <tr key={s.id} className="border-t border-zinc-100">
@@ -523,7 +524,7 @@ export default function DashboardPage() {
                             <td className="py-3 pr-3">
                               <span className={`text-[10.5px] font-semibold px-2 py-[3px] rounded-full ${typeColors[s.service_type] ?? "bg-zinc-100 text-zinc-700"}`}>{s.service_type}</span>
                             </td>
-                            <td className="py-3 pr-3 text-[12px] text-zinc-700">{s.service_date}</td>
+                            <td className="py-3 pr-3 text-[12px] text-zinc-700">{formatDateDMY(s.service_date)}</td>
                             <td className="py-3 pr-3 text-[12px] text-zinc-700 font-medium">{s.km_hours ?? "—"}</td>
                             <td className="py-3 pr-3">
                               <span className="flex items-center gap-1 text-[11px] font-semibold text-green-600">
@@ -563,7 +564,7 @@ export default function DashboardPage() {
                           <div className="flex-1 min-w-0">
                             <p className="text-[12px] font-bold text-zinc-800 truncate">{r.assetLabel}</p>
                             <p className="text-[10px] text-zinc-400">
-                              {r.next_due_date ? `Due ${r.next_due_date}` : ""}
+                              {r.next_due_date ? `Due ${formatDateDMY(r.next_due_date)}` : ""}
                               {r.next_due_date && r.next_due_km_hours != null ? " · " : ""}
                               {r.next_due_km_hours != null ? `${r.next_due_km_hours.toLocaleString()} km/hrs` : ""}
                             </p>
@@ -803,7 +804,7 @@ export default function DashboardPage() {
                   <div className="mb-4">
                     <div className="bg-green-50 border border-green-200 rounded-xl p-4 flex items-center gap-4">
                       <div className="w-12 h-12 rounded-xl bg-white border border-green-100 flex items-center justify-center shrink-0">
-                        <Image src={assetTypeImg[foundAsset.type] ?? "/images/pickup.png"} alt={foundAsset.name} width={36} height={36} className="object-contain" />
+                        <Image src={assetTypeImg[foundAsset.type] ?? "/images/car.png"} alt={foundAsset.name} width={36} height={36} className="object-contain" />
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-[10px] font-bold text-green-700 tracking-wide">ASSET FOUND</p>

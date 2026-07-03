@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { Droplets, Wrench, Hammer, Search, Filter, Disc3, Disc, Settings, MapPin, Clock } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { formatDateDMY } from "@/lib/date";
 
 type AssetData = {
   id: string;
@@ -31,12 +32,11 @@ type ServiceRecord = {
 };
 
 function formatDate(dateStr: string) {
-  const d = new Date(dateStr + "T00:00:00");
-  return d.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
+  return formatDateDMY(dateStr);
 }
 
 function formatToday() {
-  return new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
+  return formatDateDMY(new Date().toISOString().slice(0, 10));
 }
 
 function generateReportId(code: string) {

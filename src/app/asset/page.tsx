@@ -19,7 +19,7 @@ const asset = {
   plate: "AB 712 CD",
   location: "Buenos Aires, Argentina",
   firstScan: "24 May 2025 · 09:41 am",
-  image: "/images/pickup.png",
+  image: "/images/car.png",
   scanId: "MTLY-QR-8F3A7C",
   overview: [
     { icon: Tag, label: "MANUFACTURER", value: "Ford" },

@@ -10,6 +10,7 @@ import {
   Calendar, Gauge, Pencil, Trash2
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { formatDateDMY } from "@/lib/date";
 import { computeReminderStatus, REMINDER_STATUS_LABEL, REMINDER_STATUS_COLOR, type ReminderStatus } from "@/lib/reminders";
 
 const navItems = [
@@ -27,7 +28,7 @@ const navItems = [
 ];
 
 const assetTypeImg: Record<string, string> = {
-  automotive: "/images/pickup.png",
+  automotive: "/images/car.png",
   motorcycle: "/images/moto.png",
   generator: "/images/generador.png",
   machinery: "/images/excavator.png",
@@ -365,7 +366,7 @@ export default function ScheduledServicesPage() {
             ) : (
               <div className="divide-y divide-zinc-100">
                 {filtered.map(({ row, asset, status }) => {
-                  const img = asset ? assetTypeImg[asset.asset_type] ?? "/images/pickup.png" : "/images/pickup.png";
+                  const img = asset ? assetTypeImg[asset.asset_type] ?? "/images/car.png" : "/images/car.png";
                   const label = asset?.nickname || [asset?.brand, asset?.model].filter(Boolean).join(" ") || "Unknown asset";
                   const sc = REMINDER_STATUS_COLOR[status];
                   return (
@@ -383,12 +384,12 @@ export default function ScheduledServicesPage() {
                         </div>
                         <div className="flex items-center gap-3 mt-1 flex-wrap">
                           {row.next_due_date && (
-                            <span className="flex items-center gap-1 text-[11px] text-zinc-500"><Calendar size={11} /> Due {row.next_due_date}</span>
+                            <span className="flex items-center gap-1 text-[11px] text-zinc-500"><Calendar size={11} /> Due {formatDateDMY(row.next_due_date)}</span>
                           )}
                           {row.next_due_km_hours != null && (
                             <span className="flex items-center gap-1 text-[11px] text-zinc-500"><Gauge size={11} /> Due at {row.next_due_km_hours.toLocaleString()} km/hrs</span>
                           )}
-                          <span className="text-[11px] text-zinc-300">from {row.service_type} on {row.service_date}</span>
+                          <span className="text-[11px] text-zinc-300">from {row.service_type} on {formatDateDMY(row.service_date)}</span>
                         </div>
                       </div>
                       <div className="flex items-center gap-1 shrink-0">
@@ -434,7 +435,7 @@ export default function ScheduledServicesPage() {
                     const label = a?.nickname || [a?.brand, a?.model].filter(Boolean).join(" ") || "Unknown asset";
                     return (
                       <p className="text-[11px] text-zinc-400 truncate">
-                        {label} · {editRow.service_type} on {editRow.service_date}
+                        {label} · {editRow.service_type} on {formatDateDMY(editRow.service_date)}
                       </p>
                     );
                   })()}

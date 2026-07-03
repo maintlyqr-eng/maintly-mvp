@@ -8,6 +8,7 @@ import {
   Layers, ChevronRight, Eye, EyeOff, TrendingUp, ArrowUpRight, Menu, X
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { formatDateDMY } from "@/lib/date";
 
 type MechanicRow = {
   id: string; name: string; email: string;
@@ -39,7 +40,7 @@ const ASSET_COLORS: Record<string, string> = {
 };
 
 function formatDate(iso: string) {
-  return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+  return formatDateDMY(iso);
 }
 function getInitials(name: string) {
   return name.split(" ").map(p => p[0]).join("").toUpperCase().slice(0, 2);
@@ -497,7 +498,7 @@ export default function AdminPage() {
                           <p className="text-[13px] font-bold text-zinc-900 truncate leading-tight">{s.asset_label}</p>
                           <p className="text-[11px] text-zinc-400 truncate">by {s.mechanic_name}</p>
                         </div>
-                        <p className="text-[11px] text-zinc-400 shrink-0">{s.service_date}</p>
+                        <p className="text-[11px] text-zinc-400 shrink-0">{formatDate(s.service_date)}</p>
                       </div>
                     ))}
                     {services.length === 0 && (
@@ -597,7 +598,7 @@ export default function AdminPage() {
                           </span>
                         </td>
                         <td className="px-7 py-4 text-[12px] text-zinc-500">{s.mechanic_name}</td>
-                        <td className="px-7 py-4 text-[12px] text-zinc-400">{s.service_date}</td>
+                        <td className="px-7 py-4 text-[12px] text-zinc-400">{formatDate(s.service_date)}</td>
                       </tr>
                     ))}
                     {services.length === 0 && (
