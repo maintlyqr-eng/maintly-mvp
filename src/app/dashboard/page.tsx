@@ -6,7 +6,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   LayoutGrid, FileText, Box, QrCode, Users, BarChart3, Calendar as CalendarIcon,
-  Mail, FolderOpen, Settings, Search, Bell, ChevronDown, Plus, MoreVertical,
+  Mail, FolderOpen, Settings, Search, Bell, Plus, MoreVertical,
   CheckCircle2, Clock, TrendingUp, TrendingDown, Crown, ChevronLeft, ChevronRight, LogOut,
   ScanLine, Wrench, AlertCircle
 } from "lucide-react";
@@ -86,9 +86,6 @@ export default function DashboardPage() {
   const [totalServices, setTotalServices] = useState(0);
   const [totalAssets, setTotalAssets] = useState(0);
   const [realServices, setRealServices] = useState<RealService[]>([]);
-
-  // ── User menu ──
-  const [showUserMenu, setShowUserMenu] = useState(false);
 
   // ── Add Equipment modal states ──
   const [showAddAssetModal, setShowAddAssetModal] = useState(false);
@@ -362,42 +359,21 @@ export default function DashboardPage() {
               <Bell size={19} />
             </button>
 
-            <div className="relative pl-3 border-l border-zinc-200">
-              <button
-                onClick={() => setShowUserMenu(v => !v)}
-                className="flex items-center gap-2 hover:opacity-80 transition-opacity"
-              >
-                <div className="w-9 h-9 rounded-full bg-red-100 flex items-center justify-center text-red-600 font-bold text-[13px]">{initials}</div>
+            <div className="flex items-center gap-3 pl-3 border-l border-zinc-200">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-full bg-red-100 flex items-center justify-center text-red-600 font-bold text-[13px] shrink-0">{initials}</div>
                 <div className="text-left">
                   <p className="text-[12px] font-bold text-zinc-800 leading-tight">{displayName}</p>
                   <p className="text-[10px] text-zinc-400 leading-tight">Mechanic</p>
                 </div>
-                <ChevronDown size={14} className={`text-zinc-400 transition-transform duration-200 ${showUserMenu ? "rotate-180" : ""}`} />
+              </div>
+              <button
+                onClick={handleLogout}
+                className="flex items-center gap-1.5 text-[12px] font-semibold text-zinc-500 hover:text-red-600 hover:bg-red-50 border border-zinc-200 hover:border-red-200 px-3 py-2 rounded-xl transition-all"
+              >
+                <LogOut size={13} />
+                Log out
               </button>
-
-              {showUserMenu && (
-                <>
-                  {/* backdrop para cerrar al clickear afuera */}
-                  <div className="fixed inset-0 z-40" onClick={() => setShowUserMenu(false)} />
-                  <div className="absolute right-0 top-full mt-2 w-[200px] bg-white rounded-xl border border-zinc-200 shadow-xl py-1 z-50">
-                    <div className="px-4 py-3 border-b border-zinc-100">
-                      <p className="text-[12px] font-bold text-zinc-800 truncate">{displayName}</p>
-                      <p className="text-[10px] text-zinc-400 truncate mt-[1px]">{mechanicEmail}</p>
-                    </div>
-                    <button className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[12px] text-zinc-600 hover:bg-zinc-50 transition-colors">
-                      <Settings size={13} className="text-zinc-400" /> Settings
-                    </button>
-                    <div className="border-t border-zinc-100 mt-1 pt-1">
-                      <button
-                        onClick={handleLogout}
-                        className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[12px] font-semibold text-red-600 hover:bg-red-50 transition-colors"
-                      >
-                        <LogOut size={13} /> Log out
-                      </button>
-                    </div>
-                  </div>
-                </>
-              )}
             </div>
           </div>
         </header>
