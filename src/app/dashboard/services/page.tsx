@@ -245,14 +245,13 @@ export default function ServicesPage() {
           <button className="w-full bg-zinc-900 hover:bg-zinc-800 text-white text-[11px] font-bold py-2 rounded-lg transition-colors">Upgrade Now</button>
         </div>
 
-        <button onClick={handleLogout} className="flex items-center gap-2.5 px-4 py-3 border-t border-zinc-200 hover:bg-zinc-50 transition-colors text-left">
+        <div className="flex items-center gap-2.5 px-4 py-3 border-t border-zinc-200">
           <div className="w-8 h-8 rounded-full bg-red-100 flex items-center justify-center text-red-600 font-bold text-[12px] shrink-0">{initials}</div>
           <div className="flex-1 min-w-0">
             <p className="text-[12px] font-bold text-zinc-800 leading-tight truncate">{mechanicName || mechanicEmail}</p>
-            <p className="text-[10px] text-zinc-400 leading-tight">Log out</p>
+            <p className="text-[10px] text-zinc-400 leading-tight">Maintly Mechanic</p>
           </div>
-          <LogOut size={14} className="text-zinc-300" />
-        </button>
+        </div>
       </aside>
 
       {/* ════ MAIN ════ */}
