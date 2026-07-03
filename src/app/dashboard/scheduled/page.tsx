@@ -79,6 +79,7 @@ export default function ScheduledServicesPage() {
   const [editRow, setEditRow] = useState<ScheduledRow | null>(null);
   const [editDate, setEditDate] = useState("");
   const [editKm, setEditKm] = useState("");
+  const [editMinKm, setEditMinKm] = useState<number | null>(null);
   const [editSaving, setEditSaving] = useState(false);
   const [editError, setEditError] = useState("");
 
@@ -144,9 +145,11 @@ export default function ScheduledServicesPage() {
   }
 
   function openEdit(row: ScheduledRow) {
+    const asset = getAsset(row);
     setEditRow(row);
     setEditDate(row.next_due_date ?? "");
     setEditKm(row.next_due_km_hours != null ? String(row.next_due_km_hours) : "");
+    setEditMinKm(asset ? maxKmByAsset[asset.id] ?? null : null);
     setEditError("");
   }
 
@@ -158,6 +161,11 @@ export default function ScheduledServicesPage() {
     const todayStr = new Date().toISOString().slice(0, 10);
     if (editDate && editDate < todayStr) {
       setEditError("The reminder date can't be in the past.");
+      return;
+    }
+
+    if (editKm && editMinKm != null && parseFloat(editKm) < editMinKm) {
+      setEditError(`Km/Hours can't be lower than the asset's last recorded value (${editMinKm.toLocaleString()}).`);
       return;
     }
 
@@ -415,13 +423,24 @@ export default function ScheduledServicesPage() {
         <div className="fixed inset-0 z-50 bg-zinc-900/40 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-md">
             <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-200">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-xl bg-amber-50 flex items-center justify-center">
+              <div className="flex items-center gap-2 min-w-0">
+                <div className="w-8 h-8 rounded-xl bg-amber-50 flex items-center justify-center shrink-0">
                   <Bell size={15} className="text-amber-600" />
                 </div>
-                <h2 className="text-[16px] font-black text-zinc-900">Edit Reminder</h2>
+                <div className="min-w-0">
+                  <h2 className="text-[16px] font-black text-zinc-900 leading-tight">Edit Reminder</h2>
+                  {editRow && (() => {
+                    const a = getAsset(editRow);
+                    const label = a?.nickname || [a?.brand, a?.model].filter(Boolean).join(" ") || "Unknown asset";
+                    return (
+                      <p className="text-[11px] text-zinc-400 truncate">
+                        {label} · {editRow.service_type} on {editRow.service_date}
+                      </p>
+                    );
+                  })()}
+                </div>
               </div>
-              <button onClick={() => setEditRow(null)} className="text-zinc-400 hover:text-zinc-700"><X size={18} /></button>
+              <button onClick={() => setEditRow(null)} className="text-zinc-400 hover:text-zinc-700 shrink-0"><X size={18} /></button>
             </div>
 
             <form onSubmit={handleSaveEdit} className="px-6 py-5 space-y-4">
@@ -436,10 +455,15 @@ export default function ScheduledServicesPage() {
               <div>
                 <label className="text-[12px] font-bold text-zinc-700">Next service due at (Km / Hours)</label>
                 <input
-                  type="number" min="0" step="0.1" value={editKm} onChange={(e) => setEditKm(e.target.value)}
+                  type="number" min={editMinKm ?? 0} step="0.1" value={editKm} onChange={(e) => setEditKm(e.target.value)}
                   placeholder="e.g. 50000"
                   className="w-full mt-1 rounded-xl border border-zinc-200 px-3 py-[10px] text-[13px] outline-none focus:border-red-500"
                 />
+                {editMinKm != null ? (
+                  <p className="text-[11px] text-zinc-400 mt-1">This asset&apos;s last recorded reading: {editMinKm.toLocaleString()}. Can&apos;t be lower than that.</p>
+                ) : (
+                  <p className="text-[11px] text-zinc-400 mt-1">No km/hours recorded yet for this asset.</p>
+                )}
               </div>
 
               {editError && (

@@ -114,6 +114,7 @@ export default function ServicesPage() {
   const [reminderRow, setReminderRow] = useState<ServiceRow | null>(null);
   const [reminderDate, setReminderDate] = useState("");
   const [reminderKm, setReminderKm] = useState("");
+  const [reminderMinKm, setReminderMinKm] = useState<number | null>(null);
   const [reminderSaving, setReminderSaving] = useState(false);
   const [reminderError, setReminderError] = useState("");
 
@@ -243,6 +244,7 @@ export default function ServicesPage() {
     setReminderRow(row);
     setReminderDate(row.next_due_date ?? "");
     setReminderKm(row.next_due_km_hours != null ? String(row.next_due_km_hours) : "");
+    setReminderMinKm(currentKmHoursForAsset(getAsset(row)?.id));
     setReminderError("");
     setOpenMenuRowId(null);
   }
@@ -255,6 +257,11 @@ export default function ServicesPage() {
     const todayStr = new Date().toISOString().slice(0, 10);
     if (reminderDate && reminderDate < todayStr) {
       setReminderError("The reminder date can't be in the past.");
+      return;
+    }
+
+    if (reminderKm && reminderMinKm != null && parseFloat(reminderKm) < reminderMinKm) {
+      setReminderError(`Km/Hours can't be lower than the asset's last recorded value (${reminderMinKm.toLocaleString()}).`);
       return;
     }
 
@@ -491,12 +498,22 @@ export default function ServicesPage() {
                         </td>
                         <td className="px-3 py-3">
                           {hasReminder ? (
-                            <span className={`inline-flex items-center gap-1.5 text-[10.5px] font-semibold px-2 py-[3px] rounded-full ${rc.bg} ${rc.text}`}>
+                            <button
+                              onClick={() => openReminderModal(row)}
+                              title="View / edit reminder"
+                              className={`inline-flex items-center gap-1.5 text-[10.5px] font-semibold px-2 py-[3px] rounded-full transition-opacity hover:opacity-75 ${rc.bg} ${rc.text}`}
+                            >
                               <span className={`w-1.5 h-1.5 rounded-full ${rc.dot}`} />
                               {REMINDER_STATUS_LABEL[reminderStatus]}
-                            </span>
+                            </button>
                           ) : (
-                            <span className="text-[11px] text-zinc-300">—</span>
+                            <button
+                              onClick={() => openReminderModal(row)}
+                              title="Set reminder"
+                              className="text-[11px] text-zinc-300 hover:text-zinc-500 transition-colors"
+                            >
+                              — Set
+                            </button>
                           )}
                         </td>
                         <td className="px-3 py-3 text-right relative">
@@ -610,13 +627,24 @@ export default function ServicesPage() {
         <div className="fixed inset-0 z-50 bg-zinc-900/40 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-md">
             <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-200">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-xl bg-amber-50 flex items-center justify-center">
+              <div className="flex items-center gap-2 min-w-0">
+                <div className="w-8 h-8 rounded-xl bg-amber-50 flex items-center justify-center shrink-0">
                   <Bell size={15} className="text-amber-600" />
                 </div>
-                <h2 className="text-[16px] font-black text-zinc-900">Maintenance Reminder</h2>
+                <div className="min-w-0">
+                  <h2 className="text-[16px] font-black text-zinc-900 leading-tight">Maintenance Reminder</h2>
+                  {reminderRow && (() => {
+                    const a = getAsset(reminderRow);
+                    const label = a?.nickname || [a?.brand, a?.model].filter(Boolean).join(" ") || "Unknown asset";
+                    return (
+                      <p className="text-[11px] text-zinc-400 truncate">
+                        {label} · {reminderRow.service_type} on {reminderRow.service_date}
+                      </p>
+                    );
+                  })()}
+                </div>
               </div>
-              <button onClick={() => setReminderRow(null)} className="text-zinc-400 hover:text-zinc-700"><X size={18} /></button>
+              <button onClick={() => setReminderRow(null)} className="text-zinc-400 hover:text-zinc-700 shrink-0"><X size={18} /></button>
             </div>
 
             <form onSubmit={handleSaveReminder} className="px-6 py-5 space-y-4">
@@ -635,10 +663,15 @@ export default function ServicesPage() {
               <div>
                 <label className="text-[12px] font-bold text-zinc-700">Next service due at (Km / Hours)</label>
                 <input
-                  type="number" min="0" step="0.1" value={reminderKm} onChange={(e) => setReminderKm(e.target.value)}
+                  type="number" min={reminderMinKm ?? 0} step="0.1" value={reminderKm} onChange={(e) => setReminderKm(e.target.value)}
                   placeholder="e.g. 50000"
                   className="w-full mt-1 rounded-xl border border-zinc-200 px-3 py-[10px] text-[13px] outline-none focus:border-red-500"
                 />
+                {reminderMinKm != null ? (
+                  <p className="text-[11px] text-zinc-400 mt-1">This asset&apos;s last recorded reading: {reminderMinKm.toLocaleString()}. Can&apos;t be lower than that.</p>
+                ) : (
+                  <p className="text-[11px] text-zinc-400 mt-1">No km/hours recorded yet for this asset.</p>
+                )}
               </div>
 
               {reminderError && (
