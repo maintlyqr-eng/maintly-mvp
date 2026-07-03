@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   LayoutGrid, FileText, Box, QrCode, Users, BarChart3, Calendar as CalendarIcon,
-  Mail, FolderOpen, Settings, Bell, ChevronDown, Plus, X, Copy, Check, LogOut, Crown,
+  Mail, FolderOpen, Settings, Bell, Plus, X, Copy, Check, LogOut, Crown,
   Wrench, Pencil, History, CheckCircle2, UserCircle2, Camera, Gauge
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
@@ -515,13 +515,21 @@ export default function AssetsPage() {
             <button className="relative text-zinc-500 hover:text-zinc-800 transition-colors">
               <Bell size={19} />
             </button>
-            <div className="flex items-center gap-2 pl-3 border-l border-zinc-200">
-              <div className="w-9 h-9 rounded-full bg-red-100 flex items-center justify-center text-red-600 font-bold text-[13px]">{initials}</div>
-              <div>
-                <p className="text-[12px] font-bold text-zinc-800 leading-tight">{mechanicName || mechanicEmail}</p>
-                <p className="text-[10px] text-zinc-400 leading-tight">Mechanic</p>
+            <div className="flex items-center gap-3 pl-3 border-l border-zinc-200">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-full bg-red-100 flex items-center justify-center text-red-600 font-bold text-[13px] shrink-0">{initials}</div>
+                <div className="text-left">
+                  <p className="text-[12px] font-bold text-zinc-800 leading-tight">{mechanicName || mechanicEmail}</p>
+                  <p className="text-[10px] text-zinc-400 leading-tight">Mechanic</p>
+                </div>
               </div>
-              <ChevronDown size={14} className="text-zinc-400" />
+              <button
+                onClick={handleLogout}
+                className="flex items-center gap-1.5 text-[12px] font-semibold text-zinc-500 hover:text-red-600 hover:bg-red-50 border border-zinc-200 hover:border-red-200 px-3 py-2 rounded-xl transition-all"
+              >
+                <LogOut size={13} />
+                Log out
+              </button>
             </div>
           </div>
         </header>
