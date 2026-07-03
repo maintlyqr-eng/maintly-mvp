@@ -80,8 +80,8 @@ function MiniSparkline({ color }: { color: string }) {
 
 export default function DashboardPage() {
   const router = useRouter();
-  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [authChecked, setAuthChecked] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [mechanicName, setMechanicName] = useState("");
   const [mechanicEmail, setMechanicEmail] = useState("");
   const [totalServices, setTotalServices] = useState(0);
@@ -291,7 +291,6 @@ export default function DashboardPage() {
   return (
     <div className="min-h-screen bg-zinc-50 flex relative">
 
-      {/* ════ MOBILE SIDEBAR BACKDROP ════ */}
       {sidebarOpen && (
         <div className="md:hidden fixed inset-0 bg-black/40 z-30" onClick={() => setSidebarOpen(false)} />
       )}
@@ -362,7 +361,7 @@ export default function DashboardPage() {
           </div>
 
           <div className="flex items-center gap-2 md:gap-4 shrink-0">
-            <div className="relative hidden lg:block">
+            <div className="hidden lg:block relative">
               <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
               <input
                 type="text"
@@ -386,7 +385,7 @@ export default function DashboardPage() {
               </div>
               <button
                 onClick={handleLogout}
-                className="flex items-center gap-1.5 text-[12px] font-semibold text-zinc-500 hover:text-red-600 hover:bg-red-50 border border-zinc-200 hover:border-red-200 px-2.5 md:px-3 py-2 rounded-xl transition-all"
+                className="flex items-center gap-1.5 text-[12px] font-semibold text-zinc-500 hover:text-red-600 hover:bg-red-50 border border-zinc-200 hover:border-red-200 px-3 py-2 rounded-xl transition-all"
               >
                 <LogOut size={13} />
                 <span className="hidden md:inline">Log out</span>
@@ -670,7 +669,7 @@ export default function DashboardPage() {
                     <div>
                       <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wide mb-1 block">Year</label>
                       <input
-                        type="text" placeholder="e.g. 2021"
+                        type="number" placeholder="e.g. 2021" max={new Date().getFullYear()}
                         value={newYear} onChange={e => setNewYear(e.target.value)}
                         className="w-full rounded-xl border border-zinc-200 px-3 py-2.5 text-[13px] outline-none focus:border-red-400 transition-colors"
                       />

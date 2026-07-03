@@ -175,54 +175,50 @@ export default function HomePage() {
           ))}
         </div>
 
-        {/* Desktop auth controls */}
         <div className="hidden md:block">
-          {loggedIn ? (
-            <div className="flex items-center gap-2">
-              <a href="/dashboard" className="flex items-center gap-2 bg-zinc-900 hover:bg-zinc-800 text-white font-black tracking-wide rounded-xl transition-all shadow-md px-4 py-2" style={{fontSize:'clamp(10px,0.75vw,12px)'}}>
-                <LayoutGrid size={13} /> {userName}
-              </a>
-              <button onClick={handleLogout} className="flex items-center gap-1.5 text-zinc-500 hover:text-red-600 transition-colors border border-zinc-200 rounded-xl px-3 py-2" style={{fontSize:'clamp(10px,0.75vw,12px)'}}>
-                <LogOut size={13} />
-              </button>
-            </div>
-          ) : (
-            <a href="/login" className="flex items-center gap-2 bg-red-600 hover:bg-red-500 text-white font-black tracking-wide rounded-xl transition-all shadow-md shadow-red-900/20 uppercase px-5 py-2" style={{fontSize:'clamp(10px,0.75vw,12px)'}}>
-              <User size={13} /> Mechanic Login
+        {loggedIn ? (
+          <div className="flex items-center gap-2">
+            <a href="/dashboard" className="flex items-center gap-2 bg-zinc-900 hover:bg-zinc-800 text-white font-black tracking-wide rounded-xl transition-all shadow-md px-4 py-2" style={{fontSize:'clamp(10px,0.75vw,12px)'}}>
+              <LayoutGrid size={13} /> {userName}
             </a>
-          )}
+            <button onClick={handleLogout} className="flex items-center gap-1.5 text-zinc-500 hover:text-red-600 transition-colors border border-zinc-200 rounded-xl px-3 py-2" style={{fontSize:'clamp(10px,0.75vw,12px)'}}>
+              <LogOut size={13} />
+            </button>
+          </div>
+        ) : (
+          <a href="/login" className="flex items-center gap-2 bg-red-600 hover:bg-red-500 text-white font-black tracking-wide rounded-xl transition-all shadow-md shadow-red-900/20 uppercase px-5 py-2" style={{fontSize:'clamp(10px,0.75vw,12px)'}}>
+            <User size={13} /> Mechanic Login
+          </a>
+        )}
         </div>
 
-        {/* Mobile hamburger */}
         <button
-          onClick={() => setMobileMenuOpen((v) => !v)}
-          className="md:hidden w-10 h-10 flex items-center justify-center rounded-lg text-zinc-800 hover:bg-black/5 transition-colors"
-          aria-label="Menu"
+          onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+          className="md:hidden text-zinc-700 hover:text-zinc-900 p-2"
         >
           {mobileMenuOpen ? <X size={22} /> : <Menu size={22} />}
         </button>
       </nav>
 
-      {/* ════ MOBILE MENU DROPDOWN ════ */}
       {mobileMenuOpen && (
-        <div className="md:hidden relative z-50 bg-white border-b border-zinc-200 shadow-lg px-5 py-4 flex flex-col gap-1">
+        <div className="md:hidden relative z-40 bg-white border-b border-zinc-200 shadow-lg flex flex-col px-5 py-4 gap-1">
           {["Product","How It Works","Industries","Pricing","Resources","API","About"].map((item) => (
-            <a key={item} href="#" className="text-zinc-700 hover:text-red-600 font-semibold text-[14px] py-2 border-b border-zinc-100 last:border-0">
+            <a key={item} href="#" onClick={() => setMobileMenuOpen(false)} className="text-zinc-700 hover:text-zinc-900 font-medium py-2 border-b border-zinc-100 last:border-0">
               {item}
             </a>
           ))}
           <div className="pt-3">
             {loggedIn ? (
-              <div className="flex items-center gap-2">
-                <a href="/dashboard" className="flex-1 flex items-center justify-center gap-2 bg-zinc-900 text-white font-black rounded-xl px-4 py-3 text-[13px]">
+              <div className="flex flex-col gap-2">
+                <a href="/dashboard" onClick={() => setMobileMenuOpen(false)} className="flex items-center justify-center gap-2 bg-zinc-900 hover:bg-zinc-800 text-white font-black tracking-wide rounded-xl transition-all shadow-md px-4 py-3 text-[13px]">
                   <LayoutGrid size={14} /> {userName}
                 </a>
-                <button onClick={handleLogout} className="flex items-center justify-center gap-1.5 text-zinc-500 border border-zinc-200 rounded-xl px-3 py-3">
-                  <LogOut size={14} />
+                <button onClick={() => { handleLogout(); setMobileMenuOpen(false); }} className="flex items-center justify-center gap-1.5 text-zinc-500 hover:text-red-600 transition-colors border border-zinc-200 rounded-xl px-3 py-3 text-[13px]">
+                  <LogOut size={14} /> Log out
                 </button>
               </div>
             ) : (
-              <a href="/login" className="flex items-center justify-center gap-2 bg-red-600 text-white font-black tracking-wide rounded-xl uppercase px-5 py-3 text-[13px]">
+              <a href="/login" onClick={() => setMobileMenuOpen(false)} className="flex items-center justify-center gap-2 bg-red-600 hover:bg-red-500 text-white font-black tracking-wide rounded-xl transition-all shadow-md shadow-red-900/20 uppercase px-5 py-3 text-[13px]">
                 <User size={14} /> Mechanic Login
               </a>
             )}
@@ -335,13 +331,7 @@ export default function HomePage() {
             { icon: Clock, title: "Full History", sub: "Every service, every part, every time" },
             { icon: TrendingUp, title: "Built to Grow", sub: "Scalable for individuals and enterprises" },
           ].map(({ icon: Icon, title, sub }, i) => (
-            <div key={title} className={[
-              "flex flex-col items-center text-center px-3 border-zinc-200",
-              i % 2 === 0 ? "border-r" : "",
-              i < 2 ? "border-b" : "",
-              "md:border-b-0",
-              i < 3 ? "md:border-r" : "md:border-r-0",
-            ].filter(Boolean).join(" ")} style={{paddingTop:'clamp(8px,1vh,14px)', paddingBottom:'clamp(8px,1vh,14px)'}}>
+            <div key={title} className={["flex flex-col items-center text-center px-3 border-zinc-200", i % 2 === 0 ? "border-r" : "", i < 2 ? "border-b" : "", "md:border-b-0", i < 3 ? "md:border-r" : "md:border-r-0"].filter(Boolean).join(" ")} style={{paddingTop:'clamp(8px,1vh,14px)', paddingBottom:'clamp(8px,1vh,14px)'}}>
               <div className="rounded-full border border-red-200 bg-red-50 flex items-center justify-center text-red-500 shrink-0" style={{width:'clamp(24px,2.2vw,30px)', height:'clamp(24px,2.2vw,30px)', marginBottom:'clamp(4px,0.5vh,8px)'}}>
                 <Icon style={{width:'clamp(10px,0.9vw,13px)', height:'clamp(10px,0.9vw,13px)'}} />
               </div>

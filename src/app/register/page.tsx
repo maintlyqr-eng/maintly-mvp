@@ -81,7 +81,7 @@ export default function RegisterPage() {
   return (
     <main className="relative min-h-dvh bg-white overflow-x-hidden">
 
-      {/* ── IMAGEN DE FONDO COMPLETA (solo desktop/tablet — incluye el panel blanco dibujado) ── */}
+      {/* ── IMAGEN DE FONDO COMPLETA (incluye el panel blanco dibujado) ── */}
       <div className="hidden md:block absolute inset-0 z-0 bg-white">
         <Image
           src="/images/login-side.png"
@@ -92,7 +92,7 @@ export default function RegisterPage() {
         />
       </div>
 
-      {/* ── FORMULARIO — centrado simple en mobile, flotando sobre el panel blanco en desktop ── */}
+      {/* ── FORMULARIO FLOTANDO SOBRE EL PANEL BLANCO DE LA IMAGEN ── */}
       <div className="relative z-10 min-h-dvh flex items-center justify-center px-6 py-10 md:px-0 md:py-0">
         <div className="w-full flex md:max-w-[1536px] md:aspect-[1536/1019]">
           <div className="hidden md:block flex-1" />

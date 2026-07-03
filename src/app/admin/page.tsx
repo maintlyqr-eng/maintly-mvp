@@ -9,10 +9,6 @@ import {
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 
-const ADMIN_USER = "admin";
-const ADMIN_PASS = "admin157157";
-const SESSION_KEY = "mly_admin_ok";
-
 type MechanicRow = {
   id: string; name: string; email: string;
   workshop_name: string | null; verified: boolean; created_at: string;
@@ -98,8 +94,10 @@ export default function AdminPage() {
   const [loginError, setLoginError]   = useState("");
   const [showPass, setShowPass]       = useState(false);
   const [loginChecked, setLoginChecked] = useState(false);
+  const [loginSubmitting, setLoginSubmitting] = useState(false);
   const [loading, setLoading]         = useState(true);
   const [refreshing, setRefreshing]   = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const [totalMechanics, setTotalMechanics] = useState(0);
   const [totalAssets, setTotalAssets]       = useState(0);
@@ -112,7 +110,6 @@ export default function AdminPage() {
   const [services, setServices]             = useState<ServiceRow[]>([]);
   const [assetTypes, setAssetTypes]         = useState<AssetTypeCount[]>([]);
   const [section, setSection] = useState<"overview" | "mechanics" | "services" | "qr">("overview");
-  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   async function loadData() {
     setRefreshing(true);
@@ -155,26 +152,41 @@ export default function AdminPage() {
   }
 
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      const ok = sessionStorage.getItem(SESSION_KEY) === "1";
-      setAdminAuthed(ok); setLoginChecked(true);
-      if (ok) loadData().then(() => setLoading(false));
-    }
+    fetch("/api/admin/session")
+      .then((r) => r.json())
+      .then((data) => {
+        setAdminAuthed(!!data.ok);
+        setLoginChecked(true);
+        if (data.ok) loadData().then(() => setLoading(false));
+      })
+      .catch(() => setLoginChecked(true));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  function handleAdminLogin(e: React.FormEvent) {
+  async function handleAdminLogin(e: React.FormEvent) {
     e.preventDefault();
-    if (loginUser.trim() === ADMIN_USER && loginPass === ADMIN_PASS) {
-      sessionStorage.setItem(SESSION_KEY, "1");
-      setAdminAuthed(true); setLoginError("");
-      loadData().then(() => setLoading(false));
-    } else {
-      setLoginError("Incorrect credentials. Please try again.");
+    setLoginError("");
+    setLoginSubmitting(true);
+    try {
+      const res = await fetch("/api/admin/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username: loginUser.trim(), password: loginPass }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setLoginError(data.error || "Incorrect credentials. Please try again.");
+        return;
+      }
+      setAdminAuthed(true);
+      await loadData();
+      setLoading(false);
+    } finally {
+      setLoginSubmitting(false);
     }
   }
-  function handleAdminLogout() {
-    sessionStorage.removeItem(SESSION_KEY);
+  async function handleAdminLogout() {
+    await fetch("/api/admin/logout", { method: "POST" });
     setAdminAuthed(false);
   }
 
@@ -238,9 +250,9 @@ export default function AdminPage() {
                 </div>
               )}
 
-              <button type="submit"
-                className="w-full bg-red-600 hover:bg-red-500 active:scale-[0.98] text-white font-bold py-3.5 rounded-xl text-[14px] transition-all shadow-lg shadow-red-200 mt-1">
-                Access Admin Panel
+              <button type="submit" disabled={loginSubmitting}
+                className="w-full bg-red-600 hover:bg-red-500 active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed text-white font-bold py-3.5 rounded-xl text-[14px] transition-all shadow-lg shadow-red-200 mt-1">
+                {loginSubmitting ? "Checking…" : "Access Admin Panel"}
               </button>
             </form>
           </div>
@@ -273,7 +285,6 @@ export default function AdminPage() {
   return (
     <div className="min-h-screen bg-zinc-50/60 flex text-zinc-900 relative">
 
-      {/* ══ MOBILE SIDEBAR BACKDROP ══ */}
       {sidebarOpen && (
         <div className="md:hidden fixed inset-0 bg-black/40 z-30" onClick={() => setSidebarOpen(false)} />
       )}
@@ -349,7 +360,7 @@ export default function AdminPage() {
             </div>
           </div>
           <button onClick={loadData} disabled={refreshing}
-            className="shrink-0 flex items-center gap-2 bg-white border border-zinc-200 hover:border-zinc-300 hover:bg-zinc-50 text-zinc-600 hover:text-zinc-900 text-[12px] font-bold px-3 md:px-4 py-2.5 rounded-xl transition-all disabled:opacity-40 shadow-sm">
+            className="flex items-center gap-2 bg-white border border-zinc-200 hover:border-zinc-300 hover:bg-zinc-50 text-zinc-600 hover:text-zinc-900 text-[12px] font-bold px-3 md:px-4 py-2.5 rounded-xl transition-all disabled:opacity-40 shadow-sm shrink-0">
             <RefreshCw size={13} className={refreshing ? "animate-spin" : ""} />
             <span className="hidden sm:inline">Refresh</span>
           </button>

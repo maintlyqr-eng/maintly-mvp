@@ -7,7 +7,7 @@ export default function QrEmptyPage() {
   return (
     <main className="relative min-h-dvh md:h-dvh w-full bg-white md:overflow-hidden">
 
-      {/* ── IMAGEN DE FONDO COMPLETA (solo desktop/tablet, escalada por ALTO) ── */}
+      {/* ── IMAGEN DE FONDO COMPLETA, escalada por ALTO para llenar la pantalla ── */}
       <div className="hidden md:flex absolute inset-0 z-0 items-center justify-center bg-white">
         <div className="relative h-full" style={{ aspectRatio: "1536/1024" }}>
           <Image
@@ -20,7 +20,7 @@ export default function QrEmptyPage() {
         </div>
       </div>
 
-      {/* ── CONTENEDOR que tiene EXACTAMENTE el mismo tamaño/posición que la imagen (desktop) ── */}
+      {/* ── CONTENEDOR que tiene EXACTAMENTE el mismo tamaño/posición que la imagen ── */}
       <div className="hidden md:flex absolute inset-0 z-10 items-center justify-center pointer-events-none">
         <div className="relative h-full" style={{ aspectRatio: "1536/1024" }}>
 
@@ -96,7 +96,7 @@ export default function QrEmptyPage() {
         </div>
       </div>
 
-      {/* ── MOBILE LAYOUT (no split image — stacked, scrollable) ── */}
+      {/* ── MOBILE LAYOUT ── */}
       <div className="md:hidden flex flex-col min-h-dvh px-5 py-8">
         <div className="w-full max-w-[400px] mx-auto flex flex-col items-center flex-1">
 
@@ -111,7 +111,7 @@ export default function QrEmptyPage() {
             <h1 className="text-[22px] font-black text-zinc-900 tracking-tight leading-tight">
               This QR code is empty
             </h1>
-            <p className="text-[12px] text-zinc-500 mt-2 leading-relaxed max-w-[300px]">
+            <p className="text-[11.5px] text-zinc-500 mt-2 leading-relaxed max-w-[300px]">
               No asset has been assigned to this QR code yet. Be the first to add a machine and start its maintenance journey.
             </p>
           </div>

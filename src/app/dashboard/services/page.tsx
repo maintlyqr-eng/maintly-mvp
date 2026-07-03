@@ -81,8 +81,8 @@ function assetLabel(a: AssetOption | null) {
 
 export default function ServicesPage() {
   const router = useRouter();
-  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [checkingAuth, setCheckingAuth] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [mechanicId, setMechanicId] = useState("");
   const [mechanicName, setMechanicName] = useState("");
   const [mechanicEmail, setMechanicEmail] = useState("");
@@ -98,11 +98,12 @@ export default function ServicesPage() {
   const [showForm, setShowForm] = useState(false);
   const [svcAssetId, setSvcAssetId] = useState("");
   const [svcType, setSvcType] = useState("Oil Change");
-  const [svcDate, setSvcDate] = useState(new Date().toISOString().slice(0, 10));
   const [svcKmHours, setSvcKmHours] = useState("");
   const [svcNotes, setSvcNotes] = useState("");
   const [svcSaving, setSvcSaving] = useState(false);
   const [svcError, setSvcError] = useState("");
+  const [minKmHours, setMinKmHours] = useState<number | null>(null);
+  const [minKmHoursLoading, setMinKmHoursLoading] = useState(false);
 
   async function loadServices(uid: string) {
     setLoading(true);
@@ -162,23 +163,49 @@ export default function ServicesPage() {
   function resetForm() {
     setSvcAssetId(assetOptions[0]?.id ?? "");
     setSvcType("Oil Change");
-    setSvcDate(new Date().toISOString().slice(0, 10));
     setSvcKmHours("");
     setSvcNotes("");
     setSvcError("");
+    setMinKmHours(null);
   }
+
+  async function fetchMinKmHours(assetId: string) {
+    if (!assetId) { setMinKmHours(null); return; }
+    setMinKmHoursLoading(true);
+    const { data } = await supabase
+      .from("service_records")
+      .select("km_hours")
+      .eq("asset_id", assetId)
+      .not("km_hours", "is", null)
+      .order("km_hours", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    setMinKmHours(data?.km_hours ?? null);
+    setMinKmHoursLoading(false);
+  }
+
+  useEffect(() => {
+    if (showForm && svcAssetId) fetchMinKmHours(svcAssetId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showForm, svcAssetId]);
 
   async function handleAddService(e: React.FormEvent) {
     e.preventDefault();
     setSvcError("");
     if (!svcAssetId) { setSvcError("Please select an asset."); return; }
+
+    if (svcKmHours && minKmHours != null && parseFloat(svcKmHours) < minKmHours) {
+      setSvcError(`Km/Hours can't be lower than the last recorded value (${minKmHours.toLocaleString()}).`);
+      return;
+    }
+
     setSvcSaving(true);
 
     const { error } = await supabase.from("service_records").insert({
       mechanic_id: mechanicId,
       asset_id: svcAssetId,
       service_type: svcType,
-      service_date: svcDate,
+      service_date: new Date().toISOString().slice(0, 10),
       km_hours: svcKmHours ? parseFloat(svcKmHours) : null,
       notes: svcNotes.trim() || null,
     });
@@ -211,7 +238,6 @@ export default function ServicesPage() {
   return (
     <div className="min-h-screen bg-zinc-50 flex relative">
 
-      {/* ════ MOBILE SIDEBAR BACKDROP ════ */}
       {sidebarOpen && (
         <div className="md:hidden fixed inset-0 bg-black/40 z-30" onClick={() => setSidebarOpen(false)} />
       )}
@@ -291,7 +317,7 @@ export default function ServicesPage() {
               </div>
               <button
                 onClick={handleLogout}
-                className="flex items-center gap-1.5 text-[12px] font-semibold text-zinc-500 hover:text-red-600 hover:bg-red-50 border border-zinc-200 hover:border-red-200 px-2.5 md:px-3 py-2 rounded-xl transition-all"
+                className="flex items-center gap-1.5 text-[12px] font-semibold text-zinc-500 hover:text-red-600 hover:bg-red-50 border border-zinc-200 hover:border-red-200 px-3 py-2 rounded-xl transition-all"
               >
                 <LogOut size={13} />
                 <span className="hidden md:inline">Log out</span>
@@ -441,15 +467,23 @@ export default function ServicesPage() {
                 </select>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="text-[12px] font-bold text-zinc-700">Date *</label>
-                  <input type="date" required value={svcDate} onChange={(e) => setSvcDate(e.target.value)} className="w-full mt-1 rounded-xl border border-zinc-200 px-3 py-[10px] text-[13px] outline-none focus:border-red-500" />
-                </div>
-                <div>
-                  <label className="text-[12px] font-bold text-zinc-700">Km / Hours</label>
-                  <input type="number" min="0" step="0.1" value={svcKmHours} onChange={(e) => setSvcKmHours(e.target.value)} placeholder="e.g. 45000" className="w-full mt-1 rounded-xl border border-zinc-200 px-3 py-[10px] text-[13px] outline-none focus:border-red-500" />
-                </div>
+              <div className="rounded-xl bg-zinc-50 border border-zinc-200 px-3 py-2.5 text-[12px] text-zinc-500">
+                Service date will be recorded automatically as today, {new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}.
+              </div>
+
+              <div>
+                <label className="text-[12px] font-bold text-zinc-700">Km / Hours</label>
+                <input
+                  type="number" min={minKmHours ?? 0} step="0.1"
+                  value={svcKmHours} onChange={(e) => setSvcKmHours(e.target.value)}
+                  placeholder="e.g. 45000"
+                  className="w-full mt-1 rounded-xl border border-zinc-200 px-3 py-[10px] text-[13px] outline-none focus:border-red-500"
+                />
+                {minKmHoursLoading ? (
+                  <p className="text-[11px] text-zinc-400 mt-1">Checking last recorded value…</p>
+                ) : minKmHours != null ? (
+                  <p className="text-[11px] text-zinc-400 mt-1">Last recorded: {minKmHours.toLocaleString()}. Can&apos;t be lower than that.</p>
+                ) : null}
               </div>
 
               <div>
