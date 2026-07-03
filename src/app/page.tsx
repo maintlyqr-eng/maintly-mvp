@@ -1,9 +1,9 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowRight, ShieldCheck, Camera, Keyboard, User, ChevronDown, Globe, Clock, TrendingUp, LogOut, LayoutGrid } from "lucide-react";
+import { ArrowRight, ShieldCheck, Camera, Keyboard, User, ChevronDown, Globe, Clock, TrendingUp, LogOut, LayoutGrid, X, ZoomIn } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 
 export default function HomePage() {
@@ -11,6 +11,17 @@ export default function HomePage() {
   const [loggedIn, setLoggedIn] = useState(false);
   const [userName, setUserName] = useState("");
   const [qrCode, setQrCode] = useState("");
+
+  // Camera scanner states
+  const [showCamera, setShowCamera]   = useState(false);
+  const [camError, setCamError]       = useState("");
+  const [scanning, setScanning]       = useState(false);
+  const [detected, setDetected]       = useState("");
+  const videoRef    = useRef<HTMLVideoElement>(null);
+  const canvasRef   = useRef<HTMLCanvasElement>(null);
+  const streamRef   = useRef<MediaStream | null>(null);
+  const rafRef      = useRef<number | null>(null);
+  const activeRef   = useRef(false);
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
@@ -24,6 +35,12 @@ export default function HomePage() {
       }
     });
     return () => subscription.unsubscribe();
+  }, []);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => { stopCamera(); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function handleLogout() {
@@ -41,10 +58,91 @@ export default function HomePage() {
     if (e.key === "Enter") handleGoToAsset();
   }
 
+  // ── CAMERA SCANNER ────────────────────────────────────────────────────────────
+
+  function stopCamera() {
+    activeRef.current = false;
+    if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current = null; }
+    if (streamRef.current) { streamRef.current.getTracks().forEach(t => t.stop()); streamRef.current = null; }
+  }
+
+  async function openCamera() {
+    setCamError("");
+    setDetected("");
+    setShowCamera(true);
+    setScanning(false);
+    activeRef.current = true;
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: "environment" }, width: { ideal: 1280 }, height: { ideal: 720 } },
+      });
+      if (!activeRef.current) { stream.getTracks().forEach(t => t.stop()); return; }
+      streamRef.current = stream;
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        videoRef.current.onloadedmetadata = () => {
+          videoRef.current?.play();
+          setScanning(true);
+          requestScan();
+        };
+      }
+    } catch {
+      setCamError("Camera access denied. Please allow camera access in your browser settings and try again.");
+    }
+  }
+
+  function closeCamera() {
+    stopCamera();
+    setShowCamera(false);
+    setScanning(false);
+    setCamError("");
+    setDetected("");
+  }
+
+  async function requestScan() {
+    if (!activeRef.current) return;
+    const video  = videoRef.current;
+    const canvas = canvasRef.current;
+    if (!video || !canvas) return;
+
+    if (video.readyState < video.HAVE_ENOUGH_DATA) {
+      rafRef.current = requestAnimationFrame(requestScan);
+      return;
+    }
+
+    canvas.width  = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const ctx = canvas.getContext("2d", { willReadFrequently: true });
+    if (!ctx) return;
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+
+    // Dynamic import so jsQR only loads client-side
+    const jsQR = (await import("jsqr")).default;
+    const code = jsQR(imageData.data, imageData.width, imageData.height, {
+      inversionAttempts: "dontInvert",
+    });
+
+    if (code?.data && activeRef.current) {
+      setDetected(code.data);
+      stopCamera();
+      // Brief "found" animation then navigate
+      setTimeout(() => {
+        router.push(`/asset/${code.data}`);
+      }, 600);
+      return;
+    }
+
+    if (activeRef.current) {
+      rafRef.current = requestAnimationFrame(requestScan);
+    }
+  }
+
   return (
     <main className="relative h-screen overflow-hidden bg-white text-zinc-900 flex flex-col">
 
-      {/* ── FONDO ── */}
+      {/* ── BACKGROUND ── */}
       <div className="absolute inset-0 z-0">
         <Image src="/images/fondo.png" alt="Maintly background" fill priority className="object-cover object-center" />
       </div>
@@ -87,15 +185,12 @@ export default function HomePage() {
       {/* ════ HERO ════ */}
       <section className="relative z-10 flex flex-col items-center text-center px-4 flex-1" style={{paddingTop:'3vh'}}>
 
-        {/* Título */}
         <h1 className="font-black leading-[1.05] tracking-tight text-zinc-900" style={{fontSize:'clamp(36px,5.5vw,68px)'}}>
           Every Machine<br />Has a <span className="text-red-600">Story.</span>
         </h1>
 
-        {/* Línea roja */}
         <div className="w-14 h-[3px] bg-red-600 rounded-full" style={{marginTop:'1.5vh'}} />
 
-        {/* Subtítulo */}
         <p className="font-semibold text-zinc-800" style={{fontSize:'clamp(13px,1.2vw,18px)', marginTop:'1.5vh'}}>
           <span className="text-red-600 font-black">One QR.</span> Lifetime Maintenance History.
         </p>
@@ -115,7 +210,11 @@ export default function HomePage() {
             <p className="text-zinc-400 leading-tight flex-1" style={{fontSize:'clamp(9px,0.7vw,11px)', marginBottom:'1.5vh'}}>
               Use your camera to<br />scan any QR code
             </p>
-            <button className="w-full rounded-xl bg-red-600 hover:bg-red-500 active:scale-[0.98] transition-all text-white flex items-center justify-center gap-2 shadow-lg shadow-red-900/30 font-black tracking-[0.1em] uppercase" style={{fontSize:'clamp(9px,0.75vw,11px)', padding:'clamp(7px,0.9vh,11px) 0'}}>
+            <button
+              onClick={openCamera}
+              className="w-full rounded-xl bg-red-600 hover:bg-red-500 active:scale-[0.98] transition-all text-white flex items-center justify-center gap-2 shadow-lg shadow-red-900/30 font-black tracking-[0.1em] uppercase"
+              style={{fontSize:'clamp(9px,0.75vw,11px)', padding:'clamp(7px,0.9vh,11px) 0'}}
+            >
               <Camera style={{width:'clamp(11px,0.9vw,14px)', height:'clamp(11px,0.9vw,14px)'}} /> Open Camera
             </button>
           </div>
@@ -159,7 +258,6 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* Open history */}
         <div className="flex items-center gap-2 text-zinc-500" style={{marginTop:'1.2vh'}}>
           <ShieldCheck className="text-red-500 shrink-0" style={{width:'clamp(11px,0.9vw,14px)', height:'clamp(11px,0.9vw,14px)'}} />
           <span style={{fontSize:'clamp(10px,0.8vw,12px)'}}>Open history. No login required.</span>
@@ -215,6 +313,120 @@ export default function HomePage() {
         </div>
 
       </section>
+
+      {/* ════ CAMERA OVERLAY ════ */}
+      {showCamera && (
+        <div className="fixed inset-0 z-[100] bg-black flex flex-col">
+
+          {/* Hidden canvas for QR processing */}
+          <canvas ref={canvasRef} className="hidden" />
+
+          {/* Top bar */}
+          <div className="flex items-center justify-between px-5 pt-safe-top py-4 shrink-0" style={{paddingTop: 'max(env(safe-area-inset-top), 16px)'}}>
+            <div className="flex items-center gap-2.5">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/images/Maintly.png" alt="Maintly" style={{height: 18, objectFit: 'contain', filter: 'brightness(0) invert(1)'}} />
+            </div>
+            <button
+              onClick={closeCamera}
+              className="w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 active:scale-95 flex items-center justify-center transition-all"
+            >
+              <X size={20} className="text-white" />
+            </button>
+          </div>
+
+          {/* Camera feed */}
+          <div className="flex-1 relative overflow-hidden">
+            <video
+              ref={videoRef}
+              autoPlay
+              playsInline
+              muted
+              className="absolute inset-0 w-full h-full object-cover"
+            />
+
+            {/* Scanning frame overlay */}
+            {scanning && !detected && (
+              <div className="absolute inset-0 flex items-center justify-center">
+                {/* Dark surround */}
+                <div className="absolute inset-0 bg-black/50" />
+
+                {/* Scan window */}
+                <div className="relative z-10 w-[260px] h-[260px]">
+                  {/* Transparent cutout feel with corners */}
+                  <div className="absolute inset-0 rounded-2xl border-2 border-white/30" />
+
+                  {/* Corner accents */}
+                  <div className="absolute top-0 left-0 w-10 h-10 border-t-4 border-l-4 border-red-500 rounded-tl-2xl" />
+                  <div className="absolute top-0 right-0 w-10 h-10 border-t-4 border-r-4 border-red-500 rounded-tr-2xl" />
+                  <div className="absolute bottom-0 left-0 w-10 h-10 border-b-4 border-l-4 border-red-500 rounded-bl-2xl" />
+                  <div className="absolute bottom-0 right-0 w-10 h-10 border-b-4 border-r-4 border-red-500 rounded-br-2xl" />
+
+                  {/* Scanning line animation */}
+                  <div className="absolute inset-x-3 top-2 h-0.5 bg-gradient-to-r from-transparent via-red-500 to-transparent animate-[scanline_2s_ease-in-out_infinite]" />
+                </div>
+              </div>
+            )}
+
+            {/* QR detected flash */}
+            {detected && (
+              <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/70 z-20">
+                <div className="w-20 h-20 rounded-full bg-green-500 flex items-center justify-center mb-4 animate-[pop_0.3s_ease-out]">
+                  <ZoomIn size={36} className="text-white" />
+                </div>
+                <p className="text-white font-black text-[18px]">QR Detected!</p>
+                <p className="text-white/60 text-[13px] mt-1">Opening history…</p>
+              </div>
+            )}
+
+            {/* Error state */}
+            {camError && (
+              <div className="absolute inset-0 flex flex-col items-center justify-center z-20 px-8 text-center">
+                <div className="w-16 h-16 rounded-full bg-red-600/20 border border-red-500/40 flex items-center justify-center mb-4">
+                  <Camera size={28} className="text-red-400" />
+                </div>
+                <p className="text-white font-bold text-[16px] mb-2">Camera unavailable</p>
+                <p className="text-white/60 text-[13px] leading-relaxed mb-6">{camError}</p>
+                <button
+                  onClick={closeCamera}
+                  className="bg-white text-zinc-900 font-bold px-6 py-3 rounded-xl text-[14px]"
+                >
+                  Go back
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Bottom instructions */}
+          {scanning && !detected && !camError && (
+            <div className="shrink-0 flex flex-col items-center gap-2 py-8 px-6 text-center" style={{paddingBottom: 'max(env(safe-area-inset-bottom), 32px)'}}>
+              <p className="text-white font-bold text-[16px]">Point at a Maintly QR code</p>
+              <p className="text-white/50 text-[13px]">Hold steady — detection is automatic</p>
+            </div>
+          )}
+
+          {!scanning && !camError && (
+            <div className="shrink-0 flex flex-col items-center gap-3 py-8 px-6">
+              <div className="w-8 h-8 rounded-full border-2 border-white/30 border-t-white animate-spin" />
+              <p className="text-white/60 text-[13px]">Starting camera…</p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Scanline animation */}
+      <style>{`
+        @keyframes scanline {
+          0%   { transform: translateY(0px);   opacity: 1; }
+          50%  { transform: translateY(240px); opacity: 0.8; }
+          100% { transform: translateY(0px);   opacity: 1; }
+        }
+        @keyframes pop {
+          0%   { transform: scale(0.5); opacity: 0; }
+          70%  { transform: scale(1.1); }
+          100% { transform: scale(1);   opacity: 1; }
+        }
+      `}</style>
     </main>
   );
 }
