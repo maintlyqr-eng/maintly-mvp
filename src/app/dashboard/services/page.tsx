@@ -15,6 +15,7 @@ import { computeReminderStatus, REMINDER_STATUS_LABEL, REMINDER_STATUS_COLOR } f
 const navItems = [
   { icon: LayoutGrid, label: "Dashboard", href: "/dashboard" },
   { icon: FileText, label: "My Services", href: "/dashboard/services" },
+  { icon: Bell, label: "Scheduled Services", href: "/dashboard/scheduled" },
   { icon: Box, label: "Assets", href: "/dashboard/assets" },
   { icon: QrCode, label: "QR Codes", href: "/dashboard/assets" },
   { icon: Users, label: "Customers", href: "#" },
@@ -250,16 +251,30 @@ export default function ServicesPage() {
     e.preventDefault();
     if (!reminderRow) return;
     setReminderError("");
+
+    const todayStr = new Date().toISOString().slice(0, 10);
+    if (reminderDate && reminderDate < todayStr) {
+      setReminderError("The reminder date can't be in the past.");
+      return;
+    }
+
     setReminderSaving(true);
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from("service_records")
       .update({
         next_due_date: reminderDate || null,
         next_due_km_hours: reminderKm ? parseFloat(reminderKm) : null,
       })
-      .eq("id", reminderRow.id);
+      .eq("id", reminderRow.id)
+      .select("id");
     setReminderSaving(false);
+
     if (error) { setReminderError(error.message); return; }
+    if (!data || data.length === 0) {
+      setReminderError("Couldn't save — the record wasn't updated. This usually means the database is missing the reminder columns (run the migration) or a permissions (RLS) rule is blocking the update.");
+      return;
+    }
+
     setReminderRow(null);
     await loadServices(mechanicId);
   }
@@ -612,7 +627,7 @@ export default function ServicesPage() {
               <div>
                 <label className="text-[12px] font-bold text-zinc-700">Next service due date</label>
                 <input
-                  type="date" value={reminderDate} onChange={(e) => setReminderDate(e.target.value)}
+                  type="date" min={new Date().toISOString().slice(0, 10)} value={reminderDate} onChange={(e) => setReminderDate(e.target.value)}
                   className="w-full mt-1 rounded-xl border border-zinc-200 px-3 py-[10px] text-[13px] outline-none focus:border-red-500"
                 />
               </div>

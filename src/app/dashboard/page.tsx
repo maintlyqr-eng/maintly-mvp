@@ -16,6 +16,7 @@ import { computeReminderStatus, REMINDER_STATUS_LABEL, REMINDER_STATUS_COLOR, ty
 const navItems = [
   { icon: LayoutGrid,   label: "Dashboard",        href: "/dashboard",          active: true  },
   { icon: FileText,     label: "My Services",      href: "/dashboard/services", active: false },
+  { icon: Bell,         label: "Scheduled Services", href: "/dashboard/scheduled", active: false },
   { icon: Box,          label: "Assets",           href: "/dashboard/assets",   active: false },
   { icon: QrCode,       label: "QR Codes",         href: "/dashboard/assets",   active: false },
   { icon: Users,        label: "Customers",        href: "#",                   active: false },

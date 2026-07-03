@@ -13,6 +13,7 @@ import { supabase } from "@/lib/supabase";
 const navItems = [
   { icon: LayoutGrid, label: "Dashboard", href: "/dashboard" },
   { icon: FileText, label: "My Services", href: "/dashboard/services" },
+  { icon: Bell, label: "Scheduled Services", href: "/dashboard/scheduled" },
   { icon: Box, label: "Assets", href: "/dashboard/assets" },
   { icon: QrCode, label: "QR Codes", href: "/dashboard/assets" },
   { icon: Users, label: "Customers", href: "#" },
