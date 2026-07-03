@@ -125,11 +125,19 @@ export default function HomePage() {
     });
 
     if (code?.data && activeRef.current) {
-      setDetected(code.data);
+      // If QR contains a full URL, extract the last path segment (the code)
+      let qrValue = code.data.trim();
+      try {
+        const url = new URL(qrValue);
+        const parts = url.pathname.split("/").filter(Boolean);
+        qrValue = parts[parts.length - 1] || qrValue;
+      } catch {
+        // Not a URL — use as-is (e.g. "MTLY-AB12-CD34")
+      }
+      setDetected(qrValue);
       stopCamera();
-      // Brief "found" animation then navigate
       setTimeout(() => {
-        router.push(`/asset/${code.data}`);
+        router.push(`/asset/${qrValue}`);
       }, 600);
       return;
     }
