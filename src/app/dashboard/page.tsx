@@ -183,19 +183,17 @@ export default function DashboardPage() {
 
     const { error } = await supabase
       .from("mechanic_assets")
-      .insert({
-        mechanic_id: session.user.id,
-        asset_id: foundAsset.assetId,
-        qr_code: foundAsset.id,
-      });
+      .upsert(
+        {
+          mechanic_id: session.user.id,
+          asset_id: foundAsset.assetId,
+          qr_code: foundAsset.id,
+        },
+        { onConflict: "mechanic_id,asset_id", ignoreDuplicates: true }
+      );
 
     if (error) {
-      // código 23505 = duplicate (ya estaba en el taller) → tratamos como éxito
-      if (error.code === "23505") {
-        setAddSuccess(true);
-      } else {
-        setSearchError("Something went wrong. Please try again.");
-      }
+      setSearchError("Error al guardar: " + error.message);
       return;
     }
 
