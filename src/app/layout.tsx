@@ -16,7 +16,7 @@ export const metadata: Metadata = {
   title: "MaintlyQR",
   description: "One QR. Lifetime maintenance history for any machine, anywhere in the world.",
   icons: {
-    icon: "/images/qr-gear.png",
+    icon: "/images/LOGO.png",
   },
 };
 
