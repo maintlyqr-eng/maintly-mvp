@@ -64,7 +64,8 @@ type RealService = {
 
 type FoundAsset = {
   name: string;
-  id: string;
+  id: string;      // display: QR code or serial
+  assetId: string; // UUID real para insertar en BD
   type: string;
 };
 
@@ -146,12 +147,13 @@ export default function DashboardPage() {
       setFoundAsset({
         name: asset.nickname || [asset.brand, asset.model].filter(Boolean).join(" ") || "Unknown Asset",
         id: qrData.code,
+        assetId: asset.id,
         type: asset.asset_type,
       });
       return;
     }
 
-    // 2. Fallback: buscar directamente por UUID del asset (por si el mecánico pegó la URL)
+    // 2. Fallback: buscar directamente por UUID del asset
     const { data: directAsset } = await supabase
       .from("assets")
       .select("id, brand, model, nickname, asset_type, vin_serial")
@@ -168,8 +170,42 @@ export default function DashboardPage() {
     setFoundAsset({
       name: directAsset.nickname || [directAsset.brand, directAsset.model].filter(Boolean).join(" ") || "Unknown Asset",
       id: directAsset.vin_serial || directAsset.id,
+      assetId: directAsset.id,
       type: directAsset.asset_type,
     });
+  }
+
+  async function handleAddToWorkshop() {
+    if (!foundAsset) return;
+
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) { router.replace("/login"); return; }
+
+    const { error } = await supabase
+      .from("mechanic_assets")
+      .insert({
+        mechanic_id: session.user.id,
+        asset_id: foundAsset.assetId,
+        qr_code: foundAsset.id,
+      });
+
+    if (error) {
+      // código 23505 = duplicate (ya estaba en el taller) → tratamos como éxito
+      if (error.code === "23505") {
+        setAddSuccess(true);
+      } else {
+        setSearchError("Something went wrong. Please try again.");
+      }
+      return;
+    }
+
+    setAddSuccess(true);
+    // Refrescar contador de assets
+    const { count } = await supabase
+      .from("mechanic_assets")
+      .select("*", { count: "exact", head: true })
+      .eq("mechanic_id", session.user.id);
+    setTotalAssets(count ?? totalAssets);
   }
 
   useEffect(() => {
@@ -708,7 +744,7 @@ export default function DashboardPage() {
                       </div>
                     </div>
                     <button
-                      onClick={() => setAddSuccess(true)}
+                      onClick={handleAddToWorkshop}
                       className="w-full mt-3 bg-red-600 hover:bg-red-500 active:scale-[0.98] text-white font-bold py-3 rounded-xl text-[13px] transition-all shadow-sm"
                     >
                       Add to My Workshop

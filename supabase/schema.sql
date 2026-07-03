@@ -131,3 +131,30 @@ create policy "service_records: lectura pública" on public.service_records
   for select using (true);
 create policy "service_records: solo logueados crean" on public.service_records
   for insert with check (auth.uid() is not null);
+
+-- ============================================================
+-- MECHANIC_ASSETS: activos que un mecánico tiene en su taller
+-- (relación M:N entre mechanics y assets)
+-- ============================================================
+create table if not exists public.mechanic_assets (
+  id          uuid primary key default gen_random_uuid(),
+  mechanic_id uuid not null references public.mechanics(id) on delete cascade,
+  asset_id    uuid not null references public.assets(id) on delete cascade,
+  qr_code     text,
+  added_at    timestamptz not null default now(),
+  unique (mechanic_id, asset_id)
+);
+
+alter table public.mechanic_assets enable row level security;
+
+-- Solo el mecánico dueño puede ver sus activos de taller
+create policy "mechanic_assets: solo el dueño ve sus activos" on public.mechanic_assets
+  for select using (auth.uid() = mechanic_id);
+
+-- Solo el mecánico logueado puede agregar activos a su taller
+create policy "mechanic_assets: solo logueados insertan" on public.mechanic_assets
+  for insert with check (auth.uid() = mechanic_id);
+
+-- Solo el mecánico dueño puede quitar activos de su taller
+create policy "mechanic_assets: solo el dueño elimina" on public.mechanic_assets
+  for delete using (auth.uid() = mechanic_id);
