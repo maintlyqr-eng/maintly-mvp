@@ -195,6 +195,7 @@ export default function AssetsPage() {
   // ── History modal ──
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [historyAssetName, setHistoryAssetName] = useState("");
+  const [historyAssetCode, setHistoryAssetCode] = useState<string | null>(null);
   const [historyRecords, setHistoryRecords] = useState<ServiceRecord[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
 
@@ -359,6 +360,7 @@ export default function AssetsPage() {
 
   async function openHistory(a: AssetRow) {
     setHistoryAssetName(assetDisplayName(a));
+    setHistoryAssetCode(getQrCode(a));
     setHistoryRecords([]);
     setHistoryLoading(true);
     setShowHistoryModal(true);
@@ -387,15 +389,15 @@ export default function AssetsPage() {
     setShowEditForm(true);
   }
 
-  async function uploadPhoto(file: File, assetId: string): Promise<string | null> {
+  async function uploadPhoto(file: File, assetId: string): Promise<{ url: string | null; error: string | null }> {
     const ext = file.name.split(".").pop() ?? "jpg";
     const path = `${assetId}.${ext}`;
-    const { error } = await supabase.storage
+    const { error: uploadError } = await supabase.storage
       .from("asset-photos")
       .upload(path, file, { upsert: true });
-    if (error) return null;
+    if (uploadError) return { url: null, error: uploadError.message };
     const { data } = supabase.storage.from("asset-photos").getPublicUrl(path);
-    return data.publicUrl;
+    return { url: data.publicUrl, error: null };
   }
 
   async function handleCreateAsset(e: React.FormEvent) {
@@ -439,10 +441,13 @@ export default function AssetsPage() {
     }
 
     // Upload photo if provided
+    let photoUploadError: string | null = null;
     if (photoFile) {
-      const photoUrl = await uploadPhoto(photoFile, newAsset.id);
-      if (photoUrl) {
-        await supabase.from("assets").update({ photo_url: photoUrl }).eq("id", newAsset.id);
+      const { url, error } = await uploadPhoto(photoFile, newAsset.id);
+      if (url) {
+        await supabase.from("assets").update({ photo_url: url }).eq("id", newAsset.id);
+      } else {
+        photoUploadError = error ?? "Could not upload the photo.";
       }
     }
 
@@ -465,6 +470,13 @@ export default function AssetsPage() {
     );
 
     setSaving(false);
+
+    if (photoUploadError) {
+      setFormError(`Asset created, but the photo could not be uploaded: ${photoUploadError}. You can try again from Edit Asset.`);
+      await loadAssets(mechanicId);
+      return;
+    }
+
     resetForm();
     setShowForm(false);
     await loadAssets(mechanicId);
@@ -484,9 +496,11 @@ export default function AssetsPage() {
     setEditSaving(true);
 
     let photoUrl = editingAsset.photo_url;
+    let photoUploadError: string | null = null;
     if (editPhotoFile) {
-      const url = await uploadPhoto(editPhotoFile, editingAsset.id);
+      const { url, error } = await uploadPhoto(editPhotoFile, editingAsset.id);
       if (url) photoUrl = url;
+      else photoUploadError = error ?? "Could not upload the photo.";
     }
 
     const { error } = await supabase
@@ -508,6 +522,12 @@ export default function AssetsPage() {
 
     if (error) {
       setEditError(error.message);
+      return;
+    }
+
+    if (photoUploadError) {
+      setEditError(`Saved, but the photo could not be uploaded: ${photoUploadError}. You can try again.`);
+      await loadAssets(mechanicId);
       return;
     }
 
@@ -704,7 +724,7 @@ export default function AssetsPage() {
               <Menu size={22} />
             </button>
             <div className="min-w-0">
-              <h1 className="text-[17px] md:text-[20px] font-black text-zinc-900 truncate">Assets &amp; QR Codes</h1>
+              <h1 className="text-[17px] md:text-[20px] font-black text-zinc-900 truncate">My Assets</h1>
               <p className="hidden sm:block text-[12px] text-zinc-400 truncate">Create assets, generate QR codes and log services.</p>
             </div>
           </div>
@@ -1300,7 +1320,19 @@ export default function AssetsPage() {
                   <p className="text-[11px] text-zinc-400 leading-none">{historyAssetName}</p>
                 </div>
               </div>
-              <button onClick={() => setShowHistoryModal(false)} className="text-zinc-400 hover:text-zinc-700"><X size={18} /></button>
+              <div className="flex items-center gap-4 shrink-0">
+                {historyAssetCode && (
+                  <a
+                    href={`/asset/${historyAssetCode}/report`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-1.5 text-[12px] font-bold text-red-600 hover:text-red-700"
+                  >
+                    <FileText size={13} /> View Report
+                  </a>
+                )}
+                <button onClick={() => setShowHistoryModal(false)} className="text-zinc-400 hover:text-zinc-700"><X size={18} /></button>
+              </div>
             </div>
 
             <div className="flex-1 overflow-y-auto px-6 py-4">
