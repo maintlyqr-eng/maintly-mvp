@@ -76,11 +76,13 @@ export default function AssetPublicPage() {
   // Add Service form
   const [showServiceForm, setShowServiceForm] = useState(false);
   const [svcType, setSvcType]   = useState("Service");
-  const [svcDate, setSvcDate]   = useState(todayStr());
   const [svcKm, setSvcKm]       = useState("");
   const [svcNotes, setSvcNotes] = useState("");
   const [savingSvc, setSavingSvc]   = useState(false);
   const [svcError, setSvcError]     = useState("");
+  const minKmHours = services.length > 0
+    ? services.reduce((max, s) => (s.km_hours != null && s.km_hours > max ? s.km_hours : max), 0)
+    : null;
 
   // Load auth + asset
   useEffect(() => {
@@ -152,11 +154,17 @@ export default function AssetPublicPage() {
     if (!isLoggedIn) { router.push(`/login?redirect=/asset/${code}`); return; }
     if (!asset || savingSvc) return;
     setSvcError("");
+
+    if (svcKm && minKmHours != null && parseFloat(svcKm) < minKmHours) {
+      setSvcError(`Km/Hours can't be lower than the last recorded value (${minKmHours.toLocaleString()}).`);
+      return;
+    }
+
     setSavingSvc(true);
     const { error } = await supabase.from("service_records").insert({
       asset_id: asset.id,
       mechanic_id: mechanicId,
-      service_date: svcDate,
+      service_date: todayStr(),
       service_type: svcType,
       km_hours: svcKm ? parseFloat(svcKm) : null,
       notes: svcNotes.trim() || null,
@@ -176,7 +184,7 @@ export default function AssetPublicPage() {
     // Refresh services
     await loadServices(asset.id);
     setShowServiceForm(false);
-    setSvcType("Service"); setSvcDate(todayStr()); setSvcKm(""); setSvcNotes("");
+    setSvcType("Service"); setSvcKm(""); setSvcNotes("");
   }
 
   // ── LOADING ────────────────────────────────────────────────────────────────
@@ -477,19 +485,20 @@ export default function AssetPublicPage() {
                 </div>
               </div>
 
-              {/* Date */}
-              <div>
-                <label className="text-[11px] font-bold text-zinc-500 uppercase tracking-widest mb-1.5 block">Date</label>
-                <input type="date" value={svcDate} onChange={e => setSvcDate(e.target.value)} required
-                  className="w-full bg-zinc-50 border border-zinc-200 focus:border-red-400 focus:bg-white rounded-xl px-4 py-3 text-[14px] text-zinc-900 outline-none transition-all" />
+              {/* Date (auto) */}
+              <div className="rounded-xl bg-zinc-50 border border-zinc-200 px-4 py-3 text-[12px] text-zinc-500">
+                Service date will be recorded automatically as today, {new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}.
               </div>
 
               {/* KM / Hours */}
               <div>
                 <label className="text-[11px] font-bold text-zinc-500 uppercase tracking-widest mb-1.5 block">Km / Hours <span className="text-zinc-300 normal-case font-normal">(optional)</span></label>
-                <input type="number" value={svcKm} onChange={e => setSvcKm(e.target.value)}
+                <input type="number" min={minKmHours ?? 0} value={svcKm} onChange={e => setSvcKm(e.target.value)}
                   placeholder="e.g. 85000"
                   className="w-full bg-zinc-50 border border-zinc-200 focus:border-red-400 focus:bg-white rounded-xl px-4 py-3 text-[14px] text-zinc-900 placeholder-zinc-400 outline-none transition-all" />
+                {minKmHours != null && (
+                  <p className="text-[11px] text-zinc-400 mt-1.5">Last recorded: {minKmHours.toLocaleString()}. Can&apos;t be lower than that.</p>
+                )}
               </div>
 
               {/* Notes */}

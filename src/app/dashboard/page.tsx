@@ -11,6 +11,7 @@ import {
   ScanLine, Wrench, AlertCircle, Menu, X
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { computeReminderStatus, REMINDER_STATUS_LABEL, REMINDER_STATUS_COLOR, type ReminderStatus } from "@/lib/reminders";
 
 const navItems = [
   { icon: LayoutGrid,   label: "Dashboard",        href: "/dashboard",          active: true  },
@@ -69,6 +70,14 @@ type FoundAsset = {
   type: string;
 };
 
+type ReminderItem = {
+  id: string;
+  assetLabel: string;
+  status: ReminderStatus;
+  next_due_date: string | null;
+  next_due_km_hours: number | null;
+};
+
 function MiniSparkline({ color }: { color: string }) {
   const points = "0,28 10,24 20,26 30,20 40,22 50,15 60,17 70,10 80,12 90,5 100,8";
   return (
@@ -87,6 +96,7 @@ export default function DashboardPage() {
   const [totalServices, setTotalServices] = useState(0);
   const [totalAssets, setTotalAssets] = useState(0);
   const [realServices, setRealServices] = useState<RealService[]>([]);
+  const [reminders, setReminders] = useState<ReminderItem[]>([]);
 
   // ── Add Equipment modal states ──
   const [showAddAssetModal, setShowAddAssetModal] = useState(false);
@@ -235,6 +245,41 @@ export default function DashboardPage() {
         .from("service_records").select("*", { count: "exact", head: true })
         .eq("mechanic_id", session.user.id);
       if (active) setTotalServices(svcCount ?? 0);
+
+      // ── Upcoming reminders ──
+      const { data: remRows } = await supabase
+        .from("service_records")
+        .select("id, asset_id, next_due_date, next_due_km_hours, assets(nickname, brand, model)")
+        .eq("mechanic_id", session.user.id)
+        .or("next_due_date.not.is.null,next_due_km_hours.not.is.null");
+
+      const { data: kmRows } = await supabase
+        .from("service_records")
+        .select("asset_id, km_hours")
+        .eq("mechanic_id", session.user.id)
+        .not("km_hours", "is", null);
+
+      const maxKmByAsset: Record<string, number> = {};
+      for (const r of (kmRows ?? []) as any[]) {
+        if (r.km_hours != null && (maxKmByAsset[r.asset_id] == null || r.km_hours > maxKmByAsset[r.asset_id])) {
+          maxKmByAsset[r.asset_id] = r.km_hours;
+        }
+      }
+
+      const reminderItems: ReminderItem[] = ((remRows ?? []) as any[]).map((r) => {
+        const a = Array.isArray(r.assets) ? r.assets[0] : r.assets;
+        const label = a?.nickname || [a?.brand, a?.model].filter(Boolean).join(" ") || "Unknown asset";
+        const status = computeReminderStatus({
+          nextDueDate: r.next_due_date,
+          nextDueKmHours: r.next_due_km_hours,
+          currentKmHours: maxKmByAsset[r.asset_id] ?? null,
+        });
+        return { id: r.id, assetLabel: label, status, next_due_date: r.next_due_date, next_due_km_hours: r.next_due_km_hours };
+      })
+        .filter((i) => i.status === "overdue" || i.status === "due_soon")
+        .sort((a, b) => (a.status === "overdue" ? 0 : 1) - (b.status === "overdue" ? 0 : 1));
+
+      if (active) setReminders(reminderItems);
 
       if (active) setAuthChecked(true);
     }
@@ -499,6 +544,36 @@ export default function DashboardPage() {
 
             {/* ── RIGHT COLUMN ── */}
             <div className="space-y-5">
+
+              <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm p-5">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-[13px] font-black text-zinc-900">Upcoming Reminders</h3>
+                  <Link href="/dashboard/services" className="text-[11px] font-semibold text-zinc-400 hover:text-zinc-700">View all</Link>
+                </div>
+                {reminders.length === 0 ? (
+                  <p className="text-[12px] text-zinc-400 text-center py-4">No reminders due soon.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {reminders.slice(0, 5).map((r) => {
+                      const rc = REMINDER_STATUS_COLOR[r.status];
+                      return (
+                        <div key={r.id} className="flex items-center gap-2.5 p-2.5 rounded-xl bg-zinc-50 border border-zinc-100">
+                          <span className={`w-2 h-2 rounded-full shrink-0 ${rc.dot}`} />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-[12px] font-bold text-zinc-800 truncate">{r.assetLabel}</p>
+                            <p className="text-[10px] text-zinc-400">
+                              {r.next_due_date ? `Due ${r.next_due_date}` : ""}
+                              {r.next_due_date && r.next_due_km_hours != null ? " · " : ""}
+                              {r.next_due_km_hours != null ? `${r.next_due_km_hours.toLocaleString()} km/hrs` : ""}
+                            </p>
+                          </div>
+                          <span className={`text-[9px] font-bold px-1.5 py-[2px] rounded-full shrink-0 ${rc.bg} ${rc.text}`}>{REMINDER_STATUS_LABEL[r.status]}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
 
               <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm p-5">
                 <div className="flex items-center justify-between mb-3">

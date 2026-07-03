@@ -10,6 +10,7 @@ import {
   Wrench, CheckCircle2, MoreVertical, Menu
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { computeReminderStatus, REMINDER_STATUS_LABEL, REMINDER_STATUS_COLOR } from "@/lib/reminders";
 
 const navItems = [
   { icon: LayoutGrid, label: "Dashboard", href: "/dashboard" },
@@ -66,6 +67,8 @@ type ServiceRow = {
   km_hours: number | null;
   notes: string | null;
   created_at: string;
+  next_due_date: string | null;
+  next_due_km_hours: number | null;
   assets: AssetInfo | AssetInfo[] | null;
 };
 
@@ -105,11 +108,19 @@ export default function ServicesPage() {
   const [minKmHours, setMinKmHours] = useState<number | null>(null);
   const [minKmHoursLoading, setMinKmHoursLoading] = useState(false);
 
+  // Reminder menu / modal
+  const [openMenuRowId, setOpenMenuRowId] = useState<string | null>(null);
+  const [reminderRow, setReminderRow] = useState<ServiceRow | null>(null);
+  const [reminderDate, setReminderDate] = useState("");
+  const [reminderKm, setReminderKm] = useState("");
+  const [reminderSaving, setReminderSaving] = useState(false);
+  const [reminderError, setReminderError] = useState("");
+
   async function loadServices(uid: string) {
     setLoading(true);
     const { data } = await supabase
       .from("service_records")
-      .select("id, service_date, service_type, km_hours, notes, created_at, assets(id, nickname, brand, model, vin_serial, asset_type)")
+      .select("id, service_date, service_type, km_hours, notes, created_at, next_due_date, next_due_km_hours, assets(id, nickname, brand, model, vin_serial, asset_type)")
       .eq("mechanic_id", uid)
       .order("service_date", { ascending: false });
     setServices((data as unknown as ServiceRow[]) ?? []);
@@ -214,6 +225,42 @@ export default function ServicesPage() {
     if (error) { setSvcError(error.message); return; }
     resetForm();
     setShowForm(false);
+    await loadServices(mechanicId);
+  }
+
+  function currentKmHoursForAsset(assetId: string | undefined | null): number | null {
+    if (!assetId) return null;
+    let max: number | null = null;
+    for (const s of services) {
+      const a = getAsset(s);
+      if (a?.id === assetId && s.km_hours != null && (max == null || s.km_hours > max)) max = s.km_hours;
+    }
+    return max;
+  }
+
+  function openReminderModal(row: ServiceRow) {
+    setReminderRow(row);
+    setReminderDate(row.next_due_date ?? "");
+    setReminderKm(row.next_due_km_hours != null ? String(row.next_due_km_hours) : "");
+    setReminderError("");
+    setOpenMenuRowId(null);
+  }
+
+  async function handleSaveReminder(e: React.FormEvent) {
+    e.preventDefault();
+    if (!reminderRow) return;
+    setReminderError("");
+    setReminderSaving(true);
+    const { error } = await supabase
+      .from("service_records")
+      .update({
+        next_due_date: reminderDate || null,
+        next_due_km_hours: reminderKm ? parseFloat(reminderKm) : null,
+      })
+      .eq("id", reminderRow.id);
+    setReminderSaving(false);
+    if (error) { setReminderError(error.message); return; }
+    setReminderRow(null);
     await loadServices(mechanicId);
   }
 
@@ -374,8 +421,11 @@ export default function ServicesPage() {
                 </button>
               </div>
             ) : (
-              <div className="overflow-x-auto">
-              <table className="w-full min-w-[720px]">
+              <div className="overflow-x-auto relative">
+              {openMenuRowId && (
+                <div className="fixed inset-0 z-10" onClick={() => setOpenMenuRowId(null)} />
+              )}
+              <table className="w-full min-w-[820px]">
                 <thead>
                   <tr className="text-left text-[10px] text-zinc-400 font-bold uppercase border-b border-zinc-100">
                     <th className="px-5 py-3 font-bold">Asset</th>
@@ -384,6 +434,7 @@ export default function ServicesPage() {
                     <th className="px-3 py-3 font-bold">Km / Hours</th>
                     <th className="px-3 py-3 font-bold">Notes</th>
                     <th className="px-3 py-3 font-bold">Status</th>
+                    <th className="px-3 py-3 font-bold">Reminder</th>
                     <th className="px-3 py-3"></th>
                   </tr>
                 </thead>
@@ -392,6 +443,13 @@ export default function ServicesPage() {
                     const asset = getAsset(row);
                     const img = asset ? assetTypeImg[asset.asset_type] ?? "/images/pickup.png" : "/images/pickup.png";
                     const label = asset?.nickname || [asset?.brand, asset?.model].filter(Boolean).join(" ") || "Unknown asset";
+                    const hasReminder = row.next_due_date != null || row.next_due_km_hours != null;
+                    const reminderStatus = computeReminderStatus({
+                      nextDueDate: row.next_due_date,
+                      nextDueKmHours: row.next_due_km_hours,
+                      currentKmHours: currentKmHoursForAsset(asset?.id),
+                    });
+                    const rc = REMINDER_STATUS_COLOR[reminderStatus];
                     return (
                       <tr key={row.id} className="border-t border-zinc-100 hover:bg-zinc-50/50 transition-colors">
                         <td className="px-5 py-3">
@@ -416,8 +474,34 @@ export default function ServicesPage() {
                             <CheckCircle2 size={12} /> Completed
                           </span>
                         </td>
-                        <td className="px-3 py-3 text-right">
-                          <button className="text-zinc-300 hover:text-zinc-600 transition-colors"><MoreVertical size={15} /></button>
+                        <td className="px-3 py-3">
+                          {hasReminder ? (
+                            <span className={`inline-flex items-center gap-1.5 text-[10.5px] font-semibold px-2 py-[3px] rounded-full ${rc.bg} ${rc.text}`}>
+                              <span className={`w-1.5 h-1.5 rounded-full ${rc.dot}`} />
+                              {REMINDER_STATUS_LABEL[reminderStatus]}
+                            </span>
+                          ) : (
+                            <span className="text-[11px] text-zinc-300">—</span>
+                          )}
+                        </td>
+                        <td className="px-3 py-3 text-right relative">
+                          <button
+                            onClick={() => setOpenMenuRowId(openMenuRowId === row.id ? null : row.id)}
+                            className="text-zinc-300 hover:text-zinc-600 transition-colors relative z-20"
+                          >
+                            <MoreVertical size={15} />
+                          </button>
+                          {openMenuRowId === row.id && (
+                            <div className="absolute right-3 top-9 z-20 w-48 bg-white border border-zinc-200 rounded-xl shadow-lg py-1 text-left">
+                              <button
+                                onClick={() => openReminderModal(row)}
+                                className="w-full flex items-center gap-2 px-3 py-2 text-[12px] font-medium text-zinc-700 hover:bg-zinc-50"
+                              >
+                                <Bell size={13} className="text-zinc-400" />
+                                {hasReminder ? "Edit Reminder" : "Set Reminder"}
+                              </button>
+                            </div>
+                          )}
                         </td>
                       </tr>
                     );
@@ -499,6 +583,57 @@ export default function ServicesPage() {
                 <button type="button" onClick={() => setShowForm(false)} className="flex-1 border border-zinc-200 text-zinc-700 font-bold py-[11px] rounded-xl text-[13px] hover:bg-zinc-50">Cancel</button>
                 <button type="submit" disabled={svcSaving || assetOptions.length === 0} className="flex-1 bg-red-600 hover:bg-red-500 disabled:opacity-60 transition-all text-white font-bold py-[11px] rounded-xl text-[13px]">
                   {svcSaving ? "Saving..." : "Save Service"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ════ REMINDER MODAL ════ */}
+      {reminderRow && (
+        <div className="fixed inset-0 z-50 bg-zinc-900/40 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-200">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-amber-50 flex items-center justify-center">
+                  <Bell size={15} className="text-amber-600" />
+                </div>
+                <h2 className="text-[16px] font-black text-zinc-900">Maintenance Reminder</h2>
+              </div>
+              <button onClick={() => setReminderRow(null)} className="text-zinc-400 hover:text-zinc-700"><X size={18} /></button>
+            </div>
+
+            <form onSubmit={handleSaveReminder} className="px-6 py-5 space-y-4">
+              <p className="text-[12px] text-zinc-500 -mt-1">
+                Set when this asset&apos;s next service is expected. Leave blank to clear.
+              </p>
+
+              <div>
+                <label className="text-[12px] font-bold text-zinc-700">Next service due date</label>
+                <input
+                  type="date" value={reminderDate} onChange={(e) => setReminderDate(e.target.value)}
+                  className="w-full mt-1 rounded-xl border border-zinc-200 px-3 py-[10px] text-[13px] outline-none focus:border-red-500"
+                />
+              </div>
+
+              <div>
+                <label className="text-[12px] font-bold text-zinc-700">Next service due at (Km / Hours)</label>
+                <input
+                  type="number" min="0" step="0.1" value={reminderKm} onChange={(e) => setReminderKm(e.target.value)}
+                  placeholder="e.g. 50000"
+                  className="w-full mt-1 rounded-xl border border-zinc-200 px-3 py-[10px] text-[13px] outline-none focus:border-red-500"
+                />
+              </div>
+
+              {reminderError && (
+                <div className="rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-[12px] text-red-700">{reminderError}</div>
+              )}
+
+              <div className="flex gap-3 pt-1">
+                <button type="button" onClick={() => setReminderRow(null)} className="flex-1 border border-zinc-200 text-zinc-700 font-bold py-[11px] rounded-xl text-[13px] hover:bg-zinc-50">Cancel</button>
+                <button type="submit" disabled={reminderSaving} className="flex-1 bg-red-600 hover:bg-red-500 disabled:opacity-60 transition-all text-white font-bold py-[11px] rounded-xl text-[13px]">
+                  {reminderSaving ? "Saving..." : "Save Reminder"}
                 </button>
               </div>
             </form>
