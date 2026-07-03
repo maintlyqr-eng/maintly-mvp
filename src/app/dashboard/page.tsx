@@ -118,23 +118,54 @@ export default function DashboardPage() {
     setFoundAsset(null);
     setSearchLoading(true);
 
-    const { data, error } = await supabase
+    // 1. Buscar en qr_codes por el código (ej: MTLY-AB12-CD34)
+    const { data: qrData } = await supabase
+      .from("qr_codes")
+      .select("asset_id, code")
+      .ilike("code", qrInput.trim())
+      .maybeSingle();
+
+    if (qrData?.asset_id) {
+      // QR encontrado → cargar el asset vinculado
+      const { data: asset, error: assetErr } = await supabase
+        .from("assets")
+        .select("id, brand, model, nickname, asset_type, vin_serial")
+        .eq("id", qrData.asset_id)
+        .single();
+
+      setSearchLoading(false);
+
+      if (assetErr || !asset) {
+        setSearchError("QR code found but the asset is not linked yet.");
+        return;
+      }
+
+      setFoundAsset({
+        name: asset.nickname || [asset.brand, asset.model].filter(Boolean).join(" ") || "Unknown Asset",
+        id: qrData.code,
+        type: asset.asset_type,
+      });
+      return;
+    }
+
+    // 2. Fallback: buscar directamente por UUID del asset (por si el mecánico pegó la URL)
+    const { data: directAsset } = await supabase
       .from("assets")
       .select("id, brand, model, nickname, asset_type, vin_serial")
-      .or(`vin_serial.eq.${qrInput.trim()},id.eq.${qrInput.trim()}`)
-      .single();
+      .eq("id", qrInput.trim())
+      .maybeSingle();
 
     setSearchLoading(false);
 
-    if (error || !data) {
-      setSearchError("No asset found with that QR code. Check the code and try again.");
+    if (!directAsset) {
+      setSearchError("No asset found with that code. Make sure you entered the QR code exactly as it appears on the sticker (e.g. MTLY-AB12-CD34).");
       return;
     }
 
     setFoundAsset({
-      name: data.nickname || [data.brand, data.model].filter(Boolean).join(" ") || "Unknown Asset",
-      id: data.vin_serial || data.id,
-      type: data.asset_type,
+      name: directAsset.nickname || [directAsset.brand, directAsset.model].filter(Boolean).join(" ") || "Unknown Asset",
+      id: directAsset.vin_serial || directAsset.id,
+      type: directAsset.asset_type,
     });
   }
 
@@ -610,7 +641,7 @@ export default function DashboardPage() {
                     <QrCode size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
                     <input
                       type="text"
-                      placeholder="MTLY-QR-XXXXXXXX"
+                      placeholder="MTLY-AB12-CD34"
                       value={qrInput}
                       onChange={e => { setQrInput(e.target.value.toUpperCase()); setSearchError(""); setFoundAsset(null); }}
                       onKeyDown={e => e.key === "Enter" && handleSearchAsset()}
@@ -656,7 +687,7 @@ export default function DashboardPage() {
 
                 <div className="flex items-center gap-2 bg-zinc-50 border border-zinc-200 rounded-xl p-3">
                   <ScanLine size={14} className="text-zinc-400 shrink-0" />
-                  <p className="text-[11px] text-zinc-500">Scan the QR sticker with your phone — the code appears in the URL when you open it.</p>
+                  <p className="text-[11px] text-zinc-500">The code is printed on the sticker in the format <span className="font-mono font-semibold">MTLY-AB12-CD34</span>.</p>
                 </div>
               </div>
             )}
