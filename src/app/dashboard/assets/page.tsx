@@ -6,10 +6,33 @@ import { useRouter } from "next/navigation";
 import {
   LayoutGrid, FileText, Box, QrCode, Users, BarChart3, Calendar as CalendarIcon,
   Mail, FolderOpen, Settings, Bell, Plus, X, Copy, Check, LogOut, Crown,
-  Wrench, Pencil, History, CheckCircle2, UserCircle2, Camera, Gauge, Menu
+  Wrench, Pencil, History, CheckCircle2, UserCircle2, Camera, Gauge, Menu,
+  Search, MoreVertical, Trash2, Clock, CalendarClock, ListChecks, ChevronDown,
+  QrCode as QrIcon, AlertTriangle
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
-import { formatDateDMY } from "@/lib/date";
+import { formatDateDMY, daysAgoLabel, daysUntilLabel } from "@/lib/date";
+import { computeReminderStatus, ReminderStatus, REMINDER_STATUS_LABEL, REMINDER_STATUS_COLOR } from "@/lib/reminders";
+
+const STATUS_RANK: Record<ReminderStatus, number> = { none: 0, ok: 1, due_soon: 2, overdue: 3 };
+
+function assetStatusKey(rs: ReminderStatus): "healthy" | "due_soon" | "overdue" {
+  if (rs === "overdue") return "overdue";
+  if (rs === "due_soon") return "due_soon";
+  return "healthy";
+}
+
+const ASSET_STATUS_LABEL: Record<"healthy" | "due_soon" | "overdue", string> = {
+  healthy: "Healthy",
+  due_soon: "Due soon",
+  overdue: "Overdue",
+};
+
+const ASSET_STATUS_COLOR: Record<"healthy" | "due_soon" | "overdue", { bg: string; text: string; dot: string }> = {
+  healthy:  { bg: "bg-green-100", text: "text-green-700", dot: "bg-green-500" },
+  due_soon: { bg: "bg-amber-100", text: "text-amber-700", dot: "bg-amber-500" },
+  overdue:  { bg: "bg-red-100",   text: "text-red-700",   dot: "bg-red-500" },
+};
 
 const navItems = [
   { icon: LayoutGrid, label: "Dashboard", href: "/dashboard" },
@@ -86,6 +109,15 @@ type AssetRow = {
   qr_codes: QrRow[] | QrRow | null;
 };
 
+type AssetAgg = {
+  lastServiceDate: string | null;
+  totalServices: number;
+  maxKmHours: number | null;
+  nextDueDate: string | null;
+  nextDueKmHours: number | null;
+  reminderStatus: ReminderStatus;
+};
+
 function getQrCode(row: AssetRow): string | null {
   if (!row.qr_codes) return null;
   const q = Array.isArray(row.qr_codes) ? row.qr_codes[0] : row.qr_codes;
@@ -114,6 +146,22 @@ export default function AssetsPage() {
   const [mechanicEmail, setMechanicEmail] = useState("");
   const [assets, setAssets] = useState<AssetRow[]>([]);
   const [loadingAssets, setLoadingAssets] = useState(true);
+
+  // ── Service aggregates (last service, total count, max km/hours, worst reminder) per asset ──
+  const [assetAgg, setAssetAgg] = useState<Record<string, AssetAgg>>({});
+
+  // ── Search / filter / sort ──
+  const [searchQuery, setSearchQuery] = useState("");
+  const [typeFilter, setTypeFilter] = useState<string>("all");
+  const [sortBy, setSortBy] = useState<"last_service" | "name" | "status">("last_service");
+
+  // ── Per-card "⋯" menu ──
+  const [openCardMenuId, setOpenCardMenuId] = useState<string | null>(null);
+  const [qrOpenId, setQrOpenId] = useState<string | null>(null);
+
+  // ── Remove from workshop ──
+  const [removeTarget, setRemoveTarget] = useState<AssetRow | null>(null);
+  const [removing, setRemoving] = useState(false);
 
   // ── New Asset modal ──
   const [showForm, setShowForm] = useState(false);
@@ -181,6 +229,61 @@ export default function AssetsPage() {
     setLoadingAssets(false);
   }
 
+  async function loadServiceAggregates(uid: string) {
+    const { data } = await supabase
+      .from("service_records")
+      .select("asset_id, service_date, km_hours, next_due_date, next_due_km_hours")
+      .eq("mechanic_id", uid);
+
+    type Bucket = {
+      dates: string[];
+      kms: number[];
+      reminders: { date: string | null; km: number | null }[];
+    };
+    const byAsset: Record<string, Bucket> = {};
+
+    for (const r of (data ?? []) as any[]) {
+      if (!r.asset_id) continue;
+      if (!byAsset[r.asset_id]) byAsset[r.asset_id] = { dates: [], kms: [], reminders: [] };
+      const bucket = byAsset[r.asset_id];
+      if (r.service_date) bucket.dates.push(r.service_date);
+      if (r.km_hours != null) bucket.kms.push(r.km_hours);
+      if (r.next_due_date || r.next_due_km_hours != null) {
+        bucket.reminders.push({ date: r.next_due_date ?? null, km: r.next_due_km_hours ?? null });
+      }
+    }
+
+    const agg: Record<string, AssetAgg> = {};
+    for (const assetId of Object.keys(byAsset)) {
+      const b = byAsset[assetId];
+      const lastServiceDate = b.dates.length ? b.dates.reduce((a, c) => (c > a ? c : a)) : null;
+      const maxKmHours = b.kms.length ? Math.max(...b.kms) : null;
+
+      let worstStatus: ReminderStatus = "none";
+      let chosenDate: string | null = null;
+      let chosenKm: number | null = null;
+      for (const rem of b.reminders) {
+        const st = computeReminderStatus({ nextDueDate: rem.date, nextDueKmHours: rem.km, currentKmHours: maxKmHours });
+        if (STATUS_RANK[st] >= STATUS_RANK[worstStatus]) {
+          worstStatus = st;
+          chosenDate = rem.date;
+          chosenKm = rem.km;
+        }
+      }
+
+      agg[assetId] = {
+        lastServiceDate,
+        totalServices: b.dates.length,
+        maxKmHours,
+        nextDueDate: chosenDate,
+        nextDueKmHours: chosenKm,
+        reminderStatus: worstStatus,
+      };
+    }
+
+    setAssetAgg(agg);
+  }
+
   useEffect(() => {
     let active = true;
 
@@ -202,7 +305,7 @@ export default function AssetsPage() {
         .single();
       if (active && mechanic) setMechanicName(mechanic.name);
 
-      await loadAssets(session.user.id);
+      await Promise.all([loadAssets(session.user.id), loadServiceAggregates(session.user.id)]);
       if (active) setCheckingAuth(false);
     }
 
@@ -445,6 +548,21 @@ export default function AssetsPage() {
     }
 
     setShowServiceForm(false);
+    await loadServiceAggregates(mechanicId);
+  }
+
+  async function handleRemoveFromWorkshop() {
+    if (!removeTarget) return;
+    setRemoving(true);
+    await supabase
+      .from("mechanic_assets")
+      .delete()
+      .eq("mechanic_id", mechanicId)
+      .eq("asset_id", removeTarget.id);
+    setRemoving(false);
+    setRemoveTarget(null);
+    await loadAssets(mechanicId);
+    await loadServiceAggregates(mechanicId);
   }
 
   async function handleLogout() {
@@ -483,6 +601,42 @@ export default function AssetsPage() {
       .join("")
       .slice(0, 2)
       .toUpperCase() || "ME";
+
+  const totalAssets = assets.length;
+  let healthyCount = 0;
+  let dueSoonCount = 0;
+  let overdueCount = 0;
+  for (const a of assets) {
+    const key = assetStatusKey(assetAgg[a.id]?.reminderStatus ?? "none");
+    if (key === "healthy") healthyCount++;
+    else if (key === "due_soon") dueSoonCount++;
+    else overdueCount++;
+  }
+
+  const availableTypes = Array.from(new Set(assets.map((a) => a.asset_type)));
+
+  const visibleAssets = assets
+    .filter((a) => {
+      if (typeFilter !== "all" && a.asset_type !== typeFilter) return false;
+      const q = searchQuery.trim().toLowerCase();
+      if (!q) return true;
+      const haystack = [assetDisplayName(a), a.brand, a.model, a.vin_serial, a.plate]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+      return haystack.includes(q);
+    })
+    .sort((x, y) => {
+      if (sortBy === "name") return assetDisplayName(x).localeCompare(assetDisplayName(y));
+      if (sortBy === "status") {
+        const rx = STATUS_RANK[assetAgg[x.id]?.reminderStatus ?? "none"];
+        const ry = STATUS_RANK[assetAgg[y.id]?.reminderStatus ?? "none"];
+        return ry - rx;
+      }
+      const dx = assetAgg[x.id]?.lastServiceDate ?? "";
+      const dy = assetAgg[y.id]?.lastServiceDate ?? "";
+      return dy.localeCompare(dx);
+    });
 
   return (
     <div className="min-h-screen bg-zinc-50 flex relative">
@@ -579,14 +733,90 @@ export default function AssetsPage() {
 
         <div className="flex-1 overflow-y-auto p-4 md:p-7">
 
-          <div className="flex justify-end mb-5 -mt-2">
+          {/* KPI summary bar */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
+            <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm p-4">
+              <p className="text-[11px] font-semibold text-zinc-400 mb-1">Total Assets</p>
+              <p className="text-[22px] font-black text-zinc-900">{totalAssets}</p>
+            </div>
+            <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm p-4">
+              <div className="flex items-center gap-1.5 mb-1">
+                <span className="w-2 h-2 rounded-full bg-green-500" />
+                <p className="text-[11px] font-semibold text-zinc-400">Healthy</p>
+              </div>
+              <p className="text-[22px] font-black text-green-600">{healthyCount}</p>
+            </div>
+            <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm p-4">
+              <div className="flex items-center gap-1.5 mb-1">
+                <span className="w-2 h-2 rounded-full bg-amber-500" />
+                <p className="text-[11px] font-semibold text-zinc-400">Due Soon</p>
+              </div>
+              <p className="text-[22px] font-black text-amber-600">{dueSoonCount}</p>
+            </div>
+            <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm p-4">
+              <div className="flex items-center gap-1.5 mb-1">
+                <AlertTriangle size={11} className="text-red-500" />
+                <p className="text-[11px] font-semibold text-zinc-400">Overdue</p>
+              </div>
+              <p className="text-[22px] font-black text-red-600">{overdueCount}</p>
+            </div>
+          </div>
+
+          {/* Search / filter / sort + New Asset */}
+          <div className="flex flex-col lg:flex-row lg:items-center gap-3 mb-5">
+            <div className="relative flex-1 min-w-0">
+              <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search by name, brand, VIN, plate..."
+                className="w-full pl-9 pr-3 py-[9px] rounded-xl border border-zinc-200 text-[13px] outline-none focus:border-red-500 bg-white"
+              />
+            </div>
+            <div className="flex items-center gap-2 overflow-x-auto pb-1 lg:pb-0">
+              <button
+                onClick={() => setTypeFilter("all")}
+                className={`shrink-0 px-3 py-[7px] rounded-full text-[12px] font-bold transition-colors ${typeFilter === "all" ? "bg-zinc-900 text-white" : "bg-white border border-zinc-200 text-zinc-500 hover:bg-zinc-50"}`}
+              >
+                All
+              </button>
+              {availableTypes.map((t) => {
+                const opt = assetTypeOptions.find((o) => o.value === t);
+                return (
+                  <button
+                    key={t}
+                    onClick={() => setTypeFilter(t)}
+                    className={`shrink-0 px-3 py-[7px] rounded-full text-[12px] font-bold transition-colors ${typeFilter === t ? "bg-zinc-900 text-white" : "bg-white border border-zinc-200 text-zinc-500 hover:bg-zinc-50"}`}
+                  >
+                    {opt?.label ?? t}
+                  </button>
+                );
+              })}
+            </div>
+            <div className="relative shrink-0">
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as "last_service" | "name" | "status")}
+                className="appearance-none pl-3 pr-8 py-[9px] rounded-xl border border-zinc-200 text-[12px] font-bold text-zinc-600 outline-none focus:border-red-500 bg-white"
+              >
+                <option value="last_service">Sort: Last serviced</option>
+                <option value="name">Sort: Name</option>
+                <option value="status">Sort: Status</option>
+              </select>
+              <ChevronDown size={13} className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-400" />
+            </div>
             <button
               onClick={() => { resetForm(); setShowForm(true); }}
-              className="flex items-center gap-2 bg-red-600 hover:bg-red-500 active:scale-[0.98] transition-all text-white text-[13px] font-bold px-4 py-[10px] rounded-xl shadow-sm"
+              className="shrink-0 flex items-center justify-center gap-2 bg-red-600 hover:bg-red-500 active:scale-[0.98] transition-all text-white text-[13px] font-bold px-4 py-[10px] rounded-xl shadow-sm"
             >
               <Plus size={15} /> New Asset
             </button>
           </div>
+
+          {openCardMenuId && (
+            <div className="fixed inset-0 z-10" onClick={() => setOpenCardMenuId(null)} />
+          )}
 
           {loadingAssets ? (
             <p className="text-[13px] text-zinc-400 text-center py-12">Loading your assets...</p>
@@ -604,12 +834,20 @@ export default function AssetsPage() {
                 <Plus size={15} /> New Asset
               </button>
             </div>
+          ) : visibleAssets.length === 0 ? (
+            <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm p-12 text-center">
+              <p className="text-[13px] text-zinc-500">No assets match your search or filter.</p>
+            </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
-              {assets.map((a) => {
+              {visibleAssets.map((a) => {
                 const code = getQrCode(a);
                 const label = assetDisplayName(a);
                 const imgSrc = assetTypeImg[a.asset_type] ?? "/images/car.png";
+                const agg = assetAgg[a.id];
+                const statusKey = assetStatusKey(agg?.reminderStatus ?? "none");
+                const statusColor = ASSET_STATUS_COLOR[statusKey];
+                const qrOpen = qrOpenId === a.id;
                 return (
                   <div key={a.id} className="bg-white rounded-2xl border border-zinc-200 shadow-sm p-5 flex flex-col">
                     {/* Asset header */}
@@ -628,64 +866,130 @@ export default function AssetsPage() {
                         <p className="text-[14px] font-bold text-zinc-900 leading-tight truncate">{label}</p>
                         <p className="text-[11px] text-zinc-400 leading-tight">{a.year ? a.year + " · " : ""}{a.plate || a.vin_serial || "—"}</p>
                       </div>
-                      {/* Edit button */}
-                      <button
-                        onClick={() => openEdit(a)}
-                        className="p-1.5 rounded-lg text-zinc-400 hover:text-red-600 hover:bg-red-50 transition-colors shrink-0"
-                        title="Edit asset"
-                      >
-                        <Pencil size={14} />
-                      </button>
+                      <span className={`shrink-0 flex items-center gap-1 text-[10px] font-bold px-2 py-[3px] rounded-full ${statusColor.bg} ${statusColor.text}`}>
+                        <span className={`w-1.5 h-1.5 rounded-full ${statusColor.dot}`} />
+                        {ASSET_STATUS_LABEL[statusKey]}
+                      </span>
+                      {/* Kebab menu */}
+                      <div className="relative shrink-0">
+                        <button
+                          onClick={() => setOpenCardMenuId(openCardMenuId === a.id ? null : a.id)}
+                          className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-700 hover:bg-zinc-50 transition-colors"
+                          title="More actions"
+                        >
+                          <MoreVertical size={15} />
+                        </button>
+                        {openCardMenuId === a.id && (
+                          <div className="absolute right-0 top-full mt-1 w-48 bg-white rounded-xl border border-zinc-200 shadow-lg z-20 py-1">
+                            <button
+                              onClick={() => { setOpenCardMenuId(null); openEdit(a); }}
+                              className="w-full flex items-center gap-2 px-3 py-2 text-[12px] font-semibold text-zinc-600 hover:bg-zinc-50 text-left"
+                            >
+                              <Pencil size={13} /> Edit Asset
+                            </button>
+                            <button
+                              onClick={() => { setOpenCardMenuId(null); setRemoveTarget(a); }}
+                              className="w-full flex items-center gap-2 px-3 py-2 text-[12px] font-semibold text-red-600 hover:bg-red-50 text-left"
+                            >
+                              <Trash2 size={13} /> Remove from Workshop
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Stat row */}
+                    <div className="grid grid-cols-3 gap-2 mb-3 pb-3 border-b border-zinc-100">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-1 text-zinc-400 mb-0.5">
+                          <Clock size={11} />
+                          <p className="text-[9px] font-semibold uppercase tracking-wide">Last serviced</p>
+                        </div>
+                        <p className="text-[12px] font-bold text-zinc-800 truncate">
+                          {agg?.lastServiceDate ? daysAgoLabel(agg.lastServiceDate) : "No services yet"}
+                        </p>
+                      </div>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-1 text-zinc-400 mb-0.5">
+                          <CalendarClock size={11} />
+                          <p className="text-[9px] font-semibold uppercase tracking-wide">Next service</p>
+                        </div>
+                        <p className={`text-[12px] font-bold truncate ${statusKey === "overdue" ? "text-red-600" : statusKey === "due_soon" ? "text-amber-600" : "text-zinc-800"}`}>
+                          {agg?.nextDueDate
+                            ? daysUntilLabel(agg.nextDueDate)
+                            : agg?.nextDueKmHours != null
+                            ? `${agg.nextDueKmHours.toLocaleString()} km/hrs`
+                            : "Not set"}
+                        </p>
+                      </div>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-1 text-zinc-400 mb-0.5">
+                          <ListChecks size={11} />
+                          <p className="text-[9px] font-semibold uppercase tracking-wide">Services</p>
+                        </div>
+                        <button onClick={() => openHistory(a)} className="text-[12px] font-bold text-red-600 hover:text-red-700 truncate">
+                          {agg?.totalServices ?? 0} · View
+                        </button>
+                      </div>
                     </div>
 
                     {/* Action buttons */}
-                    <div className="grid grid-cols-2 gap-2 mb-3">
+                    <div className="grid grid-cols-3 gap-2">
                       <button
                         onClick={() => openHistory(a)}
-                        className="flex items-center justify-center gap-1.5 border border-zinc-200 text-zinc-600 hover:bg-zinc-50 active:scale-[0.98] transition-all text-[12px] font-bold py-[8px] rounded-xl"
+                        className="flex items-center justify-center gap-1.5 border border-zinc-200 text-zinc-600 hover:bg-zinc-50 active:scale-[0.98] transition-all text-[11px] font-bold py-[8px] rounded-xl"
                       >
-                        <History size={13} /> History
+                        <History size={12} /> History
                       </button>
                       <button
                         onClick={() => openAddService(a.id)}
-                        className="flex items-center justify-center gap-1.5 border border-red-200 text-red-600 hover:bg-red-50 active:scale-[0.98] transition-all text-[12px] font-bold py-[8px] rounded-xl"
+                        className="flex items-center justify-center gap-1.5 border border-red-200 text-red-600 hover:bg-red-50 active:scale-[0.98] transition-all text-[11px] font-bold py-[8px] rounded-xl"
                       >
-                        <Wrench size={13} /> Add Service
+                        <Wrench size={12} /> Service
+                      </button>
+                      <button
+                        onClick={() => setQrOpenId(qrOpen ? null : a.id)}
+                        disabled={!code}
+                        className="flex items-center justify-center gap-1.5 border border-zinc-200 text-zinc-600 hover:bg-zinc-50 active:scale-[0.98] transition-all text-[11px] font-bold py-[8px] rounded-xl disabled:opacity-40 disabled:cursor-not-allowed"
+                      >
+                        <QrIcon size={12} /> QR
                       </button>
                     </div>
 
-                    {/* QR section */}
-                    {code ? (
-                      <div className="flex items-center gap-4 pt-3 border-t border-zinc-100">
-                        <div className="w-20 h-20 rounded-lg border border-zinc-100 bg-white p-1 shrink-0">
-                          <img
-                            src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(publicUrl(code))}`}
-                            alt={`QR ${code}`}
-                            className="w-full h-full object-contain"
-                          />
+                    {/* QR section (collapsible) */}
+                    {qrOpen && (
+                      code ? (
+                        <div className="flex items-center gap-4 pt-3 mt-3 border-t border-zinc-100">
+                          <div className="w-20 h-20 rounded-lg border border-zinc-100 bg-white p-1 shrink-0">
+                            <img
+                              src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(publicUrl(code))}`}
+                              alt={`QR ${code}`}
+                              className="w-full h-full object-contain"
+                            />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="text-[10px] text-zinc-400 mb-1">Public link</p>
+                            <p className="text-[11px] font-mono text-zinc-600 truncate mb-2">/asset/{code}</p>
+                            <button
+                              onClick={() => copyLink(code)}
+                              className="flex items-center gap-1.5 text-[11px] font-bold text-red-600 hover:text-red-700 mb-2"
+                            >
+                              {copiedCode === code ? <Check size={12} /> : <Copy size={12} />}
+                              {copiedCode === code ? "Copied" : "Copy link"}
+                            </button>
+                            <a
+                              href={`/asset/${code}/report`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex items-center gap-1.5 text-[11px] font-bold text-zinc-500 hover:text-zinc-800"
+                            >
+                              <FileText size={12} /> View Report
+                            </a>
+                          </div>
                         </div>
-                        <div className="min-w-0 flex-1">
-                          <p className="text-[10px] text-zinc-400 mb-1">Public link</p>
-                          <p className="text-[11px] font-mono text-zinc-600 truncate mb-2">/asset/{code}</p>
-                          <button
-                            onClick={() => copyLink(code)}
-                            className="flex items-center gap-1.5 text-[11px] font-bold text-red-600 hover:text-red-700 mb-2"
-                          >
-                            {copiedCode === code ? <Check size={12} /> : <Copy size={12} />}
-                            {copiedCode === code ? "Copied" : "Copy link"}
-                          </button>
-                          <a
-                            href={`/asset/${code}/report`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="flex items-center gap-1.5 text-[11px] font-bold text-zinc-500 hover:text-zinc-800"
-                          >
-                            <FileText size={12} /> View Report
-                          </a>
-                        </div>
-                      </div>
-                    ) : (
-                      <p className="text-[11px] text-amber-600 pt-3 border-t border-zinc-100">QR code not generated.</p>
+                      ) : (
+                        <p className="text-[11px] text-amber-600 pt-3 mt-3 border-t border-zinc-100">QR code not generated.</p>
+                      )
                     )}
                   </div>
                 );
@@ -1058,6 +1362,39 @@ export default function AssetsPage() {
                   })}
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ════ REMOVE FROM WORKSHOP CONFIRM ════ */}
+      {removeTarget && (
+        <div className="fixed inset-0 z-50 bg-zinc-900/40 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-200">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-red-50 flex items-center justify-center">
+                  <Trash2 size={15} className="text-red-600" />
+                </div>
+                <h2 className="text-[15px] font-black text-zinc-900">Remove from Workshop</h2>
+              </div>
+              <button onClick={() => setRemoveTarget(null)} className="text-zinc-400 hover:text-zinc-700"><X size={18} /></button>
+            </div>
+            <div className="px-6 py-5">
+              <p className="text-[13px] text-zinc-600 leading-relaxed">
+                Remove <span className="font-bold text-zinc-900">{assetDisplayName(removeTarget)}</span> from your workshop? Its service history and QR code stay intact — you can re-link it later by scanning the QR again.
+              </p>
+              <div className="flex gap-3 mt-5">
+                <button type="button" onClick={() => setRemoveTarget(null)} className="flex-1 border border-zinc-200 text-zinc-700 font-bold py-[11px] rounded-xl text-[13px] hover:bg-zinc-50">Cancel</button>
+                <button
+                  type="button"
+                  onClick={handleRemoveFromWorkshop}
+                  disabled={removing}
+                  className="flex-1 bg-red-600 hover:bg-red-500 disabled:opacity-60 transition-all text-white font-bold py-[11px] rounded-xl text-[13px]"
+                >
+                  {removing ? "Removing..." : "Remove"}
+                </button>
+              </div>
             </div>
           </div>
         </div>
