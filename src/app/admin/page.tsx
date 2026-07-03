@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import {
   Users, Box, Wrench, QrCode, BarChart3, Shield,
   LogOut, RefreshCw, CheckCircle2, Clock, AlertCircle,
-  Layers, ChevronRight, Eye, EyeOff, TrendingUp, ArrowUpRight
+  Layers, ChevronRight, Eye, EyeOff, TrendingUp, ArrowUpRight, Menu, X
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 
@@ -112,6 +112,7 @@ export default function AdminPage() {
   const [services, setServices]             = useState<ServiceRow[]>([]);
   const [assetTypes, setAssetTypes]         = useState<AssetTypeCount[]>([]);
   const [section, setSection] = useState<"overview" | "mechanics" | "services" | "qr">("overview");
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   async function loadData() {
     setRefreshing(true);
@@ -270,13 +271,18 @@ export default function AdminPage() {
   ] as const;
 
   return (
-    <div className="min-h-screen bg-zinc-50/60 flex text-zinc-900">
+    <div className="min-h-screen bg-zinc-50/60 flex text-zinc-900 relative">
+
+      {/* ══ MOBILE SIDEBAR BACKDROP ══ */}
+      {sidebarOpen && (
+        <div className="md:hidden fixed inset-0 bg-black/40 z-30" onClick={() => setSidebarOpen(false)} />
+      )}
 
       {/* ══ SIDEBAR ══════════════════════════════════════════════════════════════ */}
-      <aside className="w-[240px] bg-white border-r border-zinc-200/80 flex flex-col shrink-0">
+      <aside className={`fixed md:static inset-y-0 left-0 z-40 w-[240px] bg-white border-r border-zinc-200/80 flex flex-col shrink-0 transform transition-transform duration-200 md:translate-x-0 ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}`}>
 
         {/* Logo */}
-        <div className="px-5 pt-5 pb-4 border-b border-zinc-100">
+        <div className="px-5 pt-5 pb-4 border-b border-zinc-100 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-xl bg-red-600 flex items-center justify-center shadow-sm shrink-0">
               <Shield size={15} className="text-white" />
@@ -287,13 +293,16 @@ export default function AdminPage() {
               <p className="text-[9px] font-bold text-red-500 tracking-[0.12em] uppercase leading-none mt-0.5">Admin Panel</p>
             </div>
           </div>
+          <button onClick={() => setSidebarOpen(false)} className="md:hidden text-zinc-400 hover:text-zinc-700">
+            <X size={18} />
+          </button>
         </div>
 
         {/* Nav */}
-        <nav className="flex-1 p-3 space-y-0.5">
+        <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto">
           <p className="text-[9px] font-bold text-zinc-300 uppercase tracking-widest px-3 pt-2 pb-1.5">Navigation</p>
           {navItems.map(({ id, label, icon: Icon }) => (
-            <button key={id} onClick={() => setSection(id)}
+            <button key={id} onClick={() => { setSection(id); setSidebarOpen(false); }}
               className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13px] font-semibold transition-all text-left ${
                 section === id
                   ? "bg-red-600 text-white shadow-sm shadow-red-200"
@@ -324,25 +333,30 @@ export default function AdminPage() {
       <div className="flex-1 flex flex-col min-w-0">
 
         {/* Topbar */}
-        <header className="bg-white border-b border-zinc-200/80 px-8 py-4 flex items-center justify-between">
-          <div>
-            <h1 className="text-[22px] font-black text-zinc-900 leading-tight">
-              {section === "overview" && "Overview"}
-              {section === "mechanics" && "Mechanics"}
-              {section === "services" && "Services"}
-              {section === "qr" && "QR Codes"}
-            </h1>
-            <p className="text-[12px] text-zinc-400 font-medium mt-0.5">MaintlyQR operations dashboard</p>
+        <header className="bg-white border-b border-zinc-200/80 px-4 md:px-8 py-4 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3 min-w-0">
+            <button onClick={() => setSidebarOpen(true)} className="md:hidden shrink-0 text-zinc-600 hover:text-zinc-900">
+              <Menu size={22} />
+            </button>
+            <div className="min-w-0">
+              <h1 className="text-[18px] md:text-[22px] font-black text-zinc-900 leading-tight truncate">
+                {section === "overview" && "Overview"}
+                {section === "mechanics" && "Mechanics"}
+                {section === "services" && "Services"}
+                {section === "qr" && "QR Codes"}
+              </h1>
+              <p className="hidden sm:block text-[12px] text-zinc-400 font-medium mt-0.5">MaintlyQR operations dashboard</p>
+            </div>
           </div>
           <button onClick={loadData} disabled={refreshing}
-            className="flex items-center gap-2 bg-white border border-zinc-200 hover:border-zinc-300 hover:bg-zinc-50 text-zinc-600 hover:text-zinc-900 text-[12px] font-bold px-4 py-2.5 rounded-xl transition-all disabled:opacity-40 shadow-sm">
+            className="shrink-0 flex items-center gap-2 bg-white border border-zinc-200 hover:border-zinc-300 hover:bg-zinc-50 text-zinc-600 hover:text-zinc-900 text-[12px] font-bold px-3 md:px-4 py-2.5 rounded-xl transition-all disabled:opacity-40 shadow-sm">
             <RefreshCw size={13} className={refreshing ? "animate-spin" : ""} />
-            Refresh
+            <span className="hidden sm:inline">Refresh</span>
           </button>
         </header>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto p-8">
+        <div className="flex-1 overflow-y-auto p-4 md:p-8">
 
           {/* ── OVERVIEW ─────────────────────────────────────────────────────── */}
           {section === "overview" && (
@@ -493,7 +507,8 @@ export default function AdminPage() {
                   <p className="text-[12px] text-zinc-400 mt-0.5">+{mechThisMonth} joined this month</p>
                 </div>
               </div>
-              <table className="w-full">
+              <div className="overflow-x-auto">
+              <table className="w-full min-w-[760px]">
                 <thead>
                   <tr className="bg-zinc-50 border-b border-zinc-100">
                     {["Mechanic", "Email", "Workshop", "Status", "Joined"].map(h => (
@@ -528,13 +543,14 @@ export default function AdminPage() {
                   )}
                 </tbody>
               </table>
+              </div>
             </div>
           )}
 
           {/* ── SERVICES ─────────────────────────────────────────────────────── */}
           {section === "services" && (
             <div className="space-y-5">
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 {[
                   { label: "Total Services", value: totalServices, color: "text-zinc-900" },
                   { label: "This Month", value: svcThisMonth, color: "text-emerald-600" },
@@ -551,7 +567,8 @@ export default function AdminPage() {
                 <div className="px-7 py-5 border-b border-zinc-100">
                   <SectionTitle>Service History</SectionTitle>
                 </div>
-                <table className="w-full">
+                <div className="overflow-x-auto">
+                <table className="w-full min-w-[600px]">
                   <thead>
                     <tr className="bg-zinc-50 border-b border-zinc-100">
                       {["Asset", "Service Type", "Mechanic", "Date"].map(h => (
@@ -577,6 +594,7 @@ export default function AdminPage() {
                     )}
                   </tbody>
                 </table>
+                </div>
               </div>
             </div>
           )}
@@ -584,7 +602,7 @@ export default function AdminPage() {
           {/* ── QR CODES ─────────────────────────────────────────────────────── */}
           {section === "qr" && (
             <div className="space-y-5">
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 {[
                   { label: "Total QR Codes", value: totalQR, color: "text-zinc-900" },
                   { label: "Linked to Assets", value: assignedQR, color: "text-emerald-600" },

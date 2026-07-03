@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import {
   LayoutGrid, FileText, Box, QrCode, Users, BarChart3, Calendar as CalendarIcon,
   Mail, FolderOpen, Settings, Bell, Plus, X, Copy, Check, LogOut, Crown,
-  Wrench, Pencil, History, CheckCircle2, UserCircle2, Camera, Gauge
+  Wrench, Pencil, History, CheckCircle2, UserCircle2, Camera, Gauge, Menu
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 
@@ -106,6 +106,7 @@ function formatDate(dateStr: string) {
 
 export default function AssetsPage() {
   const router = useRouter();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [checkingAuth, setCheckingAuth] = useState(true);
   const [mechanicId, setMechanicId] = useState("");
   const [mechanicName, setMechanicName] = useState("");
@@ -453,22 +454,33 @@ export default function AssetsPage() {
       .toUpperCase() || "ME";
 
   return (
-    <div className="min-h-screen bg-zinc-50 flex">
+    <div className="min-h-screen bg-zinc-50 flex relative">
+
+      {/* ════ MOBILE SIDEBAR BACKDROP ════ */}
+      {sidebarOpen && (
+        <div className="md:hidden fixed inset-0 bg-black/40 z-30" onClick={() => setSidebarOpen(false)} />
+      )}
 
       {/* ════ SIDEBAR ════ */}
-      <aside className="w-[230px] bg-white border-r border-zinc-200 flex flex-col shrink-0">
-        <Link href="/" className="flex items-center px-4 py-2">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/images/qr-gear.png" alt="Maintly" style={{width: 72, height: 72, objectFit: "contain"}} />
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/images/Maintly.png" alt="" style={{width: 152, objectFit: "contain", marginLeft: -18}} />
-        </Link>
+      <aside className={`fixed md:static inset-y-0 left-0 z-40 w-[230px] bg-white border-r border-zinc-200 flex flex-col shrink-0 transform transition-transform duration-200 md:translate-x-0 ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}`}>
+        <div className="flex items-center justify-between px-4 py-2">
+          <Link href="/" className="flex items-center">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/images/qr-gear.png" alt="Maintly" style={{width: 72, height: 72, objectFit: "contain"}} />
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/images/Maintly.png" alt="" style={{width: 152, objectFit: "contain", marginLeft: -18}} />
+          </Link>
+          <button onClick={() => setSidebarOpen(false)} className="md:hidden text-zinc-400 hover:text-zinc-700 mr-2">
+            <X size={20} />
+          </button>
+        </div>
 
-        <nav className="flex-1 px-3 -mt-4">
+        <nav className="flex-1 px-3 -mt-4 overflow-y-auto">
           {navItems.map((item) => (
             <Link
               key={item.label}
               href={item.href}
+              onClick={() => setSidebarOpen(false)}
               className={`flex items-center gap-3 px-3 py-[9px] rounded-lg mb-1 text-[13px] font-medium transition-colors ${
                 item.label === "Assets"
                   ? "bg-red-50 text-red-600 border-l-[3px] border-red-600 -ml-[1px]"
@@ -502,35 +514,40 @@ export default function AssetsPage() {
       {/* ════ MAIN ════ */}
       <div className="flex-1 flex flex-col min-w-0">
 
-        <header className="flex items-center justify-between px-7 py-4 bg-white border-b border-zinc-200">
-          <div>
-            <h1 className="text-[20px] font-black text-zinc-900">Assets &amp; QR Codes</h1>
-            <p className="text-[12px] text-zinc-400">Create assets, generate QR codes and log services.</p>
+        <header className="flex items-center justify-between gap-3 px-4 md:px-7 py-4 bg-white border-b border-zinc-200">
+          <div className="flex items-center gap-3 min-w-0">
+            <button onClick={() => setSidebarOpen(true)} className="md:hidden shrink-0 text-zinc-600 hover:text-zinc-900">
+              <Menu size={22} />
+            </button>
+            <div className="min-w-0">
+              <h1 className="text-[17px] md:text-[20px] font-black text-zinc-900 truncate">Assets &amp; QR Codes</h1>
+              <p className="hidden sm:block text-[12px] text-zinc-400 truncate">Create assets, generate QR codes and log services.</p>
+            </div>
           </div>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 md:gap-4 shrink-0">
             <button className="relative text-zinc-500 hover:text-zinc-800 transition-colors">
               <Bell size={19} />
             </button>
-            <div className="flex items-center gap-3 pl-3 border-l border-zinc-200">
+            <div className="flex items-center gap-3 md:pl-3 md:border-l border-zinc-200">
               <div className="flex items-center gap-2.5">
                 <div className="w-9 h-9 rounded-full bg-red-100 flex items-center justify-center text-red-600 font-bold text-[13px] shrink-0">{initials}</div>
-                <div className="text-left">
+                <div className="hidden sm:block text-left">
                   <p className="text-[12px] font-bold text-zinc-800 leading-tight">{mechanicName || mechanicEmail}</p>
                   <p className="text-[10px] text-zinc-400 leading-tight">Mechanic</p>
                 </div>
               </div>
               <button
                 onClick={handleLogout}
-                className="flex items-center gap-1.5 text-[12px] font-semibold text-zinc-500 hover:text-red-600 hover:bg-red-50 border border-zinc-200 hover:border-red-200 px-3 py-2 rounded-xl transition-all"
+                className="flex items-center gap-1.5 text-[12px] font-semibold text-zinc-500 hover:text-red-600 hover:bg-red-50 border border-zinc-200 hover:border-red-200 px-2.5 md:px-3 py-2 rounded-xl transition-all"
               >
                 <LogOut size={13} />
-                Log out
+                <span className="hidden md:inline">Log out</span>
               </button>
             </div>
           </div>
         </header>
 
-        <div className="flex-1 overflow-y-auto p-7">
+        <div className="flex-1 overflow-y-auto p-4 md:p-7">
 
           <div className="flex justify-end mb-5 -mt-2">
             <button
@@ -667,7 +684,7 @@ export default function AssetsPage() {
                 </select>
               </div>
 
-              <div className="grid grid-cols-2 gap-3 mb-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
                 <div>
                   <label className="text-[12px] font-bold text-zinc-700">Brand *</label>
                   <input type="text" required value={brand} onChange={(e) => setBrand(e.target.value)} placeholder="e.g. Ford" className="w-full mt-1 rounded-xl border border-zinc-200 px-3 py-[10px] text-[13px] outline-none focus:border-red-500" />
@@ -683,7 +700,7 @@ export default function AssetsPage() {
                 <input type="text" value={nickname} onChange={(e) => setNickname(e.target.value)} placeholder="e.g. Work Truck #2" className="w-full mt-1 rounded-xl border border-zinc-200 px-3 py-[10px] text-[13px] outline-none focus:border-red-500" />
               </div>
 
-              <div className="grid grid-cols-2 gap-3 mb-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
                 <div>
                   <label className="text-[12px] font-bold text-zinc-700">VIN / Serial</label>
                   <input type="text" value={vin} onChange={(e) => setVin(e.target.value)} className="w-full mt-1 rounded-xl border border-zinc-200 px-3 py-[10px] text-[13px] outline-none focus:border-red-500" />
@@ -694,7 +711,7 @@ export default function AssetsPage() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3 mb-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
                 <div>
                   <label className="text-[12px] font-bold text-zinc-700">Plate</label>
                   <input type="text" value={plate} onChange={(e) => setPlate(e.target.value)} className="w-full mt-1 rounded-xl border border-zinc-200 px-3 py-[10px] text-[13px] outline-none focus:border-red-500" />
@@ -776,7 +793,7 @@ export default function AssetsPage() {
             </div>
 
             <form onSubmit={handleEditAsset} className="px-6 py-5">
-              <div className="grid grid-cols-2 gap-3 mb-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
                 <div>
                   <label className="text-[12px] font-bold text-zinc-700">Brand</label>
                   <input type="text" value={editBrand} onChange={(e) => setEditBrand(e.target.value)} placeholder="e.g. Ford" className="w-full mt-1 rounded-xl border border-zinc-200 px-3 py-[10px] text-[13px] outline-none focus:border-red-500" />
@@ -792,7 +809,7 @@ export default function AssetsPage() {
                 <input type="text" value={editNickname} onChange={(e) => setEditNickname(e.target.value)} placeholder="e.g. Work Truck #2" className="w-full mt-1 rounded-xl border border-zinc-200 px-3 py-[10px] text-[13px] outline-none focus:border-red-500" />
               </div>
 
-              <div className="grid grid-cols-2 gap-3 mb-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
                 <div>
                   <label className="text-[12px] font-bold text-zinc-700">VIN / Serial</label>
                   <input type="text" value={editVin} onChange={(e) => setEditVin(e.target.value)} className="w-full mt-1 rounded-xl border border-zinc-200 px-3 py-[10px] text-[13px] outline-none focus:border-red-500" />
@@ -803,7 +820,7 @@ export default function AssetsPage() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3 mb-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
                 <div>
                   <label className="text-[12px] font-bold text-zinc-700">Plate</label>
                   <input type="text" value={editPlate} onChange={(e) => setEditPlate(e.target.value)} className="w-full mt-1 rounded-xl border border-zinc-200 px-3 py-[10px] text-[13px] outline-none focus:border-red-500" />
@@ -896,7 +913,7 @@ export default function AssetsPage() {
                 </select>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="text-[12px] font-bold text-zinc-700">Date *</label>
                   <input type="date" required value={svcDate} onChange={(e) => setSvcDate(e.target.value)} className="w-full mt-1 rounded-xl border border-zinc-200 px-3 py-[10px] text-[13px] outline-none focus:border-red-500" />

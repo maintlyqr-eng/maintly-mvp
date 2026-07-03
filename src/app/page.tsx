@@ -3,7 +3,7 @@
 import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowRight, ShieldCheck, Camera, Keyboard, User, ChevronDown, Globe, Clock, TrendingUp, LogOut, LayoutGrid, X, ZoomIn } from "lucide-react";
+import { ArrowRight, ShieldCheck, Camera, Keyboard, User, ChevronDown, Globe, Clock, TrendingUp, LogOut, LayoutGrid, X, ZoomIn, Menu } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 
 export default function HomePage() {
@@ -11,6 +11,7 @@ export default function HomePage() {
   const [loggedIn, setLoggedIn] = useState(false);
   const [userName, setUserName] = useState("");
   const [qrCode, setQrCode] = useState("");
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   // Camera scanner states
   const [showCamera, setShowCamera]   = useState(false);
@@ -148,7 +149,7 @@ export default function HomePage() {
   }
 
   return (
-    <main className="relative h-screen overflow-hidden bg-white text-zinc-900 flex flex-col">
+    <main className="relative min-h-dvh md:h-dvh overflow-x-hidden md:overflow-hidden bg-white text-zinc-900 flex flex-col">
 
       {/* ── BACKGROUND ── */}
       <div className="absolute inset-0 z-0">
@@ -157,12 +158,12 @@ export default function HomePage() {
       <div className="absolute inset-0 z-0 bg-white/15 pointer-events-none" />
 
       {/* ════ NAVBAR ════ */}
-      <nav className="relative z-50 flex items-center justify-between pl-3 pr-8 bg-transparent border-b border-white/10 shrink-0" style={{height:'9vh'}}>
+      <nav className="relative z-50 flex items-center justify-between pl-3 pr-4 md:pr-8 bg-transparent border-b border-white/10 shrink-0 h-16 md:h-[9vh]">
         <a href="/" className="flex items-center">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/images/qr-gear.png" alt="Maintly" style={{width: 84, height: 84, objectFit: "contain"}} />
+          <img src="/images/qr-gear.png" alt="Maintly" className="w-10 h-10 md:w-[84px] md:h-[84px] object-contain" />
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/images/Maintly.png" alt="" style={{width: 175, objectFit: "contain", marginLeft: -20}} />
+          <img src="/images/Maintly.png" alt="" className="w-[88px] md:w-[175px] object-contain -ml-2 md:-ml-5" />
         </a>
 
         <div className="hidden md:flex items-center gap-10">
@@ -174,24 +175,63 @@ export default function HomePage() {
           ))}
         </div>
 
-        {loggedIn ? (
-          <div className="flex items-center gap-2">
-            <a href="/dashboard" className="flex items-center gap-2 bg-zinc-900 hover:bg-zinc-800 text-white font-black tracking-wide rounded-xl transition-all shadow-md px-4 py-2" style={{fontSize:'clamp(10px,0.75vw,12px)'}}>
-              <LayoutGrid size={13} /> {userName}
+        {/* Desktop auth controls */}
+        <div className="hidden md:block">
+          {loggedIn ? (
+            <div className="flex items-center gap-2">
+              <a href="/dashboard" className="flex items-center gap-2 bg-zinc-900 hover:bg-zinc-800 text-white font-black tracking-wide rounded-xl transition-all shadow-md px-4 py-2" style={{fontSize:'clamp(10px,0.75vw,12px)'}}>
+                <LayoutGrid size={13} /> {userName}
+              </a>
+              <button onClick={handleLogout} className="flex items-center gap-1.5 text-zinc-500 hover:text-red-600 transition-colors border border-zinc-200 rounded-xl px-3 py-2" style={{fontSize:'clamp(10px,0.75vw,12px)'}}>
+                <LogOut size={13} />
+              </button>
+            </div>
+          ) : (
+            <a href="/login" className="flex items-center gap-2 bg-red-600 hover:bg-red-500 text-white font-black tracking-wide rounded-xl transition-all shadow-md shadow-red-900/20 uppercase px-5 py-2" style={{fontSize:'clamp(10px,0.75vw,12px)'}}>
+              <User size={13} /> Mechanic Login
             </a>
-            <button onClick={handleLogout} className="flex items-center gap-1.5 text-zinc-500 hover:text-red-600 transition-colors border border-zinc-200 rounded-xl px-3 py-2" style={{fontSize:'clamp(10px,0.75vw,12px)'}}>
-              <LogOut size={13} />
-            </button>
-          </div>
-        ) : (
-          <a href="/login" className="flex items-center gap-2 bg-red-600 hover:bg-red-500 text-white font-black tracking-wide rounded-xl transition-all shadow-md shadow-red-900/20 uppercase px-5 py-2" style={{fontSize:'clamp(10px,0.75vw,12px)'}}>
-            <User size={13} /> Mechanic Login
-          </a>
-        )}
+          )}
+        </div>
+
+        {/* Mobile hamburger */}
+        <button
+          onClick={() => setMobileMenuOpen((v) => !v)}
+          className="md:hidden w-10 h-10 flex items-center justify-center rounded-lg text-zinc-800 hover:bg-black/5 transition-colors"
+          aria-label="Menu"
+        >
+          {mobileMenuOpen ? <X size={22} /> : <Menu size={22} />}
+        </button>
       </nav>
 
+      {/* ════ MOBILE MENU DROPDOWN ════ */}
+      {mobileMenuOpen && (
+        <div className="md:hidden relative z-50 bg-white border-b border-zinc-200 shadow-lg px-5 py-4 flex flex-col gap-1">
+          {["Product","How It Works","Industries","Pricing","Resources","API","About"].map((item) => (
+            <a key={item} href="#" className="text-zinc-700 hover:text-red-600 font-semibold text-[14px] py-2 border-b border-zinc-100 last:border-0">
+              {item}
+            </a>
+          ))}
+          <div className="pt-3">
+            {loggedIn ? (
+              <div className="flex items-center gap-2">
+                <a href="/dashboard" className="flex-1 flex items-center justify-center gap-2 bg-zinc-900 text-white font-black rounded-xl px-4 py-3 text-[13px]">
+                  <LayoutGrid size={14} /> {userName}
+                </a>
+                <button onClick={handleLogout} className="flex items-center justify-center gap-1.5 text-zinc-500 border border-zinc-200 rounded-xl px-3 py-3">
+                  <LogOut size={14} />
+                </button>
+              </div>
+            ) : (
+              <a href="/login" className="flex items-center justify-center gap-2 bg-red-600 text-white font-black tracking-wide rounded-xl uppercase px-5 py-3 text-[13px]">
+                <User size={14} /> Mechanic Login
+              </a>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* ════ HERO ════ */}
-      <section className="relative z-10 flex flex-col items-center text-center px-4 flex-1" style={{paddingTop:'3vh'}}>
+      <section className="relative z-10 flex flex-col items-center text-center px-4 flex-1 pb-8 md:pb-0" style={{paddingTop:'3vh'}}>
 
         <h1 className="font-black leading-[1.05] tracking-tight text-zinc-900" style={{fontSize:'clamp(36px,5.5vw,68px)'}}>
           Every Machine<br />Has a <span className="text-red-600">Story.</span>
@@ -207,10 +247,10 @@ export default function HomePage() {
         </p>
 
         {/* ── ACTION CARDS ── */}
-        <div className="flex items-stretch w-full max-w-[540px] rounded-2xl overflow-hidden shadow-[0_8px_50px_rgba(0,0,0,0.13)] border border-zinc-200/80" style={{marginTop:'2.5vh'}}>
+        <div className="flex flex-col md:flex-row items-stretch w-full max-w-[540px] rounded-2xl overflow-hidden shadow-[0_8px_50px_rgba(0,0,0,0.13)] border border-zinc-200/80" style={{marginTop:'2.5vh'}}>
 
           {/* SCAN QR */}
-          <div className="flex-1 bg-zinc-900 flex flex-col items-center text-center px-7 rounded-l-2xl" style={{paddingTop:'2.5vh', paddingBottom:'2.5vh'}}>
+          <div className="flex-1 bg-zinc-900 flex flex-col items-center text-center px-7 rounded-t-2xl md:rounded-t-none md:rounded-l-2xl" style={{paddingTop:'2.5vh', paddingBottom:'2.5vh'}}>
             <div className="rounded-full bg-red-600/15 border border-red-600/30 flex items-center justify-center mb-3" style={{width:'clamp(40px,4vw,56px)', height:'clamp(40px,4vw,56px)'}}>
               <Camera className="text-red-500" style={{width:'clamp(18px,1.8vw,26px)', height:'clamp(18px,1.8vw,26px)'}} />
             </div>
@@ -228,16 +268,16 @@ export default function HomePage() {
           </div>
 
           {/* OR */}
-          <div className="flex flex-col items-center justify-center bg-white px-3 shrink-0 gap-2">
-            <div className="w-[1px] flex-1 bg-zinc-200" />
+          <div className="flex flex-row md:flex-col items-center justify-center bg-white px-3 md:px-3 py-3 md:py-0 shrink-0 gap-2">
+            <div className="h-[1px] w-auto md:h-auto md:w-[1px] flex-1 bg-zinc-200" />
             <div className="rounded-full border-2 border-zinc-200 bg-white flex items-center justify-center shrink-0" style={{width:'clamp(28px,2.5vw,36px)', height:'clamp(28px,2.5vw,36px)'}}>
               <span className="text-zinc-400 font-black" style={{fontSize:'clamp(8px,0.65vw,10px)'}}>OR</span>
             </div>
-            <div className="w-[1px] flex-1 bg-zinc-200" />
+            <div className="h-[1px] w-auto md:h-auto md:w-[1px] flex-1 bg-zinc-200" />
           </div>
 
           {/* ENTER QR */}
-          <div className="flex-1 bg-white flex flex-col items-center text-center px-7 rounded-r-2xl" style={{paddingTop:'2.5vh', paddingBottom:'2.5vh'}}>
+          <div className="flex-1 bg-white flex flex-col items-center text-center px-7 rounded-b-2xl md:rounded-b-none md:rounded-r-2xl" style={{paddingTop:'2.5vh', paddingBottom:'2.5vh'}}>
             <div className="rounded-full bg-zinc-100 border border-zinc-200 flex items-center justify-center mb-3" style={{width:'clamp(40px,4vw,56px)', height:'clamp(40px,4vw,56px)'}}>
               <Keyboard className="text-zinc-500" style={{width:'clamp(16px,1.5vw,22px)', height:'clamp(16px,1.5vw,22px)'}} />
             </div>
@@ -288,14 +328,20 @@ export default function HomePage() {
         </div>
 
         {/* ── PILLARS ── */}
-        <div className="w-full max-w-[540px] grid grid-cols-4 rounded-2xl overflow-hidden border border-zinc-200 bg-white/92 backdrop-blur-sm shadow-sm" style={{marginTop:'1.2vh'}}>
+        <div className="w-full max-w-[540px] grid grid-cols-2 md:grid-cols-4 rounded-2xl overflow-hidden border border-zinc-200 bg-white/92 backdrop-blur-sm shadow-sm" style={{marginTop:'1.2vh'}}>
           {[
             { icon: ShieldCheck, title: "100% Secure", sub: "Your data is safe and encrypted" },
             { icon: Globe, title: "Access Anywhere", sub: "Global access to your maintenance history" },
             { icon: Clock, title: "Full History", sub: "Every service, every part, every time" },
             { icon: TrendingUp, title: "Built to Grow", sub: "Scalable for individuals and enterprises" },
           ].map(({ icon: Icon, title, sub }, i) => (
-            <div key={title} className={`flex flex-col items-center text-center px-3 ${i < 3 ? "border-r border-zinc-200" : ""}`} style={{paddingTop:'clamp(8px,1vh,14px)', paddingBottom:'clamp(8px,1vh,14px)'}}>
+            <div key={title} className={[
+              "flex flex-col items-center text-center px-3 border-zinc-200",
+              i % 2 === 0 ? "border-r" : "",
+              i < 2 ? "border-b" : "",
+              "md:border-b-0",
+              i < 3 ? "md:border-r" : "md:border-r-0",
+            ].filter(Boolean).join(" ")} style={{paddingTop:'clamp(8px,1vh,14px)', paddingBottom:'clamp(8px,1vh,14px)'}}>
               <div className="rounded-full border border-red-200 bg-red-50 flex items-center justify-center text-red-500 shrink-0" style={{width:'clamp(24px,2.2vw,30px)', height:'clamp(24px,2.2vw,30px)', marginBottom:'clamp(4px,0.5vh,8px)'}}>
                 <Icon style={{width:'clamp(10px,0.9vw,13px)', height:'clamp(10px,0.9vw,13px)'}} />
               </div>

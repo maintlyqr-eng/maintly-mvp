@@ -8,7 +8,7 @@ import {
   LayoutGrid, FileText, Box, QrCode, Users, BarChart3, Calendar as CalendarIcon,
   Mail, FolderOpen, Settings, Search, Bell, Plus, MoreVertical,
   CheckCircle2, Clock, TrendingUp, TrendingDown, Crown, ChevronLeft, ChevronRight, LogOut,
-  ScanLine, Wrench, AlertCircle
+  ScanLine, Wrench, AlertCircle, Menu, X
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 
@@ -80,6 +80,7 @@ function MiniSparkline({ color }: { color: string }) {
 
 export default function DashboardPage() {
   const router = useRouter();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [authChecked, setAuthChecked] = useState(false);
   const [mechanicName, setMechanicName] = useState("");
   const [mechanicEmail, setMechanicEmail] = useState("");
@@ -288,23 +289,34 @@ export default function DashboardPage() {
   ];
 
   return (
-    <div className="min-h-screen bg-zinc-50 flex">
+    <div className="min-h-screen bg-zinc-50 flex relative">
+
+      {/* ════ MOBILE SIDEBAR BACKDROP ════ */}
+      {sidebarOpen && (
+        <div className="md:hidden fixed inset-0 bg-black/40 z-30" onClick={() => setSidebarOpen(false)} />
+      )}
 
       {/* ════ SIDEBAR ════ */}
-      <aside className="w-[230px] bg-white border-r border-zinc-200 flex flex-col shrink-0">
+      <aside className={`fixed md:static inset-y-0 left-0 z-40 w-[230px] bg-white border-r border-zinc-200 flex flex-col shrink-0 transform transition-transform duration-200 md:translate-x-0 ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}`}>
 
-        <Link href="/" className="flex items-center px-4 py-2">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/images/qr-gear.png" alt="Maintly" style={{width: 72, height: 72, objectFit: "contain"}} />
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/images/Maintly.png" alt="" style={{width: 152, objectFit: "contain", marginLeft: -18}} />
-        </Link>
+        <div className="flex items-center justify-between px-4 py-2">
+          <Link href="/" className="flex items-center">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/images/qr-gear.png" alt="Maintly" style={{width: 72, height: 72, objectFit: "contain"}} />
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/images/Maintly.png" alt="" style={{width: 152, objectFit: "contain", marginLeft: -18}} />
+          </Link>
+          <button onClick={() => setSidebarOpen(false)} className="md:hidden text-zinc-400 hover:text-zinc-700 mr-2">
+            <X size={20} />
+          </button>
+        </div>
 
-        <nav className="flex-1 px-3">
+        <nav className="flex-1 px-3 overflow-y-auto">
           {navItems.map((item) => (
             <Link
               key={item.label}
               href={item.href}
+              onClick={() => setSidebarOpen(false)}
               className={`flex items-center gap-3 px-3 py-[9px] rounded-lg mb-1 text-[13px] font-medium transition-colors ${
                 item.active
                   ? "bg-red-50 text-red-600 border-l-[3px] border-red-600 -ml-[1px]"
@@ -338,14 +350,19 @@ export default function DashboardPage() {
       {/* ════ MAIN CONTENT ════ */}
       <div className="flex-1 flex flex-col min-w-0">
 
-        <header className="flex items-center justify-between px-7 py-4 bg-white border-b border-zinc-200">
-          <div>
-            <h1 className="text-[20px] font-black text-zinc-900">Dashboard</h1>
-            <p className="text-[12px] text-zinc-400">Welcome back, {mechanicName || "Mechanic"}! Here&apos;s what&apos;s happening with your maintenance work.</p>
+        <header className="flex items-center justify-between gap-3 px-4 md:px-7 py-4 bg-white border-b border-zinc-200">
+          <div className="flex items-center gap-3 min-w-0">
+            <button onClick={() => setSidebarOpen(true)} className="md:hidden shrink-0 text-zinc-600 hover:text-zinc-900">
+              <Menu size={22} />
+            </button>
+            <div className="min-w-0">
+              <h1 className="text-[17px] md:text-[20px] font-black text-zinc-900 truncate">Dashboard</h1>
+              <p className="hidden sm:block text-[12px] text-zinc-400 truncate">Welcome back, {mechanicName || "Mechanic"}! Here&apos;s what&apos;s happening with your maintenance work.</p>
+            </div>
           </div>
 
-          <div className="flex items-center gap-4">
-            <div className="relative">
+          <div className="flex items-center gap-2 md:gap-4 shrink-0">
+            <div className="relative hidden lg:block">
               <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
               <input
                 type="text"
@@ -359,26 +376,26 @@ export default function DashboardPage() {
               <Bell size={19} />
             </button>
 
-            <div className="flex items-center gap-3 pl-3 border-l border-zinc-200">
+            <div className="flex items-center gap-3 md:pl-3 md:border-l border-zinc-200">
               <div className="flex items-center gap-2.5">
                 <div className="w-9 h-9 rounded-full bg-red-100 flex items-center justify-center text-red-600 font-bold text-[13px] shrink-0">{initials}</div>
-                <div className="text-left">
+                <div className="hidden sm:block text-left">
                   <p className="text-[12px] font-bold text-zinc-800 leading-tight">{displayName}</p>
                   <p className="text-[10px] text-zinc-400 leading-tight">Mechanic</p>
                 </div>
               </div>
               <button
                 onClick={handleLogout}
-                className="flex items-center gap-1.5 text-[12px] font-semibold text-zinc-500 hover:text-red-600 hover:bg-red-50 border border-zinc-200 hover:border-red-200 px-3 py-2 rounded-xl transition-all"
+                className="flex items-center gap-1.5 text-[12px] font-semibold text-zinc-500 hover:text-red-600 hover:bg-red-50 border border-zinc-200 hover:border-red-200 px-2.5 md:px-3 py-2 rounded-xl transition-all"
               >
                 <LogOut size={13} />
-                Log out
+                <span className="hidden md:inline">Log out</span>
               </button>
             </div>
           </div>
         </header>
 
-        <div className="flex-1 overflow-y-auto p-7">
+        <div className="flex-1 overflow-y-auto p-4 md:p-7">
 
           {/* ── Action buttons ── */}
           <div className="flex justify-end gap-3 mb-5 -mt-2">
@@ -428,7 +445,8 @@ export default function DashboardPage() {
                     <Link href="/dashboard/services" className="text-[12px] font-bold text-red-600 hover:text-red-700">Log your first service →</Link>
                   </div>
                 ) : (
-                  <table className="w-full">
+                  <div className="overflow-x-auto -mx-5 px-5">
+                  <table className="w-full min-w-[560px]">
                     <thead>
                       <tr className="text-left text-[10px] text-zinc-400 font-bold uppercase">
                         <th className="pb-2 font-bold">Asset</th>
@@ -475,6 +493,7 @@ export default function DashboardPage() {
                       })}
                     </tbody>
                   </table>
+                  </div>
                 )}
               </div>
             </div>
@@ -595,7 +614,7 @@ export default function DashboardPage() {
 
             {/* ── STEP: CHOOSE ── */}
             {addAssetTab === "choose" && (
-              <div className="p-6 grid grid-cols-2 gap-4">
+              <div className="p-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <button
                   onClick={() => setAddAssetTab("new")}
                   className="flex flex-col items-center gap-3 p-5 border-2 border-zinc-200 hover:border-red-300 hover:bg-red-50 rounded-2xl transition-all text-center group"
@@ -629,7 +648,7 @@ export default function DashboardPage() {
               <div className="p-6">
                 <p className="text-[13px] text-zinc-500 mb-5">Fill in the details to register a new asset. A unique QR code will be generated automatically.</p>
                 <div className="space-y-3">
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
                       <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wide mb-1 block">Brand</label>
                       <input
@@ -647,7 +666,7 @@ export default function DashboardPage() {
                       />
                     </div>
                   </div>
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
                       <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wide mb-1 block">Year</label>
                       <input
