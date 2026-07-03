@@ -221,8 +221,8 @@ export default function DashboardPage() {
       if (active && mechanic) setMechanicName(mechanic.name);
 
       const { count: assetCount } = await supabase
-        .from("assets").select("*", { count: "exact", head: true })
-        .eq("created_by", session.user.id);
+        .from("mechanic_assets").select("*", { count: "exact", head: true })
+        .eq("mechanic_id", session.user.id);
       if (active) setTotalAssets(assetCount ?? 0);
 
       const { data: svcs } = await supabase

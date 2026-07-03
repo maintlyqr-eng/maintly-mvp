@@ -165,14 +165,16 @@ export default function AssetsPage() {
 
   async function loadAssets(uid: string) {
     setLoadingAssets(true);
+    // Traer todos los assets del workshop del mecánico (los que creó + los que vinculó)
     const { data } = await supabase
-      .from("assets")
-      .select(
-        "id, asset_type, brand, model, nickname, vin_serial, year, plate, fuel_type, location, photo_url, created_at, qr_codes(code)"
-      )
-      .eq("created_by", uid)
-      .order("created_at", { ascending: false });
-    setAssets((data as unknown as AssetRow[]) ?? []);
+      .from("mechanic_assets")
+      .select("asset_id, assets(id, asset_type, brand, model, nickname, vin_serial, year, plate, fuel_type, location, photo_url, created_at, qr_codes(code))")
+      .eq("mechanic_id", uid)
+      .order("added_at", { ascending: false });
+    const assetList = (data ?? [])
+      .map((row: any) => Array.isArray(row.assets) ? row.assets[0] : row.assets)
+      .filter(Boolean);
+    setAssets(assetList as unknown as AssetRow[]);
     setLoadingAssets(false);
   }
 
@@ -326,14 +328,20 @@ export default function AssetsPage() {
       .from("qr_codes")
       .insert({ code, asset_id: newAsset.id, created_by: mechanicId });
 
-    setSaving(false);
-
     if (qrError) {
+      setSaving(false);
       setFormError("Asset created, but QR could not be generated: " + qrError.message);
       await loadAssets(mechanicId);
       return;
     }
 
+    // Vincular el asset al workshop del mecánico
+    await supabase.from("mechanic_assets").upsert(
+      { mechanic_id: mechanicId, asset_id: newAsset.id, qr_code: code },
+      { onConflict: "mechanic_id,asset_id", ignoreDuplicates: true }
+    );
+
+    setSaving(false);
     resetForm();
     setShowForm(false);
     await loadAssets(mechanicId);
