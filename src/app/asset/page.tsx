@@ -5,7 +5,7 @@ import { useState } from "react";
 import {
   ShieldCheck, Wrench, Calendar, Plus, Download, User,
   Eye, Globe, Tag, Grid3x3, Zap, MapPin, Clock,
-  ChevronDown, Filter, Gauge
+  ChevronDown, Filter, Gauge, LayoutDashboard, ChevronRight
 } from "lucide-react";
 
 // ── DATOS DE EJEMPLO ──
@@ -79,6 +79,7 @@ const tabs = ["History", "Asset Details", "Documents", "Ownership"];
 export default function AssetPage() {
   const [activeTab, setActiveTab] = useState("History");
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showWorkshopModal, setShowWorkshopModal] = useState(false);
 
   return (
     <main className="min-h-screen bg-zinc-50 text-zinc-900">
@@ -108,8 +109,11 @@ export default function AssetPage() {
           <button className="flex items-center gap-2 border border-zinc-200 hover:bg-zinc-50 transition-colors text-zinc-700 text-[12px] font-semibold px-3 py-2 rounded-lg">
             <Download size={13} /> Export PDF
           </button>
-          <button className="flex items-center gap-2 border border-zinc-200 hover:bg-zinc-50 transition-colors text-zinc-700 text-[12px] font-semibold px-3 py-2 rounded-lg">
-            <User size={13} /> Mechanic Login
+          <button
+            onClick={() => setShowWorkshopModal(true)}
+            className="flex items-center gap-2 border border-red-200 bg-red-50 hover:bg-red-100 active:scale-[0.98] transition-all text-red-600 text-[12px] font-bold px-3 py-2 rounded-lg"
+          >
+            <LayoutDashboard size={13} /> Add to My Workshop
           </button>
           <button
             onClick={() => setShowAddModal(true)}
@@ -387,6 +391,79 @@ export default function AssetPage() {
           </div>
         </div>
       )}
+
+      {/* ════ MODAL: ADD TO MY WORKSHOP ════ */}
+      {showWorkshopModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden">
+
+            {/* Header oscuro */}
+            <div className="bg-zinc-900 px-6 py-5">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-red-600 flex items-center justify-center shrink-0">
+                    <LayoutDashboard size={18} className="text-white" />
+                  </div>
+                  <div>
+                    <h3 className="text-[15px] font-black text-white">Add to My Workshop</h3>
+                    <p className="text-[11px] text-zinc-400 truncate max-w-[220px]">{asset.name}</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowWorkshopModal(false)}
+                  className="text-zinc-500 hover:text-zinc-300 text-[24px] leading-none transition-colors"
+                >×</button>
+              </div>
+            </div>
+
+            {/* Body */}
+            <div className="p-6">
+              <p className="text-[13px] text-zinc-500 text-center mb-6">
+                Log in or create a free account to track this asset and add service records.
+              </p>
+
+              <div className="space-y-3">
+                {/* Login option */}
+                <a
+                  href="/login"
+                  className="flex items-center gap-4 p-4 border-2 border-red-100 bg-red-50 hover:bg-red-100 rounded-xl transition-colors group"
+                >
+                  <div className="w-10 h-10 rounded-xl bg-red-600 flex items-center justify-center shrink-0">
+                    <User size={16} className="text-white" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[13px] font-bold text-zinc-900">Log in to my account</p>
+                    <p className="text-[11px] text-zinc-500">Already a Maintly mechanic? Log in and track this asset.</p>
+                  </div>
+                  <ChevronRight size={16} className="text-zinc-400 group-hover:text-red-600 shrink-0 transition-colors" />
+                </a>
+
+                {/* Register option */}
+                <a
+                  href="/register"
+                  className="flex items-center gap-4 p-4 border border-zinc-200 hover:bg-zinc-50 rounded-xl transition-colors group"
+                >
+                  <div className="w-10 h-10 rounded-xl bg-zinc-100 group-hover:bg-zinc-200 flex items-center justify-center shrink-0 transition-colors">
+                    <Plus size={16} className="text-zinc-600" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[13px] font-bold text-zinc-900">Create a free account</p>
+                    <p className="text-[11px] text-zinc-500">Register as a Maintly mechanic — free, takes 30 seconds.</p>
+                  </div>
+                  <ChevronRight size={16} className="text-zinc-400 group-hover:text-zinc-700 shrink-0 transition-colors" />
+                </a>
+              </div>
+
+              <div className="mt-5 pt-4 border-t border-zinc-100 text-center">
+                <p className="text-[10px] text-zinc-400">
+                  Asset QR ID: <span className="font-mono font-semibold text-zinc-600">{asset.scanId}</span>
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
     </main>
   );
 }
