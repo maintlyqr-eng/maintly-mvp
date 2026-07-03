@@ -869,7 +869,7 @@ export default function AssetsPage() {
                 const statusColor = ASSET_STATUS_COLOR[statusKey];
                 const qrOpen = qrOpenId === a.id;
                 return (
-                  <div key={a.id} className="bg-white rounded-2xl border border-zinc-200 shadow-sm p-5 flex flex-col">
+                  <div key={a.id} className="bg-white rounded-2xl border border-zinc-200 shadow-sm p-5 flex flex-col transition-all duration-200 hover:scale-[1.03] hover:shadow-lg hover:border-zinc-300 hover:z-10">
                     {/* Asset header */}
                     <div className="flex items-center gap-3 mb-3">
                       {/* Photo or icon */}
