@@ -2,20 +2,21 @@
 
 import Image from "next/image";
 import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import {
   ShieldCheck, Calendar, Gauge, Wrench, CheckCircle2, MapPin,
-  Hash, Fuel, AlertCircle, ChevronDown, ChevronUp, UserCircle2
+  Hash, Fuel, AlertCircle, ChevronDown, ChevronUp, UserCircle2,
+  Plus, BookMarked, LogIn, X, ChevronRight
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 
 const assetTypeImg: Record<string, string> = {
   automotive: "/images/pickup.png",
   motorcycle: "/images/moto.png",
-  generator: "/images/generador.png",
-  machinery: "/images/excavator.png",
-  marine: "/images/barco.png",
-  aviation: "/images/avion.png",
+  generator:  "/images/generador.png",
+  machinery:  "/images/excavator.png",
+  marine:     "/images/barco.png",
+  aviation:   "/images/avion.png",
 };
 
 const typeColors: Record<string, { bg: string; text: string }> = {
@@ -28,28 +29,17 @@ const typeColors: Record<string, { bg: string; text: string }> = {
   "Brake Service": { bg: "bg-orange-100", text: "text-orange-700" },
 };
 
+const SERVICE_TYPES = ["Oil Change", "Service", "Repair", "Inspection", "Filter Change", "Tire Change", "Brake Service", "Other"];
+
 type AssetData = {
-  id: string;
-  asset_type: string;
-  brand: string | null;
-  model: string | null;
-  nickname: string | null;
-  vin_serial: string | null;
-  year: number | null;
-  plate: string | null;
-  fuel_type: string | null;
-  location: string | null;
+  id: string; asset_type: string; brand: string | null; model: string | null;
+  nickname: string | null; vin_serial: string | null; year: number | null;
+  plate: string | null; fuel_type: string | null; location: string | null;
 };
-
 type MechanicInfo = { name: string };
-
 type ServiceRecord = {
-  id: string;
-  service_date: string;
-  service_type: string;
-  km_hours: number | null;
-  notes: string | null;
-  created_at: string;
+  id: string; service_date: string; service_type: string;
+  km_hours: number | null; notes: string | null; created_at: string;
   mechanics: MechanicInfo | MechanicInfo[] | null;
 };
 
@@ -57,63 +47,139 @@ function formatDate(dateStr: string) {
   const d = new Date(dateStr + "T00:00:00");
   return d.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
 }
+function todayStr() {
+  return new Date().toISOString().split("T")[0];
+}
 
 export default function AssetPublicPage() {
-  const params = useParams();
-  const code = params?.code as string;
+  const params   = useParams();
+  const router   = useRouter();
+  const code     = params?.code as string;
 
-  const [loading, setLoading] = useState(true);
+  // Asset data
+  const [loading, setLoading]   = useState(true);
   const [notFound, setNotFound] = useState(false);
-  const [asset, setAsset] = useState<AssetData | null>(null);
+  const [asset, setAsset]       = useState<AssetData | null>(null);
   const [services, setServices] = useState<ServiceRecord[]>([]);
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
+  // Auth
+  const [mechanicId, setMechanicId]     = useState<string | null>(null);
+  const [mechanicName, setMechanicName] = useState("");
+  const [isLoggedIn, setIsLoggedIn]     = useState(false);
+
+  // Workshop
+  const [inWorkshop, setInWorkshop]         = useState(false);
+  const [addingWorkshop, setAddingWorkshop] = useState(false);
+  const [workshopDone, setWorkshopDone]     = useState(false);
+
+  // Add Service form
+  const [showServiceForm, setShowServiceForm] = useState(false);
+  const [svcType, setSvcType]   = useState("Service");
+  const [svcDate, setSvcDate]   = useState(todayStr());
+  const [svcKm, setSvcKm]       = useState("");
+  const [svcNotes, setSvcNotes] = useState("");
+  const [savingSvc, setSavingSvc]   = useState(false);
+  const [svcError, setSvcError]     = useState("");
+
+  // Load auth + asset
   useEffect(() => {
     if (!code) { setNotFound(true); setLoading(false); return; }
 
-    async function load() {
-      // 1. Find asset via QR code
-      const { data: qrRow } = await supabase
-        .from("qr_codes")
-        .select("asset_id")
-        .eq("code", code)
-        .single();
-
-      if (!qrRow?.asset_id) {
-        setNotFound(true);
-        setLoading(false);
-        return;
+    async function init() {
+      // Auth check (non-blocking)
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        setIsLoggedIn(true);
+        setMechanicId(session.user.id);
+        const { data: m } = await supabase.from("mechanics").select("name").eq("id", session.user.id).single();
+        if (m) setMechanicName(m.name);
       }
 
-      // 2. Load asset data
+      // QR → asset
+      const { data: qrRow } = await supabase.from("qr_codes").select("asset_id").eq("code", code).single();
+      if (!qrRow?.asset_id) { setNotFound(true); setLoading(false); return; }
+
       const { data: assetData } = await supabase
         .from("assets")
         .select("id, asset_type, brand, model, nickname, vin_serial, year, plate, fuel_type, location")
-        .eq("id", qrRow.asset_id)
-        .single();
-
-      if (!assetData) {
-        setNotFound(true);
-        setLoading(false);
-        return;
-      }
+        .eq("id", qrRow.asset_id).single();
+      if (!assetData) { setNotFound(true); setLoading(false); return; }
 
       setAsset(assetData as AssetData);
 
-      // 3. Load service records
-      const { data: serviceRows } = await supabase
-        .from("service_records")
-        .select("id, service_date, service_type, km_hours, notes, created_at, mechanics(name)")
-        .eq("asset_id", qrRow.asset_id)
-        .order("service_date", { ascending: false });
+      // Load services
+      await loadServices(qrRow.asset_id);
 
-      setServices((serviceRows as ServiceRecord[]) ?? []);
+      // Check if already in workshop
+      if (session) {
+        const { count } = await supabase.from("mechanic_assets")
+          .select("*", { count: "exact", head: true })
+          .eq("mechanic_id", session.user.id).eq("asset_id", qrRow.asset_id);
+        if ((count ?? 0) > 0) { setInWorkshop(true); setWorkshopDone(true); }
+      }
+
       setLoading(false);
     }
 
-    load();
+    init();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [code]);
 
+  async function loadServices(assetId: string) {
+    const { data } = await supabase
+      .from("service_records")
+      .select("id, service_date, service_type, km_hours, notes, created_at, mechanics(name)")
+      .eq("asset_id", assetId)
+      .order("service_date", { ascending: false });
+    setServices((data as ServiceRecord[]) ?? []);
+  }
+
+  async function handleAddToWorkshop() {
+    if (!isLoggedIn) { router.push(`/login?redirect=/asset/${code}`); return; }
+    if (!asset || inWorkshop || addingWorkshop) return;
+    setAddingWorkshop(true);
+    const { error } = await supabase.from("mechanic_assets").upsert(
+      { mechanic_id: mechanicId, asset_id: asset.id, qr_code: code },
+      { onConflict: "mechanic_id,asset_id", ignoreDuplicates: true }
+    );
+    setAddingWorkshop(false);
+    if (!error) { setInWorkshop(true); setWorkshopDone(true); }
+  }
+
+  async function handleAddService(e: React.FormEvent) {
+    e.preventDefault();
+    if (!isLoggedIn) { router.push(`/login?redirect=/asset/${code}`); return; }
+    if (!asset || savingSvc) return;
+    setSvcError("");
+    setSavingSvc(true);
+    const { error } = await supabase.from("service_records").insert({
+      asset_id: asset.id,
+      mechanic_id: mechanicId,
+      service_date: svcDate,
+      service_type: svcType,
+      km_hours: svcKm ? parseFloat(svcKm) : null,
+      notes: svcNotes.trim() || null,
+    });
+    setSavingSvc(false);
+    if (error) { setSvcError("Error saving. Please try again."); return; }
+
+    // Also add to workshop if not already there
+    if (!inWorkshop) {
+      await supabase.from("mechanic_assets").upsert(
+        { mechanic_id: mechanicId, asset_id: asset.id, qr_code: code },
+        { onConflict: "mechanic_id,asset_id", ignoreDuplicates: true }
+      );
+      setInWorkshop(true); setWorkshopDone(true);
+    }
+
+    // Refresh services
+    await loadServices(asset.id);
+    setShowServiceForm(false);
+    setSvcType("Service"); setSvcDate(todayStr()); setSvcKm(""); setSvcNotes("");
+  }
+
+  // ── LOADING ────────────────────────────────────────────────────────────────
   if (loading) {
     return (
       <div className="min-h-screen bg-zinc-50 flex flex-col items-center justify-center gap-4">
@@ -123,6 +189,7 @@ export default function AssetPublicPage() {
     );
   }
 
+  // ── NOT FOUND ──────────────────────────────────────────────────────────────
   if (notFound || !asset) {
     return (
       <div className="min-h-screen bg-zinc-50 flex flex-col items-center justify-center px-6 text-center">
@@ -130,7 +197,7 @@ export default function AssetPublicPage() {
           <AlertCircle size={28} className="text-red-500" />
         </div>
         <h1 className="text-[20px] font-black text-zinc-900 mb-2">QR Code Not Found</h1>
-        <p className="text-[14px] text-zinc-500 max-w-xs">This QR code doesn&apos;t match any asset in our system. It may have been removed or is invalid.</p>
+        <p className="text-[14px] text-zinc-500 max-w-xs">This QR code doesn&apos;t match any asset in our system.</p>
         <div className="mt-8 flex items-center gap-0">
           <Image src="/images/qr-gear.png" alt="Maintly" width={64} height={64} className="object-contain mt-2" />
           <Image src="/images/Maintly.png" alt="Maintly" width={140} height={140} className="object-contain w-[140px] h-auto -ml-4 mt-2" />
@@ -140,30 +207,25 @@ export default function AssetPublicPage() {
   }
 
   const assetName = asset.nickname || [asset.brand, asset.model].filter(Boolean).join(" ") || "Asset";
-  const assetImg = assetTypeImg[asset.asset_type] ?? "/images/pickup.png";
-  const color = typeColors;
+  const assetImg  = assetTypeImg[asset.asset_type] ?? "/images/pickup.png";
 
   return (
-    <div className="min-h-screen bg-zinc-50">
+    <div className="min-h-screen bg-zinc-50 pb-32">
 
       {/* ── HEADER ── */}
       <div className="bg-white border-b border-zinc-200 px-4 py-3 flex items-center justify-between sticky top-0 z-10 shadow-sm">
-        <a href="/" className="flex items-center gap-0">
+        <a href="/" className="flex items-center">
           <Image src="/images/qr-gear.png" alt="Maintly" width={64} height={64} className="object-contain mt-2" />
           <Image src="/images/Maintly.png" alt="Maintly" width={140} height={140} className="object-contain w-[140px] h-auto -ml-4 mt-2" />
         </a>
         <div className="flex items-center gap-3">
-          <a
-            href={`/asset/${code}/report`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-1.5 bg-red-600 hover:bg-red-500 text-white text-[11px] font-bold px-3 py-1.5 rounded-lg transition-colors"
-          >
-            📄 Download Report
+          <a href={`/asset/${code}/report`} target="_blank" rel="noopener noreferrer"
+            className="flex items-center gap-1.5 bg-red-600 hover:bg-red-500 text-white text-[11px] font-bold px-3 py-1.5 rounded-lg transition-colors">
+            📄 Report
           </a>
           <div className="flex items-center gap-1.5 text-[11px] text-zinc-500 font-medium">
             <ShieldCheck size={13} className="text-red-500" />
-            Verified Record
+            Verified
           </div>
         </div>
       </div>
@@ -181,9 +243,7 @@ export default function AssetPublicPage() {
                 {asset.asset_type.charAt(0).toUpperCase() + asset.asset_type.slice(1)}
               </p>
               <h1 className="text-[20px] font-black text-white leading-tight truncate">{assetName}</h1>
-              {asset.year && (
-                <p className="text-[12px] text-zinc-400 mt-0.5">{asset.year}</p>
-              )}
+              {asset.year && <p className="text-[12px] text-zinc-400 mt-0.5">{asset.year}</p>}
             </div>
           </div>
 
@@ -191,37 +251,29 @@ export default function AssetPublicPage() {
             {asset.vin_serial && (
               <div className="flex items-start gap-2">
                 <Hash size={13} className="text-zinc-400 mt-0.5 shrink-0" />
-                <div>
-                  <p className="text-[10px] text-zinc-400 font-bold uppercase tracking-wide">VIN / Serial</p>
-                  <p className="text-[12px] font-mono text-zinc-700 font-semibold">{asset.vin_serial}</p>
-                </div>
+                <div><p className="text-[10px] text-zinc-400 font-bold uppercase tracking-wide">VIN / Serial</p>
+                  <p className="text-[12px] font-mono text-zinc-700 font-semibold">{asset.vin_serial}</p></div>
               </div>
             )}
             {asset.plate && (
               <div className="flex items-start gap-2">
                 <Hash size={13} className="text-zinc-400 mt-0.5 shrink-0" />
-                <div>
-                  <p className="text-[10px] text-zinc-400 font-bold uppercase tracking-wide">Plate</p>
-                  <p className="text-[12px] font-mono text-zinc-700 font-semibold">{asset.plate}</p>
-                </div>
+                <div><p className="text-[10px] text-zinc-400 font-bold uppercase tracking-wide">Plate</p>
+                  <p className="text-[12px] font-mono text-zinc-700 font-semibold">{asset.plate}</p></div>
               </div>
             )}
             {asset.fuel_type && (
               <div className="flex items-start gap-2">
                 <Fuel size={13} className="text-zinc-400 mt-0.5 shrink-0" />
-                <div>
-                  <p className="text-[10px] text-zinc-400 font-bold uppercase tracking-wide">Fuel</p>
-                  <p className="text-[12px] text-zinc-700 font-semibold">{asset.fuel_type}</p>
-                </div>
+                <div><p className="text-[10px] text-zinc-400 font-bold uppercase tracking-wide">Fuel</p>
+                  <p className="text-[12px] text-zinc-700 font-semibold">{asset.fuel_type}</p></div>
               </div>
             )}
             {asset.location && (
               <div className="flex items-start gap-2">
                 <MapPin size={13} className="text-zinc-400 mt-0.5 shrink-0" />
-                <div>
-                  <p className="text-[10px] text-zinc-400 font-bold uppercase tracking-wide">Location</p>
-                  <p className="text-[12px] text-zinc-700 font-semibold">{asset.location}</p>
-                </div>
+                <div><p className="text-[10px] text-zinc-400 font-bold uppercase tracking-wide">Location</p>
+                  <p className="text-[12px] text-zinc-700 font-semibold">{asset.location}</p></div>
               </div>
             )}
           </div>
@@ -235,17 +287,13 @@ export default function AssetPublicPage() {
           </div>
           <div className="bg-white rounded-xl border border-zinc-200 shadow-sm p-3 text-center">
             <p className="text-[22px] font-black text-zinc-900">
-              {services.length > 0
-                ? new Date(services[services.length - 1].service_date + "T00:00:00").getFullYear()
-                : "—"}
+              {services.length > 0 ? new Date(services[services.length - 1].service_date + "T00:00:00").getFullYear() : "—"}
             </p>
             <p className="text-[10px] text-zinc-400 font-bold uppercase tracking-wide mt-0.5">Since</p>
           </div>
           <div className="bg-white rounded-xl border border-zinc-200 shadow-sm p-3 text-center">
             <p className="text-[22px] font-black text-zinc-900">
-              {services[0]?.km_hours != null
-                ? services[0].km_hours.toLocaleString()
-                : "—"}
+              {services[0]?.km_hours != null ? services[0].km_hours.toLocaleString() : "—"}
             </p>
             <p className="text-[10px] text-zinc-400 font-bold uppercase tracking-wide mt-0.5">Last Km/Hrs</p>
           </div>
@@ -264,46 +312,29 @@ export default function AssetPublicPage() {
                 <Wrench size={20} className="text-zinc-300" />
               </div>
               <p className="text-[13px] text-zinc-400">No service records yet.</p>
+              <p className="text-[12px] text-zinc-300 mt-1">Be the first to log a service.</p>
             </div>
           ) : (
             <div className="divide-y divide-zinc-100">
               {services.map((svc, idx) => {
-                const tc = color[svc.service_type] ?? { bg: "bg-zinc-100", text: "text-zinc-700" };
+                const tc = typeColors[svc.service_type] ?? { bg: "bg-zinc-100", text: "text-zinc-700" };
                 const isExpanded = expandedId === svc.id;
-                const isLatest = idx === 0;
+                const isLatest   = idx === 0;
                 return (
                   <div key={svc.id} className="px-5 py-4">
-                    <button
-                      className="w-full text-left"
-                      onClick={() => setExpandedId(isExpanded ? null : svc.id)}
-                    >
+                    <button className="w-full text-left" onClick={() => setExpandedId(isExpanded ? null : svc.id)}>
                       <div className="flex items-center gap-3">
-                        {/* Timeline dot */}
                         <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${isLatest ? "bg-red-600" : "bg-zinc-100"}`}>
-                          {isLatest
-                            ? <CheckCircle2 size={15} className="text-white" />
-                            : <Wrench size={13} className="text-zinc-400" />
-                          }
+                          {isLatest ? <CheckCircle2 size={15} className="text-white" /> : <Wrench size={13} className="text-zinc-400" />}
                         </div>
-
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 flex-wrap">
-                            <span className={`text-[11px] font-bold px-2 py-[2px] rounded-full ${tc.bg} ${tc.text}`}>
-                              {svc.service_type}
-                            </span>
-                            {isLatest && (
-                              <span className="text-[10px] font-bold text-red-600 bg-red-50 px-2 py-[2px] rounded-full">Latest</span>
-                            )}
+                            <span className={`text-[11px] font-bold px-2 py-[2px] rounded-full ${tc.bg} ${tc.text}`}>{svc.service_type}</span>
+                            {isLatest && <span className="text-[10px] font-bold text-red-600 bg-red-50 px-2 py-[2px] rounded-full">Latest</span>}
                           </div>
                           <div className="flex items-center gap-3 mt-1 flex-wrap">
-                            <span className="flex items-center gap-1 text-[11px] text-zinc-500">
-                              <Calendar size={11} /> {formatDate(svc.service_date)}
-                            </span>
-                            {svc.km_hours != null && (
-                              <span className="flex items-center gap-1 text-[11px] text-zinc-500">
-                                <Gauge size={11} /> {svc.km_hours.toLocaleString()} km/hrs
-                              </span>
-                            )}
+                            <span className="flex items-center gap-1 text-[11px] text-zinc-500"><Calendar size={11} /> {formatDate(svc.service_date)}</span>
+                            {svc.km_hours != null && <span className="flex items-center gap-1 text-[11px] text-zinc-500"><Gauge size={11} /> {svc.km_hours.toLocaleString()} km/hrs</span>}
                           </div>
                           {(() => {
                             const mech = Array.isArray(svc.mechanics) ? svc.mechanics[0] : svc.mechanics;
@@ -315,22 +346,15 @@ export default function AssetPublicPage() {
                             ) : null;
                           })()}
                         </div>
-
-                        <div className="text-zinc-300 shrink-0">
-                          {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                        </div>
+                        <div className="text-zinc-300 shrink-0">{isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}</div>
                       </div>
                     </button>
-
-                    {isExpanded && svc.notes && (
+                    {isExpanded && (
                       <div className="mt-3 ml-11 bg-zinc-50 rounded-xl px-4 py-3 border border-zinc-100">
-                        <p className="text-[11px] font-bold text-zinc-400 uppercase tracking-wide mb-1">Notes</p>
-                        <p className="text-[13px] text-zinc-700 leading-relaxed">{svc.notes}</p>
-                      </div>
-                    )}
-                    {isExpanded && !svc.notes && (
-                      <div className="mt-3 ml-11">
-                        <p className="text-[12px] text-zinc-400 italic">No notes for this service.</p>
+                        {svc.notes
+                          ? <><p className="text-[11px] font-bold text-zinc-400 uppercase tracking-wide mb-1">Notes</p><p className="text-[13px] text-zinc-700 leading-relaxed">{svc.notes}</p></>
+                          : <p className="text-[12px] text-zinc-400 italic">No notes for this service.</p>
+                        }
                       </div>
                     )}
                   </div>
@@ -353,6 +377,147 @@ export default function AssetPublicPage() {
           Powered by <span className="font-bold text-zinc-600">Maintly</span> · Maintenance. Tracked.
         </p>
       </div>
+
+      {/* ══ STICKY ACTION BAR ══════════════════════════════════════════════════ */}
+      <div className="fixed bottom-0 inset-x-0 z-40 bg-white border-t border-zinc-200 shadow-[0_-4px_24px_rgba(0,0,0,0.08)]"
+        style={{paddingBottom: 'max(env(safe-area-inset-bottom), 12px)'}}>
+
+        {isLoggedIn ? (
+          <div className="max-w-lg mx-auto px-4 pt-3 pb-1 space-y-2">
+
+            {/* Mechanic greeting */}
+            <p className="text-[11px] text-zinc-400 font-medium text-center">
+              Logged in as <span className="font-bold text-zinc-700">{mechanicName}</span>
+            </p>
+
+            <div className="flex gap-3">
+              {/* Add to Workshop */}
+              <button
+                onClick={handleAddToWorkshop}
+                disabled={workshopDone || addingWorkshop}
+                className={`flex-1 flex items-center justify-center gap-2 py-3.5 rounded-2xl font-bold text-[13px] transition-all active:scale-[0.97] ${
+                  workshopDone
+                    ? "bg-emerald-50 border border-emerald-200 text-emerald-700"
+                    : "bg-zinc-900 hover:bg-zinc-800 text-white shadow-sm"
+                }`}
+              >
+                {addingWorkshop
+                  ? <div className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />
+                  : workshopDone
+                    ? <><CheckCircle2 size={15} /> In Workshop</>
+                    : <><BookMarked size={15} /> Add to Workshop</>
+                }
+              </button>
+
+              {/* Add Service */}
+              <button
+                onClick={() => setShowServiceForm(true)}
+                className="flex-1 flex items-center justify-center gap-2 py-3.5 rounded-2xl font-bold text-[13px] bg-red-600 hover:bg-red-500 text-white shadow-sm transition-all active:scale-[0.97]"
+              >
+                <Plus size={15} /> Add Service
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="max-w-lg mx-auto px-4 pt-3 pb-1">
+            <p className="text-[11px] text-zinc-400 text-center mb-2">Are you a mechanic? Log in to add services or link this asset to your workshop.</p>
+            <button
+              onClick={() => router.push(`/login?redirect=/asset/${code}`)}
+              className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl font-bold text-[14px] bg-zinc-900 hover:bg-zinc-800 text-white shadow-sm transition-all active:scale-[0.97]"
+            >
+              <LogIn size={16} /> Log in as Mechanic
+              <ChevronRight size={15} className="opacity-60" />
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* ══ ADD SERVICE FORM (bottom sheet) ════════════════════════════════════ */}
+      {showServiceForm && (
+        <div className="fixed inset-0 z-50 flex flex-col justify-end">
+          {/* Backdrop */}
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setShowServiceForm(false)} />
+
+          {/* Sheet */}
+          <div className="relative bg-white rounded-t-3xl shadow-2xl max-h-[90vh] overflow-y-auto"
+            style={{paddingBottom: 'max(env(safe-area-inset-bottom), 24px)'}}>
+
+            {/* Handle */}
+            <div className="flex justify-center pt-3 pb-1">
+              <div className="w-10 h-1 bg-zinc-200 rounded-full" />
+            </div>
+
+            <div className="flex items-center justify-between px-5 py-3 border-b border-zinc-100">
+              <div>
+                <h3 className="text-[16px] font-black text-zinc-900">Log a Service</h3>
+                <p className="text-[12px] text-zinc-400">{assetName}</p>
+              </div>
+              <button onClick={() => setShowServiceForm(false)}
+                className="w-8 h-8 rounded-full bg-zinc-100 flex items-center justify-center hover:bg-zinc-200 transition-colors">
+                <X size={15} className="text-zinc-600" />
+              </button>
+            </div>
+
+            <form onSubmit={handleAddService} className="px-5 py-5 space-y-4">
+
+              {/* Service Type */}
+              <div>
+                <label className="text-[11px] font-bold text-zinc-500 uppercase tracking-widest mb-2 block">Service Type</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {SERVICE_TYPES.map(t => (
+                    <button key={t} type="button" onClick={() => setSvcType(t)}
+                      className={`py-2.5 px-3 rounded-xl text-[12px] font-bold border transition-all text-left ${
+                        svcType === t
+                          ? "bg-red-600 text-white border-red-600"
+                          : "bg-zinc-50 text-zinc-700 border-zinc-200 hover:border-zinc-300"
+                      }`}>
+                      {t}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Date */}
+              <div>
+                <label className="text-[11px] font-bold text-zinc-500 uppercase tracking-widest mb-1.5 block">Date</label>
+                <input type="date" value={svcDate} onChange={e => setSvcDate(e.target.value)} required
+                  className="w-full bg-zinc-50 border border-zinc-200 focus:border-red-400 focus:bg-white rounded-xl px-4 py-3 text-[14px] text-zinc-900 outline-none transition-all" />
+              </div>
+
+              {/* KM / Hours */}
+              <div>
+                <label className="text-[11px] font-bold text-zinc-500 uppercase tracking-widest mb-1.5 block">Km / Hours <span className="text-zinc-300 normal-case font-normal">(optional)</span></label>
+                <input type="number" value={svcKm} onChange={e => setSvcKm(e.target.value)}
+                  placeholder="e.g. 85000"
+                  className="w-full bg-zinc-50 border border-zinc-200 focus:border-red-400 focus:bg-white rounded-xl px-4 py-3 text-[14px] text-zinc-900 placeholder-zinc-400 outline-none transition-all" />
+              </div>
+
+              {/* Notes */}
+              <div>
+                <label className="text-[11px] font-bold text-zinc-500 uppercase tracking-widest mb-1.5 block">Notes <span className="text-zinc-300 normal-case font-normal">(optional)</span></label>
+                <textarea value={svcNotes} onChange={e => setSvcNotes(e.target.value)} rows={3}
+                  placeholder="Parts replaced, observations, recommendations..."
+                  className="w-full bg-zinc-50 border border-zinc-200 focus:border-red-400 focus:bg-white rounded-xl px-4 py-3 text-[14px] text-zinc-900 placeholder-zinc-400 outline-none transition-all resize-none" />
+              </div>
+
+              {svcError && (
+                <div className="flex items-center gap-2 bg-red-50 border border-red-200 rounded-xl px-3 py-2.5">
+                  <AlertCircle size={14} className="text-red-500 shrink-0" />
+                  <p className="text-[12px] text-red-600">{svcError}</p>
+                </div>
+              )}
+
+              <button type="submit" disabled={savingSvc}
+                className="w-full bg-red-600 hover:bg-red-500 disabled:opacity-60 text-white font-black py-4 rounded-2xl text-[15px] transition-all active:scale-[0.98] shadow-sm flex items-center justify-center gap-2">
+                {savingSvc
+                  ? <><div className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" /> Saving…</>
+                  : <><Plus size={16} /> Save Service Record</>
+                }
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
