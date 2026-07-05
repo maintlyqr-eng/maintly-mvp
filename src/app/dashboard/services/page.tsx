@@ -28,7 +28,7 @@ const navItems = [
   { icon: BarChart3, label: "Reports", href: "/dashboard/reports" },
   { icon: CalendarIcon, label: "Calendar", href: "/dashboard/calendar" },
   { icon: Mail, label: "Messages", href: "/dashboard/messages" },
-  { icon: FolderOpen, label: "Document Library", href: "#" },
+  { icon: FolderOpen, label: "Document Library", href: "/dashboard/documents" },
   { icon: Settings, label: "Settings", href: "/dashboard/settings" },
 ];
 
