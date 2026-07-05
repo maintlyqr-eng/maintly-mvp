@@ -15,6 +15,7 @@ import { formatDateDMY } from "@/lib/date";
 import { computeReminderStatus, REMINDER_STATUS_LABEL, REMINDER_STATUS_COLOR, type ReminderStatus } from "@/lib/reminders";
 import { getUnitLabel, getUnitShort, formatUnitValue } from "@/lib/units";
 import HoverAvatar from "@/components/HoverAvatar";
+import CalendarDayCell, { type DayInfo } from "@/components/CalendarDayCell";
 import { buildMonthGridMondayFirst } from "@/lib/calendarGrid";
 
 const navItems = [
@@ -82,6 +83,7 @@ type ReminderItem = {
   status: ReminderStatus;
   next_due_date: string | null;
   next_due_km_hours: number | null;
+  serviceType: string;
 };
 
 type SearchAsset = {
@@ -125,9 +127,9 @@ export default function DashboardPage() {
 
   // ── Mini calendar widget ──
   const [calViewDate, setCalViewDate] = useState(() => new Date());
-  const [calServiceDates, setCalServiceDates] = useState<string[]>([]);
-  const [calReminders, setCalReminders] = useState<{ date: string; status: ReminderStatus }[]>([]);
-  const [calTasks, setCalTasks] = useState<{ date: string; done: boolean }[]>([]);
+  const [calServices, setCalServices] = useState<{ date: string; label: string; type: string }[]>([]);
+  const [calReminders, setCalReminders] = useState<{ date: string; status: ReminderStatus; label: string; type: string }[]>([]);
+  const [calTasks, setCalTasks] = useState<{ date: string; done: boolean; title: string }[]>([]);
 
   // ── Top search bar ──
   const [searchQuery, setSearchQuery] = useState("");
@@ -287,7 +289,7 @@ export default function DashboardPage() {
       // ── Upcoming reminders ──
       const { data: remRows } = await supabase
         .from("service_records")
-        .select("id, asset_id, next_due_date, next_due_km_hours, assets(nickname, brand, model, asset_type)")
+        .select("id, asset_id, service_type, next_due_date, next_due_km_hours, assets(nickname, brand, model, asset_type)")
         .eq("mechanic_id", session.user.id)
         .or("next_due_date.not.is.null,next_due_km_hours.not.is.null");
 
@@ -312,7 +314,7 @@ export default function DashboardPage() {
           nextDueKmHours: r.next_due_km_hours,
           currentKmHours: maxKmByAsset[r.asset_id] ?? null,
         });
-        return { id: r.id, assetLabel: label, assetType: a?.asset_type ?? null, status, next_due_date: r.next_due_date, next_due_km_hours: r.next_due_km_hours };
+        return { id: r.id, assetLabel: label, assetType: a?.asset_type ?? null, status, next_due_date: r.next_due_date, next_due_km_hours: r.next_due_km_hours, serviceType: r.service_type };
       });
 
       const reminderItems = allReminderItems
@@ -321,28 +323,36 @@ export default function DashboardPage() {
 
       if (active) setReminders(reminderItems);
 
-      // ── Mini calendar widget: every date-based reminder (any status), every
-      // service's date, and every planned task — so the widget can put a dot
-      // on any day with activity, not just urgent ones. ──
+      // ── Mini calendar widget: full detail for every date-based reminder
+      // (any status), every service's date, and every planned task — so
+      // hovering a day shows exactly what's going on, not just a count. ──
       if (active) {
         setCalReminders(
           allReminderItems
             .filter((i): i is ReminderItem & { next_due_date: string } => !!i.next_due_date)
-            .map((i) => ({ date: i.next_due_date, status: i.status }))
+            .map((i) => ({ date: i.next_due_date, status: i.status, label: i.assetLabel, type: i.serviceType }))
         );
       }
 
-      const { data: allSvcDates } = await supabase
+      const { data: allSvcRows } = await supabase
         .from("service_records")
-        .select("service_date")
+        .select("service_date, service_type, assets(nickname, brand, model)")
         .eq("mechanic_id", session.user.id);
-      if (active) setCalServiceDates(((allSvcDates ?? []) as any[]).map((r) => r.service_date));
+      if (active) {
+        setCalServices(
+          ((allSvcRows ?? []) as any[]).map((r) => {
+            const a = Array.isArray(r.assets) ? r.assets[0] : r.assets;
+            const label = a?.nickname || [a?.brand, a?.model].filter(Boolean).join(" ") || "Unknown asset";
+            return { date: r.service_date, label, type: r.service_type };
+          })
+        );
+      }
 
       const { data: taskRowsForCal } = await supabase
         .from("calendar_tasks")
-        .select("task_date, done")
+        .select("task_date, done, title")
         .eq("mechanic_id", session.user.id);
-      if (active) setCalTasks(((taskRowsForCal ?? []) as any[]).map((r) => ({ date: r.task_date, done: r.done })));
+      if (active) setCalTasks(((taskRowsForCal ?? []) as any[]).map((r) => ({ date: r.task_date, done: r.done, title: r.title })));
 
       // ── Full asset list, for the top search bar (assets + QR codes) ──
       const { data: assetRows } = await supabase
@@ -474,37 +484,25 @@ export default function DashboardPage() {
   const calendarMonth = `${CAL_MONTH_LABELS[calViewDate.getMonth()]} ${calViewDate.getFullYear()}`;
   const calendarGrid = buildMonthGridMondayFirst(calViewDate.getFullYear(), calViewDate.getMonth());
 
-  const calActivityByDate: Record<string, { services: number; openTasks: number; overdue: number; dueSoon: number; ok: number }> = {};
-  function ensureCalDay(k: string) {
-    return (calActivityByDate[k] ??= { services: 0, openTasks: 0, overdue: 0, dueSoon: 0, ok: 0 });
+  const calActivityByDate: Record<string, DayInfo> = {};
+  function ensureCalDay(k: string): DayInfo {
+    return (calActivityByDate[k] ??= { services: [], tasks: [], reminders: [] });
   }
-  for (const d of calServiceDates) ensureCalDay(d).services += 1;
-  for (const r of calReminders) {
-    const e = ensureCalDay(r.date);
-    if (r.status === "overdue") e.overdue += 1;
-    else if (r.status === "due_soon") e.dueSoon += 1;
-    else e.ok += 1;
-  }
-  for (const t of calTasks) { if (!t.done) ensureCalDay(t.date).openTasks += 1; }
+  for (const s of calServices) ensureCalDay(s.date).services.push({ label: s.label, type: s.type });
+  for (const r of calReminders) ensureCalDay(r.date).reminders.push({ label: r.label, type: r.type, status: r.status });
+  for (const t of calTasks) ensureCalDay(t.date).tasks.push({ title: t.title, done: t.done });
 
-  function calDotColor(info?: { services: number; openTasks: number; overdue: number; dueSoon: number; ok: number }) {
+  function calDotColor(info?: DayInfo) {
     if (!info) return null;
-    if (info.overdue > 0) return "bg-red-500";
-    if (info.dueSoon > 0) return "bg-amber-500";
-    if (info.openTasks > 0) return "bg-blue-500";
-    if (info.services > 0) return "bg-emerald-500";
-    if (info.ok > 0) return "bg-zinc-300";
+    const overdue = info.reminders.some((r) => r.status === "overdue");
+    const dueSoon = info.reminders.some((r) => r.status === "due_soon");
+    const openTasks = info.tasks.some((t) => !t.done);
+    if (overdue) return "bg-red-500";
+    if (dueSoon) return "bg-amber-500";
+    if (openTasks) return "bg-blue-500";
+    if (info.services.length > 0) return "bg-emerald-500";
+    if (info.reminders.length > 0) return "bg-zinc-300";
     return null;
-  }
-
-  function calSummaryLines(info: { services: number; openTasks: number; overdue: number; dueSoon: number; ok: number }) {
-    const lines: string[] = [];
-    if (info.overdue > 0) lines.push(`${info.overdue} overdue reminder${info.overdue > 1 ? "s" : ""}`);
-    if (info.dueSoon > 0) lines.push(`${info.dueSoon} due soon`);
-    if (info.ok > 0) lines.push(`${info.ok} upcoming reminder${info.ok > 1 ? "s" : ""}`);
-    if (info.openTasks > 0) lines.push(`${info.openTasks} planned task${info.openTasks > 1 ? "s" : ""}`);
-    if (info.services > 0) lines.push(`${info.services} service${info.services > 1 ? "s" : ""} logged`);
-    return lines;
   }
 
   const miniStats = [
@@ -844,30 +842,18 @@ export default function DashboardPage() {
                   {["MON","TUE","WED","THU","FRI","SAT","SUN"].map(d => (
                     <span key={d} className="text-[8px] font-bold text-zinc-400 pb-1">{d}</span>
                   ))}
-                  {calendarGrid.map((cell) => {
-                    const info = calActivityByDate[cell.key];
-                    const dot = calDotColor(info);
-                    return (
-                      <Link
-                        key={cell.key}
-                        href={`/dashboard/calendar?date=${cell.key}`}
-                        className="relative group flex flex-col items-center py-1"
-                      >
-                        <span className={`text-[11px] w-6 h-6 flex items-center justify-center rounded-full transition-colors ${
-                          cell.isToday ? "bg-red-600 text-white font-bold" : !cell.inMonth ? "text-zinc-300" : "text-zinc-600 group-hover:bg-zinc-100"
-                        }`}>{cell.day}</span>
-                        <span className={`w-1.5 h-1.5 rounded-full mt-0.5 ${dot ?? "bg-transparent"}`} />
-                        {info && (
-                          <div className="hidden group-hover:block absolute z-30 left-1/2 -translate-x-1/2 top-full mt-1 w-40 bg-white border border-zinc-200 rounded-xl shadow-xl p-2.5 text-left pointer-events-none">
-                            <p className="text-[10px] font-bold text-zinc-800 mb-1">{formatDateDMY(cell.key)}</p>
-                            {calSummaryLines(info).map((l, i) => (
-                              <p key={i} className="text-[10px] text-zinc-500 leading-snug">{l}</p>
-                            ))}
-                          </div>
-                        )}
-                      </Link>
-                    );
-                  })}
+                  {calendarGrid.map((cell) => (
+                    <CalendarDayCell
+                      key={cell.key}
+                      dateKey={cell.key}
+                      day={cell.day}
+                      inMonth={cell.inMonth}
+                      isToday={cell.isToday}
+                      dateLabel={new Date(cell.key + "T00:00:00").toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" })}
+                      info={calActivityByDate[cell.key]}
+                      dotColor={calDotColor(calActivityByDate[cell.key])}
+                    />
+                  ))}
                 </div>
               </div>
 
