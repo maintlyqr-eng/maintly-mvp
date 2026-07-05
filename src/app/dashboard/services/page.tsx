@@ -12,6 +12,7 @@ import {
 import { supabase } from "@/lib/supabase";
 import { formatDateDMY } from "@/lib/date";
 import { computeReminderStatus, REMINDER_STATUS_LABEL, REMINDER_STATUS_COLOR } from "@/lib/reminders";
+import { getUnitLabel, formatUnitValue } from "@/lib/units";
 
 const navItems = [
   { icon: LayoutGrid, label: "Dashboard", href: "/dashboard" },
@@ -209,7 +210,8 @@ export default function ServicesPage() {
     if (!svcAssetId) { setSvcError("Please select an asset."); return; }
 
     if (svcKmHours && minKmHours != null && parseFloat(svcKmHours) < minKmHours) {
-      setSvcError(`Km/Hours can't be lower than the last recorded value (${minKmHours.toLocaleString()}).`);
+      const svcUnit = getUnitLabel(assetOptions.find((a) => a.id === svcAssetId)?.asset_type);
+      setSvcError(`${svcUnit} can't be lower than the last recorded value (${minKmHours.toLocaleString()}).`);
       return;
     }
 
@@ -262,7 +264,8 @@ export default function ServicesPage() {
     }
 
     if (reminderKm && reminderMinKm != null && parseFloat(reminderKm) < reminderMinKm) {
-      setReminderError(`Km/Hours can't be lower than the asset's last recorded value (${reminderMinKm.toLocaleString()}).`);
+      const remUnit = getUnitLabel(getAsset(reminderRow)?.asset_type);
+      setReminderError(`${remUnit} can't be lower than the asset's last recorded value (${reminderMinKm.toLocaleString()}).`);
       return;
     }
 
@@ -296,6 +299,8 @@ export default function ServicesPage() {
   }
 
   const initials = mechanicName.split(" ").filter(Boolean).map(p => p[0]).join("").slice(0, 2).toUpperCase() || "ME";
+
+  const svcAssetType = assetOptions.find((a) => a.id === svcAssetId)?.asset_type;
 
   // Filtered list
   const filtered = services.filter(row => {
@@ -454,7 +459,7 @@ export default function ServicesPage() {
                     <th className="px-5 py-3 font-bold">Asset</th>
                     <th className="px-3 py-3 font-bold">Service Type</th>
                     <th className="px-3 py-3 font-bold">Date</th>
-                    <th className="px-3 py-3 font-bold">Km / Hours</th>
+                    <th className="px-3 py-3 font-bold">Reading</th>
                     <th className="px-3 py-3 font-bold">Notes</th>
                     <th className="px-3 py-3 font-bold">Status</th>
                     <th className="px-3 py-3 font-bold">Reminder</th>
@@ -490,7 +495,7 @@ export default function ServicesPage() {
                           <span className={`text-[10.5px] font-semibold px-2 py-[3px] rounded-full ${typeColors[row.service_type] ?? "bg-zinc-100 text-zinc-700"}`}>{row.service_type}</span>
                         </td>
                         <td className="px-3 py-3 text-[12px] text-zinc-700">{formatDateDMY(row.service_date)}</td>
-                        <td className="px-3 py-3 text-[12px] text-zinc-700 font-medium">{row.km_hours ?? "—"}</td>
+                        <td className="px-3 py-3 text-[12px] text-zinc-700 font-medium">{formatUnitValue(row.km_hours, asset?.asset_type)}</td>
                         <td className="px-3 py-3 text-[11px] text-zinc-500 max-w-[180px] truncate">{row.notes || "—"}</td>
                         <td className="px-3 py-3">
                           <span className="flex items-center gap-1 text-[11px] font-semibold text-green-600">
@@ -589,7 +594,7 @@ export default function ServicesPage() {
               </div>
 
               <div>
-                <label className="text-[12px] font-bold text-zinc-700">Km / Hours</label>
+                <label className="text-[12px] font-bold text-zinc-700">{getUnitLabel(svcAssetType)}</label>
                 <input
                   type="number" min={minKmHours ?? 0} step="0.1"
                   value={svcKmHours} onChange={(e) => setSvcKmHours(e.target.value)}
@@ -599,7 +604,7 @@ export default function ServicesPage() {
                 {minKmHoursLoading ? (
                   <p className="text-[11px] text-zinc-400 mt-1">Checking last recorded value…</p>
                 ) : minKmHours != null ? (
-                  <p className="text-[11px] text-zinc-400 mt-1">Last recorded: {minKmHours.toLocaleString()}. Can&apos;t be lower than that.</p>
+                  <p className="text-[11px] text-zinc-400 mt-1">Last recorded: {formatUnitValue(minKmHours, svcAssetType)}. Can&apos;t be lower than that.</p>
                 ) : null}
               </div>
 
@@ -662,16 +667,16 @@ export default function ServicesPage() {
               </div>
 
               <div>
-                <label className="text-[12px] font-bold text-zinc-700">Next service due at (Km / Hours)</label>
+                <label className="text-[12px] font-bold text-zinc-700">Next service due at ({getUnitLabel(getAsset(reminderRow)?.asset_type)})</label>
                 <input
                   type="number" min={reminderMinKm ?? 0} step="0.1" value={reminderKm} onChange={(e) => setReminderKm(e.target.value)}
                   placeholder="e.g. 50000"
                   className="w-full mt-1 rounded-xl border border-zinc-200 px-3 py-[10px] text-[13px] outline-none focus:border-red-500"
                 />
                 {reminderMinKm != null ? (
-                  <p className="text-[11px] text-zinc-400 mt-1">This asset&apos;s last recorded reading: {reminderMinKm.toLocaleString()}. Can&apos;t be lower than that.</p>
+                  <p className="text-[11px] text-zinc-400 mt-1">This asset&apos;s last recorded reading: {formatUnitValue(reminderMinKm, getAsset(reminderRow)?.asset_type)}. Can&apos;t be lower than that.</p>
                 ) : (
-                  <p className="text-[11px] text-zinc-400 mt-1">No km/hours recorded yet for this asset.</p>
+                  <p className="text-[11px] text-zinc-400 mt-1">No {getUnitLabel(getAsset(reminderRow)?.asset_type).toLowerCase()} recorded yet for this asset.</p>
                 )}
               </div>
 

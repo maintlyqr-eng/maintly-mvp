@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { formatDateDMY } from "@/lib/date";
+import { getUnitLabel, getUnitShort, formatUnitValue } from "@/lib/units";
 
 const assetTypeImg: Record<string, string> = {
   automotive: "/images/car.png",
@@ -156,7 +157,7 @@ export default function AssetPublicPage() {
     setSvcError("");
 
     if (svcKm && minKmHours != null && parseFloat(svcKm) < minKmHours) {
-      setSvcError(`Km/Hours can't be lower than the last recorded value (${minKmHours.toLocaleString()}).`);
+      setSvcError(`${getUnitLabel(asset.asset_type)} can't be lower than the last recorded value (${minKmHours.toLocaleString()}).`);
       return;
     }
 
@@ -303,7 +304,7 @@ export default function AssetPublicPage() {
             <p className="text-[22px] font-black text-zinc-900">
               {services[0]?.km_hours != null ? services[0].km_hours.toLocaleString() : "—"}
             </p>
-            <p className="text-[10px] text-zinc-400 font-bold uppercase tracking-wide mt-0.5">Last Km/Hrs</p>
+            <p className="text-[10px] text-zinc-400 font-bold uppercase tracking-wide mt-0.5">Last {getUnitLabel(asset.asset_type)}</p>
           </div>
         </div>
 
@@ -342,7 +343,7 @@ export default function AssetPublicPage() {
                           </div>
                           <div className="flex items-center gap-3 mt-1 flex-wrap">
                             <span className="flex items-center gap-1 text-[11px] text-zinc-500"><Calendar size={11} /> {formatDate(svc.service_date)}</span>
-                            {svc.km_hours != null && <span className="flex items-center gap-1 text-[11px] text-zinc-500"><Gauge size={11} /> {svc.km_hours.toLocaleString()} km/hrs</span>}
+                            {svc.km_hours != null && <span className="flex items-center gap-1 text-[11px] text-zinc-500"><Gauge size={11} /> {svc.km_hours.toLocaleString()} {getUnitShort(asset.asset_type)}</span>}
                           </div>
                           {(() => {
                             const mech = Array.isArray(svc.mechanics) ? svc.mechanics[0] : svc.mechanics;
@@ -492,12 +493,12 @@ export default function AssetPublicPage() {
 
               {/* KM / Hours */}
               <div>
-                <label className="text-[11px] font-bold text-zinc-500 uppercase tracking-widest mb-1.5 block">Km / Hours <span className="text-zinc-300 normal-case font-normal">(optional)</span></label>
+                <label className="text-[11px] font-bold text-zinc-500 uppercase tracking-widest mb-1.5 block">{getUnitLabel(asset.asset_type)} <span className="text-zinc-300 normal-case font-normal">(optional)</span></label>
                 <input type="number" min={minKmHours ?? 0} value={svcKm} onChange={e => setSvcKm(e.target.value)}
                   placeholder="e.g. 85000"
                   className="w-full bg-zinc-50 border border-zinc-200 focus:border-red-400 focus:bg-white rounded-xl px-4 py-3 text-[14px] text-zinc-900 placeholder-zinc-400 outline-none transition-all" />
                 {minKmHours != null && (
-                  <p className="text-[11px] text-zinc-400 mt-1.5">Last recorded: {minKmHours.toLocaleString()}. Can&apos;t be lower than that.</p>
+                  <p className="text-[11px] text-zinc-400 mt-1.5">Last recorded: {formatUnitValue(minKmHours, asset.asset_type)}. Can&apos;t be lower than that.</p>
                 )}
               </div>
 

@@ -13,6 +13,7 @@ import {
 import { supabase } from "@/lib/supabase";
 import { formatDateDMY, daysAgoLabel, daysUntilLabel } from "@/lib/date";
 import { computeReminderStatus, ReminderStatus, REMINDER_STATUS_LABEL, REMINDER_STATUS_COLOR } from "@/lib/reminders";
+import { getUnitLabel, getUnitShort } from "@/lib/units";
 
 const STATUS_RANK: Record<ReminderStatus, number> = { none: 0, ok: 1, due_soon: 2, overdue: 3 };
 
@@ -196,6 +197,7 @@ export default function AssetsPage() {
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [historyAssetName, setHistoryAssetName] = useState("");
   const [historyAssetCode, setHistoryAssetCode] = useState<string | null>(null);
+  const [historyAssetType, setHistoryAssetType] = useState<string | null>(null);
   const [historyRecords, setHistoryRecords] = useState<ServiceRecord[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
 
@@ -361,6 +363,7 @@ export default function AssetsPage() {
   async function openHistory(a: AssetRow) {
     setHistoryAssetName(assetDisplayName(a));
     setHistoryAssetCode(getQrCode(a));
+    setHistoryAssetType(a.asset_type);
     setHistoryRecords([]);
     setHistoryLoading(true);
     setShowHistoryModal(true);
@@ -545,7 +548,8 @@ export default function AssetsPage() {
     }
 
     if (svcKmHours && minKmHours != null && parseFloat(svcKmHours) < minKmHours) {
-      setSvcError(`Km/Hours can't be lower than the last recorded value (${minKmHours.toLocaleString()}).`);
+      const svcUnit = getUnitLabel(assets.find((a) => a.id === svcAssetId)?.asset_type);
+      setSvcError(`${svcUnit} can't be lower than the last recorded value (${minKmHours.toLocaleString()}).`);
       return;
     }
 
@@ -634,6 +638,7 @@ export default function AssetsPage() {
   }
 
   const availableTypes = Array.from(new Set(assets.map((a) => a.asset_type)));
+  const svcAssetType = assets.find((a) => a.id === svcAssetId)?.asset_type;
 
   const visibleAssets = assets
     .filter((a) => {
@@ -938,7 +943,7 @@ export default function AssetsPage() {
                           {agg?.nextDueDate
                             ? daysUntilLabel(agg.nextDueDate)
                             : agg?.nextDueKmHours != null
-                            ? `${agg.nextDueKmHours.toLocaleString()} km/hrs`
+                            ? `${agg.nextDueKmHours.toLocaleString()} ${getUnitShort(a.asset_type)}`
                             : "Not set"}
                         </p>
                       </div>
@@ -1272,7 +1277,7 @@ export default function AssetsPage() {
               </div>
 
               <div>
-                <label className="text-[12px] font-bold text-zinc-700">Km / Hours</label>
+                <label className="text-[12px] font-bold text-zinc-700">{getUnitLabel(svcAssetType)}</label>
                 <input
                   type="number" min={minKmHours ?? 0} step="0.1"
                   value={svcKmHours} onChange={(e) => setSvcKmHours(e.target.value)}
@@ -1282,7 +1287,7 @@ export default function AssetsPage() {
                 {minKmHoursLoading ? (
                   <p className="text-[11px] text-zinc-400 mt-1">Checking last recorded value…</p>
                 ) : minKmHours != null ? (
-                  <p className="text-[11px] text-zinc-400 mt-1">Last recorded: {minKmHours.toLocaleString()}. Can&apos;t be lower than that.</p>
+                  <p className="text-[11px] text-zinc-400 mt-1">Last recorded: {minKmHours.toLocaleString()} {getUnitShort(svcAssetType)}. Can&apos;t be lower than that.</p>
                 ) : null}
               </div>
 
@@ -1375,7 +1380,7 @@ export default function AssetsPage() {
                             <span className="text-[11px] text-zinc-500">{formatDate(svc.service_date)}</span>
                             {svc.km_hours != null && (
                               <span className="flex items-center gap-1 text-[11px] text-zinc-500">
-                                <Gauge size={10} /> {svc.km_hours.toLocaleString()} km/hrs
+                                <Gauge size={10} /> {svc.km_hours.toLocaleString()} {getUnitShort(historyAssetType)}
                               </span>
                             )}
                           </div>

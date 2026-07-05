@@ -13,6 +13,7 @@ import {
 import { supabase } from "@/lib/supabase";
 import { formatDateDMY } from "@/lib/date";
 import { computeReminderStatus, REMINDER_STATUS_LABEL, REMINDER_STATUS_COLOR, type ReminderStatus } from "@/lib/reminders";
+import { getUnitLabel, getUnitShort, formatUnitValue } from "@/lib/units";
 
 const navItems = [
   { icon: LayoutGrid,   label: "Dashboard",        href: "/dashboard",          active: true  },
@@ -75,6 +76,7 @@ type FoundAsset = {
 type ReminderItem = {
   id: string;
   assetLabel: string;
+  assetType: string | null;
   status: ReminderStatus;
   next_due_date: string | null;
   next_due_km_hours: number | null;
@@ -251,7 +253,7 @@ export default function DashboardPage() {
       // ── Upcoming reminders ──
       const { data: remRows } = await supabase
         .from("service_records")
-        .select("id, asset_id, next_due_date, next_due_km_hours, assets(nickname, brand, model)")
+        .select("id, asset_id, next_due_date, next_due_km_hours, assets(nickname, brand, model, asset_type)")
         .eq("mechanic_id", session.user.id)
         .or("next_due_date.not.is.null,next_due_km_hours.not.is.null");
 
@@ -276,7 +278,7 @@ export default function DashboardPage() {
           nextDueKmHours: r.next_due_km_hours,
           currentKmHours: maxKmByAsset[r.asset_id] ?? null,
         });
-        return { id: r.id, assetLabel: label, status, next_due_date: r.next_due_date, next_due_km_hours: r.next_due_km_hours };
+        return { id: r.id, assetLabel: label, assetType: a?.asset_type ?? null, status, next_due_date: r.next_due_date, next_due_km_hours: r.next_due_km_hours };
       })
         .filter((i) => i.status === "overdue" || i.status === "due_soon")
         .sort((a, b) => (a.status === "overdue" ? 0 : 1) - (b.status === "overdue" ? 0 : 1));
@@ -498,7 +500,7 @@ export default function DashboardPage() {
                         <th className="pb-2 font-bold">Asset</th>
                         <th className="pb-2 font-bold">Service Type</th>
                         <th className="pb-2 font-bold">Date</th>
-                        <th className="pb-2 font-bold">Km / Hrs</th>
+                        <th className="pb-2 font-bold">Reading</th>
                         <th className="pb-2 font-bold">Status</th>
                         <th className="pb-2"></th>
                       </tr>
@@ -525,7 +527,7 @@ export default function DashboardPage() {
                               <span className={`text-[10.5px] font-semibold px-2 py-[3px] rounded-full ${typeColors[s.service_type] ?? "bg-zinc-100 text-zinc-700"}`}>{s.service_type}</span>
                             </td>
                             <td className="py-3 pr-3 text-[12px] text-zinc-700">{formatDateDMY(s.service_date)}</td>
-                            <td className="py-3 pr-3 text-[12px] text-zinc-700 font-medium">{s.km_hours ?? "—"}</td>
+                            <td className="py-3 pr-3 text-[12px] text-zinc-700 font-medium">{formatUnitValue(s.km_hours, asset?.asset_type)}</td>
                             <td className="py-3 pr-3">
                               <span className="flex items-center gap-1 text-[11px] font-semibold text-green-600">
                                 <CheckCircle2 size={12} /> Completed
@@ -566,7 +568,7 @@ export default function DashboardPage() {
                             <p className="text-[10px] text-zinc-400">
                               {r.next_due_date ? `Due ${formatDateDMY(r.next_due_date)}` : ""}
                               {r.next_due_date && r.next_due_km_hours != null ? " · " : ""}
-                              {r.next_due_km_hours != null ? `${r.next_due_km_hours.toLocaleString()} km/hrs` : ""}
+                              {r.next_due_km_hours != null ? `${r.next_due_km_hours.toLocaleString()} ${getUnitShort(r.assetType)}` : ""}
                             </p>
                           </div>
                           <span className={`text-[9px] font-bold px-1.5 py-[2px] rounded-full shrink-0 ${rc.bg} ${rc.text}`}>{REMINDER_STATUS_LABEL[r.status]}</span>

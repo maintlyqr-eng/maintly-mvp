@@ -12,6 +12,7 @@ import {
 import { supabase } from "@/lib/supabase";
 import { formatDateDMY } from "@/lib/date";
 import { computeReminderStatus, REMINDER_STATUS_LABEL, REMINDER_STATUS_COLOR, type ReminderStatus } from "@/lib/reminders";
+import { getUnitLabel, formatUnitValue } from "@/lib/units";
 
 const navItems = [
   { icon: LayoutGrid, label: "Dashboard", href: "/dashboard" },
@@ -166,7 +167,8 @@ export default function ScheduledServicesPage() {
     }
 
     if (editKm && editMinKm != null && parseFloat(editKm) < editMinKm) {
-      setEditError(`Km/Hours can't be lower than the asset's last recorded value (${editMinKm.toLocaleString()}).`);
+      const editUnit = getUnitLabel(getAsset(editRow)?.asset_type);
+      setEditError(`${editUnit} can't be lower than the asset's last recorded value (${editMinKm.toLocaleString()}).`);
       return;
     }
 
@@ -387,7 +389,7 @@ export default function ScheduledServicesPage() {
                             <span className="flex items-center gap-1 text-[11px] text-zinc-500"><Calendar size={11} /> Due {formatDateDMY(row.next_due_date)}</span>
                           )}
                           {row.next_due_km_hours != null && (
-                            <span className="flex items-center gap-1 text-[11px] text-zinc-500"><Gauge size={11} /> Due at {row.next_due_km_hours.toLocaleString()} km/hrs</span>
+                            <span className="flex items-center gap-1 text-[11px] text-zinc-500"><Gauge size={11} /> Due at {formatUnitValue(row.next_due_km_hours, asset?.asset_type)}</span>
                           )}
                           <span className="text-[11px] text-zinc-300">from {row.service_type} on {formatDateDMY(row.service_date)}</span>
                         </div>
@@ -454,16 +456,16 @@ export default function ScheduledServicesPage() {
               </div>
 
               <div>
-                <label className="text-[12px] font-bold text-zinc-700">Next service due at (Km / Hours)</label>
+                <label className="text-[12px] font-bold text-zinc-700">Next service due at ({getUnitLabel(getAsset(editRow)?.asset_type)})</label>
                 <input
                   type="number" min={editMinKm ?? 0} step="0.1" value={editKm} onChange={(e) => setEditKm(e.target.value)}
                   placeholder="e.g. 50000"
                   className="w-full mt-1 rounded-xl border border-zinc-200 px-3 py-[10px] text-[13px] outline-none focus:border-red-500"
                 />
                 {editMinKm != null ? (
-                  <p className="text-[11px] text-zinc-400 mt-1">This asset&apos;s last recorded reading: {editMinKm.toLocaleString()}. Can&apos;t be lower than that.</p>
+                  <p className="text-[11px] text-zinc-400 mt-1">This asset&apos;s last recorded reading: {formatUnitValue(editMinKm, getAsset(editRow)?.asset_type)}. Can&apos;t be lower than that.</p>
                 ) : (
-                  <p className="text-[11px] text-zinc-400 mt-1">No km/hours recorded yet for this asset.</p>
+                  <p className="text-[11px] text-zinc-400 mt-1">No {getUnitLabel(getAsset(editRow)?.asset_type).toLowerCase()} recorded yet for this asset.</p>
                 )}
               </div>
 

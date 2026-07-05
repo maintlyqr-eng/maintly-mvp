@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import { Droplets, Wrench, Hammer, Search, Filter, Disc3, Disc, Settings, MapPin, Clock } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { formatDateDMY } from "@/lib/date";
+import { getUnitShort, formatUnitValue } from "@/lib/units";
 
 type AssetData = {
   id: string;
@@ -255,7 +256,7 @@ export default function AssetReportPage() {
                   asset.fuel_type && { label: "FUEL TYPE",     value: asset.fuel_type },
                   asset.plate     && { label: "PLATE",         value: asset.plate, mono: true },
                   asset.location  && { label: "LOCATION",      value: asset.location },
-                  maxKmHrs > 0    && { label: "LAST KM/HRS",   value: maxKmHrs.toLocaleString() + " hrs" },
+                  maxKmHrs > 0    && { label: `LAST ${getUnitShort(asset.asset_type).toUpperCase()}`, value: maxKmHrs.toLocaleString() + " " + getUnitShort(asset.asset_type) },
                 ].filter(Boolean).map((field: any) => (
                   <div key={field.label}>
                     <div style={{ fontSize: 7.5, color: "#aaa", fontWeight: 700, letterSpacing: 1 }}>{field.label}</div>
@@ -300,7 +301,7 @@ export default function AssetReportPage() {
                         </div>
                       </td>
                       <td style={{ padding: "9px 8px", color: "#666", fontSize: 10 }}>
-                        {s.km_hours != null ? `${s.km_hours.toLocaleString()} hrs` : "—"}
+                        {formatUnitValue(s.km_hours, asset.asset_type)}
                       </td>
                       <td style={{ padding: "9px 8px" }}>
                         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
@@ -345,7 +346,7 @@ export default function AssetReportPage() {
             <div style={{ display: "flex", gap: 32 }}>
               {[
                 { value: String(services.length), label: "TOTAL SERVICES" },
-                ...(maxKmHrs > 0 ? [{ value: maxKmHrs.toLocaleString(), label: "LAST KM/HRS" }] : []),
+                ...(maxKmHrs > 0 ? [{ value: maxKmHrs.toLocaleString(), label: `LAST ${getUnitShort(asset.asset_type).toUpperCase()}` }] : []),
                 { value: "100%", label: "VERIFIED RECORDS" },
               ].map(({ value, label }) => (
                 <div key={label} style={{ textAlign: "center" }}>
