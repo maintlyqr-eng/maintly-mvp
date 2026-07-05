@@ -1,15 +1,17 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   LayoutGrid, FileText, Box, QrCode, Users, BarChart3, Calendar as CalendarIcon,
   Mail, FolderOpen, Settings as SettingsIcon, Bell, X, LogOut, Crown, Menu,
   ShieldCheck, Wrench, CalendarDays, KeyRound, AlertCircle, CheckCircle2, Camera,
+  Image as ImageIcon,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { formatDateDMY } from "@/lib/date";
+import AvatarCropModal from "@/components/AvatarCropModal";
 
 const navItems = [
   { icon: LayoutGrid, label: "Dashboard", href: "/dashboard" },
@@ -45,6 +47,10 @@ export default function SettingsPage() {
   const [photoUrl, setPhotoUrl] = useState("");
   const [photoUploading, setPhotoUploading] = useState(false);
   const [photoMsg, setPhotoMsg] = useState<{ text: string; ok: boolean } | null>(null);
+  const [cropImageSrc, setCropImageSrc] = useState<string | null>(null);
+  const [showSourceMenu, setShowSourceMenu] = useState(false);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Password form
   const [newPassword, setNewPassword] = useState("");
@@ -95,19 +101,26 @@ export default function SettingsPage() {
     router.replace("/login");
   }
 
-  async function handlePhotoChange(e: React.ChangeEvent<HTMLInputElement>) {
+  function handleFileSelected(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     e.target.value = ""; // allow picking the same file again later
-    if (!file || !mechanicId) return;
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = () => setCropImageSrc(reader.result as string);
+    reader.readAsDataURL(file);
+  }
+
+  async function uploadPhoto(file: File) {
+    if (!mechanicId) return;
 
     setPhotoMsg(null);
     setPhotoUploading(true);
 
-    const ext = file.name.split(".").pop() ?? "jpg";
-    const path = `${mechanicId}.${ext}`;
+    const path = `${mechanicId}.jpg`;
     const { error: uploadError } = await supabase.storage
       .from("mechanic-photos")
-      .upload(path, file, { upsert: true });
+      .upload(path, file, { upsert: true, contentType: "image/jpeg" });
 
     if (uploadError) {
       setPhotoUploading(false);
@@ -133,6 +146,11 @@ export default function SettingsPage() {
 
     setPhotoUrl(publicUrl);
     setPhotoMsg({ text: "Profile photo updated.", ok: true });
+  }
+
+  async function handleCropSave(file: File) {
+    await uploadPhoto(file);
+    setCropImageSrc(null);
   }
 
   async function handleSaveProfile(e: React.FormEvent) {
@@ -337,31 +355,70 @@ export default function SettingsPage() {
                 ) : (
                   <div className="w-16 h-16 rounded-full bg-red-100 flex items-center justify-center text-red-600 font-bold text-[20px]">{initials}</div>
                 )}
-                <label
-                  htmlFor="photo-upload"
-                  className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-zinc-900 hover:bg-zinc-800 flex items-center justify-center cursor-pointer border-2 border-white transition-colors"
+                <button
+                  type="button"
+                  onClick={() => setShowSourceMenu(true)}
+                  disabled={photoUploading}
+                  className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-zinc-900 hover:bg-zinc-800 flex items-center justify-center cursor-pointer border-2 border-white transition-colors disabled:opacity-50"
                   title="Change photo"
                 >
                   <Camera size={12} className="text-white" />
-                </label>
+                </button>
+
+                {showSourceMenu && (
+                  <>
+                    <div className="fixed inset-0 z-[60]" onClick={() => setShowSourceMenu(false)} />
+                    <div className="absolute left-1/2 -translate-x-1/2 top-full mt-2 z-[61] bg-white rounded-xl border border-zinc-200 shadow-lg py-1.5 w-48">
+                      <button
+                        type="button"
+                        onClick={() => { setShowSourceMenu(false); cameraInputRef.current?.click(); }}
+                        className="w-full text-left px-3 py-2 text-[12px] font-semibold text-zinc-700 hover:bg-zinc-50 flex items-center gap-2"
+                      >
+                        <Camera size={13} /> Take a photo
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => { setShowSourceMenu(false); fileInputRef.current?.click(); }}
+                        className="w-full text-left px-3 py-2 text-[12px] font-semibold text-zinc-700 hover:bg-zinc-50 flex items-center gap-2"
+                      >
+                        <ImageIcon size={13} /> Choose from files
+                      </button>
+                    </div>
+                  </>
+                )}
+
                 <input
-                  id="photo-upload" type="file" accept="image/*" className="hidden"
-                  onChange={handlePhotoChange} disabled={photoUploading}
+                  ref={cameraInputRef} type="file" accept="image/*" capture="user" className="hidden"
+                  onChange={handleFileSelected}
+                />
+                <input
+                  ref={fileInputRef} type="file" accept="image/*" className="hidden"
+                  onChange={handleFileSelected}
                 />
               </div>
               <div>
-                <label
-                  htmlFor="photo-upload"
-                  className="inline-block text-[12px] font-bold text-zinc-700 hover:text-red-600 cursor-pointer transition-colors"
+                <button
+                  type="button"
+                  onClick={() => setShowSourceMenu(true)}
+                  disabled={photoUploading}
+                  className="inline-block text-[12px] font-bold text-zinc-700 hover:text-red-600 cursor-pointer transition-colors disabled:opacity-50"
                 >
                   {photoUploading ? "Uploading…" : "Change profile photo"}
-                </label>
+                </button>
                 <p className="text-[11px] text-zinc-400 mt-0.5">JPG or PNG, shown to customers on your services.</p>
                 {photoMsg && (
                   <p className={`text-[11px] font-semibold mt-1 ${photoMsg.ok ? "text-emerald-600" : "text-red-600"}`}>{photoMsg.text}</p>
                 )}
               </div>
             </div>
+
+            {cropImageSrc && (
+              <AvatarCropModal
+                imageSrc={cropImageSrc}
+                onCancel={() => setCropImageSrc(null)}
+                onSave={handleCropSave}
+              />
+            )}
 
             <form onSubmit={handleSaveProfile} className="space-y-4">
               <div>
