@@ -189,9 +189,7 @@ export default function MessagesPage() {
           ))}
         </nav>
 
-        <div className="border-t border-zinc-100 py-2">
-          <ContactSupportWidget mechanicId={mechanicId} />
-        </div>
+        <ContactSupportWidget mechanicId={mechanicId} />
 
         <div className="mx-3 mb-3 p-4 rounded-xl bg-gradient-to-br from-zinc-50 to-zinc-100 border border-zinc-200">
           <div className="flex items-center gap-1.5 text-amber-500 mb-1">

@@ -101,12 +101,14 @@ export default function ContactSupportWidget({ mechanicId }: { mechanicId: strin
     <>
       <button
         onClick={openWidget}
-        className="relative flex items-center gap-3 mx-3 px-3 py-[9px] rounded-lg text-[13px] font-medium text-zinc-600 hover:bg-zinc-50 transition-colors"
+        className="relative w-[calc(100%-24px)] mx-3 mb-3 flex items-center gap-2.5 px-3.5 py-3 rounded-xl bg-gradient-to-br from-zinc-100 via-white to-zinc-200 hover:to-zinc-300 border border-zinc-200/80 text-zinc-800 text-[13px] font-bold transition-all shadow-sm"
       >
-        <LifeBuoy size={16} />
+        <div className="w-7 h-7 rounded-lg bg-red-600 flex items-center justify-center shrink-0">
+          <LifeBuoy size={14} className="text-white" />
+        </div>
         Contact Support
         {unreadCount > 0 && (
-          <span className="ml-auto bg-red-600 text-white text-[9px] font-bold rounded-full min-w-[16px] h-4 flex items-center justify-center px-1">{unreadCount}</span>
+          <span className="ml-auto bg-red-600 text-white text-[9px] font-black rounded-full min-w-[16px] h-4 flex items-center justify-center px-1">{unreadCount}</span>
         )}
       </button>
 
