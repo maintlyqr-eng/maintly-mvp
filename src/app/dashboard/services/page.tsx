@@ -92,6 +92,9 @@ export default function ServicesPage() {
   const [mechanicId, setMechanicId] = useState("");
   const [mechanicName, setMechanicName] = useState("");
   const [mechanicEmail, setMechanicEmail] = useState("");
+  const [isMechanicActive, setIsMechanicActive] = useState(false);
+  const [showMechanicGate, setShowMechanicGate] = useState(false);
+  const [activatingMechanic, setActivatingMechanic] = useState(false);
   const [services, setServices] = useState<ServiceRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [assetOptions, setAssetOptions] = useState<AssetOption[]>([]);
@@ -161,8 +164,8 @@ export default function ServicesPage() {
       setMechanicEmail(session.user.email ?? "");
 
       const { data: mechanic } = await supabase
-        .from("mechanics").select("name").eq("id", session.user.id).single();
-      if (active && mechanic) setMechanicName(mechanic.name);
+        .from("mechanics").select("name, is_mechanic").eq("id", session.user.id).single();
+      if (active && mechanic) { setMechanicName(mechanic.name); setIsMechanicActive(!!mechanic.is_mechanic); }
 
       await Promise.all([loadServices(session.user.id), loadAssets(session.user.id)]);
       if (active) setCheckingAuth(false);
@@ -191,6 +194,24 @@ export default function ServicesPage() {
     setMinKmHours(null);
   }
 
+  function handleOpenAddService() {
+    if (!isMechanicActive) { setShowMechanicGate(true); return; }
+    resetForm();
+    setShowForm(true);
+  }
+
+  async function handleBecomeMechanic() {
+    if (!mechanicId || activatingMechanic) return;
+    setActivatingMechanic(true);
+    const { error } = await supabase.from("mechanics").update({ is_mechanic: true }).eq("id", mechanicId).select("id");
+    setActivatingMechanic(false);
+    if (error) return;
+    setIsMechanicActive(true);
+    setShowMechanicGate(false);
+    resetForm();
+    setShowForm(true);
+  }
+
   async function fetchMinKmHours(assetId: string) {
     if (!assetId) { setMinKmHours(null); return; }
     setMinKmHoursLoading(true);
@@ -214,6 +235,7 @@ export default function ServicesPage() {
   async function handleAddService(e: React.FormEvent) {
     e.preventDefault();
     setSvcError("");
+    if (!isMechanicActive) { setShowForm(false); setShowMechanicGate(true); return; }
     if (!svcAssetId) { setSvcError("Please select an asset."); return; }
 
     if (svcKmHours && minKmHours != null && parseFloat(svcKmHours) < minKmHours) {
@@ -431,7 +453,7 @@ export default function ServicesPage() {
               </select>
             </div>
             <button
-              onClick={() => { resetForm(); setShowForm(true); }}
+              onClick={handleOpenAddService}
               className="flex items-center gap-2 bg-red-600 hover:bg-red-500 active:scale-[0.98] transition-all text-white text-[13px] font-bold px-4 py-[10px] rounded-xl shadow-sm"
             >
               <Plus size={15} /> Add Service
@@ -449,7 +471,7 @@ export default function ServicesPage() {
                 </div>
                 <p className="text-[13px] text-zinc-400 mb-3">No services found.</p>
                 <button
-                  onClick={() => { resetForm(); setShowForm(true); }}
+                  onClick={handleOpenAddService}
                   className="text-[12px] font-bold text-red-600 hover:text-red-700"
                 >
                   Log your first service →
@@ -698,6 +720,34 @@ export default function ServicesPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ════ BECOME A MECHANIC GATE ════ */}
+      {showMechanicGate && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-zinc-900/40">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6 text-center">
+            <div className="w-12 h-12 rounded-full bg-red-50 flex items-center justify-center mx-auto mb-3">
+              <Wrench size={20} className="text-red-500" />
+            </div>
+            <h3 className="text-[16px] font-black text-zinc-900 mb-2">Become a Mechanic</h3>
+            <p className="text-[13px] text-zinc-500 mb-5">To add maintenance records, your account needs to be activated as a mechanic.</p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowMechanicGate(false)}
+                className="flex-1 border border-zinc-200 text-zinc-700 font-bold py-3 rounded-xl text-[13px] hover:bg-zinc-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleBecomeMechanic}
+                disabled={activatingMechanic}
+                className="flex-1 bg-red-600 hover:bg-red-500 disabled:opacity-60 text-white font-bold py-3 rounded-xl text-[13px] transition-all"
+              >
+                {activatingMechanic ? "Activating…" : "Become a Mechanic"}
+              </button>
+            </div>
           </div>
         </div>
       )}

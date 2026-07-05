@@ -145,6 +145,10 @@ export default function AssetsPage() {
   const [mechanicId, setMechanicId] = useState("");
   const [mechanicName, setMechanicName] = useState("");
   const [mechanicEmail, setMechanicEmail] = useState("");
+  const [isMechanicActive, setIsMechanicActive] = useState(false);
+  const [showMechanicGate, setShowMechanicGate] = useState(false);
+  const [activatingMechanic, setActivatingMechanic] = useState(false);
+  const [pendingServiceAssetId, setPendingServiceAssetId] = useState<string | null>(null);
   const [assets, setAssets] = useState<AssetRow[]>([]);
   const [loadingAssets, setLoadingAssets] = useState(true);
 
@@ -310,10 +314,10 @@ export default function AssetsPage() {
 
       const { data: mechanic } = await supabase
         .from("mechanics")
-        .select("name")
+        .select("name, is_mechanic")
         .eq("id", session.user.id)
         .single();
-      if (active && mechanic) setMechanicName(mechanic.name);
+      if (active && mechanic) { setMechanicName(mechanic.name); setIsMechanicActive(!!mechanic.is_mechanic); }
 
       await Promise.all([loadAssets(session.user.id), loadServiceAggregates(session.user.id)]);
       if (active) setCheckingAuth(false);
@@ -347,6 +351,7 @@ export default function AssetsPage() {
   }
 
   async function openAddService(assetId: string) {
+    if (!isMechanicActive) { setPendingServiceAssetId(assetId); setShowMechanicGate(true); return; }
     setSvcAssetId(assetId);
     setSvcType("Oil Change");
     setSvcKmHours("");
@@ -365,6 +370,21 @@ export default function AssetsPage() {
       .maybeSingle();
     setMinKmHours(data?.km_hours ?? null);
     setMinKmHoursLoading(false);
+  }
+
+  async function handleBecomeMechanic() {
+    if (!mechanicId || activatingMechanic) return;
+    setActivatingMechanic(true);
+    const { error } = await supabase.from("mechanics").update({ is_mechanic: true }).eq("id", mechanicId).select("id");
+    setActivatingMechanic(false);
+    if (error) return;
+    setIsMechanicActive(true);
+    setShowMechanicGate(false);
+    if (pendingServiceAssetId) {
+      const assetId = pendingServiceAssetId;
+      setPendingServiceAssetId(null);
+      await openAddService(assetId);
+    }
   }
 
   async function openHistory(a: AssetRow) {
@@ -548,6 +568,8 @@ export default function AssetsPage() {
   async function handleAddService(e: React.FormEvent) {
     e.preventDefault();
     setSvcError("");
+
+    if (!isMechanicActive) { setShowServiceForm(false); setShowMechanicGate(true); return; }
 
     if (!svcAssetId) {
       setSvcError("No asset selected.");
@@ -1439,6 +1461,34 @@ export default function AssetsPage() {
                   {removing ? "Removing..." : "Remove"}
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ════ BECOME A MECHANIC GATE ════ */}
+      {showMechanicGate && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-zinc-900/40">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6 text-center">
+            <div className="w-12 h-12 rounded-full bg-red-50 flex items-center justify-center mx-auto mb-3">
+              <Wrench size={20} className="text-red-500" />
+            </div>
+            <h3 className="text-[16px] font-black text-zinc-900 mb-2">Become a Mechanic</h3>
+            <p className="text-[13px] text-zinc-500 mb-5">To add maintenance records, your account needs to be activated as a mechanic.</p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => { setShowMechanicGate(false); setPendingServiceAssetId(null); }}
+                className="flex-1 border border-zinc-200 text-zinc-700 font-bold py-3 rounded-xl text-[13px] hover:bg-zinc-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleBecomeMechanic}
+                disabled={activatingMechanic}
+                className="flex-1 bg-red-600 hover:bg-red-500 disabled:opacity-60 text-white font-bold py-3 rounded-xl text-[13px] transition-all"
+              >
+                {activatingMechanic ? "Activating…" : "Become a Mechanic"}
+              </button>
             </div>
           </div>
         </div>
