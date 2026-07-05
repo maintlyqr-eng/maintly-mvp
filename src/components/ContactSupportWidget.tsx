@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { LifeBuoy, X, Send, Trash2 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { formatDateDMY } from "@/lib/date";
@@ -10,6 +11,13 @@ import { formatDateDMY } from "@/lib/date";
 // anywhere, not just from the Messages page. Self-contained: manages its own
 // unread count, thread, and compose state, independent of whatever page it's
 // rendered on.
+//
+// The modal is rendered through a portal into document.body. The sidebar
+// <aside> that hosts this widget has a `transform` class (needed for its
+// slide-in/out animation), and any transformed ancestor becomes the
+// containing block for `position: fixed` descendants — without the portal,
+// the modal would render clipped to the sidebar's own width instead of
+// covering the full screen.
 
 type SupportMsgRow = {
   id: string;
@@ -34,6 +42,11 @@ export default function ContactSupportWidget({ mechanicId, variant = "sidebar" }
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [confirmClear, setConfirmClear] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     if (!mechanicId) return;
@@ -118,7 +131,7 @@ export default function ContactSupportWidget({ mechanicId, variant = "sidebar" }
         )}
       </button>
 
-      {open && (
+      {open && mounted && createPortal(
         <div className="fixed inset-0 z-50 bg-zinc-900/40 flex items-center justify-center p-4" onClick={() => setOpen(false)}>
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-md h-[75vh] max-h-[560px] flex flex-col" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-100 shrink-0">
@@ -201,7 +214,8 @@ export default function ContactSupportWidget({ mechanicId, variant = "sidebar" }
               </div>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </>
   );
