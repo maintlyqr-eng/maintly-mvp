@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { formatDateDMY } from "@/lib/date";
+import HoverAvatar from "@/components/HoverAvatar";
 
 // ────────────────────────────────────────────────────────────────────────────
 // Types
@@ -25,6 +26,7 @@ type AccountRow = {
   verified: boolean;
   suspended: boolean;
   created_at: string;
+  photo_url: string | null;
 };
 
 type ServiceRow = {
@@ -285,7 +287,7 @@ export default function AdminPage() {
       { data: scanWeekRows },
     ] = await Promise.all([
       supabase.from("mechanics")
-        .select("id, name, email, workshop_name, is_mechanic, verified, suspended, created_at")
+        .select("id, name, email, workshop_name, is_mechanic, verified, suspended, created_at, photo_url")
         .order("created_at", { ascending: false }),
       supabase.from("service_records")
         .select("id, service_date, service_type, mechanic_id, asset_id, mechanics(name), assets(brand, model, nickname)")
@@ -837,9 +839,13 @@ export default function AdminPage() {
                           <tr key={a.id} className="hover:bg-zinc-50/80 transition-colors cursor-pointer" onClick={() => openDetail(a)}>
                             <td className="px-7 py-4">
                               <div className="flex items-center gap-3">
-                                <div className={`w-9 h-9 rounded-full flex items-center justify-center text-[12px] font-black shrink-0 ${getAvatarColor(a.name)}`}>
-                                  {getInitials(a.name)}
-                                </div>
+                                {a.photo_url ? (
+                                  <HoverAvatar src={a.photo_url} size={36} className="shrink-0" />
+                                ) : (
+                                  <div className={`w-9 h-9 rounded-full flex items-center justify-center text-[12px] font-black shrink-0 ${getAvatarColor(a.name)}`}>
+                                    {getInitials(a.name)}
+                                  </div>
+                                )}
                                 <div className="min-w-0">
                                   <p className="text-[13px] font-bold text-zinc-900 truncate">{a.name}</p>
                                   <p className="text-[11px] text-zinc-400 truncate">{a.email}</p>
@@ -905,9 +911,13 @@ export default function AdminPage() {
                         <tr key={m.id} className="hover:bg-zinc-50/80 transition-colors">
                           <td className="px-7 py-4 cursor-pointer" onClick={() => openDetail(m)}>
                             <div className="flex items-center gap-3">
-                              <div className={`w-9 h-9 rounded-full flex items-center justify-center text-[12px] font-black shrink-0 ${getAvatarColor(m.name)}`}>
-                                {getInitials(m.name)}
-                              </div>
+                              {m.photo_url ? (
+                                <HoverAvatar src={m.photo_url} size={36} className="shrink-0" />
+                              ) : (
+                                <div className={`w-9 h-9 rounded-full flex items-center justify-center text-[12px] font-black shrink-0 ${getAvatarColor(m.name)}`}>
+                                  {getInitials(m.name)}
+                                </div>
+                              )}
                               <span className="text-[13px] font-bold text-zinc-900">{m.name}</span>
                             </div>
                           </td>
@@ -1163,9 +1173,13 @@ export default function AdminPage() {
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[88vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-100">
               <div className="flex items-center gap-3 min-w-0">
-                <div className={`w-10 h-10 rounded-full flex items-center justify-center text-[13px] font-black shrink-0 ${getAvatarColor(detailAccount.name)}`}>
-                  {getInitials(detailAccount.name)}
-                </div>
+                {detailAccount.photo_url ? (
+                  <HoverAvatar src={detailAccount.photo_url} size={40} previewSize={200} className="shrink-0" />
+                ) : (
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center text-[13px] font-black shrink-0 ${getAvatarColor(detailAccount.name)}`}>
+                    {getInitials(detailAccount.name)}
+                  </div>
+                )}
                 <div className="min-w-0">
                   <h2 className="text-[15px] font-black text-zinc-900 truncate">{detailAccount.name}</h2>
                   <p className="text-[11px] text-zinc-400 truncate">{detailAccount.email}</p>

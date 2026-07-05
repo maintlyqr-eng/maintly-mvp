@@ -12,6 +12,7 @@ import {
 import { supabase } from "@/lib/supabase";
 import { formatDateDMY } from "@/lib/date";
 import AvatarCropModal from "@/components/AvatarCropModal";
+import HoverAvatar from "@/components/HoverAvatar";
 
 const navItems = [
   { icon: LayoutGrid, label: "Dashboard", href: "/dashboard" },
@@ -260,8 +261,7 @@ export default function SettingsPage() {
 
         <div className="flex items-center gap-2.5 px-4 py-3 border-t border-zinc-200">
           {photoUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={photoUrl} alt="" className="w-8 h-8 rounded-full object-cover shrink-0" />
+            <HoverAvatar src={photoUrl} size={32} className="shrink-0" />
           ) : (
             <div className="w-8 h-8 rounded-full bg-red-100 flex items-center justify-center text-red-600 font-bold text-[12px] shrink-0">{initials}</div>
           )}
@@ -290,8 +290,7 @@ export default function SettingsPage() {
             <div className="flex items-center gap-3 md:pl-3 md:border-l border-zinc-200">
               <div className="flex items-center gap-2.5">
                 {photoUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={photoUrl} alt="" className="w-9 h-9 rounded-full object-cover shrink-0" />
+                  <HoverAvatar src={photoUrl} size={36} className="shrink-0" />
                 ) : (
                   <div className="w-9 h-9 rounded-full bg-red-100 flex items-center justify-center text-red-600 font-bold text-[13px] shrink-0">{initials}</div>
                 )}

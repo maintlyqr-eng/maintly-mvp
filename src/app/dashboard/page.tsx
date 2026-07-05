@@ -14,6 +14,7 @@ import { supabase } from "@/lib/supabase";
 import { formatDateDMY } from "@/lib/date";
 import { computeReminderStatus, REMINDER_STATUS_LABEL, REMINDER_STATUS_COLOR, type ReminderStatus } from "@/lib/reminders";
 import { getUnitLabel, getUnitShort, formatUnitValue } from "@/lib/units";
+import HoverAvatar from "@/components/HoverAvatar";
 
 const navItems = [
   { icon: LayoutGrid,   label: "Dashboard",        href: "/dashboard",          active: true  },
@@ -503,8 +504,7 @@ export default function DashboardPage() {
         <div className="flex items-center gap-2.5 px-4 py-3 border-t border-zinc-200">
           <Link href="/dashboard/settings" className="shrink-0">
             {mechanicPhoto ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={mechanicPhoto} alt="" className="w-8 h-8 rounded-full object-cover" />
+              <HoverAvatar src={mechanicPhoto} size={32} />
             ) : (
               <div className="w-8 h-8 rounded-full bg-red-100 flex items-center justify-center text-red-600 font-bold text-[12px]">{initials}</div>
             )}
@@ -605,8 +605,7 @@ export default function DashboardPage() {
               <div className="flex items-center gap-2.5">
                 <Link href="/dashboard/settings" className="shrink-0">
                   {mechanicPhoto ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={mechanicPhoto} alt="" className="w-9 h-9 rounded-full object-cover" />
+                    <HoverAvatar src={mechanicPhoto} size={36} />
                   ) : (
                     <div className="w-9 h-9 rounded-full bg-red-100 flex items-center justify-center text-red-600 font-bold text-[13px]">{initials}</div>
                   )}
