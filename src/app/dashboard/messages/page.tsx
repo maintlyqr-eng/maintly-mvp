@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import {
   LayoutGrid, FileText, Box, QrCode, Users, BarChart3, Calendar as CalendarIcon,
   Mail, FolderOpen, Settings, Bell, X, LogOut, Crown, Menu,
-  Mailbox, Trash2, Wrench,
+  Mailbox, Trash2, Wrench, Shield, LifeBuoy, Send,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import HoverAvatar from "@/components/HoverAvatar";
@@ -40,12 +40,13 @@ type AssetInfo = { id: string; nickname: string | null; brand: string | null; mo
 
 type MessageRow = {
   id: string;
-  asset_id: string;
+  asset_id: string | null;
   sender_name: string;
   sender_contact: string;
   body: string;
   read: boolean;
   created_at: string;
+  from_admin: boolean;
   assets: AssetInfo | AssetInfo[] | null;
 };
 
@@ -75,6 +76,11 @@ export default function MessagesPage() {
   const [messages, setMessages] = useState<MessageRow[]>([]);
   const [unreadOnly, setUnreadOnly] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [showSupportModal, setShowSupportModal] = useState(false);
+  const [supportBody, setSupportBody] = useState("");
+  const [supportSaving, setSupportSaving] = useState(false);
+  const [supportError, setSupportError] = useState("");
+  const [supportSent, setSupportSent] = useState(false);
 
   const unreadCount = useUnreadMessagesCount(mechanicId);
 
@@ -82,7 +88,7 @@ export default function MessagesPage() {
     setLoading(true);
     const { data } = await supabase
       .from("messages")
-      .select("id, asset_id, sender_name, sender_contact, body, read, created_at, assets(id, nickname, brand, model, asset_type)")
+      .select("id, asset_id, sender_name, sender_contact, body, read, created_at, from_admin, assets(id, nickname, brand, model, asset_type)")
       .eq("mechanic_id", uid)
       .order("created_at", { ascending: false });
     setMessages((data as unknown as MessageRow[]) ?? []);
@@ -133,6 +139,29 @@ export default function MessagesPage() {
   async function handleDelete(m: MessageRow) {
     setMessages((prev) => prev.filter((x) => x.id !== m.id));
     await supabase.from("messages").delete().eq("id", m.id);
+  }
+
+  function openSupportModal() {
+    setSupportBody("");
+    setSupportError("");
+    setSupportSent(false);
+    setShowSupportModal(true);
+  }
+
+  async function handleSendSupport() {
+    if (!supportBody.trim()) return;
+    setSupportSaving(true);
+    setSupportError("");
+    const { data, error } = await supabase
+      .from("support_messages")
+      .insert({ mechanic_id: mechanicId, body: supportBody.trim() })
+      .select("id");
+    setSupportSaving(false);
+    if (error || !data || data.length === 0) {
+      setSupportError("Couldn't send your message. Try again.");
+      return;
+    }
+    setSupportSent(true);
   }
 
   if (checkingAuth) {
@@ -226,6 +255,13 @@ export default function MessagesPage() {
             </div>
           </div>
           <div className="flex items-center gap-2 md:gap-4 shrink-0">
+            <button
+              onClick={openSupportModal}
+              className="flex items-center gap-1.5 text-[12px] font-bold text-white bg-zinc-900 hover:bg-zinc-800 px-3 py-2 rounded-xl transition-all shadow-sm"
+            >
+              <LifeBuoy size={14} />
+              <span className="hidden sm:inline">Contact Support</span>
+            </button>
             <button className="relative text-zinc-500 hover:text-zinc-800 transition-colors"><Bell size={19} /></button>
             <div className="flex items-center gap-3 md:pl-3 md:border-l border-zinc-200">
               <div className="flex items-center gap-2.5">
@@ -287,18 +323,30 @@ export default function MessagesPage() {
                   const isExpanded = expandedId === m.id;
                   const contactHref = looksLikeEmail(m.sender_contact) ? `mailto:${m.sender_contact}` : `tel:${m.sender_contact.replace(/[^\d+]/g, "")}`;
                   return (
-                    <div key={m.id} className={`px-5 py-4 ${!m.read ? "bg-red-50/30" : ""}`}>
+                    <div key={m.id} className={`px-5 py-4 ${!m.read ? (m.from_admin ? "bg-zinc-50" : "bg-red-50/30") : ""}`}>
                       <button className="w-full text-left" onClick={() => openMessage(m)}>
                         <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-lg bg-zinc-50 border border-zinc-100 flex items-center justify-center shrink-0 overflow-hidden">
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img src={img} alt="" className="w-[26px] h-[26px] object-contain" />
-                          </div>
+                          {m.from_admin ? (
+                            <div className="w-10 h-10 rounded-lg bg-zinc-900 flex items-center justify-center shrink-0">
+                              <Shield size={18} className="text-white" />
+                            </div>
+                          ) : (
+                            <div className="w-10 h-10 rounded-lg bg-zinc-50 border border-zinc-100 flex items-center justify-center shrink-0 overflow-hidden">
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img src={img} alt="" className="w-[26px] h-[26px] object-contain" />
+                            </div>
+                          )}
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 flex-wrap">
                               {!m.read && <span className="w-2 h-2 rounded-full bg-red-600 shrink-0" />}
-                              <p className="text-[13px] font-bold text-zinc-800 truncate">{m.sender_name}</p>
-                              <span className="text-[11px] text-zinc-400">on {assetLabel(asset)}</span>
+                              {m.from_admin ? (
+                                <span className="text-[10px] font-black uppercase tracking-wide text-white bg-zinc-900 px-1.5 py-0.5 rounded-full">Maintly Team</span>
+                              ) : (
+                                <>
+                                  <p className="text-[13px] font-bold text-zinc-800 truncate">{m.sender_name}</p>
+                                  <span className="text-[11px] text-zinc-400">on {assetLabel(asset)}</span>
+                                </>
+                              )}
                             </div>
                             <p className={`text-[12px] mt-0.5 ${isExpanded ? "text-zinc-700" : "text-zinc-400 truncate"}`}>{m.body}</p>
                           </div>
@@ -308,12 +356,21 @@ export default function MessagesPage() {
 
                       {isExpanded && (
                         <div className="mt-3 ml-[52px] flex items-center gap-2 flex-wrap">
-                          <a
-                            href={contactHref}
-                            className="flex items-center gap-1.5 text-[12px] font-bold text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-lg transition-colors"
-                          >
-                            Reply to {m.sender_contact}
-                          </a>
+                          {m.from_admin ? (
+                            <button
+                              onClick={openSupportModal}
+                              className="flex items-center gap-1.5 text-[12px] font-bold text-zinc-700 hover:text-zinc-900 bg-zinc-100 hover:bg-zinc-200 px-3 py-1.5 rounded-lg transition-colors"
+                            >
+                              <LifeBuoy size={12} /> Reply via Support
+                            </button>
+                          ) : (
+                            <a
+                              href={contactHref}
+                              className="flex items-center gap-1.5 text-[12px] font-bold text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-lg transition-colors"
+                            >
+                              Reply to {m.sender_contact}
+                            </a>
+                          )}
                           {asset && (
                             <Link
                               href={`/dashboard/services?asset=${asset.id}`}
@@ -340,6 +397,54 @@ export default function MessagesPage() {
           <p className="text-center text-[11px] text-zinc-400 mt-8">© 2026 Maintly. All rights reserved.</p>
         </div>
       </div>
+
+      {/* ══ CONTACT SUPPORT MODAL ══ */}
+      {showSupportModal && (
+        <div className="fixed inset-0 z-50 bg-zinc-900/40 flex items-center justify-center p-4" onClick={() => setShowSupportModal(false)}>
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-100">
+              <div className="flex items-center gap-2">
+                <LifeBuoy size={16} className="text-zinc-700" />
+                <h2 className="text-[15px] font-black text-zinc-900">Contact Support</h2>
+              </div>
+              <button onClick={() => setShowSupportModal(false)} className="text-zinc-400 hover:text-zinc-700"><X size={18} /></button>
+            </div>
+
+            <div className="px-6 py-5 space-y-3">
+              {supportSent ? (
+                <div className="text-center py-6">
+                  <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-emerald-50 mb-3">
+                    <Send size={18} className="text-emerald-600" />
+                  </div>
+                  <p className="text-[13px] font-bold text-zinc-800">Message sent!</p>
+                  <p className="text-[12px] text-zinc-400 mt-1">The Maintly team will reply right here in your Messages inbox.</p>
+                  <button onClick={() => setShowSupportModal(false)} className="mt-4 text-[12px] font-bold text-zinc-500 hover:text-zinc-800">Close</button>
+                </div>
+              ) : (
+                <>
+                  <p className="text-[12px] text-zinc-400">Any question or issue — write it here and the team will get back to you directly in this inbox.</p>
+                  <textarea
+                    value={supportBody}
+                    onChange={(e) => setSupportBody(e.target.value)}
+                    placeholder="What's up?"
+                    rows={4}
+                    autoFocus
+                    className="w-full rounded-xl border border-zinc-200 px-3 py-2 text-[13px] outline-none focus:border-red-400 resize-none"
+                  />
+                  {supportError && <p className="text-[12px] text-red-600">{supportError}</p>}
+                  <button
+                    onClick={handleSendSupport}
+                    disabled={supportSaving || !supportBody.trim()}
+                    className="w-full flex items-center justify-center gap-2 bg-zinc-900 hover:bg-zinc-800 disabled:opacity-40 text-white font-bold py-2.5 rounded-xl text-[13px] transition-all"
+                  >
+                    <Send size={14} /> {supportSaving ? "Sending…" : "Send to Support"}
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

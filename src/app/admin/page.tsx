@@ -8,6 +8,7 @@ import {
   Layers, Eye, EyeOff, Menu, X, Search,
   Ban, ShieldCheck, ShieldOff, Trash2, KeyRound, UserCog,
   UserPlus, UserMinus, Plus, Link2Off, ScanLine, ClipboardList,
+  LifeBuoy, Send, MessageCircle,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { formatDateDMY } from "@/lib/date";
@@ -61,7 +62,16 @@ type QrRow = {
 type AssetTypeCount = { type: string; count: number };
 type DayBucket = { label: string; count: number };
 
-type Section = "dashboard" | "accounts" | "mechanics" | "assets" | "services" | "qr";
+type Section = "dashboard" | "accounts" | "mechanics" | "assets" | "services" | "qr" | "support";
+
+type SupportMessageRow = {
+  id: string;
+  mechanic_id: string;
+  body: string;
+  read: boolean;
+  created_at: string;
+  mechanics: { name: string; email: string } | { name: string; email: string }[] | null;
+};
 
 // ────────────────────────────────────────────────────────────────────────────
 // Constants
@@ -248,6 +258,16 @@ export default function AdminPage() {
   const [detailWorkshop, setDetailWorkshop] = useState("");
   const [detailSaving, setDetailSaving] = useState(false);
   const [detailError, setDetailError] = useState("");
+  const [detailMessageBody, setDetailMessageBody] = useState("");
+  const [detailMessageSaving, setDetailMessageSaving] = useState(false);
+  const [detailMessageMsg, setDetailMessageMsg] = useState<{ text: string; ok: boolean } | null>(null);
+
+  // ── Support inbox (mechanic -> Control Center) ──
+  const [supportMessages, setSupportMessages] = useState<SupportMessageRow[]>([]);
+  const [supportLoading, setSupportLoading] = useState(true);
+  const [expandedSupportId, setExpandedSupportId] = useState<string | null>(null);
+  const [replyDrafts, setReplyDrafts] = useState<Record<string, string>>({});
+  const [replySavingId, setReplySavingId] = useState<string | null>(null);
 
   // ── Assets UI state ──
   const [assetSearch, setAssetSearch] = useState("");
@@ -359,7 +379,60 @@ export default function AdminPage() {
     setNewQrDays(bucketDaily(qrRowsTyped.filter((q) => q.asset_id).map((q) => q.created_at), 14));
     setNewServiceDays(bucketDaily(svcMapped.map((s) => s.service_date), 14));
 
+    await loadSupportMessages();
+
     setRefreshing(false);
+  }
+
+  async function loadSupportMessages() {
+    setSupportLoading(true);
+    try {
+      const res = await fetch("/api/admin/support-messages");
+      const data = await res.json().catch(() => ({}));
+      setSupportMessages((data.messages as SupportMessageRow[]) ?? []);
+    } finally {
+      setSupportLoading(false);
+    }
+  }
+
+  function getSupportMechanic(m: SupportMessageRow) {
+    return Array.isArray(m.mechanics) ? m.mechanics[0] ?? null : m.mechanics;
+  }
+
+  async function openSupportMessage(m: SupportMessageRow) {
+    setExpandedSupportId(expandedSupportId === m.id ? null : m.id);
+    if (!m.read) {
+      setSupportMessages((prev) => prev.map((x) => (x.id === m.id ? { ...x, read: true } : x)));
+      await adminFetch("/api/admin/support-messages", "PATCH", { id: m.id, read: true });
+    }
+  }
+
+  async function handleSendReply(m: SupportMessageRow) {
+    const text = (replyDrafts[m.id] ?? "").trim();
+    if (!text) return;
+    setReplySavingId(m.id);
+    const result = await adminFetch("/api/admin/messages", "POST", { mechanicId: m.mechanic_id, body: text });
+    setReplySavingId(null);
+    if (result.ok) {
+      setReplyDrafts((prev) => ({ ...prev, [m.id]: "" }));
+      setExpandedSupportId(null);
+      flash("Reply sent.");
+    } else {
+      flash(result.error || "Couldn't send the reply.", "error");
+    }
+  }
+
+  async function handleSendDirectMessage() {
+    if (!detailAccount || !detailMessageBody.trim()) return;
+    setDetailMessageSaving(true);
+    const result = await adminFetch("/api/admin/messages", "POST", { mechanicId: detailAccount.id, body: detailMessageBody.trim() });
+    setDetailMessageSaving(false);
+    if (result.ok) {
+      setDetailMessageBody("");
+      setDetailMessageMsg({ text: "Message sent.", ok: true });
+    } else {
+      setDetailMessageMsg({ text: result.error || "Couldn't send the message.", ok: false });
+    }
   }
 
   useEffect(() => {
@@ -407,6 +480,8 @@ export default function AdminPage() {
     setDetailName(a.name);
     setDetailWorkshop(a.workshop_name ?? "");
     setDetailError("");
+    setDetailMessageBody("");
+    setDetailMessageMsg(null);
   }
 
   async function patchAccount(id: string, patch: Record<string, unknown>) {
@@ -633,11 +708,13 @@ export default function AdminPage() {
     { id: "assets",    label: "Assets",    icon: Box       },
     { id: "services",  label: "Services",  icon: ClipboardList },
     { id: "qr",        label: "QR Manager", icon: QrCode   },
+    { id: "support",   label: "Support",   icon: LifeBuoy  },
   ];
   const sectionLabels: Record<Section, string> = {
     dashboard: "Dashboard", accounts: "Accounts", mechanics: "Mechanics",
-    assets: "Assets", services: "Services", qr: "QR Manager",
+    assets: "Assets", services: "Services", qr: "QR Manager", support: "Support",
   };
+  const unreadSupportCount = supportMessages.filter((m) => !m.read).length;
 
   return (
     <div className="min-h-screen bg-zinc-50/60 flex text-zinc-900 relative">
@@ -675,6 +752,13 @@ export default function AdminPage() {
               }`}>
               <Icon size={15} className={section === id ? "text-white" : ""} />
               {label}
+              {id === "support" && unreadSupportCount > 0 && (
+                <span className={`ml-auto text-[10px] font-black px-1.5 py-0.5 rounded-full leading-none ${
+                  section === id ? "bg-white text-red-600" : "bg-red-600 text-white"
+                }`}>
+                  {unreadSupportCount}
+                </span>
+              )}
             </button>
           ))}
         </nav>
@@ -1163,6 +1247,70 @@ export default function AdminPage() {
             </div>
           )}
 
+          {/* ── SUPPORT (mechanic -> Control Center) ─────────────────────── */}
+          {section === "support" && (
+            <div className="space-y-4">
+              <p className="text-[12px] text-zinc-400">
+                Questions mechanics send in from the app. Reply here — it lands straight in their Messages inbox.
+              </p>
+
+              {supportLoading ? (
+                <div className="bg-white rounded-2xl border border-zinc-200/80 shadow-sm py-16 text-center text-[13px] text-zinc-300">
+                  Loading…
+                </div>
+              ) : supportMessages.length === 0 ? (
+                <div className="bg-white rounded-2xl border border-zinc-200/80 shadow-sm py-16 text-center">
+                  <MessageCircle size={28} className="mx-auto text-zinc-200 mb-2" />
+                  <p className="text-[13px] text-zinc-300 font-medium">No messages from mechanics yet.</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {supportMessages.map((m) => {
+                    const mech = getSupportMechanic(m);
+                    const isOpen = expandedSupportId === m.id;
+                    return (
+                      <div key={m.id} className={`bg-white rounded-2xl border shadow-sm overflow-hidden transition-colors ${
+                        !m.read ? "border-red-200" : "border-zinc-200/80"
+                      }`}>
+                        <button onClick={() => openSupportMessage(m)} className="w-full flex items-start gap-3 px-5 py-4 text-left hover:bg-zinc-50/80 transition-colors">
+                          {!m.read && <span className="w-2 h-2 rounded-full bg-red-600 mt-1.5 shrink-0" />}
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <p className="text-[13px] font-bold text-zinc-900 truncate">{mech?.name ?? "Unknown mechanic"}</p>
+                              <p className="text-[11px] text-zinc-400 truncate">{mech?.email ?? ""}</p>
+                            </div>
+                            <p className={`text-[12px] mt-1 ${isOpen ? "text-zinc-700" : "text-zinc-500 truncate"}`}>{m.body}</p>
+                          </div>
+                          <p className="text-[11px] text-zinc-300 shrink-0 whitespace-nowrap">{formatDate(m.created_at)}</p>
+                        </button>
+
+                        {isOpen && (
+                          <div className="px-5 pb-4 border-t border-zinc-100 pt-3 space-y-2.5">
+                            <textarea
+                              value={replyDrafts[m.id] ?? ""}
+                              onChange={(e) => setReplyDrafts((prev) => ({ ...prev, [m.id]: e.target.value }))}
+                              placeholder="Type a quick reply…"
+                              rows={3}
+                              autoFocus
+                              className="w-full rounded-xl border border-zinc-200 px-3 py-2 text-[13px] outline-none focus:border-red-400 resize-none"
+                            />
+                            <button
+                              onClick={() => handleSendReply(m)}
+                              disabled={replySavingId === m.id || !(replyDrafts[m.id] ?? "").trim()}
+                              className="flex items-center gap-2 bg-red-600 hover:bg-red-500 disabled:opacity-40 text-white font-bold px-4 py-2 rounded-xl text-[12px] transition-all"
+                            >
+                              <Send size={13} /> {replySavingId === m.id ? "Sending…" : "Send reply"}
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+
           <p className="text-center text-[10px] text-zinc-300 mt-12 font-medium">MaintlyQR Admin · Internal use only</p>
         </div>
       </div>
@@ -1223,6 +1371,27 @@ export default function AdminPage() {
                 <button onClick={handleSaveDetail} disabled={detailSaving}
                   className="w-full bg-zinc-900 hover:bg-zinc-800 disabled:opacity-60 text-white font-bold py-2.5 rounded-xl text-[13px] transition-all">
                   {detailSaving ? "Saving…" : "Save changes"}
+                </button>
+              </div>
+
+              {/* Send Message (Control Center -> mechanic) */}
+              <div className="border-t border-zinc-100 pt-4 space-y-2.5">
+                <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest flex items-center gap-1.5">
+                  <MessageCircle size={12} /> Send a message
+                </p>
+                <textarea
+                  value={detailMessageBody}
+                  onChange={(e) => { setDetailMessageBody(e.target.value); setDetailMessageMsg(null); }}
+                  placeholder={`Write to ${detailAccount.name}…`}
+                  rows={3}
+                  className="w-full rounded-xl border border-zinc-200 px-3 py-2 text-[13px] outline-none focus:border-red-400 resize-none"
+                />
+                {detailMessageMsg && (
+                  <p className={`text-[12px] ${detailMessageMsg.ok ? "text-emerald-600" : "text-red-600"}`}>{detailMessageMsg.text}</p>
+                )}
+                <button onClick={handleSendDirectMessage} disabled={detailMessageSaving || !detailMessageBody.trim()}
+                  className="w-full flex items-center justify-center gap-2 bg-red-600 hover:bg-red-500 disabled:opacity-40 text-white font-bold py-2.5 rounded-xl text-[13px] transition-all">
+                  <Send size={14} /> {detailMessageSaving ? "Sending…" : "Send message"}
                 </button>
               </div>
 
