@@ -46,7 +46,7 @@ const navItems = [
   { icon: CalendarIcon, label: "Calendar", href: "#" },
   { icon: Mail, label: "Messages", href: "#" },
   { icon: FolderOpen, label: "Document Library", href: "#" },
-  { icon: Settings, label: "Settings", href: "#" },
+  { icon: Settings, label: "Settings", href: "/dashboard/settings" },
 ];
 
 const serviceTypeOptions = ["Oil Change", "Service", "Repair", "Inspection", "Filter Change", "Tire Change", "Brake Service", "Other"];

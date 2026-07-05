@@ -26,7 +26,7 @@ const navItems = [
   { icon: CalendarIcon, label: "Calendar",         href: "#",                   active: false },
   { icon: Mail,         label: "Messages",         href: "#",                   active: false },
   { icon: FolderOpen,   label: "Document Library", href: "#",                   active: false },
-  { icon: Settings,     label: "Settings",         href: "#",                   active: false },
+  { icon: Settings,     label: "Settings",         href: "/dashboard/settings", active: false },
 ];
 
 const typeColors: Record<string, string> = {
