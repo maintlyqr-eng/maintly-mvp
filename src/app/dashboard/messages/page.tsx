@@ -6,10 +6,11 @@ import { useRouter } from "next/navigation";
 import {
   LayoutGrid, FileText, Box, QrCode, Users, BarChart3, Calendar as CalendarIcon,
   Mail, FolderOpen, Settings, Bell, X, LogOut, Crown, Menu,
-  Mailbox, Trash2, Wrench, Shield, LifeBuoy, Send,
+  Mailbox, Trash2, Wrench,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import HoverAvatar from "@/components/HoverAvatar";
+import ContactSupportWidget from "@/components/ContactSupportWidget";
 import { useUnreadMessagesCount } from "@/lib/useUnreadMessages";
 import { formatDateDMY } from "@/lib/date";
 
@@ -46,7 +47,6 @@ type MessageRow = {
   body: string;
   read: boolean;
   created_at: string;
-  from_admin: boolean;
   assets: AssetInfo | AssetInfo[] | null;
 };
 
@@ -64,20 +64,6 @@ function looksLikeEmail(s: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s.trim());
 }
 
-function formatTime(iso: string) {
-  const d = new Date(iso);
-  if (isNaN(d.getTime())) return "";
-  return d.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" });
-}
-
-type SupportMsgRow = {
-  id: string;
-  body: string;
-  from_admin: boolean;
-  read: boolean;
-  created_at: string;
-};
-
 export default function MessagesPage() {
   const router = useRouter();
   const [checkingAuth, setCheckingAuth] = useState(true);
@@ -90,32 +76,14 @@ export default function MessagesPage() {
   const [messages, setMessages] = useState<MessageRow[]>([]);
   const [unreadOnly, setUnreadOnly] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [showSupportModal, setShowSupportModal] = useState(false);
-  const [supportThread, setSupportThread] = useState<SupportMsgRow[]>([]);
-  const [supportThreadLoading, setSupportThreadLoading] = useState(false);
-  const [supportBody, setSupportBody] = useState("");
-  const [supportSaving, setSupportSaving] = useState(false);
-  const [supportError, setSupportError] = useState("");
-  const [supportUnreadCount, setSupportUnreadCount] = useState(0);
-  const [confirmClearSupport, setConfirmClearSupport] = useState(false);
 
   const unreadCount = useUnreadMessagesCount(mechanicId);
-
-  async function loadSupportUnreadCount(uid: string) {
-    const { count } = await supabase
-      .from("support_messages")
-      .select("*", { count: "exact", head: true })
-      .eq("mechanic_id", uid)
-      .eq("from_admin", true)
-      .eq("read", false);
-    setSupportUnreadCount(count ?? 0);
-  }
 
   async function loadMessages(uid: string) {
     setLoading(true);
     const { data } = await supabase
       .from("messages")
-      .select("id, asset_id, sender_name, sender_contact, body, read, created_at, from_admin, assets(id, nickname, brand, model, asset_type)")
+      .select("id, asset_id, sender_name, sender_contact, body, read, created_at, assets(id, nickname, brand, model, asset_type)")
       .eq("mechanic_id", uid)
       .order("created_at", { ascending: false });
     setMessages((data as unknown as MessageRow[]) ?? []);
@@ -138,7 +106,6 @@ export default function MessagesPage() {
       if (active && mechanic) { setMechanicName(mechanic.name); setMechanicPhoto(mechanic.photo_url ?? ""); }
 
       await loadMessages(session.user.id);
-      await loadSupportUnreadCount(session.user.id);
       if (active) setCheckingAuth(false);
     }
 
@@ -167,55 +134,6 @@ export default function MessagesPage() {
   async function handleDelete(m: MessageRow) {
     setMessages((prev) => prev.filter((x) => x.id !== m.id));
     await supabase.from("messages").delete().eq("id", m.id);
-  }
-
-  async function handleClearSupportThread() {
-    setSupportThread([]);
-    setConfirmClearSupport(false);
-    await supabase.from("support_messages").update({ hidden_for_mechanic: true }).eq("mechanic_id", mechanicId);
-  }
-
-  async function openSupportModal() {
-    setSupportBody("");
-    setSupportError("");
-    setConfirmClearSupport(false);
-    setShowSupportModal(true);
-    setSupportThreadLoading(true);
-
-    const { data } = await supabase
-      .from("support_messages")
-      .select("id, body, from_admin, read, created_at")
-      .eq("mechanic_id", mechanicId)
-      .eq("hidden_for_mechanic", false)
-      .order("created_at", { ascending: true });
-    const thread = (data as SupportMsgRow[]) ?? [];
-    setSupportThread(thread);
-    setSupportThreadLoading(false);
-
-    const unreadIds = thread.filter((m) => m.from_admin && !m.read).map((m) => m.id);
-    if (unreadIds.length > 0) {
-      setSupportThread((prev) => prev.map((m) => (unreadIds.includes(m.id) ? { ...m, read: true } : m)));
-      setSupportUnreadCount(0);
-      await supabase.from("support_messages").update({ read: true }).in("id", unreadIds);
-    }
-  }
-
-  async function handleSendSupport() {
-    if (!supportBody.trim()) return;
-    const text = supportBody.trim();
-    setSupportSaving(true);
-    setSupportError("");
-    const { data, error } = await supabase
-      .from("support_messages")
-      .insert({ mechanic_id: mechanicId, body: text, from_admin: false })
-      .select("id, body, from_admin, read, created_at");
-    setSupportSaving(false);
-    if (error || !data || data.length === 0) {
-      setSupportError("Couldn't send your message. Try again.");
-      return;
-    }
-    setSupportThread((prev) => [...prev, data[0] as SupportMsgRow]);
-    setSupportBody("");
   }
 
   if (checkingAuth) {
@@ -271,6 +189,10 @@ export default function MessagesPage() {
           ))}
         </nav>
 
+        <div className="border-t border-zinc-100 py-2">
+          <ContactSupportWidget mechanicId={mechanicId} />
+        </div>
+
         <div className="mx-3 mb-3 p-4 rounded-xl bg-gradient-to-br from-zinc-50 to-zinc-100 border border-zinc-200">
           <div className="flex items-center gap-1.5 text-amber-500 mb-1">
             <Crown size={14} />
@@ -309,18 +231,6 @@ export default function MessagesPage() {
             </div>
           </div>
           <div className="flex items-center gap-2 md:gap-4 shrink-0">
-            <button
-              onClick={openSupportModal}
-              className="relative flex items-center gap-1.5 text-[12px] font-bold text-white bg-zinc-900 hover:bg-zinc-800 px-3 py-2 rounded-xl transition-all shadow-sm"
-            >
-              <LifeBuoy size={14} />
-              <span className="hidden sm:inline">Contact Support</span>
-              {supportUnreadCount > 0 && (
-                <span className="absolute -top-1.5 -right-1.5 bg-red-600 text-white text-[9px] font-black rounded-full min-w-[16px] h-4 flex items-center justify-center px-1 ring-2 ring-white">
-                  {supportUnreadCount}
-                </span>
-              )}
-            </button>
             <button className="relative text-zinc-500 hover:text-zinc-800 transition-colors"><Bell size={19} /></button>
             <div className="flex items-center gap-3 md:pl-3 md:border-l border-zinc-200">
               <div className="flex items-center gap-2.5">
@@ -348,21 +258,6 @@ export default function MessagesPage() {
         </header>
 
         <div className="flex-1 overflow-y-auto p-4 md:p-7">
-
-          {supportUnreadCount > 0 && (
-            <button
-              onClick={openSupportModal}
-              className="w-full flex items-center gap-3 bg-zinc-900 hover:bg-zinc-800 text-white rounded-2xl px-5 py-3.5 mb-4 transition-all shadow-sm text-left"
-            >
-              <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center shrink-0">
-                <LifeBuoy size={15} />
-              </div>
-              <p className="flex-1 text-[13px] font-bold">
-                {supportUnreadCount === 1 ? "You have 1 new message" : `You have ${supportUnreadCount} new messages`} from Maintly Team
-              </p>
-              <span className="text-[11px] font-bold bg-white/15 px-3 py-1.5 rounded-lg shrink-0">View</span>
-            </button>
-          )}
 
           <div className="flex items-center justify-between mb-4">
             <p className="text-[12px] text-zinc-400">
@@ -397,30 +292,18 @@ export default function MessagesPage() {
                   const isExpanded = expandedId === m.id;
                   const contactHref = looksLikeEmail(m.sender_contact) ? `mailto:${m.sender_contact}` : `tel:${m.sender_contact.replace(/[^\d+]/g, "")}`;
                   return (
-                    <div key={m.id} className={`px-5 py-4 ${!m.read ? (m.from_admin ? "bg-zinc-50" : "bg-red-50/30") : ""}`}>
+                    <div key={m.id} className={`px-5 py-4 ${!m.read ? "bg-red-50/30" : ""}`}>
                       <button className="w-full text-left" onClick={() => openMessage(m)}>
                         <div className="flex items-center gap-3">
-                          {m.from_admin ? (
-                            <div className="w-10 h-10 rounded-lg bg-zinc-900 flex items-center justify-center shrink-0">
-                              <Shield size={18} className="text-white" />
-                            </div>
-                          ) : (
-                            <div className="w-10 h-10 rounded-lg bg-zinc-50 border border-zinc-100 flex items-center justify-center shrink-0 overflow-hidden">
-                              {/* eslint-disable-next-line @next/next/no-img-element */}
-                              <img src={img} alt="" className="w-[26px] h-[26px] object-contain" />
-                            </div>
-                          )}
+                          <div className="w-10 h-10 rounded-lg bg-zinc-50 border border-zinc-100 flex items-center justify-center shrink-0 overflow-hidden">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src={img} alt="" className="w-[26px] h-[26px] object-contain" />
+                          </div>
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 flex-wrap">
                               {!m.read && <span className="w-2 h-2 rounded-full bg-red-600 shrink-0" />}
-                              {m.from_admin ? (
-                                <span className="text-[10px] font-black uppercase tracking-wide text-white bg-zinc-900 px-1.5 py-0.5 rounded-full">Maintly Team</span>
-                              ) : (
-                                <>
-                                  <p className="text-[13px] font-bold text-zinc-800 truncate">{m.sender_name}</p>
-                                  <span className="text-[11px] text-zinc-400">on {assetLabel(asset)}</span>
-                                </>
-                              )}
+                              <p className="text-[13px] font-bold text-zinc-800 truncate">{m.sender_name}</p>
+                              <span className="text-[11px] text-zinc-400">on {assetLabel(asset)}</span>
                             </div>
                             <p className={`text-[12px] mt-0.5 ${isExpanded ? "text-zinc-700" : "text-zinc-400 truncate"}`}>{m.body}</p>
                           </div>
@@ -430,21 +313,12 @@ export default function MessagesPage() {
 
                       {isExpanded && (
                         <div className="mt-3 ml-[52px] flex items-center gap-2 flex-wrap">
-                          {m.from_admin ? (
-                            <button
-                              onClick={openSupportModal}
-                              className="flex items-center gap-1.5 text-[12px] font-bold text-zinc-700 hover:text-zinc-900 bg-zinc-100 hover:bg-zinc-200 px-3 py-1.5 rounded-lg transition-colors"
-                            >
-                              <LifeBuoy size={12} /> Reply via Support
-                            </button>
-                          ) : (
-                            <a
-                              href={contactHref}
-                              className="flex items-center gap-1.5 text-[12px] font-bold text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-lg transition-colors"
-                            >
-                              Reply to {m.sender_contact}
-                            </a>
-                          )}
+                          <a
+                            href={contactHref}
+                            className="flex items-center gap-1.5 text-[12px] font-bold text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-lg transition-colors"
+                          >
+                            Reply to {m.sender_contact}
+                          </a>
                           {asset && (
                             <Link
                               href={`/dashboard/services?asset=${asset.id}`}
@@ -471,93 +345,6 @@ export default function MessagesPage() {
           <p className="text-center text-[11px] text-zinc-400 mt-8">© 2026 Maintly. All rights reserved.</p>
         </div>
       </div>
-
-      {/* ══ CONTACT SUPPORT MODAL (full conversation) ══ */}
-      {showSupportModal && (
-        <div className="fixed inset-0 z-50 bg-zinc-900/40 flex items-center justify-center p-4" onClick={() => setShowSupportModal(false)}>
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md h-[75vh] max-h-[560px] flex flex-col" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-100 shrink-0">
-              <div className="flex items-center gap-2">
-                <LifeBuoy size={16} className="text-zinc-700" />
-                <div>
-                  <h2 className="text-[15px] font-black text-zinc-900 leading-tight">Contact Support</h2>
-                  <p className="text-[11px] text-zinc-400 leading-tight">Maintly Team</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-3 shrink-0">
-                <button
-                  onClick={() => setConfirmClearSupport(true)}
-                  className="text-zinc-300 hover:text-red-600 transition-colors"
-                  title="Clear conversation (only from your side)"
-                >
-                  <Trash2 size={15} />
-                </button>
-                <button onClick={() => setShowSupportModal(false)} className="text-zinc-400 hover:text-zinc-700"><X size={18} /></button>
-              </div>
-            </div>
-
-            {confirmClearSupport && (
-              <div className="flex items-center justify-between gap-2 px-5 py-2.5 bg-red-50 border-b border-red-100 shrink-0">
-                <span className="text-[11px] text-red-700 font-medium">Clear this conversation from your side only?</span>
-                <div className="flex items-center gap-1.5 shrink-0">
-                  <button onClick={handleClearSupportThread} className="text-[11px] font-bold text-white bg-red-600 hover:bg-red-500 px-2.5 py-1 rounded-lg transition-colors">Confirm</button>
-                  <button onClick={() => setConfirmClearSupport(false)} className="text-[11px] font-semibold text-zinc-400 hover:text-zinc-700 px-1.5">Cancel</button>
-                </div>
-              </div>
-            )}
-
-            <div className="flex-1 overflow-y-auto px-5 py-4 space-y-2.5 bg-zinc-50/40">
-              {supportThreadLoading ? (
-                <p className="text-[12px] text-zinc-300 text-center py-8">Loading…</p>
-              ) : supportThread.length === 0 ? (
-                <p className="text-[12px] text-zinc-300 text-center py-8">Any question or issue — write it below and the team will reply right here.</p>
-              ) : (
-                supportThread.map((m, i) => {
-                  const prev = supportThread[i - 1];
-                  const showLabel = !prev || prev.from_admin !== m.from_admin;
-                  return (
-                    <div key={m.id} className={`flex flex-col ${m.from_admin ? "items-start" : "items-end"}`}>
-                      {showLabel && (
-                        <p className={`text-[10px] font-black uppercase tracking-wide mb-1 px-1 ${m.from_admin ? "text-zinc-400" : "text-zinc-500"}`}>
-                          {m.from_admin ? "Maintly Team" : "You"}
-                        </p>
-                      )}
-                      <div className={`max-w-[80%] rounded-2xl px-3.5 py-2.5 text-[12.5px] leading-snug ${
-                        m.from_admin ? "bg-white border border-zinc-200 text-zinc-700 rounded-bl-sm" : "bg-blue-600 text-white rounded-br-sm"
-                      }`}>
-                        <p className="whitespace-pre-wrap break-words">{m.body}</p>
-                        <p className={`text-[9.5px] mt-1 ${m.from_admin ? "text-zinc-300" : "text-blue-100"}`}>{formatDateDMY(m.created_at)} · {formatTime(m.created_at)}</p>
-                      </div>
-                    </div>
-                  );
-                })
-              )}
-            </div>
-
-            <div className="px-4 py-3 border-t border-zinc-100 shrink-0 space-y-1.5">
-              {supportError && <p className="text-[11px] text-red-600 px-1">{supportError}</p>}
-              <div className="flex items-end gap-2">
-                <textarea
-                  value={supportBody}
-                  onChange={(e) => setSupportBody(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSendSupport(); } }}
-                  placeholder="Type a message…"
-                  rows={1}
-                  autoFocus
-                  className="flex-1 rounded-xl border border-zinc-200 px-3 py-2.5 text-[13px] outline-none focus:border-red-400 resize-none"
-                />
-                <button
-                  onClick={handleSendSupport}
-                  disabled={supportSaving || !supportBody.trim()}
-                  className="flex items-center justify-center gap-1.5 bg-zinc-900 hover:bg-zinc-800 disabled:opacity-40 text-white font-bold px-4 py-2.5 rounded-xl text-[12px] transition-all shrink-0"
-                >
-                  <Send size={13} />
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

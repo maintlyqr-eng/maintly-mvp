@@ -11,6 +11,7 @@ import {
 import { supabase } from "@/lib/supabase";
 import { useUnreadMessagesCount } from "@/lib/useUnreadMessages";
 import HoverAvatar from "@/components/HoverAvatar";
+import ContactSupportWidget from "@/components/ContactSupportWidget";
 import { formatDateDMY } from "@/lib/date";
 import { computeReminderStatus, REMINDER_STATUS_LABEL, REMINDER_STATUS_COLOR, type ReminderStatus } from "@/lib/reminders";
 import { formatUnitValue } from "@/lib/units";
@@ -335,6 +336,10 @@ export default function CalendarPage() {
             </Link>
           ))}
         </nav>
+
+        <div className="border-t border-zinc-100 py-2">
+          <ContactSupportWidget mechanicId={mechanicId} />
+        </div>
 
         <div className="mx-3 mb-3 p-4 rounded-xl bg-gradient-to-br from-zinc-50 to-zinc-100 border border-zinc-200">
           <div className="flex items-center gap-1.5 text-amber-500 mb-1">
