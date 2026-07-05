@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import Image from "next/image";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   LayoutGrid, FileText, Box, QrCode, Users, BarChart3, Calendar as CalendarIcon,
@@ -672,6 +673,36 @@ export default function AssetsPage() {
     }
   }
 
+  // Filtered + sorted every render otherwise (this page has a lot of other
+  // state — edit-modal fields, etc. — that shouldn't force a full re-filter
+  // of the asset list on every keystroke). Declared before the early return
+  // below since hooks must run unconditionally on every render.
+  const visibleAssets = useMemo(() => {
+    return assets
+      .filter((a) => {
+        if (typeFilter !== "all" && a.asset_type !== typeFilter) return false;
+        const q = searchQuery.trim().toLowerCase();
+        if (!q) return true;
+        const haystack = [assetDisplayName(a), a.brand, a.model, a.vin_serial, a.plate]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase();
+        return haystack.includes(q);
+      })
+      .sort((x, y) => {
+        if (sortBy === "name") return assetDisplayName(x).localeCompare(assetDisplayName(y));
+        if (sortBy === "status") {
+          const rx = STATUS_RANK[assetAgg[x.id]?.reminderStatus ?? "none"];
+          const ry = STATUS_RANK[assetAgg[y.id]?.reminderStatus ?? "none"];
+          return ry - rx;
+        }
+        const dx = assetAgg[x.id]?.lastServiceDate ?? "";
+        const dy = assetAgg[y.id]?.lastServiceDate ?? "";
+        return dy.localeCompare(dx);
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [assets, typeFilter, searchQuery, sortBy, assetAgg]);
+
   if (checkingAuth) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-zinc-50">
@@ -703,29 +734,6 @@ export default function AssetsPage() {
   const availableTypes = Array.from(new Set(assets.map((a) => a.asset_type)));
   const svcAssetType = assets.find((a) => a.id === svcAssetId)?.asset_type;
 
-  const visibleAssets = assets
-    .filter((a) => {
-      if (typeFilter !== "all" && a.asset_type !== typeFilter) return false;
-      const q = searchQuery.trim().toLowerCase();
-      if (!q) return true;
-      const haystack = [assetDisplayName(a), a.brand, a.model, a.vin_serial, a.plate]
-        .filter(Boolean)
-        .join(" ")
-        .toLowerCase();
-      return haystack.includes(q);
-    })
-    .sort((x, y) => {
-      if (sortBy === "name") return assetDisplayName(x).localeCompare(assetDisplayName(y));
-      if (sortBy === "status") {
-        const rx = STATUS_RANK[assetAgg[x.id]?.reminderStatus ?? "none"];
-        const ry = STATUS_RANK[assetAgg[y.id]?.reminderStatus ?? "none"];
-        return ry - rx;
-      }
-      const dx = assetAgg[x.id]?.lastServiceDate ?? "";
-      const dy = assetAgg[y.id]?.lastServiceDate ?? "";
-      return dy.localeCompare(dx);
-    });
-
   return (
     <div className="min-h-screen bg-zinc-50 flex relative">
 
@@ -737,10 +745,8 @@ export default function AssetsPage() {
       <aside className={`fixed md:static inset-y-0 left-0 z-40 w-[230px] bg-white border-r border-zinc-200 flex flex-col shrink-0 transform transition-transform duration-200 md:translate-x-0 ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}`}>
         <div className="flex items-center justify-between px-4 py-2">
           <Link href="/" className="flex items-center">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/images/qr-gear.png" alt="Maintly" style={{width: 72, height: 72, objectFit: "contain"}} />
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/images/Maintly.png" alt="" style={{width: 152, objectFit: "contain", marginLeft: -18}} />
+            <Image src="/images/qr-gear.png" alt="Maintly" width={72} height={72} priority style={{ objectFit: "contain" }} />
+            <Image src="/images/Maintly.png" alt="" width={152} height={101} priority style={{ objectFit: "contain", marginLeft: -18 }} />
           </Link>
           <button onClick={() => setSidebarOpen(false)} className="md:hidden text-zinc-400 hover:text-zinc-700 mr-2">
             <X size={20} />

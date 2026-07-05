@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
 import {
   Users, Box, Wrench, QrCode, BarChart3, Shield,
@@ -721,8 +722,7 @@ export default function AdminPage() {
               <Shield size={28} className="text-white" />
             </div>
             <div className="flex justify-center mb-2">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/images/Maintly.png" alt="Maintly" style={{ height: 24, objectFit: "contain" }} />
+              <Image src="/images/Maintly.png" alt="Maintly" width={36} height={24} priority style={{ objectFit: "contain" }} />
             </div>
             <p className="text-[12px] text-zinc-400 font-semibold tracking-widest uppercase">Control Center</p>
           </div>
@@ -819,8 +819,7 @@ export default function AdminPage() {
               <Shield size={15} className="text-white" />
             </div>
             <div>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/images/Maintly.png" alt="Maintly" style={{ height: 17, objectFit: "contain" }} />
+              <Image src="/images/Maintly.png" alt="Maintly" width={26} height={17} priority style={{ objectFit: "contain" }} />
               <p className="text-[9px] font-bold text-red-500 tracking-[0.12em] uppercase leading-none mt-0.5">Control Center</p>
             </div>
           </div>

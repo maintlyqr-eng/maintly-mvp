@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -251,10 +252,8 @@ export default function CustomersPage() {
       <aside className={`fixed md:static inset-y-0 left-0 z-40 w-[230px] bg-white border-r border-zinc-200 flex flex-col shrink-0 transform transition-transform duration-200 md:translate-x-0 ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}`}>
         <div className="flex items-center justify-between px-4 py-2">
           <Link href="/" className="flex items-center">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/images/qr-gear.png" alt="Maintly" style={{width: 72, height: 72, objectFit: "contain"}} />
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/images/Maintly.png" alt="" style={{width: 152, objectFit: "contain", marginLeft: -18}} />
+            <Image src="/images/qr-gear.png" alt="Maintly" width={72} height={72} priority style={{ objectFit: "contain" }} />
+            <Image src="/images/Maintly.png" alt="" width={152} height={101} priority style={{ objectFit: "contain", marginLeft: -18 }} />
           </Link>
           <button onClick={() => setSidebarOpen(false)} className="md:hidden text-zinc-400 hover:text-zinc-700 mr-2">
             <X size={20} />

@@ -269,41 +269,62 @@ export default function DashboardPage() {
       setMechanicId(session.user.id);
       setMechanicEmail(session.user.email ?? "");
 
-      const { data: mechanic } = await supabase
-        .from("mechanics").select("name, photo_url").eq("id", session.user.id).single();
-      if (active && mechanic) { setMechanicName(mechanic.name); setMechanicPhoto(mechanic.photo_url ?? ""); }
+      // These 9 queries are all independent (none depends on another's
+      // result), so they're fired concurrently instead of one after another
+      // — page load time is now bounded by the slowest single query instead
+      // of the sum of all of them.
+      const [
+        { data: mechanic },
+        { count: assetCount },
+        { data: svcs },
+        { count: svcCount },
+        { data: remRows },
+        { data: kmRows },
+        { data: allSvcRows },
+        { data: taskRowsForCal },
+        { data: assetRows },
+      ] = await Promise.all([
+        supabase.from("mechanics").select("name, photo_url").eq("id", session.user.id).single(),
+        supabase.from("mechanic_assets").select("*", { count: "exact", head: true }).eq("mechanic_id", session.user.id),
+        supabase
+          .from("service_records")
+          .select("id, service_date, service_type, km_hours, notes, asset_id, assets(brand, model, nickname, asset_type, vin_serial)")
+          .eq("mechanic_id", session.user.id)
+          .order("service_date", { ascending: false })
+          .limit(6),
+        supabase.from("service_records").select("*", { count: "exact", head: true }).eq("mechanic_id", session.user.id),
+        supabase
+          .from("service_records")
+          .select("id, asset_id, service_type, next_due_date, next_due_km_hours, assets(nickname, brand, model, asset_type)")
+          .eq("mechanic_id", session.user.id)
+          .or("next_due_date.not.is.null,next_due_km_hours.not.is.null"),
+        supabase
+          .from("service_records")
+          .select("asset_id, km_hours")
+          .eq("mechanic_id", session.user.id)
+          .not("km_hours", "is", null),
+        supabase
+          .from("service_records")
+          .select("service_date, service_type, assets(nickname, brand, model)")
+          .eq("mechanic_id", session.user.id),
+        supabase
+          .from("calendar_tasks")
+          .select("task_date, done, title")
+          .eq("mechanic_id", session.user.id),
+        supabase
+          .from("mechanic_assets")
+          .select("assets(id, nickname, brand, model, vin_serial, asset_type, qr_codes(code))")
+          .eq("mechanic_id", session.user.id),
+      ]);
 
-      const { count: assetCount } = await supabase
-        .from("mechanic_assets").select("*", { count: "exact", head: true })
-        .eq("mechanic_id", session.user.id);
-      if (active) setTotalAssets(assetCount ?? 0);
+      if (!active) return;
 
-      const { data: svcs } = await supabase
-        .from("service_records")
-        .select("id, service_date, service_type, km_hours, notes, asset_id, assets(brand, model, nickname, asset_type, vin_serial)")
-        .eq("mechanic_id", session.user.id)
-        .order("service_date", { ascending: false })
-        .limit(6);
-      if (active) setRealServices((svcs as unknown as RealService[]) ?? []);
-
-      const { count: svcCount } = await supabase
-        .from("service_records").select("*", { count: "exact", head: true })
-        .eq("mechanic_id", session.user.id);
-      if (active) setTotalServices(svcCount ?? 0);
+      if (mechanic) { setMechanicName(mechanic.name); setMechanicPhoto(mechanic.photo_url ?? ""); }
+      setTotalAssets(assetCount ?? 0);
+      setRealServices((svcs as unknown as RealService[]) ?? []);
+      setTotalServices(svcCount ?? 0);
 
       // ── Upcoming reminders ──
-      const { data: remRows } = await supabase
-        .from("service_records")
-        .select("id, asset_id, service_type, next_due_date, next_due_km_hours, assets(nickname, brand, model, asset_type)")
-        .eq("mechanic_id", session.user.id)
-        .or("next_due_date.not.is.null,next_due_km_hours.not.is.null");
-
-      const { data: kmRows } = await supabase
-        .from("service_records")
-        .select("asset_id, km_hours")
-        .eq("mechanic_id", session.user.id)
-        .not("km_hours", "is", null);
-
       const maxKmByAsset: Record<string, number> = {};
       for (const r of (kmRows ?? []) as any[]) {
         if (r.km_hours != null && (maxKmByAsset[r.asset_id] == null || r.km_hours > maxKmByAsset[r.asset_id])) {
@@ -326,45 +347,28 @@ export default function DashboardPage() {
         .filter((i) => i.status === "overdue" || i.status === "due_soon")
         .sort((a, b) => (a.status === "overdue" ? 0 : 1) - (b.status === "overdue" ? 0 : 1));
 
-      if (active) setReminders(reminderItems);
+      setReminders(reminderItems);
 
       // ── Mini calendar widget: full detail for every date-based reminder
       // (any status), every service's date, and every planned task — so
       // hovering a day shows exactly what's going on, not just a count. ──
-      if (active) {
-        setCalReminders(
-          allReminderItems
-            .filter((i): i is ReminderItem & { next_due_date: string } => !!i.next_due_date)
-            .map((i) => ({ date: i.next_due_date, status: i.status, label: i.assetLabel, type: i.serviceType }))
-        );
-      }
+      setCalReminders(
+        allReminderItems
+          .filter((i): i is ReminderItem & { next_due_date: string } => !!i.next_due_date)
+          .map((i) => ({ date: i.next_due_date, status: i.status, label: i.assetLabel, type: i.serviceType }))
+      );
 
-      const { data: allSvcRows } = await supabase
-        .from("service_records")
-        .select("service_date, service_type, assets(nickname, brand, model)")
-        .eq("mechanic_id", session.user.id);
-      if (active) {
-        setCalServices(
-          ((allSvcRows ?? []) as any[]).map((r) => {
-            const a = Array.isArray(r.assets) ? r.assets[0] : r.assets;
-            const label = a?.nickname || [a?.brand, a?.model].filter(Boolean).join(" ") || "Unknown asset";
-            return { date: r.service_date, label, type: r.service_type };
-          })
-        );
-      }
+      setCalServices(
+        ((allSvcRows ?? []) as any[]).map((r) => {
+          const a = Array.isArray(r.assets) ? r.assets[0] : r.assets;
+          const label = a?.nickname || [a?.brand, a?.model].filter(Boolean).join(" ") || "Unknown asset";
+          return { date: r.service_date, label, type: r.service_type };
+        })
+      );
 
-      const { data: taskRowsForCal } = await supabase
-        .from("calendar_tasks")
-        .select("task_date, done, title")
-        .eq("mechanic_id", session.user.id);
-      if (active) setCalTasks(((taskRowsForCal ?? []) as any[]).map((r) => ({ date: r.task_date, done: r.done, title: r.title })));
+      setCalTasks(((taskRowsForCal ?? []) as any[]).map((r) => ({ date: r.task_date, done: r.done, title: r.title })));
 
       // ── Full asset list, for the top search bar (assets + QR codes) ──
-      const { data: assetRows } = await supabase
-        .from("mechanic_assets")
-        .select("assets(id, nickname, brand, model, vin_serial, asset_type, qr_codes(code))")
-        .eq("mechanic_id", session.user.id);
-
       const searchList: SearchAsset[] = ((assetRows ?? []) as any[])
         .map((r) => {
           const a = Array.isArray(r.assets) ? r.assets[0] : r.assets;
@@ -529,10 +533,8 @@ export default function DashboardPage() {
 
         <div className="flex items-center justify-between px-4 py-2">
           <Link href="/" className="flex items-center">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/images/qr-gear.png" alt="Maintly" style={{width: 72, height: 72, objectFit: "contain"}} />
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/images/Maintly.png" alt="" style={{width: 152, objectFit: "contain", marginLeft: -18}} />
+            <Image src="/images/qr-gear.png" alt="Maintly" width={72} height={72} priority style={{ objectFit: "contain" }} />
+            <Image src="/images/Maintly.png" alt="" width={152} height={101} priority style={{ objectFit: "contain", marginLeft: -18 }} />
           </Link>
           <button onClick={() => setSidebarOpen(false)} className="md:hidden text-zinc-400 hover:text-zinc-700 mr-2">
             <X size={20} />
