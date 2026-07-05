@@ -256,7 +256,7 @@ export default function AssetReportPage() {
                   asset.fuel_type && { label: "FUEL TYPE",     value: asset.fuel_type },
                   asset.plate     && { label: "PLATE",         value: asset.plate, mono: true },
                   asset.location  && { label: "LOCATION",      value: asset.location },
-                  maxKmHrs > 0    && { label: `LAST ${getUnitShort(asset.asset_type).toUpperCase()}`, value: maxKmHrs.toLocaleString() + " " + getUnitShort(asset.asset_type) },
+                  maxKmHrs > 0    && { label: "LAST READING", value: maxKmHrs.toLocaleString() + " " + getUnitShort(asset.asset_type) },
                 ].filter(Boolean).map((field: any) => (
                   <div key={field.label}>
                     <div style={{ fontSize: 7.5, color: "#aaa", fontWeight: 700, letterSpacing: 1 }}>{field.label}</div>
@@ -281,7 +281,7 @@ export default function AssetReportPage() {
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 10 }}>
               <thead>
                 <tr style={{ borderBottom: "2px solid #e4e4e7" }}>
-                  {["DATE", "KM / HRS", "SERVICE TYPE", "DESCRIPTION", "PERFORMED BY"].map(h => (
+                  {["DATE", "READING", "SERVICE TYPE", "DESCRIPTION", "PERFORMED BY"].map(h => (
                     <th key={h} style={{ textAlign: "left", padding: "5px 8px", fontSize: 8, color: "#aaa", fontWeight: 700, letterSpacing: 1 }}>{h}</th>
                   ))}
                 </tr>
@@ -346,7 +346,7 @@ export default function AssetReportPage() {
             <div style={{ display: "flex", gap: 32 }}>
               {[
                 { value: String(services.length), label: "TOTAL SERVICES" },
-                ...(maxKmHrs > 0 ? [{ value: maxKmHrs.toLocaleString(), label: `LAST ${getUnitShort(asset.asset_type).toUpperCase()}` }] : []),
+                ...(maxKmHrs > 0 ? [{ value: maxKmHrs.toLocaleString(), label: "LAST READING" }] : []),
                 { value: "100%", label: "VERIFIED RECORDS" },
               ].map(({ value, label }) => (
                 <div key={label} style={{ textAlign: "center" }}>

@@ -304,7 +304,7 @@ export default function AssetPublicPage() {
             <p className="text-[22px] font-black text-zinc-900">
               {services[0]?.km_hours != null ? services[0].km_hours.toLocaleString() : "—"}
             </p>
-            <p className="text-[10px] text-zinc-400 font-bold uppercase tracking-wide mt-0.5">Last {getUnitLabel(asset.asset_type)}</p>
+            <p className="text-[10px] text-zinc-400 font-bold uppercase tracking-wide mt-0.5">Last Reading</p>
           </div>
         </div>
 
