@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import {
   LayoutGrid, FileText, Box, QrCode, Users, BarChart3, Calendar as CalendarIcon,
   Mail, FolderOpen, Settings as SettingsIcon, Bell, X, LogOut, Crown, Menu,
-  ShieldCheck, Wrench, CalendarDays, KeyRound, AlertCircle, CheckCircle2,
+  ShieldCheck, Wrench, CalendarDays, KeyRound, AlertCircle, CheckCircle2, Camera,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { formatDateDMY } from "@/lib/date";
@@ -41,6 +41,11 @@ export default function SettingsPage() {
   const [profileSaving, setProfileSaving] = useState(false);
   const [profileMsg, setProfileMsg] = useState<{ text: string; ok: boolean } | null>(null);
 
+  // Profile photo
+  const [photoUrl, setPhotoUrl] = useState("");
+  const [photoUploading, setPhotoUploading] = useState(false);
+  const [photoMsg, setPhotoMsg] = useState<{ text: string; ok: boolean } | null>(null);
+
   // Password form
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -60,7 +65,7 @@ export default function SettingsPage() {
 
       const { data: mechanic } = await supabase
         .from("mechanics")
-        .select("name, workshop_name, created_at, is_mechanic, verified")
+        .select("name, workshop_name, created_at, is_mechanic, verified, photo_url")
         .eq("id", session.user.id)
         .single();
 
@@ -70,6 +75,7 @@ export default function SettingsPage() {
         setCreatedAt(mechanic.created_at ?? "");
         setIsMechanic(!!mechanic.is_mechanic);
         setVerified(!!mechanic.verified);
+        setPhotoUrl(mechanic.photo_url ?? "");
       }
 
       if (active) setCheckingAuth(false);
@@ -87,6 +93,46 @@ export default function SettingsPage() {
   async function handleLogout() {
     await supabase.auth.signOut();
     router.replace("/login");
+  }
+
+  async function handlePhotoChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // allow picking the same file again later
+    if (!file || !mechanicId) return;
+
+    setPhotoMsg(null);
+    setPhotoUploading(true);
+
+    const ext = file.name.split(".").pop() ?? "jpg";
+    const path = `${mechanicId}.${ext}`;
+    const { error: uploadError } = await supabase.storage
+      .from("mechanic-photos")
+      .upload(path, file, { upsert: true });
+
+    if (uploadError) {
+      setPhotoUploading(false);
+      setPhotoMsg({ text: uploadError.message, ok: false });
+      return;
+    }
+
+    const { data } = supabase.storage.from("mechanic-photos").getPublicUrl(path);
+    const publicUrl = `${data.publicUrl}?v=${Date.now()}`; // bust CDN/browser cache after upsert
+
+    const { data: updated, error: dbError } = await supabase
+      .from("mechanics")
+      .update({ photo_url: publicUrl })
+      .eq("id", mechanicId)
+      .select("id");
+
+    setPhotoUploading(false);
+
+    if (dbError || !updated || updated.length === 0) {
+      setPhotoMsg({ text: dbError?.message || "Uploaded, but couldn't save it to your profile.", ok: false });
+      return;
+    }
+
+    setPhotoUrl(publicUrl);
+    setPhotoMsg({ text: "Profile photo updated.", ok: true });
   }
 
   async function handleSaveProfile(e: React.FormEvent) {
@@ -195,7 +241,12 @@ export default function SettingsPage() {
         </div>
 
         <div className="flex items-center gap-2.5 px-4 py-3 border-t border-zinc-200">
-          <div className="w-8 h-8 rounded-full bg-red-100 flex items-center justify-center text-red-600 font-bold text-[12px] shrink-0">{initials}</div>
+          {photoUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={photoUrl} alt="" className="w-8 h-8 rounded-full object-cover shrink-0" />
+          ) : (
+            <div className="w-8 h-8 rounded-full bg-red-100 flex items-center justify-center text-red-600 font-bold text-[12px] shrink-0">{initials}</div>
+          )}
           <div className="flex-1 min-w-0">
             <p className="text-[12px] font-bold text-zinc-800 leading-tight truncate">{name || email}</p>
             <p className="text-[10px] text-zinc-400 leading-tight">Maintly Mechanic</p>
@@ -220,7 +271,12 @@ export default function SettingsPage() {
             <button className="relative text-zinc-500 hover:text-zinc-800 transition-colors"><Bell size={19} /></button>
             <div className="flex items-center gap-3 md:pl-3 md:border-l border-zinc-200">
               <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-full bg-red-100 flex items-center justify-center text-red-600 font-bold text-[13px] shrink-0">{initials}</div>
+                {photoUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={photoUrl} alt="" className="w-9 h-9 rounded-full object-cover shrink-0" />
+                ) : (
+                  <div className="w-9 h-9 rounded-full bg-red-100 flex items-center justify-center text-red-600 font-bold text-[13px] shrink-0">{initials}</div>
+                )}
                 <div className="hidden sm:block text-left">
                   <p className="text-[12px] font-bold text-zinc-800 leading-tight">{name || email}</p>
                   <p className="text-[10px] text-zinc-400 leading-tight">Mechanic</p>
@@ -272,6 +328,40 @@ export default function SettingsPage() {
           <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm p-6 mb-6">
             <h2 className="text-[14px] font-black text-zinc-900 mb-1">Profile</h2>
             <p className="text-[12px] text-zinc-400 mb-5">This is what customers see when you log a service on their asset.</p>
+
+            <div className="flex items-center gap-4 mb-6">
+              <div className="relative shrink-0">
+                {photoUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={photoUrl} alt="" className="w-16 h-16 rounded-full object-cover border border-zinc-200" />
+                ) : (
+                  <div className="w-16 h-16 rounded-full bg-red-100 flex items-center justify-center text-red-600 font-bold text-[20px]">{initials}</div>
+                )}
+                <label
+                  htmlFor="photo-upload"
+                  className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-zinc-900 hover:bg-zinc-800 flex items-center justify-center cursor-pointer border-2 border-white transition-colors"
+                  title="Change photo"
+                >
+                  <Camera size={12} className="text-white" />
+                </label>
+                <input
+                  id="photo-upload" type="file" accept="image/*" className="hidden"
+                  onChange={handlePhotoChange} disabled={photoUploading}
+                />
+              </div>
+              <div>
+                <label
+                  htmlFor="photo-upload"
+                  className="inline-block text-[12px] font-bold text-zinc-700 hover:text-red-600 cursor-pointer transition-colors"
+                >
+                  {photoUploading ? "Uploading…" : "Change profile photo"}
+                </label>
+                <p className="text-[11px] text-zinc-400 mt-0.5">JPG or PNG, shown to customers on your services.</p>
+                {photoMsg && (
+                  <p className={`text-[11px] font-semibold mt-1 ${photoMsg.ok ? "text-emerald-600" : "text-red-600"}`}>{photoMsg.text}</p>
+                )}
+              </div>
+            </div>
 
             <form onSubmit={handleSaveProfile} className="space-y-4">
               <div>

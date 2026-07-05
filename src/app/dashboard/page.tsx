@@ -114,6 +114,7 @@ export default function DashboardPage() {
   const [authChecked, setAuthChecked] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [mechanicName, setMechanicName] = useState("");
+  const [mechanicPhoto, setMechanicPhoto] = useState("");
   const [mechanicEmail, setMechanicEmail] = useState("");
   const [totalServices, setTotalServices] = useState(0);
   const [totalAssets, setTotalAssets] = useState(0);
@@ -254,8 +255,8 @@ export default function DashboardPage() {
       setMechanicEmail(session.user.email ?? "");
 
       const { data: mechanic } = await supabase
-        .from("mechanics").select("name").eq("id", session.user.id).single();
-      if (active && mechanic) setMechanicName(mechanic.name);
+        .from("mechanics").select("name, photo_url").eq("id", session.user.id).single();
+      if (active && mechanic) { setMechanicName(mechanic.name); setMechanicPhoto(mechanic.photo_url ?? ""); }
 
       const { count: assetCount } = await supabase
         .from("mechanic_assets").select("*", { count: "exact", head: true })
@@ -500,7 +501,14 @@ export default function DashboardPage() {
         </div>
 
         <div className="flex items-center gap-2.5 px-4 py-3 border-t border-zinc-200">
-          <div className="w-8 h-8 rounded-full bg-red-100 flex items-center justify-center text-red-600 font-bold text-[12px] shrink-0">{initials}</div>
+          <Link href="/dashboard/settings" className="shrink-0">
+            {mechanicPhoto ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={mechanicPhoto} alt="" className="w-8 h-8 rounded-full object-cover" />
+            ) : (
+              <div className="w-8 h-8 rounded-full bg-red-100 flex items-center justify-center text-red-600 font-bold text-[12px]">{initials}</div>
+            )}
+          </Link>
           <div className="flex-1 min-w-0">
             <p className="text-[12px] font-bold text-zinc-800 leading-tight truncate">{displayName}</p>
             <p className="text-[10px] text-zinc-400 leading-tight">Maintly Mechanic</p>
@@ -595,7 +603,14 @@ export default function DashboardPage() {
 
             <div className="flex items-center gap-3 md:pl-3 md:border-l border-zinc-200">
               <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-full bg-red-100 flex items-center justify-center text-red-600 font-bold text-[13px] shrink-0">{initials}</div>
+                <Link href="/dashboard/settings" className="shrink-0">
+                  {mechanicPhoto ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={mechanicPhoto} alt="" className="w-9 h-9 rounded-full object-cover" />
+                  ) : (
+                    <div className="w-9 h-9 rounded-full bg-red-100 flex items-center justify-center text-red-600 font-bold text-[13px]">{initials}</div>
+                  )}
+                </Link>
                 <div className="hidden sm:block text-left">
                   <p className="text-[12px] font-bold text-zinc-800 leading-tight">{displayName}</p>
                   <p className="text-[10px] text-zinc-400 leading-tight">Mechanic</p>
