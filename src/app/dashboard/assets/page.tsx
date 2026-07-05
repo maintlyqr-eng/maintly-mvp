@@ -42,7 +42,7 @@ const navItems = [
   { icon: Box, label: "Assets", href: "/dashboard/assets" },
   { icon: QrCode, label: "QR Codes", href: "/dashboard/assets" },
   { icon: Users, label: "Customers", href: "#" },
-  { icon: BarChart3, label: "Reports", href: "#" },
+  { icon: BarChart3, label: "Reports", href: "/dashboard/reports" },
   { icon: CalendarIcon, label: "Calendar", href: "#" },
   { icon: Mail, label: "Messages", href: "#" },
   { icon: FolderOpen, label: "Document Library", href: "#" },

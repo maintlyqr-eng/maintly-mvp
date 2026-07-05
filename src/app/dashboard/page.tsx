@@ -22,7 +22,7 @@ const navItems = [
   { icon: Box,          label: "Assets",           href: "/dashboard/assets",   active: false },
   { icon: QrCode,       label: "QR Codes",         href: "/dashboard/assets",   active: false },
   { icon: Users,        label: "Customers",        href: "#",                   active: false },
-  { icon: BarChart3,    label: "Reports",          href: "#",                   active: false },
+  { icon: BarChart3,    label: "Reports",          href: "/dashboard/reports",  active: false },
   { icon: CalendarIcon, label: "Calendar",         href: "#",                   active: false },
   { icon: Mail,         label: "Messages",         href: "#",                   active: false },
   { icon: FolderOpen,   label: "Document Library", href: "#",                   active: false },
@@ -533,11 +533,8 @@ export default function DashboardPage() {
                 onBlur={() => setTimeout(() => setSearchOpen(false), 150)}
                 onKeyDown={(e) => { if (e.key === "Enter") handleSearchSubmit(); if (e.key === "Escape") setSearchOpen(false); }}
                 placeholder="Search assets, QR codes, services..."
-                className="w-[280px] rounded-xl border border-zinc-200 bg-zinc-50 pl-9 pr-12 py-[9px] text-[12px] outline-none focus:border-red-400 transition-colors"
+                className="w-[280px] rounded-xl border border-zinc-200 bg-zinc-50 pl-9 pr-3 py-[9px] text-[12px] outline-none focus:border-red-400 transition-colors"
               />
-              {!searchQuery && (
-                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-zinc-400 border border-zinc-200 rounded px-1.5 py-[1px]">⌘K</span>
-              )}
 
               {searchOpen && searchQuery.trim().length > 0 && (
                 <div className="absolute top-[calc(100%+6px)] left-0 w-[340px] bg-white rounded-xl border border-zinc-200 shadow-lg py-2 z-50 max-h-[360px] overflow-y-auto">
