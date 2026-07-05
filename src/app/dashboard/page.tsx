@@ -560,8 +560,6 @@ export default function DashboardPage() {
           ))}
         </nav>
 
-        <ContactSupportWidget mechanicId={mechanicId} />
-
         <div className="mx-3 mb-3 p-4 rounded-xl bg-gradient-to-br from-zinc-50 to-zinc-100 border border-zinc-200">
           <div className="flex items-center gap-1.5 text-amber-500 mb-1">
             <Crown size={14} />
@@ -699,7 +697,9 @@ export default function DashboardPage() {
         <div className="flex-1 overflow-y-auto p-4 md:p-7">
 
           {/* ── Action buttons ── */}
-          <div className="flex justify-end gap-3 mb-5 -mt-2">
+          <div className="flex justify-between items-center gap-3 mb-5 -mt-2">
+            <ContactSupportWidget mechanicId={mechanicId} variant="inline" />
+            <div className="flex gap-3">
             <button
               onClick={() => { setShowAddAssetModal(true); setAddAssetTab("choose"); }}
               className="flex items-center gap-2 border border-zinc-200 bg-white hover:bg-zinc-50 active:scale-[0.98] transition-all text-zinc-700 text-[13px] font-bold px-4 py-[10px] rounded-xl shadow-sm"
@@ -712,6 +712,7 @@ export default function DashboardPage() {
             >
               <Plus size={15} /> Add Service
             </Link>
+            </div>
           </div>
 
           <div className="grid grid-cols-1 xl:grid-cols-[1fr_320px] gap-5">
