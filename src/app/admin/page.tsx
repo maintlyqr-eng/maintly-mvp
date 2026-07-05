@@ -112,6 +112,12 @@ const ASSET_COLORS: Record<string, string> = {
 function formatDate(iso: string) {
   return formatDateDMY(iso);
 }
+
+function formatTime(iso: string) {
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return "";
+  return d.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" });
+}
 function getInitials(name: string) {
   return (name || "?").split(" ").filter(Boolean).map(p => p[0]).join("").toUpperCase().slice(0, 2) || "?";
 }
@@ -1360,16 +1366,25 @@ export default function AdminPage() {
                         </div>
 
                         <div className="flex-1 overflow-y-auto px-5 py-4 space-y-2.5 bg-zinc-50/40">
-                          {activeThread.messages.map((m) => (
-                            <div key={m.id} className={`flex ${m.from_admin ? "justify-end" : "justify-start"}`}>
-                              <div className={`max-w-[80%] rounded-2xl px-3.5 py-2.5 text-[12.5px] leading-snug ${
-                                m.from_admin ? "bg-red-600 text-white rounded-br-sm" : "bg-white border border-zinc-200 text-zinc-700 rounded-bl-sm"
-                              }`}>
-                                <p className="whitespace-pre-wrap break-words">{m.body}</p>
-                                <p className={`text-[9.5px] mt-1 ${m.from_admin ? "text-red-100" : "text-zinc-300"}`}>{formatDate(m.created_at)}</p>
+                          {activeThread.messages.map((m, i) => {
+                            const prev = activeThread.messages[i - 1];
+                            const showLabel = !prev || prev.from_admin !== m.from_admin;
+                            return (
+                              <div key={m.id} className={`flex flex-col ${m.from_admin ? "items-end" : "items-start"}`}>
+                                {showLabel && (
+                                  <p className={`text-[10px] font-black uppercase tracking-wide mb-1 px-1 ${m.from_admin ? "text-zinc-400" : "text-zinc-400"}`}>
+                                    {m.from_admin ? "You" : activeThread.mechanic?.name ?? "Mechanic"}
+                                  </p>
+                                )}
+                                <div className={`max-w-[80%] rounded-2xl px-3.5 py-2.5 text-[12.5px] leading-snug ${
+                                  m.from_admin ? "bg-red-600 text-white rounded-br-sm" : "bg-white border border-zinc-200 text-zinc-700 rounded-bl-sm"
+                                }`}>
+                                  <p className="whitespace-pre-wrap break-words">{m.body}</p>
+                                  <p className={`text-[9.5px] mt-1 ${m.from_admin ? "text-red-100" : "text-zinc-300"}`}>{formatDate(m.created_at)} · {formatTime(m.created_at)}</p>
+                                </div>
                               </div>
-                            </div>
-                          ))}
+                            );
+                          })}
                         </div>
 
                         <div className="px-4 py-3 border-t border-zinc-100 flex items-end gap-2">

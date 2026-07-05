@@ -64,6 +64,12 @@ function looksLikeEmail(s: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s.trim());
 }
 
+function formatTime(iso: string) {
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return "";
+  return d.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" });
+}
+
 type SupportMsgRow = {
   id: string;
   body: string;
@@ -445,16 +451,25 @@ export default function MessagesPage() {
               ) : supportThread.length === 0 ? (
                 <p className="text-[12px] text-zinc-300 text-center py-8">Any question or issue — write it below and the team will reply right here.</p>
               ) : (
-                supportThread.map((m) => (
-                  <div key={m.id} className={`flex ${m.from_admin ? "justify-start" : "justify-end"}`}>
-                    <div className={`max-w-[80%] rounded-2xl px-3.5 py-2.5 text-[12.5px] leading-snug ${
-                      m.from_admin ? "bg-white border border-zinc-200 text-zinc-700 rounded-bl-sm" : "bg-zinc-900 text-white rounded-br-sm"
-                    }`}>
-                      <p className="whitespace-pre-wrap break-words">{m.body}</p>
-                      <p className={`text-[9.5px] mt-1 ${m.from_admin ? "text-zinc-300" : "text-zinc-400"}`}>{formatDateDMY(m.created_at)}</p>
+                supportThread.map((m, i) => {
+                  const prev = supportThread[i - 1];
+                  const showLabel = !prev || prev.from_admin !== m.from_admin;
+                  return (
+                    <div key={m.id} className={`flex flex-col ${m.from_admin ? "items-start" : "items-end"}`}>
+                      {showLabel && (
+                        <p className={`text-[10px] font-black uppercase tracking-wide mb-1 px-1 ${m.from_admin ? "text-zinc-400" : "text-zinc-500"}`}>
+                          {m.from_admin ? "Maintly Team" : "You"}
+                        </p>
+                      )}
+                      <div className={`max-w-[80%] rounded-2xl px-3.5 py-2.5 text-[12.5px] leading-snug ${
+                        m.from_admin ? "bg-white border border-zinc-200 text-zinc-700 rounded-bl-sm" : "bg-zinc-900 text-white rounded-br-sm"
+                      }`}>
+                        <p className="whitespace-pre-wrap break-words">{m.body}</p>
+                        <p className={`text-[9.5px] mt-1 ${m.from_admin ? "text-zinc-300" : "text-zinc-400"}`}>{formatDateDMY(m.created_at)} · {formatTime(m.created_at)}</p>
+                      </div>
                     </div>
-                  </div>
-                ))
+                  );
+                })
               )}
             </div>
 
