@@ -15,6 +15,7 @@ import { formatDateDMY } from "@/lib/date";
 import { computeReminderStatus, REMINDER_STATUS_LABEL, REMINDER_STATUS_COLOR, type ReminderStatus } from "@/lib/reminders";
 import { getUnitLabel, getUnitShort, formatUnitValue } from "@/lib/units";
 import HoverAvatar from "@/components/HoverAvatar";
+import { buildMonthGridMondayFirst } from "@/lib/calendarGrid";
 
 const navItems = [
   { icon: LayoutGrid,   label: "Dashboard",        href: "/dashboard",          active: true  },
@@ -121,6 +122,12 @@ export default function DashboardPage() {
   const [totalAssets, setTotalAssets] = useState(0);
   const [realServices, setRealServices] = useState<RealService[]>([]);
   const [reminders, setReminders] = useState<ReminderItem[]>([]);
+
+  // ── Mini calendar widget ──
+  const [calViewDate, setCalViewDate] = useState(() => new Date());
+  const [calServiceDates, setCalServiceDates] = useState<string[]>([]);
+  const [calReminders, setCalReminders] = useState<{ date: string; status: ReminderStatus }[]>([]);
+  const [calTasks, setCalTasks] = useState<{ date: string; done: boolean }[]>([]);
 
   // ── Top search bar ──
   const [searchQuery, setSearchQuery] = useState("");
@@ -297,7 +304,7 @@ export default function DashboardPage() {
         }
       }
 
-      const reminderItems: ReminderItem[] = ((remRows ?? []) as any[]).map((r) => {
+      const allReminderItems: ReminderItem[] = ((remRows ?? []) as any[]).map((r) => {
         const a = Array.isArray(r.assets) ? r.assets[0] : r.assets;
         const label = a?.nickname || [a?.brand, a?.model].filter(Boolean).join(" ") || "Unknown asset";
         const status = computeReminderStatus({
@@ -306,11 +313,36 @@ export default function DashboardPage() {
           currentKmHours: maxKmByAsset[r.asset_id] ?? null,
         });
         return { id: r.id, assetLabel: label, assetType: a?.asset_type ?? null, status, next_due_date: r.next_due_date, next_due_km_hours: r.next_due_km_hours };
-      })
+      });
+
+      const reminderItems = allReminderItems
         .filter((i) => i.status === "overdue" || i.status === "due_soon")
         .sort((a, b) => (a.status === "overdue" ? 0 : 1) - (b.status === "overdue" ? 0 : 1));
 
       if (active) setReminders(reminderItems);
+
+      // ── Mini calendar widget: every date-based reminder (any status), every
+      // service's date, and every planned task — so the widget can put a dot
+      // on any day with activity, not just urgent ones. ──
+      if (active) {
+        setCalReminders(
+          allReminderItems
+            .filter((i): i is ReminderItem & { next_due_date: string } => !!i.next_due_date)
+            .map((i) => ({ date: i.next_due_date, status: i.status }))
+        );
+      }
+
+      const { data: allSvcDates } = await supabase
+        .from("service_records")
+        .select("service_date")
+        .eq("mechanic_id", session.user.id);
+      if (active) setCalServiceDates(((allSvcDates ?? []) as any[]).map((r) => r.service_date));
+
+      const { data: taskRowsForCal } = await supabase
+        .from("calendar_tasks")
+        .select("task_date, done")
+        .eq("mechanic_id", session.user.id);
+      if (active) setCalTasks(((taskRowsForCal ?? []) as any[]).map((r) => ({ date: r.task_date, done: r.done })));
 
       // ── Full asset list, for the top search bar (assets + QR codes) ──
       const { data: assetRows } = await supabase
@@ -435,15 +467,45 @@ export default function DashboardPage() {
     { label: "PENDING",        value: "0",                   up: true,  icon: Clock,        color: "bg-amber-50 text-amber-500" },
   ];
 
-  const calendarMonth = "June 2026";
-  const calendarDays = [
-    [26,27,28,29,30,31,1],
-    [2,3,4,5,6,7,8],
-    [9,10,11,12,13,14,15],
-    [16,17,18,19,20,21,22],
-    [23,24,25,26,27,28,29],
-    [30,1,2,3,4,5,6],
+  const CAL_MONTH_LABELS = [
+    "January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December",
   ];
+  const calendarMonth = `${CAL_MONTH_LABELS[calViewDate.getMonth()]} ${calViewDate.getFullYear()}`;
+  const calendarGrid = buildMonthGridMondayFirst(calViewDate.getFullYear(), calViewDate.getMonth());
+
+  const calActivityByDate: Record<string, { services: number; openTasks: number; overdue: number; dueSoon: number; ok: number }> = {};
+  function ensureCalDay(k: string) {
+    return (calActivityByDate[k] ??= { services: 0, openTasks: 0, overdue: 0, dueSoon: 0, ok: 0 });
+  }
+  for (const d of calServiceDates) ensureCalDay(d).services += 1;
+  for (const r of calReminders) {
+    const e = ensureCalDay(r.date);
+    if (r.status === "overdue") e.overdue += 1;
+    else if (r.status === "due_soon") e.dueSoon += 1;
+    else e.ok += 1;
+  }
+  for (const t of calTasks) { if (!t.done) ensureCalDay(t.date).openTasks += 1; }
+
+  function calDotColor(info?: { services: number; openTasks: number; overdue: number; dueSoon: number; ok: number }) {
+    if (!info) return null;
+    if (info.overdue > 0) return "bg-red-500";
+    if (info.dueSoon > 0) return "bg-amber-500";
+    if (info.openTasks > 0) return "bg-blue-500";
+    if (info.services > 0) return "bg-emerald-500";
+    if (info.ok > 0) return "bg-zinc-300";
+    return null;
+  }
+
+  function calSummaryLines(info: { services: number; openTasks: number; overdue: number; dueSoon: number; ok: number }) {
+    const lines: string[] = [];
+    if (info.overdue > 0) lines.push(`${info.overdue} overdue reminder${info.overdue > 1 ? "s" : ""}`);
+    if (info.dueSoon > 0) lines.push(`${info.dueSoon} due soon`);
+    if (info.ok > 0) lines.push(`${info.ok} upcoming reminder${info.ok > 1 ? "s" : ""}`);
+    if (info.openTasks > 0) lines.push(`${info.openTasks} planned task${info.openTasks > 1 ? "s" : ""}`);
+    if (info.services > 0) lines.push(`${info.services} service${info.services > 1 ? "s" : ""} logged`);
+    return lines;
+  }
 
   const miniStats = [
     { label: "SERVICES",  value: String(totalServices), color: "#16a34a" },
@@ -765,25 +827,45 @@ export default function DashboardPage() {
               <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm p-5">
                 <div className="flex items-center justify-between mb-3">
                   <h3 className="text-[13px] font-black text-zinc-900">Calendar</h3>
+                  <Link href="/dashboard/calendar" className="text-[10px] font-bold text-red-600 hover:text-red-700">View all →</Link>
                 </div>
                 <div className="flex items-center justify-between mb-3">
-                  <button className="text-zinc-400 hover:text-zinc-700"><ChevronLeft size={16} /></button>
+                  <button
+                    onClick={() => setCalViewDate(new Date(calViewDate.getFullYear(), calViewDate.getMonth() - 1, 1))}
+                    className="text-zinc-400 hover:text-zinc-700"
+                  ><ChevronLeft size={16} /></button>
                   <span className="text-[12px] font-bold text-zinc-700">{calendarMonth}</span>
-                  <button className="text-zinc-400 hover:text-zinc-700"><ChevronRight size={16} /></button>
+                  <button
+                    onClick={() => setCalViewDate(new Date(calViewDate.getFullYear(), calViewDate.getMonth() + 1, 1))}
+                    className="text-zinc-400 hover:text-zinc-700"
+                  ><ChevronRight size={16} /></button>
                 </div>
                 <div className="grid grid-cols-7 gap-1 text-center">
                   {["MON","TUE","WED","THU","FRI","SAT","SUN"].map(d => (
                     <span key={d} className="text-[8px] font-bold text-zinc-400 pb-1">{d}</span>
                   ))}
-                  {calendarDays.flat().map((day, i) => {
-                    const isOther = (i < 5 && day > 20) || (i > 35 && day < 10);
-                    const isToday = day === 30 && !isOther && i < 35;
+                  {calendarGrid.map((cell) => {
+                    const info = calActivityByDate[cell.key];
+                    const dot = calDotColor(info);
                     return (
-                      <div key={i} className="flex flex-col items-center py-1">
-                        <span className={`text-[11px] w-6 h-6 flex items-center justify-center rounded-full ${
-                          isToday ? "bg-red-600 text-white font-bold" : isOther ? "text-zinc-300" : "text-zinc-600"
-                        }`}>{day}</span>
-                      </div>
+                      <Link
+                        key={cell.key}
+                        href={`/dashboard/calendar?date=${cell.key}`}
+                        className="relative group flex flex-col items-center py-1"
+                      >
+                        <span className={`text-[11px] w-6 h-6 flex items-center justify-center rounded-full transition-colors ${
+                          cell.isToday ? "bg-red-600 text-white font-bold" : !cell.inMonth ? "text-zinc-300" : "text-zinc-600 group-hover:bg-zinc-100"
+                        }`}>{cell.day}</span>
+                        <span className={`w-1.5 h-1.5 rounded-full mt-0.5 ${dot ?? "bg-transparent"}`} />
+                        {info && (
+                          <div className="hidden group-hover:block absolute z-30 left-1/2 -translate-x-1/2 top-full mt-1 w-40 bg-white border border-zinc-200 rounded-xl shadow-xl p-2.5 text-left pointer-events-none">
+                            <p className="text-[10px] font-bold text-zinc-800 mb-1">{formatDateDMY(cell.key)}</p>
+                            {calSummaryLines(info).map((l, i) => (
+                              <p key={i} className="text-[10px] text-zinc-500 leading-snug">{l}</p>
+                            ))}
+                          </div>
+                        )}
+                      </Link>
                     );
                   })}
                 </div>

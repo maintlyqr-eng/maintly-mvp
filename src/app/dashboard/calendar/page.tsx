@@ -13,6 +13,7 @@ import HoverAvatar from "@/components/HoverAvatar";
 import { formatDateDMY } from "@/lib/date";
 import { computeReminderStatus, REMINDER_STATUS_LABEL, REMINDER_STATUS_COLOR, type ReminderStatus } from "@/lib/reminders";
 import { formatUnitValue } from "@/lib/units";
+import { dateKey, todayKey, buildMonthGrid } from "@/lib/calendarGrid";
 
 const navItems = [
   { icon: LayoutGrid, label: "Dashboard", href: "/dashboard" },
@@ -74,27 +75,6 @@ function assetLabel(a: AssetInfo | AssetOption | null) {
   return a.nickname || [a.brand, a.model].filter(Boolean).join(" ") || "Unnamed asset";
 }
 
-function dateKey(y: number, m: number, d: number) {
-  return `${y}-${String(m + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
-}
-
-function buildMonthGrid(year: number, month: number) {
-  const firstDay = new Date(year, month, 1);
-  const startWeekday = firstDay.getDay();
-  const today = new Date();
-  const todayKey = dateKey(today.getFullYear(), today.getMonth(), today.getDate());
-
-  const startDate = new Date(year, month, 1 - startWeekday);
-  const cells: { key: string; day: number; inMonth: boolean; isToday: boolean }[] = [];
-  for (let i = 0; i < 42; i++) {
-    const d = new Date(startDate);
-    d.setDate(startDate.getDate() + i);
-    const k = dateKey(d.getFullYear(), d.getMonth(), d.getDate());
-    cells.push({ key: k, day: d.getDate(), inMonth: d.getMonth() === month, isToday: k === todayKey });
-  }
-  return cells;
-}
-
 export default function CalendarPage() {
   const router = useRouter();
   const [checkingAuth, setCheckingAuth] = useState(true);
@@ -105,10 +85,18 @@ export default function CalendarPage() {
   const [mechanicEmail, setMechanicEmail] = useState("");
 
   const [viewDate, setViewDate] = useState(() => new Date());
-  const [selectedKey, setSelectedKey] = useState(() => {
-    const t = new Date();
-    return dateKey(t.getFullYear(), t.getMonth(), t.getDate());
-  });
+  const [selectedKey, setSelectedKey] = useState(() => todayKey());
+
+  // Deep link from the Dashboard's mini calendar widget: /dashboard/calendar?date=YYYY-MM-DD
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const d = new URLSearchParams(window.location.search).get("date");
+    if (d && /^\d{4}-\d{2}-\d{2}$/.test(d)) {
+      setSelectedKey(d);
+      const parsed = new Date(d + "T00:00:00");
+      if (!isNaN(parsed.getTime())) setViewDate(parsed);
+    }
+  }, []);
 
   const [serviceRows, setServiceRows] = useState<ServiceRow[]>([]);
   const [taskRows, setTaskRows] = useState<TaskRow[]>([]);
@@ -285,7 +273,7 @@ export default function CalendarPage() {
   const month = viewDate.getMonth();
   const grid = buildMonthGrid(year, month);
 
-  const todayKeyStr = (() => { const t = new Date(); return dateKey(t.getFullYear(), t.getMonth(), t.getDate()); })();
+  const todayKeyStr = todayKey();
 
   const selectedTasks = tasksByDate[selectedKey] ?? [];
   const selectedReminders = remindersByDate[selectedKey] ?? [];
