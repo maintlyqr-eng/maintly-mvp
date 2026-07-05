@@ -100,6 +100,13 @@ export default function ServicesPage() {
   const [filterAsset, setFilterAsset] = useState("all");
   const [filterType, setFilterType] = useState("all");
 
+  // Pre-fill the asset filter from a deep link (e.g. the dashboard's top search bar: /dashboard/services?asset=...)
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const assetId = new URLSearchParams(window.location.search).get("asset");
+    if (assetId) setFilterAsset(assetId);
+  }, []);
+
   // Add Service modal
   const [showForm, setShowForm] = useState(false);
   const [svcAssetId, setSvcAssetId] = useState("");

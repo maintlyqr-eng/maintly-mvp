@@ -82,6 +82,24 @@ type ReminderItem = {
   next_due_km_hours: number | null;
 };
 
+type SearchAsset = {
+  id: string;
+  name: string;
+  brand: string | null;
+  model: string | null;
+  vin: string | null;
+  type: string;
+  qrCode: string | null;
+};
+
+type SearchServiceResult = {
+  id: string;
+  asset_id: string;
+  service_type: string;
+  service_date: string;
+  assetName: string;
+};
+
 function MiniSparkline({ color }: { color: string }) {
   const points = "0,28 10,24 20,26 30,20 40,22 50,15 60,17 70,10 80,12 90,5 100,8";
   return (
@@ -101,6 +119,13 @@ export default function DashboardPage() {
   const [totalAssets, setTotalAssets] = useState(0);
   const [realServices, setRealServices] = useState<RealService[]>([]);
   const [reminders, setReminders] = useState<ReminderItem[]>([]);
+
+  // ── Top search bar ──
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchAssetsList, setSearchAssetsList] = useState<SearchAsset[]>([]);
+  const [searchServiceResults, setSearchServiceResults] = useState<SearchServiceResult[]>([]);
+  const [searchingServices, setSearchingServices] = useState(false);
 
   // ── Add Equipment modal states ──
   const [showAddAssetModal, setShowAddAssetModal] = useState(false);
@@ -285,6 +310,30 @@ export default function DashboardPage() {
 
       if (active) setReminders(reminderItems);
 
+      // ── Full asset list, for the top search bar (assets + QR codes) ──
+      const { data: assetRows } = await supabase
+        .from("mechanic_assets")
+        .select("assets(id, nickname, brand, model, vin_serial, asset_type, qr_codes(code))")
+        .eq("mechanic_id", session.user.id);
+
+      const searchList: SearchAsset[] = ((assetRows ?? []) as any[])
+        .map((r) => {
+          const a = Array.isArray(r.assets) ? r.assets[0] : r.assets;
+          if (!a) return null;
+          const qr = Array.isArray(a.qr_codes) ? a.qr_codes[0]?.code : a.qr_codes?.code;
+          return {
+            id: a.id,
+            name: a.nickname || [a.brand, a.model].filter(Boolean).join(" ") || "Unknown Asset",
+            brand: a.brand ?? null,
+            model: a.model ?? null,
+            vin: a.vin_serial ?? null,
+            type: a.asset_type,
+            qrCode: qr ?? null,
+          };
+        })
+        .filter(Boolean) as SearchAsset[];
+      if (active) setSearchAssetsList(searchList);
+
       if (active) setAuthChecked(true);
     }
 
@@ -296,6 +345,46 @@ export default function DashboardPage() {
 
     return () => { active = false; listener.subscription.unsubscribe(); };
   }, [router]);
+
+  // ── Live search: services (debounced, searches full history, not just the recent 6) ──
+  useEffect(() => {
+    const q = searchQuery.trim();
+    if (q.length < 2) { setSearchServiceResults([]); setSearchingServices(false); return; }
+
+    const safeQ = q.replace(/[%,()]/g, "").trim();
+    if (!safeQ) { setSearchServiceResults([]); setSearchingServices(false); return; }
+
+    let cancelled = false;
+    setSearchingServices(true);
+    const t = setTimeout(async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session || cancelled) { if (!cancelled) setSearchingServices(false); return; }
+
+      const { data } = await supabase
+        .from("service_records")
+        .select("id, asset_id, service_type, service_date, notes, assets(nickname, brand, model)")
+        .eq("mechanic_id", session.user.id)
+        .or(`service_type.ilike.%${safeQ}%,notes.ilike.%${safeQ}%`)
+        .order("service_date", { ascending: false })
+        .limit(5);
+
+      if (cancelled) return;
+      const results: SearchServiceResult[] = ((data ?? []) as any[]).map((s) => {
+        const a = Array.isArray(s.assets) ? s.assets[0] : s.assets;
+        return {
+          id: s.id,
+          asset_id: s.asset_id,
+          service_type: s.service_type,
+          service_date: s.service_date,
+          assetName: a?.nickname || [a?.brand, a?.model].filter(Boolean).join(" ") || "Unknown Asset",
+        };
+      });
+      setSearchServiceResults(results);
+      setSearchingServices(false);
+    }, 300);
+
+    return () => { cancelled = true; clearTimeout(t); };
+  }, [searchQuery]);
 
   async function handleLogout() {
     await supabase.auth.signOut();
@@ -312,6 +401,30 @@ export default function DashboardPage() {
 
   const displayName = mechanicName || mechanicEmail;
   const initials = displayName.split(" ").filter(Boolean).map((p: string) => p[0]).join("").toUpperCase().slice(0, 2) || "ME";
+
+  // ── Top search bar: matching assets (client-side, from the full workshop list) ──
+  const searchQ = searchQuery.trim().toLowerCase();
+  const matchedAssets = searchQ.length > 0
+    ? searchAssetsList.filter((a) => {
+        const hay = [a.name, a.brand, a.model, a.vin, a.qrCode].filter(Boolean).join(" ").toLowerCase();
+        return hay.includes(searchQ);
+      }).slice(0, 5)
+    : [];
+  const hasSearchResults = matchedAssets.length > 0 || searchServiceResults.length > 0;
+
+  function goToAsset(a: SearchAsset) {
+    setSearchOpen(false);
+    router.push(`/dashboard/assets?q=${encodeURIComponent(a.name)}`);
+  }
+  function goToService(s: SearchServiceResult) {
+    setSearchOpen(false);
+    router.push(`/dashboard/services?asset=${s.asset_id}`);
+  }
+  function handleSearchSubmit() {
+    if (!searchQ) return;
+    setSearchOpen(false);
+    router.push(`/dashboard/assets?q=${encodeURIComponent(searchQuery.trim())}`);
+  }
 
   const statsCards = [
     { label: "TOTAL SERVICES", value: String(totalServices), up: true,  icon: CalendarIcon, color: "bg-red-50 text-red-500"   },
@@ -414,10 +527,69 @@ export default function DashboardPage() {
               <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
               <input
                 type="text"
+                value={searchQuery}
+                onChange={(e) => { setSearchQuery(e.target.value); setSearchOpen(true); }}
+                onFocus={() => { if (searchQuery.trim()) setSearchOpen(true); }}
+                onBlur={() => setTimeout(() => setSearchOpen(false), 150)}
+                onKeyDown={(e) => { if (e.key === "Enter") handleSearchSubmit(); if (e.key === "Escape") setSearchOpen(false); }}
                 placeholder="Search assets, QR codes, services..."
                 className="w-[280px] rounded-xl border border-zinc-200 bg-zinc-50 pl-9 pr-12 py-[9px] text-[12px] outline-none focus:border-red-400 transition-colors"
               />
-              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-zinc-400 border border-zinc-200 rounded px-1.5 py-[1px]">⌘K</span>
+              {!searchQuery && (
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-zinc-400 border border-zinc-200 rounded px-1.5 py-[1px]">⌘K</span>
+              )}
+
+              {searchOpen && searchQuery.trim().length > 0 && (
+                <div className="absolute top-[calc(100%+6px)] left-0 w-[340px] bg-white rounded-xl border border-zinc-200 shadow-lg py-2 z-50 max-h-[360px] overflow-y-auto">
+                  {matchedAssets.length > 0 && (
+                    <div className="px-2">
+                      <p className="px-2 pb-1 text-[10px] font-bold text-zinc-400 uppercase tracking-wide">Assets</p>
+                      {matchedAssets.map((a) => (
+                        <button
+                          key={a.id}
+                          onMouseDown={() => goToAsset(a)}
+                          className="w-full flex items-center gap-2.5 px-2 py-2 rounded-lg hover:bg-zinc-50 text-left"
+                        >
+                          <div className="w-7 h-7 rounded-lg bg-red-50 flex items-center justify-center shrink-0">
+                            <Box size={13} className="text-red-500" />
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-[12px] font-bold text-zinc-800 truncate">{a.name}</p>
+                            <p className="text-[10px] text-zinc-400 truncate">{a.qrCode || a.vin || a.type}</p>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
+                  {searchServiceResults.length > 0 && (
+                    <div className="px-2 mt-1">
+                      <p className="px-2 pb-1 text-[10px] font-bold text-zinc-400 uppercase tracking-wide">Services</p>
+                      {searchServiceResults.map((s) => (
+                        <button
+                          key={s.id}
+                          onMouseDown={() => goToService(s)}
+                          className="w-full flex items-center gap-2.5 px-2 py-2 rounded-lg hover:bg-zinc-50 text-left"
+                        >
+                          <div className="w-7 h-7 rounded-lg bg-blue-50 flex items-center justify-center shrink-0">
+                            <Wrench size={13} className="text-blue-500" />
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-[12px] font-bold text-zinc-800 truncate">{s.service_type} · {s.assetName}</p>
+                            <p className="text-[10px] text-zinc-400 truncate">{formatDateDMY(s.service_date)}</p>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
+                  {!hasSearchResults && (
+                    <p className="px-4 py-3 text-[12px] text-zinc-400">
+                      {searchingServices ? "Searching…" : `No results for "${searchQuery.trim()}"`}
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
 
             <button className="relative text-zinc-500 hover:text-zinc-800 transition-colors">

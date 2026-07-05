@@ -156,6 +156,13 @@ export default function AssetsPage() {
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [sortBy, setSortBy] = useState<"last_service" | "name" | "status">("last_service");
 
+  // Pre-fill search from a deep link (e.g. the dashboard's top search bar: /dashboard/assets?q=...)
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const q = new URLSearchParams(window.location.search).get("q");
+    if (q) setSearchQuery(q);
+  }, []);
+
   // ── Per-card "⋯" menu ──
   const [openCardMenuId, setOpenCardMenuId] = useState<string | null>(null);
   const [qrOpenId, setQrOpenId] = useState<string | null>(null);
