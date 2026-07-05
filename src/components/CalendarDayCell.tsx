@@ -51,11 +51,16 @@ export default function CalendarDayCell({ dateKey, day, inMonth, isToday, dateLa
       onMouseLeave={() => setHover(false)}
     >
       <span className={`text-[11px] w-6 h-6 flex items-center justify-center rounded-full transition-colors ${
-        isToday ? "bg-red-600 text-white font-bold" : !inMonth ? "text-zinc-300" : "text-zinc-600 hover:bg-zinc-100"
+        dotColor
+          ? `${dotColor} font-bold ${dotColor === "bg-zinc-300" ? "text-zinc-700" : "text-white"} ${isToday ? "ring-2 ring-red-600 ring-offset-1" : ""}`
+          : isToday
+          ? "bg-red-600 text-white font-bold"
+          : !inMonth
+          ? "text-zinc-300"
+          : "text-zinc-600 hover:bg-zinc-100"
       }`}>
         {day}
       </span>
-      <span className={`w-1.5 h-1.5 rounded-full mt-0.5 ${dotColor ?? "bg-transparent"}`} />
 
       {hover && hasAny && info && (
         <div className="fixed z-[100] pointer-events-none" style={{ top: pos.top, left: pos.left, width: BUBBLE_WIDTH }}>
