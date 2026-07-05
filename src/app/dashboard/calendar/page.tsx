@@ -12,6 +12,7 @@ import { supabase } from "@/lib/supabase";
 import { useUnreadMessagesCount } from "@/lib/useUnreadMessages";
 import HoverAvatar from "@/components/HoverAvatar";
 import ContactSupportWidget from "@/components/ContactSupportWidget";
+import CustomerPicker, { CustomerOption } from "@/components/CustomerPicker";
 import { formatDateDMY } from "@/lib/date";
 import { computeReminderStatus, REMINDER_STATUS_LABEL, REMINDER_STATUS_COLOR, type ReminderStatus } from "@/lib/reminders";
 import { formatUnitValue } from "@/lib/units";
@@ -23,7 +24,7 @@ const navItems = [
   { icon: Bell, label: "Scheduled Services", href: "/dashboard/scheduled" },
   { icon: Box, label: "Assets", href: "/dashboard/assets" },
   { icon: QrCode, label: "QR Codes", href: "/dashboard/assets" },
-  { icon: Users, label: "Customers", href: "#" },
+  { icon: Users, label: "Customers", href: "/dashboard/customers" },
   { icon: BarChart3, label: "Reports", href: "/dashboard/reports" },
   { icon: CalendarIcon, label: "Calendar", href: "/dashboard/calendar" },
   { icon: Mail, label: "Messages", href: "/dashboard/messages" },
@@ -111,6 +112,8 @@ export default function CalendarPage() {
   const [taskTitle, setTaskTitle] = useState("");
   const [taskAssetId, setTaskAssetId] = useState("");
   const [taskNotes, setTaskNotes] = useState("");
+  const [taskCustomerId, setTaskCustomerId] = useState("");
+  const [customers, setCustomers] = useState<CustomerOption[]>([]);
   const [taskSaving, setTaskSaving] = useState(false);
   const [taskError, setTaskError] = useState("");
 
@@ -149,6 +152,13 @@ export default function CalendarPage() {
       .eq("created_by", uid)
       .order("created_at", { ascending: false });
     setAssetOptions((assets as AssetOption[]) ?? []);
+
+    const { data: custRows } = await supabase
+      .from("customers")
+      .select("id, name, phone, email")
+      .eq("mechanic_id", uid)
+      .order("name", { ascending: true });
+    setCustomers((custRows as CustomerOption[]) ?? []);
 
     await loadTasks(uid);
   }
@@ -220,6 +230,7 @@ export default function CalendarPage() {
     setTaskTitle("");
     setTaskAssetId("");
     setTaskNotes("");
+    setTaskCustomerId("");
     setTaskError("");
   }
 
@@ -237,6 +248,7 @@ export default function CalendarPage() {
         title: taskTitle.trim(),
         notes: taskNotes.trim() || null,
         task_date: selectedKey,
+        customer_id: taskCustomerId || null,
       })
       .select("id");
     setTaskSaving(false);
@@ -511,6 +523,14 @@ export default function CalendarPage() {
                       value={taskNotes} onChange={(e) => setTaskNotes(e.target.value)}
                       placeholder="Notes (optional)" rows={2}
                       className="w-full rounded-lg border border-zinc-200 px-2.5 py-2 text-[12px] outline-none focus:border-red-500 resize-none"
+                    />
+                    <CustomerPicker
+                      mechanicId={mechanicId}
+                      customers={customers}
+                      value={taskCustomerId}
+                      onChange={setTaskCustomerId}
+                      onCreated={(c) => setCustomers((prev) => [...prev, c].sort((a, b) => a.name.localeCompare(b.name)))}
+                      label="Customer (optional)"
                     />
                     {taskError && <p className="text-[11px] text-red-600 font-semibold">{taskError}</p>}
                     <div className="flex gap-2">

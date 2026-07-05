@@ -38,6 +38,7 @@ type ServiceRow = {
   mechanic_name: string;
   asset_id: string;
   asset_label: string;
+  customer_name: string;
 };
 
 type AssetRow = {
@@ -326,7 +327,7 @@ export default function AdminPage() {
         .select("id, name, email, workshop_name, is_mechanic, verified, suspended, created_at, photo_url")
         .order("created_at", { ascending: false }),
       supabase.from("service_records")
-        .select("id, service_date, service_type, mechanic_id, asset_id, mechanics(name), assets(brand, model, nickname)")
+        .select("id, service_date, service_type, mechanic_id, asset_id, customer_id, mechanics(name), assets(brand, model, nickname)")
         .order("service_date", { ascending: false })
         .limit(2000),
       supabase.from("assets")
@@ -342,6 +343,18 @@ export default function AdminPage() {
     const accountRows = (mechRows ?? []) as AccountRow[];
     setAccounts(accountRows);
 
+    // customers live behind strict owner-only RLS, so they're resolved
+    // through the service-role /api/admin/customers route (see that file).
+    let customerNameById: Record<string, string> = {};
+    try {
+      const custRes = await fetch("/api/admin/customers");
+      const custData = await custRes.json().catch(() => ({}));
+      const custRows = (custData.customers as { id: string; name: string }[]) ?? [];
+      customerNameById = Object.fromEntries(custRows.map((c) => [c.id, c.name]));
+    } catch {
+      // non-fatal — Services table just shows "—" for the Customer column
+    }
+
     const svcMapped: ServiceRow[] = ((svcRows ?? []) as any[]).map((s) => {
       const mech = Array.isArray(s.mechanics) ? s.mechanics[0] : s.mechanics;
       const asset = Array.isArray(s.assets) ? s.assets[0] : s.assets;
@@ -350,6 +363,7 @@ export default function AdminPage() {
         mechanic_id: s.mechanic_id, mechanic_name: mech?.name ?? "—",
         asset_id: s.asset_id,
         asset_label: asset?.nickname || [asset?.brand, asset?.model].filter(Boolean).join(" ") || "Unknown",
+        customer_name: s.customer_id ? (customerNameById[s.customer_id] ?? "—") : "—",
       };
     });
     setServices(svcMapped);
@@ -1203,7 +1217,7 @@ export default function AdminPage() {
                   <table className="w-full min-w-[680px]">
                     <thead>
                       <tr className="bg-zinc-50 border-b border-zinc-100">
-                        {["Asset", "Service Type", "Mechanic", "Date", ""].map(h => (
+                        {["Asset", "Service Type", "Mechanic", "Customer", "Date", ""].map(h => (
                           <th key={h} className="px-7 py-3 text-left text-[9px] font-bold text-zinc-400 uppercase tracking-widest">{h}</th>
                         ))}
                       </tr>
@@ -1218,6 +1232,7 @@ export default function AdminPage() {
                             </span>
                           </td>
                           <td className="px-7 py-4 text-[12px] text-zinc-500">{s.mechanic_name}</td>
+                          <td className="px-7 py-4 text-[12px] text-zinc-500">{s.customer_name}</td>
                           <td className="px-7 py-4 text-[12px] text-zinc-400">{formatDate(s.service_date)}</td>
                           <td className="px-7 py-4 text-right">
                             <button onClick={() => confirmDeleteService(s)} className="text-zinc-300 hover:text-red-600 transition-colors" title="Delete">
@@ -1227,7 +1242,7 @@ export default function AdminPage() {
                         </tr>
                       ))}
                       {visibleServices.length === 0 && (
-                        <tr><td colSpan={5} className="px-7 py-16 text-center text-[13px] text-zinc-300">No services match these filters.</td></tr>
+                        <tr><td colSpan={6} className="px-7 py-16 text-center text-[13px] text-zinc-300">No services match these filters.</td></tr>
                       )}
                     </tbody>
                   </table>

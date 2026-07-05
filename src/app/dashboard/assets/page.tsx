@@ -14,6 +14,7 @@ import { supabase } from "@/lib/supabase";
 import { useUnreadMessagesCount } from "@/lib/useUnreadMessages";
 import HoverAvatar from "@/components/HoverAvatar";
 import ContactSupportWidget from "@/components/ContactSupportWidget";
+import CustomerPicker, { CustomerOption } from "@/components/CustomerPicker";
 import { formatDateDMY, daysAgoLabel, daysUntilLabel } from "@/lib/date";
 import { computeReminderStatus, ReminderStatus, REMINDER_STATUS_LABEL, REMINDER_STATUS_COLOR } from "@/lib/reminders";
 import { getUnitLabel, getUnitShort } from "@/lib/units";
@@ -44,7 +45,7 @@ const navItems = [
   { icon: Bell, label: "Scheduled Services", href: "/dashboard/scheduled" },
   { icon: Box, label: "Assets", href: "/dashboard/assets" },
   { icon: QrCode, label: "QR Codes", href: "/dashboard/assets" },
-  { icon: Users, label: "Customers", href: "#" },
+  { icon: Users, label: "Customers", href: "/dashboard/customers" },
   { icon: BarChart3, label: "Reports", href: "/dashboard/reports" },
   { icon: CalendarIcon, label: "Calendar", href: "/dashboard/calendar" },
   { icon: Mail, label: "Messages", href: "/dashboard/messages" },
@@ -110,6 +111,7 @@ type AssetRow = {
   location: string | null;
   photo_url: string | null;
   created_at: string;
+  customer_id: string | null;
   qr_codes: QrRow[] | QrRow | null;
 };
 
@@ -197,6 +199,8 @@ export default function AssetsPage() {
   const [location, setLocation] = useState("");
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string>("");
+  const [customerId, setCustomerId] = useState("");
+  const [customers, setCustomers] = useState<CustomerOption[]>([]);
 
   // ── Add Service modal ──
   const [showServiceForm, setShowServiceForm] = useState(false);
@@ -204,6 +208,7 @@ export default function AssetsPage() {
   const [svcType, setSvcType] = useState("Oil Change");
   const [svcKmHours, setSvcKmHours] = useState("");
   const [svcNotes, setSvcNotes] = useState("");
+  const [svcCustomerId, setSvcCustomerId] = useState("");
   const [svcSaving, setSvcSaving] = useState(false);
   const [svcError, setSvcError] = useState("");
   const [minKmHours, setMinKmHours] = useState<number | null>(null);
@@ -232,13 +237,14 @@ export default function AssetsPage() {
   const [editLocation, setEditLocation] = useState("");
   const [editPhotoFile, setEditPhotoFile] = useState<File | null>(null);
   const [editPhotoPreview, setEditPhotoPreview] = useState<string>("");
+  const [editCustomerId, setEditCustomerId] = useState("");
 
   async function loadAssets(uid: string) {
     setLoadingAssets(true);
     // Traer todos los assets del workshop del mecánico (los que creó + los que vinculó)
     const { data } = await supabase
       .from("mechanic_assets")
-      .select("asset_id, assets(id, asset_type, brand, model, nickname, vin_serial, year, plate, fuel_type, location, photo_url, created_at, qr_codes(code))")
+      .select("asset_id, assets(id, asset_type, brand, model, nickname, vin_serial, year, plate, fuel_type, location, photo_url, created_at, customer_id, qr_codes(code))")
       .eq("mechanic_id", uid)
       .order("added_at", { ascending: false });
     const assetList = (data ?? [])
@@ -246,6 +252,15 @@ export default function AssetsPage() {
       .filter(Boolean);
     setAssets(assetList as unknown as AssetRow[]);
     setLoadingAssets(false);
+  }
+
+  async function loadCustomers(uid: string) {
+    const { data } = await supabase
+      .from("customers")
+      .select("id, name, phone, email")
+      .eq("mechanic_id", uid)
+      .order("name", { ascending: true });
+    setCustomers((data as CustomerOption[]) ?? []);
   }
 
   async function loadServiceAggregates(uid: string) {
@@ -324,7 +339,7 @@ export default function AssetsPage() {
         .single();
       if (active && mechanic) { setMechanicName(mechanic.name); setIsMechanicActive(!!mechanic.is_mechanic); setMechanicPhoto(mechanic.photo_url ?? ""); }
 
-      await Promise.all([loadAssets(session.user.id), loadServiceAggregates(session.user.id)]);
+      await Promise.all([loadAssets(session.user.id), loadServiceAggregates(session.user.id), loadCustomers(session.user.id)]);
       if (active) setCheckingAuth(false);
     }
 
@@ -352,6 +367,7 @@ export default function AssetsPage() {
     setLocation("");
     setPhotoFile(null);
     setPhotoPreview("");
+    setCustomerId("");
     setFormError("");
   }
 
@@ -361,6 +377,7 @@ export default function AssetsPage() {
     setSvcType("Oil Change");
     setSvcKmHours("");
     setSvcNotes("");
+    setSvcCustomerId(assets.find((a) => a.id === assetId)?.customer_id ?? "");
     setSvcError("");
     setMinKmHours(null);
     setShowServiceForm(true);
@@ -420,6 +437,7 @@ export default function AssetsPage() {
     setEditLocation(a.location ?? "");
     setEditPhotoFile(null);
     setEditPhotoPreview(a.photo_url ?? "");
+    setEditCustomerId(a.customer_id ?? "");
     setEditError("");
     setShowEditForm(true);
   }
@@ -465,6 +483,7 @@ export default function AssetsPage() {
         plate: plate.trim() || null,
         fuel_type: fuelType || null,
         location: location.trim() || null,
+        customer_id: customerId || null,
       })
       .select()
       .single();
@@ -550,6 +569,7 @@ export default function AssetsPage() {
         fuel_type: editFuelType || null,
         location: editLocation.trim() || null,
         photo_url: photoUrl,
+        customer_id: editCustomerId || null,
       })
       .eq("id", editingAsset.id);
 
@@ -596,15 +616,24 @@ export default function AssetsPage() {
       service_date: new Date().toISOString().slice(0, 10),
       km_hours: svcKmHours ? parseFloat(svcKmHours) : null,
       notes: svcNotes.trim() || null,
+      customer_id: svcCustomerId || null,
     });
 
-    setSvcSaving(false);
-
     if (error) {
+      setSvcSaving(false);
       setSvcError(error.message);
       return;
     }
 
+    // Keep the asset's "last known customer" cache in sync.
+    const asset = assets.find((a) => a.id === svcAssetId);
+    const newCustomerId = svcCustomerId || null;
+    if (asset && asset.customer_id !== newCustomerId) {
+      await supabase.from("assets").update({ customer_id: newCustomerId }).eq("id", svcAssetId);
+      setAssets((prev) => prev.map((a) => (a.id === svcAssetId ? { ...a, customer_id: newCustomerId } : a)));
+    }
+
+    setSvcSaving(false);
     setShowServiceForm(false);
     await loadServiceAggregates(mechanicId);
   }
@@ -1140,6 +1169,16 @@ export default function AssetsPage() {
                 <input type="text" value={location} onChange={(e) => setLocation(e.target.value)} placeholder="e.g. Main shop" className="w-full mt-1 rounded-xl border border-zinc-200 px-3 py-[10px] text-[13px] outline-none focus:border-red-500" />
               </div>
 
+              <div className="mb-4">
+                <CustomerPicker
+                  mechanicId={mechanicId}
+                  customers={customers}
+                  value={customerId}
+                  onChange={setCustomerId}
+                  onCreated={(c) => setCustomers((prev) => [...prev, c].sort((a, b) => a.name.localeCompare(b.name)))}
+                />
+              </div>
+
               {/* Photo upload */}
               <div className="mb-5">
                 <label className="text-[12px] font-bold text-zinc-700">Photo (optional)</label>
@@ -1249,6 +1288,16 @@ export default function AssetsPage() {
                 <input type="text" value={editLocation} onChange={(e) => setEditLocation(e.target.value)} placeholder="e.g. Main shop" className="w-full mt-1 rounded-xl border border-zinc-200 px-3 py-[10px] text-[13px] outline-none focus:border-red-500" />
               </div>
 
+              <div className="mb-4">
+                <CustomerPicker
+                  mechanicId={mechanicId}
+                  customers={customers}
+                  value={editCustomerId}
+                  onChange={setEditCustomerId}
+                  onCreated={(c) => setCustomers((prev) => [...prev, c].sort((a, b) => a.name.localeCompare(b.name)))}
+                />
+              </div>
+
               {/* Photo upload / preview */}
               <div className="mb-5">
                 <label className="text-[12px] font-bold text-zinc-700">Photo</label>
@@ -1346,6 +1395,14 @@ export default function AssetsPage() {
                 <label className="text-[12px] font-bold text-zinc-700">Notes (optional)</label>
                 <textarea rows={3} value={svcNotes} onChange={(e) => setSvcNotes(e.target.value)} placeholder="Parts used, observations, next service..." className="w-full mt-1 rounded-xl border border-zinc-200 px-3 py-[10px] text-[13px] outline-none focus:border-red-500 resize-none" />
               </div>
+
+              <CustomerPicker
+                mechanicId={mechanicId}
+                customers={customers}
+                value={svcCustomerId}
+                onChange={setSvcCustomerId}
+                onCreated={(c) => setCustomers((prev) => [...prev, c].sort((a, b) => a.name.localeCompare(b.name)))}
+              />
 
               {svcError && (
                 <div className="rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-[12px] text-red-700">{svcError}</div>

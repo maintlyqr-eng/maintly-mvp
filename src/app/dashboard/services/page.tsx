@@ -13,6 +13,7 @@ import { supabase } from "@/lib/supabase";
 import { useUnreadMessagesCount } from "@/lib/useUnreadMessages";
 import HoverAvatar from "@/components/HoverAvatar";
 import ContactSupportWidget from "@/components/ContactSupportWidget";
+import CustomerPicker, { CustomerOption } from "@/components/CustomerPicker";
 import { formatDateDMY } from "@/lib/date";
 import { computeReminderStatus, REMINDER_STATUS_LABEL, REMINDER_STATUS_COLOR } from "@/lib/reminders";
 import { getUnitLabel, formatUnitValue } from "@/lib/units";
@@ -23,7 +24,7 @@ const navItems = [
   { icon: Bell, label: "Scheduled Services", href: "/dashboard/scheduled" },
   { icon: Box, label: "Assets", href: "/dashboard/assets" },
   { icon: QrCode, label: "QR Codes", href: "/dashboard/assets" },
-  { icon: Users, label: "Customers", href: "#" },
+  { icon: Users, label: "Customers", href: "/dashboard/customers" },
   { icon: BarChart3, label: "Reports", href: "/dashboard/reports" },
   { icon: CalendarIcon, label: "Calendar", href: "/dashboard/calendar" },
   { icon: Mail, label: "Messages", href: "/dashboard/messages" },
@@ -64,6 +65,7 @@ type AssetOption = {
   brand: string | null;
   model: string | null;
   asset_type: string;
+  customer_id: string | null;
 };
 
 type ServiceRow = {
@@ -121,6 +123,8 @@ export default function ServicesPage() {
   const [svcType, setSvcType] = useState("Oil Change");
   const [svcKmHours, setSvcKmHours] = useState("");
   const [svcNotes, setSvcNotes] = useState("");
+  const [svcCustomerId, setSvcCustomerId] = useState("");
+  const [customers, setCustomers] = useState<CustomerOption[]>([]);
   const [svcSaving, setSvcSaving] = useState(false);
   const [svcError, setSvcError] = useState("");
   const [minKmHours, setMinKmHours] = useState<number | null>(null);
@@ -149,12 +153,21 @@ export default function ServicesPage() {
   async function loadAssets(uid: string) {
     const { data } = await supabase
       .from("assets")
-      .select("id, nickname, brand, model, asset_type")
+      .select("id, nickname, brand, model, asset_type, customer_id")
       .eq("created_by", uid)
       .order("created_at", { ascending: false });
     const opts = (data as AssetOption[]) ?? [];
     setAssetOptions(opts);
     if (opts.length > 0) setSvcAssetId(opts[0].id);
+  }
+
+  async function loadCustomers(uid: string) {
+    const { data } = await supabase
+      .from("customers")
+      .select("id, name, phone, email")
+      .eq("mechanic_id", uid)
+      .order("name", { ascending: true });
+    setCustomers((data as CustomerOption[]) ?? []);
   }
 
   useEffect(() => {
@@ -172,7 +185,7 @@ export default function ServicesPage() {
         .from("mechanics").select("name, is_mechanic, photo_url").eq("id", session.user.id).single();
       if (active && mechanic) { setMechanicName(mechanic.name); setIsMechanicActive(!!mechanic.is_mechanic); setMechanicPhoto(mechanic.photo_url ?? ""); }
 
-      await Promise.all([loadServices(session.user.id), loadAssets(session.user.id)]);
+      await Promise.all([loadServices(session.user.id), loadAssets(session.user.id), loadCustomers(session.user.id)]);
       if (active) setCheckingAuth(false);
     }
 
@@ -191,10 +204,12 @@ export default function ServicesPage() {
   }
 
   function resetForm() {
-    setSvcAssetId(assetOptions[0]?.id ?? "");
+    const firstAsset = assetOptions[0];
+    setSvcAssetId(firstAsset?.id ?? "");
     setSvcType("Oil Change");
     setSvcKmHours("");
     setSvcNotes("");
+    setSvcCustomerId(firstAsset?.customer_id ?? "");
     setSvcError("");
     setMinKmHours(null);
   }
@@ -237,6 +252,15 @@ export default function ServicesPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showForm, svcAssetId]);
 
+  // Default the customer field to whoever was on this asset's last service —
+  // the mechanic can still change it per service, this is just a starting point.
+  useEffect(() => {
+    if (!showForm || !svcAssetId) return;
+    const asset = assetOptions.find((a) => a.id === svcAssetId);
+    setSvcCustomerId(asset?.customer_id ?? "");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showForm, svcAssetId]);
+
   async function handleAddService(e: React.FormEvent) {
     e.preventDefault();
     setSvcError("");
@@ -258,10 +282,21 @@ export default function ServicesPage() {
       service_date: new Date().toISOString().slice(0, 10),
       km_hours: svcKmHours ? parseFloat(svcKmHours) : null,
       notes: svcNotes.trim() || null,
+      customer_id: svcCustomerId || null,
     });
 
+    if (error) { setSvcSaving(false); setSvcError(error.message); return; }
+
+    // Keep the asset's "last known customer" cache in sync — no manual
+    // transfer step, it just follows whatever customer was on this service.
+    const asset = assetOptions.find((a) => a.id === svcAssetId);
+    const newCustomerId = svcCustomerId || null;
+    if (asset && asset.customer_id !== newCustomerId) {
+      await supabase.from("assets").update({ customer_id: newCustomerId }).eq("id", svcAssetId);
+      setAssetOptions((prev) => prev.map((a) => (a.id === svcAssetId ? { ...a, customer_id: newCustomerId } : a)));
+    }
+
     setSvcSaving(false);
-    if (error) { setSvcError(error.message); return; }
     resetForm();
     setShowForm(false);
     await loadServices(mechanicId);
@@ -663,6 +698,14 @@ export default function ServicesPage() {
                 <label className="text-[12px] font-bold text-zinc-700">Notes (optional)</label>
                 <textarea rows={3} value={svcNotes} onChange={(e) => setSvcNotes(e.target.value)} placeholder="Parts used, observations, next service..." className="w-full mt-1 rounded-xl border border-zinc-200 px-3 py-[10px] text-[13px] outline-none focus:border-red-500 resize-none" />
               </div>
+
+              <CustomerPicker
+                mechanicId={mechanicId}
+                customers={customers}
+                value={svcCustomerId}
+                onChange={setSvcCustomerId}
+                onCreated={(c) => setCustomers((prev) => [...prev, c].sort((a, b) => a.name.localeCompare(b.name)))}
+              />
 
               {svcError && (
                 <div className="rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-[12px] text-red-700">{svcError}</div>

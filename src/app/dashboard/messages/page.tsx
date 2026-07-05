@@ -20,7 +20,7 @@ const navItems = [
   { icon: Bell, label: "Scheduled Services", href: "/dashboard/scheduled" },
   { icon: Box, label: "Assets", href: "/dashboard/assets" },
   { icon: QrCode, label: "QR Codes", href: "/dashboard/assets" },
-  { icon: Users, label: "Customers", href: "#" },
+  { icon: Users, label: "Customers", href: "/dashboard/customers" },
   { icon: BarChart3, label: "Reports", href: "/dashboard/reports" },
   { icon: CalendarIcon, label: "Calendar", href: "/dashboard/calendar" },
   { icon: Mail, label: "Messages", href: "/dashboard/messages" },
