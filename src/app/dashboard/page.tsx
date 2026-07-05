@@ -24,7 +24,7 @@ const navItems = [
   { icon: QrCode,       label: "QR Codes",         href: "/dashboard/assets",   active: false },
   { icon: Users,        label: "Customers",        href: "#",                   active: false },
   { icon: BarChart3,    label: "Reports",          href: "/dashboard/reports",  active: false },
-  { icon: CalendarIcon, label: "Calendar",         href: "#",                   active: false },
+  { icon: CalendarIcon, label: "Calendar",         href: "/dashboard/calendar", active: false },
   { icon: Mail,         label: "Messages",         href: "#",                   active: false },
   { icon: FolderOpen,   label: "Document Library", href: "#",                   active: false },
   { icon: Settings,     label: "Settings",         href: "/dashboard/settings", active: false },
