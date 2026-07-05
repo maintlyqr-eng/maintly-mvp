@@ -8,12 +8,10 @@
 --   New accounts default to false and get activated on demand, the first
 --   time they try to add a service ("Become a Mechanic" gate in the app).
 --
--- is_verified_mechanic: whether this mechanic has been manually verified by
---   MaintlyQR (e.g. after presenting a license/ABN/certificate). Shown in
---   service history / reports as "Verified Mechanic" vs "Community Mechanic".
---   Granted by hand for now — no self-serve verification flow yet.
+-- NOTE: verification already has a column — "verified" on mechanics, already
+-- used by the admin panel ("Verified"/"Pending" status). The app now shows
+-- that same flag to end users as "Verified Mechanic" vs "Community Mechanic"
+-- on service history / reports. No new column needed for that.
 
 alter table mechanics add column if not exists is_mechanic boolean not null default true;
 alter table mechanics alter column is_mechanic set default false;
-
-alter table mechanics add column if not exists is_verified_mechanic boolean not null default false;

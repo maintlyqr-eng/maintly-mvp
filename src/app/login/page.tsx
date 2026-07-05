@@ -18,8 +18,17 @@ function LoginForm() {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session) router.push(redirectTo);
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      if (!session) return;
+
+      const { data: m } = await supabase.from("mechanics").select("suspended").eq("id", session.user.id).single();
+      if (m?.suspended) {
+        await supabase.auth.signOut();
+        setError("This account has been suspended. Contact support if you think this is a mistake.");
+        return;
+      }
+
+      router.push(redirectTo);
     });
     return () => subscription.unsubscribe();
   }, [router, redirectTo]);
@@ -38,7 +47,8 @@ function LoginForm() {
       return;
     }
 
-    router.push(redirectTo);
+    // Successful sign-in triggers onAuthStateChange above, which checks the
+    // suspended flag before redirecting.
   }
 
   return (

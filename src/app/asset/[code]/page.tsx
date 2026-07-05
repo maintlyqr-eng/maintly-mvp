@@ -38,7 +38,7 @@ type AssetData = {
   nickname: string | null; vin_serial: string | null; year: number | null;
   plate: string | null; fuel_type: string | null; location: string | null;
 };
-type MechanicInfo = { name: string; is_verified_mechanic?: boolean | null };
+type MechanicInfo = { name: string; verified?: boolean | null };
 type ServiceRecord = {
   id: string; service_date: string; service_type: string;
   km_hours: number | null; notes: string | null; created_at: string;
@@ -116,6 +116,9 @@ export default function AssetPublicPage() {
 
       setAsset(assetData as AssetData);
 
+      // Log the scan for the admin Dashboard (fire-and-forget, never blocks the page).
+      supabase.from("qr_scans").insert({ code, asset_id: qrRow.asset_id }).then(() => {});
+
       // Load services
       await loadServices(qrRow.asset_id);
 
@@ -137,7 +140,7 @@ export default function AssetPublicPage() {
   async function loadServices(assetId: string) {
     const { data } = await supabase
       .from("service_records")
-      .select("id, service_date, service_type, km_hours, notes, created_at, mechanics(name, is_verified_mechanic)")
+      .select("id, service_date, service_type, km_hours, notes, created_at, mechanics(name, verified)")
       .eq("asset_id", assetId)
       .order("service_date", { ascending: false });
     setServices((data as ServiceRecord[]) ?? []);
@@ -374,7 +377,7 @@ export default function AssetPublicPage() {
                               <div className="flex items-center gap-1.5 mt-1">
                                 <UserCircle2 size={11} className="text-zinc-400 shrink-0" />
                                 <span className="text-[11px] text-zinc-400">{mech.name}</span>
-                                {mech.is_verified_mechanic ? (
+                                {mech.verified ? (
                                   <span className="flex items-center gap-1 text-[10px] font-semibold text-blue-600">
                                     <span className="w-1.5 h-1.5 rounded-full bg-blue-500 shrink-0" /> Verified Mechanic
                                   </span>

@@ -21,7 +21,7 @@ type AssetData = {
   photo_url: string | null;
 };
 
-type MechanicInfo = { name: string; is_verified_mechanic?: boolean | null };
+type MechanicInfo = { name: string; verified?: boolean | null };
 
 type ServiceRecord = {
   id: string;
@@ -110,7 +110,7 @@ export default function AssetReportPage() {
 
       const { data: svcRows } = await supabase
         .from("service_records")
-        .select("id, service_date, service_type, km_hours, notes, mechanics(name, is_verified_mechanic)")
+        .select("id, service_date, service_type, km_hours, notes, mechanics(name, verified)")
         .eq("asset_id", qrRow.asset_id)
         .order("service_date", { ascending: false });
 
@@ -328,7 +328,7 @@ export default function AssetReportPage() {
                       <td style={{ padding: "9px 8px" }}>
                         <div style={{ fontWeight: 700, color: "#222", fontSize: 10 }}>{mechName}</div>
                         <div style={{ display: "flex", alignItems: "center", gap: 3, marginTop: 2 }}>
-                          {mech?.is_verified_mechanic ? (
+                          {mech?.verified ? (
                             <span style={{ color: "#dc2626", fontSize: 8, fontWeight: 700 }}>✓ VERIFIED MECHANIC</span>
                           ) : (
                             <span style={{ color: "#aaa", fontSize: 8, fontWeight: 700 }}>○ COMMUNITY MECHANIC</span>
