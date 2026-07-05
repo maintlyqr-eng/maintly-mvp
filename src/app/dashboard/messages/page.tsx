@@ -96,8 +96,20 @@ export default function MessagesPage() {
   const [supportBody, setSupportBody] = useState("");
   const [supportSaving, setSupportSaving] = useState(false);
   const [supportError, setSupportError] = useState("");
+  const [supportUnreadCount, setSupportUnreadCount] = useState(0);
+  const [confirmClearSupport, setConfirmClearSupport] = useState(false);
 
   const unreadCount = useUnreadMessagesCount(mechanicId);
+
+  async function loadSupportUnreadCount(uid: string) {
+    const { count } = await supabase
+      .from("support_messages")
+      .select("*", { count: "exact", head: true })
+      .eq("mechanic_id", uid)
+      .eq("from_admin", true)
+      .eq("read", false);
+    setSupportUnreadCount(count ?? 0);
+  }
 
   async function loadMessages(uid: string) {
     setLoading(true);
@@ -126,6 +138,7 @@ export default function MessagesPage() {
       if (active && mechanic) { setMechanicName(mechanic.name); setMechanicPhoto(mechanic.photo_url ?? ""); }
 
       await loadMessages(session.user.id);
+      await loadSupportUnreadCount(session.user.id);
       if (active) setCheckingAuth(false);
     }
 
@@ -156,9 +169,16 @@ export default function MessagesPage() {
     await supabase.from("messages").delete().eq("id", m.id);
   }
 
+  async function handleClearSupportThread() {
+    setSupportThread([]);
+    setConfirmClearSupport(false);
+    await supabase.from("support_messages").update({ hidden_for_mechanic: true }).eq("mechanic_id", mechanicId);
+  }
+
   async function openSupportModal() {
     setSupportBody("");
     setSupportError("");
+    setConfirmClearSupport(false);
     setShowSupportModal(true);
     setSupportThreadLoading(true);
 
@@ -166,6 +186,7 @@ export default function MessagesPage() {
       .from("support_messages")
       .select("id, body, from_admin, read, created_at")
       .eq("mechanic_id", mechanicId)
+      .eq("hidden_for_mechanic", false)
       .order("created_at", { ascending: true });
     const thread = (data as SupportMsgRow[]) ?? [];
     setSupportThread(thread);
@@ -174,6 +195,7 @@ export default function MessagesPage() {
     const unreadIds = thread.filter((m) => m.from_admin && !m.read).map((m) => m.id);
     if (unreadIds.length > 0) {
       setSupportThread((prev) => prev.map((m) => (unreadIds.includes(m.id) ? { ...m, read: true } : m)));
+      setSupportUnreadCount(0);
       await supabase.from("support_messages").update({ read: true }).in("id", unreadIds);
     }
   }
@@ -289,10 +311,15 @@ export default function MessagesPage() {
           <div className="flex items-center gap-2 md:gap-4 shrink-0">
             <button
               onClick={openSupportModal}
-              className="flex items-center gap-1.5 text-[12px] font-bold text-white bg-zinc-900 hover:bg-zinc-800 px-3 py-2 rounded-xl transition-all shadow-sm"
+              className="relative flex items-center gap-1.5 text-[12px] font-bold text-white bg-zinc-900 hover:bg-zinc-800 px-3 py-2 rounded-xl transition-all shadow-sm"
             >
               <LifeBuoy size={14} />
               <span className="hidden sm:inline">Contact Support</span>
+              {supportUnreadCount > 0 && (
+                <span className="absolute -top-1.5 -right-1.5 bg-red-600 text-white text-[9px] font-black rounded-full min-w-[16px] h-4 flex items-center justify-center px-1 ring-2 ring-white">
+                  {supportUnreadCount}
+                </span>
+              )}
             </button>
             <button className="relative text-zinc-500 hover:text-zinc-800 transition-colors"><Bell size={19} /></button>
             <div className="flex items-center gap-3 md:pl-3 md:border-l border-zinc-200">
@@ -321,6 +348,21 @@ export default function MessagesPage() {
         </header>
 
         <div className="flex-1 overflow-y-auto p-4 md:p-7">
+
+          {supportUnreadCount > 0 && (
+            <button
+              onClick={openSupportModal}
+              className="w-full flex items-center gap-3 bg-zinc-900 hover:bg-zinc-800 text-white rounded-2xl px-5 py-3.5 mb-4 transition-all shadow-sm text-left"
+            >
+              <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center shrink-0">
+                <LifeBuoy size={15} />
+              </div>
+              <p className="flex-1 text-[13px] font-bold">
+                {supportUnreadCount === 1 ? "You have 1 new message" : `You have ${supportUnreadCount} new messages`} from Maintly Team
+              </p>
+              <span className="text-[11px] font-bold bg-white/15 px-3 py-1.5 rounded-lg shrink-0">View</span>
+            </button>
+          )}
 
           <div className="flex items-center justify-between mb-4">
             <p className="text-[12px] text-zinc-400">
@@ -442,8 +484,27 @@ export default function MessagesPage() {
                   <p className="text-[11px] text-zinc-400 leading-tight">Maintly Team</p>
                 </div>
               </div>
-              <button onClick={() => setShowSupportModal(false)} className="text-zinc-400 hover:text-zinc-700"><X size={18} /></button>
+              <div className="flex items-center gap-3 shrink-0">
+                <button
+                  onClick={() => setConfirmClearSupport(true)}
+                  className="text-zinc-300 hover:text-red-600 transition-colors"
+                  title="Clear conversation (only from your side)"
+                >
+                  <Trash2 size={15} />
+                </button>
+                <button onClick={() => setShowSupportModal(false)} className="text-zinc-400 hover:text-zinc-700"><X size={18} /></button>
+              </div>
             </div>
+
+            {confirmClearSupport && (
+              <div className="flex items-center justify-between gap-2 px-5 py-2.5 bg-red-50 border-b border-red-100 shrink-0">
+                <span className="text-[11px] text-red-700 font-medium">Clear this conversation from your side only?</span>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <button onClick={handleClearSupportThread} className="text-[11px] font-bold text-white bg-red-600 hover:bg-red-500 px-2.5 py-1 rounded-lg transition-colors">Confirm</button>
+                  <button onClick={() => setConfirmClearSupport(false)} className="text-[11px] font-semibold text-zinc-400 hover:text-zinc-700 px-1.5">Cancel</button>
+                </div>
+              </div>
+            )}
 
             <div className="flex-1 overflow-y-auto px-5 py-4 space-y-2.5 bg-zinc-50/40">
               {supportThreadLoading ? (

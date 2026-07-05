@@ -13,6 +13,7 @@ export async function GET(req: NextRequest) {
   const { data, error } = await admin
     .from("support_messages")
     .select("id, mechanic_id, body, read, created_at, from_admin, mechanics(name, email)")
+    .eq("hidden_for_admin", false)
     .order("created_at", { ascending: true });
 
   if (error) {
@@ -75,6 +76,35 @@ export async function PATCH(req: NextRequest) {
     .eq("mechanic_id", mechanicId)
     .eq("from_admin", false)
     .eq("read", false);
+
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  return NextResponse.json({ ok: true });
+}
+
+// DELETE: clear a conversation from the Control Center's own view only.
+// This never touches the mechanic's copy — it's a per-side hide, not a real
+// delete, so one side clearing a thread can't hide anything from the other.
+// Body: { mechanicId }
+export async function DELETE(req: NextRequest) {
+  if (!isAdminRequest(req)) {
+    return NextResponse.json({ error: "Not authorized." }, { status: 401 });
+  }
+
+  const payload = await req.json().catch(() => ({}));
+  const { mechanicId } = payload ?? {};
+
+  if (!mechanicId || typeof mechanicId !== "string") {
+    return NextResponse.json({ error: "Missing mechanicId." }, { status: 400 });
+  }
+
+  const admin = getSupabaseAdmin();
+  const { error } = await admin
+    .from("support_messages")
+    .update({ hidden_for_admin: true })
+    .eq("mechanic_id", mechanicId);
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });

@@ -283,6 +283,7 @@ export default function AdminPage() {
   const [selectedThreadMechanic, setSelectedThreadMechanic] = useState<string | null>(null);
   const [threadDraft, setThreadDraft] = useState("");
   const [threadSending, setThreadSending] = useState(false);
+  const [confirmClearThread, setConfirmClearThread] = useState(false);
 
   // ── Assets UI state ──
   const [assetSearch, setAssetSearch] = useState("");
@@ -439,6 +440,7 @@ export default function AdminPage() {
 
   async function openThread(mechanicId: string) {
     setSelectedThreadMechanic(mechanicId);
+    setConfirmClearThread(false);
     const hasUnread = supportMessages.some((m) => m.mechanic_id === mechanicId && !m.from_admin && !m.read);
     if (hasUnread) {
       setSupportMessages((prev) => prev.map((x) => (x.mechanic_id === mechanicId && !x.from_admin ? { ...x, read: true } : x)));
@@ -467,6 +469,14 @@ export default function AdminPage() {
     }
     flash(result.error || "Couldn't send the message.", "error");
     return false;
+  }
+
+  async function handleClearThread(mechanicId: string) {
+    setSupportMessages((prev) => prev.filter((m) => m.mechanic_id !== mechanicId));
+    setSelectedThreadMechanic(null);
+    setConfirmClearThread(false);
+    const result = await adminFetch("/api/admin/support-messages", "DELETE", { mechanicId });
+    if (!result.ok) flash(result.error || "Couldn't clear the conversation.", "error");
   }
 
   async function handleSendThreadReply() {
@@ -1372,6 +1382,31 @@ export default function AdminPage() {
                             <p className="text-[13px] font-bold text-zinc-900 truncate">{activeThread.mechanic?.name ?? "Unknown mechanic"}</p>
                             <p className="text-[11px] text-zinc-400 truncate">{activeThread.mechanic?.email ?? ""}</p>
                           </div>
+                          {confirmClearThread ? (
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              <span className="text-[11px] text-zinc-400 hidden sm:inline">Clear for you only?</span>
+                              <button
+                                onClick={() => handleClearThread(activeThread.mechanicId)}
+                                className="text-[11px] font-bold text-white bg-red-600 hover:bg-red-500 px-2.5 py-1.5 rounded-lg transition-colors"
+                              >
+                                Confirm
+                              </button>
+                              <button
+                                onClick={() => setConfirmClearThread(false)}
+                                className="text-[11px] font-semibold text-zinc-400 hover:text-zinc-700 px-2 py-1.5"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              onClick={() => setConfirmClearThread(true)}
+                              className="text-zinc-300 hover:text-red-600 transition-colors shrink-0"
+                              title="Clear conversation (only from your view — the mechanic keeps their copy)"
+                            >
+                              <Trash2 size={15} />
+                            </button>
+                          )}
                         </div>
 
                         <div className="flex-1 overflow-y-auto px-5 py-4 space-y-2.5 bg-zinc-50/40">
