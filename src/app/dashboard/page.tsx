@@ -11,6 +11,7 @@ import {
   ScanLine, Wrench, AlertCircle, Menu, X
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { useUnreadMessagesCount } from "@/lib/useUnreadMessages";
 import { formatDateDMY } from "@/lib/date";
 import { computeReminderStatus, REMINDER_STATUS_LABEL, REMINDER_STATUS_COLOR, type ReminderStatus } from "@/lib/reminders";
 import { getUnitLabel, getUnitShort, formatUnitValue } from "@/lib/units";
@@ -27,7 +28,7 @@ const navItems = [
   { icon: Users,        label: "Customers",        href: "#",                   active: false },
   { icon: BarChart3,    label: "Reports",          href: "/dashboard/reports",  active: false },
   { icon: CalendarIcon, label: "Calendar",         href: "/dashboard/calendar", active: false },
-  { icon: Mail,         label: "Messages",         href: "#",                   active: false },
+  { icon: Mail,         label: "Messages",         href: "/dashboard/messages", active: false },
   { icon: FolderOpen,   label: "Document Library", href: "#",                   active: false },
   { icon: Settings,     label: "Settings",         href: "/dashboard/settings", active: false },
 ];
@@ -117,6 +118,8 @@ export default function DashboardPage() {
   const router = useRouter();
   const [authChecked, setAuthChecked] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [mechanicId, setMechanicId] = useState("");
+  const unreadMessages = useUnreadMessagesCount(mechanicId);
   const [mechanicName, setMechanicName] = useState("");
   const [mechanicPhoto, setMechanicPhoto] = useState("");
   const [mechanicEmail, setMechanicEmail] = useState("");
@@ -262,6 +265,7 @@ export default function DashboardPage() {
       if (!session) { router.replace("/login"); return; }
       if (!active) return;
 
+      setMechanicId(session.user.id);
       setMechanicEmail(session.user.email ?? "");
 
       const { data: mechanic } = await supabase
@@ -548,6 +552,9 @@ export default function DashboardPage() {
             >
               <item.icon size={16} />
               {item.label}
+              {item.label === "Messages" && unreadMessages > 0 && (
+                <span className="ml-auto bg-red-600 text-white text-[9px] font-bold rounded-full min-w-[16px] h-4 flex items-center justify-center px-1">{unreadMessages}</span>
+              )}
             </Link>
           ))}
         </nav>

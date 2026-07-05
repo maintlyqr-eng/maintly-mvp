@@ -10,6 +10,7 @@ import {
   Calendar, Gauge, Pencil, Trash2
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { useUnreadMessagesCount } from "@/lib/useUnreadMessages";
 import HoverAvatar from "@/components/HoverAvatar";
 import { formatDateDMY } from "@/lib/date";
 import { computeReminderStatus, REMINDER_STATUS_LABEL, REMINDER_STATUS_COLOR, type ReminderStatus } from "@/lib/reminders";
@@ -24,7 +25,7 @@ const navItems = [
   { icon: Users, label: "Customers", href: "#" },
   { icon: BarChart3, label: "Reports", href: "/dashboard/reports" },
   { icon: CalendarIcon, label: "Calendar", href: "/dashboard/calendar" },
-  { icon: Mail, label: "Messages", href: "#" },
+  { icon: Mail, label: "Messages", href: "/dashboard/messages" },
   { icon: FolderOpen, label: "Document Library", href: "#" },
   { icon: Settings, label: "Settings", href: "/dashboard/settings" },
 ];
@@ -69,6 +70,7 @@ export default function ScheduledServicesPage() {
   const [checkingAuth, setCheckingAuth] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [mechanicId, setMechanicId] = useState("");
+  const unreadMessages = useUnreadMessagesCount(mechanicId);
   const [mechanicName, setMechanicName] = useState("");
   const [mechanicPhoto, setMechanicPhoto] = useState("");
   const [mechanicEmail, setMechanicEmail] = useState("");
@@ -264,6 +266,9 @@ export default function ScheduledServicesPage() {
             >
               <item.icon size={16} />
               {item.label}
+              {item.label === "Messages" && unreadMessages > 0 && (
+                <span className="ml-auto bg-red-600 text-white text-[9px] font-bold rounded-full min-w-[16px] h-4 flex items-center justify-center px-1">{unreadMessages}</span>
+              )}
             </Link>
           ))}
         </nav>

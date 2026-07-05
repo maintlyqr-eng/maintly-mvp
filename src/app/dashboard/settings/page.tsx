@@ -10,6 +10,7 @@ import {
   Image as ImageIcon,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { useUnreadMessagesCount } from "@/lib/useUnreadMessages";
 import { formatDateDMY } from "@/lib/date";
 import AvatarCropModal from "@/components/AvatarCropModal";
 import HoverAvatar from "@/components/HoverAvatar";
@@ -23,7 +24,7 @@ const navItems = [
   { icon: Users, label: "Customers", href: "#" },
   { icon: BarChart3, label: "Reports", href: "/dashboard/reports" },
   { icon: CalendarIcon, label: "Calendar", href: "/dashboard/calendar" },
-  { icon: Mail, label: "Messages", href: "#" },
+  { icon: Mail, label: "Messages", href: "/dashboard/messages" },
   { icon: FolderOpen, label: "Document Library", href: "#" },
   { icon: SettingsIcon, label: "Settings", href: "/dashboard/settings" },
 ];
@@ -33,6 +34,7 @@ export default function SettingsPage() {
   const [checkingAuth, setCheckingAuth] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [mechanicId, setMechanicId] = useState("");
+  const unreadMessages = useUnreadMessagesCount(mechanicId);
   const [email, setEmail] = useState("");
   const [createdAt, setCreatedAt] = useState("");
   const [isMechanic, setIsMechanic] = useState(false);
@@ -246,6 +248,9 @@ export default function SettingsPage() {
             >
               <item.icon size={16} />
               {item.label}
+              {item.label === "Messages" && unreadMessages > 0 && (
+                <span className="ml-auto bg-red-600 text-white text-[9px] font-bold rounded-full min-w-[16px] h-4 flex items-center justify-center px-1">{unreadMessages}</span>
+              )}
             </Link>
           ))}
         </nav>

@@ -6,7 +6,7 @@ import { useParams, useRouter } from "next/navigation";
 import {
   ShieldCheck, Calendar, Gauge, Wrench, CheckCircle2, MapPin,
   Hash, Fuel, AlertCircle, ChevronDown, ChevronUp, UserCircle2,
-  Plus, BookMarked, LogIn, X, ChevronRight
+  Plus, BookMarked, LogIn, X, ChevronRight, MessageCircle, Send
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { formatDateDMY } from "@/lib/date";
@@ -37,6 +37,7 @@ type AssetData = {
   id: string; asset_type: string; brand: string | null; model: string | null;
   nickname: string | null; vin_serial: string | null; year: number | null;
   plate: string | null; fuel_type: string | null; location: string | null;
+  created_by: string | null;
 };
 type MechanicInfo = { name: string; verified?: boolean | null };
 type ServiceRecord = {
@@ -79,6 +80,15 @@ export default function AssetPublicPage() {
   const [showMechanicGate, setShowMechanicGate] = useState(false);
   const [activatingMechanic, setActivatingMechanic] = useState(false);
 
+  // Contact the mechanic
+  const [showContactForm, setShowContactForm] = useState(false);
+  const [contactName, setContactName] = useState("");
+  const [contactInfo, setContactInfo] = useState("");
+  const [contactMessage, setContactMessage] = useState("");
+  const [contactSaving, setContactSaving] = useState(false);
+  const [contactError, setContactError] = useState("");
+  const [contactSent, setContactSent] = useState(false);
+
   // Add Service form
   const [showServiceForm, setShowServiceForm] = useState(false);
   const [svcType, setSvcType]   = useState("Service");
@@ -110,7 +120,7 @@ export default function AssetPublicPage() {
 
       const { data: assetData } = await supabase
         .from("assets")
-        .select("id, asset_type, brand, model, nickname, vin_serial, year, plate, fuel_type, location")
+        .select("id, asset_type, brand, model, nickname, vin_serial, year, plate, fuel_type, location, created_by")
         .eq("id", qrRow.asset_id).single();
       if (!assetData) { setNotFound(true); setLoading(false); return; }
 
@@ -212,6 +222,40 @@ export default function AssetPublicPage() {
     await loadServices(asset.id);
     setShowServiceForm(false);
     setSvcType("Service"); setSvcKm(""); setSvcNotes("");
+  }
+
+  async function handleSendMessage(e: React.FormEvent) {
+    e.preventDefault();
+    if (!asset || contactSaving) return;
+    setContactError("");
+
+    if (!contactName.trim() || !contactInfo.trim() || !contactMessage.trim()) {
+      setContactError("Please fill in your name, contact info, and message.");
+      return;
+    }
+    if (!asset.created_by) {
+      setContactError("This asset doesn't have a mechanic to contact yet.");
+      return;
+    }
+
+    setContactSaving(true);
+    const { error } = await supabase.from("messages").insert({
+      asset_id: asset.id,
+      mechanic_id: asset.created_by,
+      sender_name: contactName.trim(),
+      sender_contact: contactInfo.trim(),
+      body: contactMessage.trim(),
+    });
+    setContactSaving(false);
+
+    if (error) { setContactError("Couldn't send your message. Please try again."); return; }
+    setContactSent(true);
+  }
+
+  function closeContactForm() {
+    setShowContactForm(false);
+    setContactSent(false);
+    setContactName(""); setContactInfo(""); setContactMessage(""); setContactError("");
   }
 
   // ── LOADING ────────────────────────────────────────────────────────────────
@@ -408,6 +452,25 @@ export default function AssetPublicPage() {
           )}
         </div>
 
+        {/* ── CONTACT THE MECHANIC ── */}
+        {asset.created_by && asset.created_by !== mechanicId && (
+          <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm px-5 py-4 flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-blue-50 flex items-center justify-center shrink-0">
+              <MessageCircle size={16} className="text-blue-500" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-[12px] font-bold text-zinc-800">Have a question about this {asset.asset_type}?</p>
+              <p className="text-[11px] text-zinc-400">Send a message to the mechanic who manages it.</p>
+            </div>
+            <button
+              onClick={() => setShowContactForm(true)}
+              className="shrink-0 text-[12px] font-bold text-blue-600 hover:text-blue-700 border border-blue-200 hover:bg-blue-50 px-3 py-2 rounded-xl transition-colors"
+            >
+              Message
+            </button>
+          </div>
+        )}
+
         {/* ── FOOTER ── */}
         <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm px-5 py-4 flex items-center gap-3">
           <ShieldCheck size={18} className="text-red-500 shrink-0" />
@@ -588,6 +651,80 @@ export default function AssetPublicPage() {
                 {activatingMechanic ? "Activating…" : "Become a Mechanic"}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ══ CONTACT THE MECHANIC (bottom sheet) ═══════════════════════════════ */}
+      {showContactForm && (
+        <div className="fixed inset-0 z-50 flex flex-col justify-end">
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={closeContactForm} />
+
+          <div className="relative bg-white rounded-t-3xl shadow-2xl max-h-[90vh] overflow-y-auto"
+            style={{paddingBottom: 'max(env(safe-area-inset-bottom), 24px)'}}>
+
+            <div className="flex justify-center pt-3 pb-1">
+              <div className="w-10 h-1 bg-zinc-200 rounded-full" />
+            </div>
+
+            <div className="flex items-center justify-between px-5 py-3 border-b border-zinc-100">
+              <div>
+                <h3 className="text-[16px] font-black text-zinc-900">Message the Mechanic</h3>
+                <p className="text-[12px] text-zinc-400">{assetName}</p>
+              </div>
+              <button onClick={closeContactForm}
+                className="w-8 h-8 rounded-full bg-zinc-100 flex items-center justify-center hover:bg-zinc-200 transition-colors">
+                <X size={15} className="text-zinc-600" />
+              </button>
+            </div>
+
+            {contactSent ? (
+              <div className="px-5 py-10 text-center">
+                <div className="w-12 h-12 rounded-full bg-emerald-50 flex items-center justify-center mx-auto mb-3">
+                  <CheckCircle2 size={22} className="text-emerald-500" />
+                </div>
+                <h4 className="text-[15px] font-black text-zinc-900 mb-1">Message sent!</h4>
+                <p className="text-[13px] text-zinc-500 mb-6">The mechanic will get back to you using the contact info you left.</p>
+                <button onClick={closeContactForm}
+                  className="w-full bg-zinc-900 hover:bg-zinc-800 text-white font-bold py-3 rounded-2xl text-[13px] transition-all">
+                  Done
+                </button>
+              </div>
+            ) : (
+              <form onSubmit={handleSendMessage} className="px-5 py-5 space-y-4">
+                <div>
+                  <label className="text-[11px] font-bold text-zinc-500 uppercase tracking-widest mb-1.5 block">Your name</label>
+                  <input value={contactName} onChange={(e) => setContactName(e.target.value)} placeholder="e.g. Jane Smith"
+                    className="w-full bg-zinc-50 border border-zinc-200 focus:border-blue-400 focus:bg-white rounded-xl px-4 py-3 text-[14px] text-zinc-900 placeholder-zinc-400 outline-none transition-all" />
+                </div>
+                <div>
+                  <label className="text-[11px] font-bold text-zinc-500 uppercase tracking-widest mb-1.5 block">Email or phone</label>
+                  <input value={contactInfo} onChange={(e) => setContactInfo(e.target.value)} placeholder="So the mechanic can reply to you"
+                    className="w-full bg-zinc-50 border border-zinc-200 focus:border-blue-400 focus:bg-white rounded-xl px-4 py-3 text-[14px] text-zinc-900 placeholder-zinc-400 outline-none transition-all" />
+                </div>
+                <div>
+                  <label className="text-[11px] font-bold text-zinc-500 uppercase tracking-widest mb-1.5 block">Message</label>
+                  <textarea value={contactMessage} onChange={(e) => setContactMessage(e.target.value)} rows={4}
+                    placeholder="What would you like to ask or request?"
+                    className="w-full bg-zinc-50 border border-zinc-200 focus:border-blue-400 focus:bg-white rounded-xl px-4 py-3 text-[14px] text-zinc-900 placeholder-zinc-400 outline-none transition-all resize-none" />
+                </div>
+
+                {contactError && (
+                  <div className="flex items-center gap-2 bg-red-50 border border-red-200 rounded-xl px-3 py-2.5">
+                    <AlertCircle size={14} className="text-red-500 shrink-0" />
+                    <p className="text-[12px] text-red-600">{contactError}</p>
+                  </div>
+                )}
+
+                <button type="submit" disabled={contactSaving}
+                  className="w-full bg-blue-600 hover:bg-blue-500 disabled:opacity-60 text-white font-black py-4 rounded-2xl text-[15px] transition-all active:scale-[0.98] shadow-sm flex items-center justify-center gap-2">
+                  {contactSaving
+                    ? <><div className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" /> Sending…</>
+                    : <><Send size={15} /> Send Message</>
+                  }
+                </button>
+              </form>
+            )}
           </div>
         </div>
       )}
