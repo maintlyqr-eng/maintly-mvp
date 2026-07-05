@@ -70,7 +70,16 @@ type SupportMessageRow = {
   body: string;
   read: boolean;
   created_at: string;
+  from_admin: boolean;
   mechanics: { name: string; email: string } | { name: string; email: string }[] | null;
+};
+
+type SupportConversation = {
+  mechanicId: string;
+  mechanic: { name: string; email: string } | null;
+  messages: SupportMessageRow[];
+  lastMessage: SupportMessageRow;
+  unreadCount: number;
 };
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -265,9 +274,9 @@ export default function AdminPage() {
   // ── Support inbox (mechanic -> Control Center) ──
   const [supportMessages, setSupportMessages] = useState<SupportMessageRow[]>([]);
   const [supportLoading, setSupportLoading] = useState(true);
-  const [expandedSupportId, setExpandedSupportId] = useState<string | null>(null);
-  const [replyDrafts, setReplyDrafts] = useState<Record<string, string>>({});
-  const [replySavingId, setReplySavingId] = useState<string | null>(null);
+  const [selectedThreadMechanic, setSelectedThreadMechanic] = useState<string | null>(null);
+  const [threadDraft, setThreadDraft] = useState("");
+  const [threadSending, setThreadSending] = useState(false);
 
   // ── Assets UI state ──
   const [assetSearch, setAssetSearch] = useState("");
@@ -399,39 +408,79 @@ export default function AdminPage() {
     return Array.isArray(m.mechanics) ? m.mechanics[0] ?? null : m.mechanics;
   }
 
-  async function openSupportMessage(m: SupportMessageRow) {
-    setExpandedSupportId(expandedSupportId === m.id ? null : m.id);
-    if (!m.read) {
-      setSupportMessages((prev) => prev.map((x) => (x.id === m.id ? { ...x, read: true } : x)));
-      await adminFetch("/api/admin/support-messages", "PATCH", { id: m.id, read: true });
+  const supportConversations: SupportConversation[] = useMemo(() => {
+    const byMechanic = new Map<string, SupportMessageRow[]>();
+    for (const m of supportMessages) {
+      const list = byMechanic.get(m.mechanic_id) ?? [];
+      list.push(m);
+      byMechanic.set(m.mechanic_id, list);
+    }
+    const conversations: SupportConversation[] = [];
+    for (const [mechanicId, msgs] of byMechanic) {
+      const sorted = [...msgs].sort((a, b) => a.created_at.localeCompare(b.created_at));
+      conversations.push({
+        mechanicId,
+        mechanic: getSupportMechanic(sorted[sorted.length - 1]),
+        messages: sorted,
+        lastMessage: sorted[sorted.length - 1],
+        unreadCount: sorted.filter((m) => !m.from_admin && !m.read).length,
+      });
+    }
+    return conversations.sort((a, b) => b.lastMessage.created_at.localeCompare(a.lastMessage.created_at));
+  }, [supportMessages]);
+
+  const activeThread = supportConversations.find((c) => c.mechanicId === selectedThreadMechanic) ?? null;
+
+  async function openThread(mechanicId: string) {
+    setSelectedThreadMechanic(mechanicId);
+    const hasUnread = supportMessages.some((m) => m.mechanic_id === mechanicId && !m.from_admin && !m.read);
+    if (hasUnread) {
+      setSupportMessages((prev) => prev.map((x) => (x.mechanic_id === mechanicId && !x.from_admin ? { ...x, read: true } : x)));
+      await adminFetch("/api/admin/support-messages", "PATCH", { mechanicId });
     }
   }
 
-  async function handleSendReply(m: SupportMessageRow) {
-    const text = (replyDrafts[m.id] ?? "").trim();
-    if (!text) return;
-    setReplySavingId(m.id);
-    const result = await adminFetch("/api/admin/messages", "POST", { mechanicId: m.mechanic_id, body: text });
-    setReplySavingId(null);
+  async function sendSupportReply(mechanicId: string, text: string): Promise<boolean> {
+    const result = await adminFetch("/api/admin/support-messages", "POST", { mechanicId, body: text });
     if (result.ok) {
-      setReplyDrafts((prev) => ({ ...prev, [m.id]: "" }));
-      setExpandedSupportId(null);
-      flash("Reply sent.");
-    } else {
-      flash(result.error || "Couldn't send the reply.", "error");
+      const mech = supportMessages.find((m) => m.mechanic_id === mechanicId)?.mechanics
+        ?? (detailAccount && detailAccount.id === mechanicId ? { name: detailAccount.name, email: detailAccount.email } : null);
+      setSupportMessages((prev) => [
+        ...prev,
+        {
+          id: `tmp-${prev.length}-${text.length}`,
+          mechanic_id: mechanicId,
+          body: text,
+          read: true,
+          created_at: new Date().toISOString(),
+          from_admin: true,
+          mechanics: mech,
+        },
+      ]);
+      return true;
     }
+    flash(result.error || "Couldn't send the message.", "error");
+    return false;
+  }
+
+  async function handleSendThreadReply() {
+    if (!selectedThreadMechanic || !threadDraft.trim()) return;
+    setThreadSending(true);
+    const ok = await sendSupportReply(selectedThreadMechanic, threadDraft.trim());
+    setThreadSending(false);
+    if (ok) setThreadDraft("");
   }
 
   async function handleSendDirectMessage() {
     if (!detailAccount || !detailMessageBody.trim()) return;
     setDetailMessageSaving(true);
-    const result = await adminFetch("/api/admin/messages", "POST", { mechanicId: detailAccount.id, body: detailMessageBody.trim() });
+    const ok = await sendSupportReply(detailAccount.id, detailMessageBody.trim());
     setDetailMessageSaving(false);
-    if (result.ok) {
+    if (ok) {
       setDetailMessageBody("");
       setDetailMessageMsg({ text: "Message sent.", ok: true });
     } else {
-      setDetailMessageMsg({ text: result.error || "Couldn't send the message.", ok: false });
+      setDetailMessageMsg({ text: "Couldn't send the message.", ok: false });
     }
   }
 
@@ -714,7 +763,7 @@ export default function AdminPage() {
     dashboard: "Dashboard", accounts: "Accounts", mechanics: "Mechanics",
     assets: "Assets", services: "Services", qr: "QR Manager", support: "Support",
   };
-  const unreadSupportCount = supportMessages.filter((m) => !m.read).length;
+  const unreadSupportCount = supportMessages.filter((m) => !m.from_admin && !m.read).length;
 
   return (
     <div className="min-h-screen bg-zinc-50/60 flex text-zinc-900 relative">
@@ -1247,65 +1296,102 @@ export default function AdminPage() {
             </div>
           )}
 
-          {/* ── SUPPORT (mechanic -> Control Center) ─────────────────────── */}
+          {/* ── SUPPORT (mechanic <-> Control Center, full conversation) ──── */}
           {section === "support" && (
-            <div className="space-y-4">
+            <div className="space-y-3">
               <p className="text-[12px] text-zinc-400">
-                Questions mechanics send in from the app. Reply here — it lands straight in their Messages inbox.
+                Full back-and-forth with each mechanic. Everything sent from either side is kept in one thread.
               </p>
 
               {supportLoading ? (
                 <div className="bg-white rounded-2xl border border-zinc-200/80 shadow-sm py-16 text-center text-[13px] text-zinc-300">
                   Loading…
                 </div>
-              ) : supportMessages.length === 0 ? (
+              ) : supportConversations.length === 0 ? (
                 <div className="bg-white rounded-2xl border border-zinc-200/80 shadow-sm py-16 text-center">
                   <MessageCircle size={28} className="mx-auto text-zinc-200 mb-2" />
-                  <p className="text-[13px] text-zinc-300 font-medium">No messages from mechanics yet.</p>
+                  <p className="text-[13px] text-zinc-300 font-medium">No conversations yet.</p>
                 </div>
               ) : (
-                <div className="space-y-3">
-                  {supportMessages.map((m) => {
-                    const mech = getSupportMechanic(m);
-                    const isOpen = expandedSupportId === m.id;
-                    return (
-                      <div key={m.id} className={`bg-white rounded-2xl border shadow-sm overflow-hidden transition-colors ${
-                        !m.read ? "border-red-200" : "border-zinc-200/80"
-                      }`}>
-                        <button onClick={() => openSupportMessage(m)} className="w-full flex items-start gap-3 px-5 py-4 text-left hover:bg-zinc-50/80 transition-colors">
-                          {!m.read && <span className="w-2 h-2 rounded-full bg-red-600 mt-1.5 shrink-0" />}
-                          <div className="min-w-0 flex-1">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <p className="text-[13px] font-bold text-zinc-900 truncate">{mech?.name ?? "Unknown mechanic"}</p>
-                              <p className="text-[11px] text-zinc-400 truncate">{mech?.email ?? ""}</p>
-                            </div>
-                            <p className={`text-[12px] mt-1 ${isOpen ? "text-zinc-700" : "text-zinc-500 truncate"}`}>{m.body}</p>
+                <div className="grid grid-cols-1 md:grid-cols-[280px_1fr] gap-4 h-[calc(100vh-220px)] min-h-[420px]">
+                  {/* Conversation list */}
+                  <div className={`bg-white rounded-2xl border border-zinc-200/80 shadow-sm overflow-y-auto ${activeThread ? "hidden md:block" : ""}`}>
+                    {supportConversations.map((c) => (
+                      <button
+                        key={c.mechanicId}
+                        onClick={() => openThread(c.mechanicId)}
+                        className={`w-full flex items-start gap-2.5 px-4 py-3.5 text-left border-b border-zinc-50 transition-colors ${
+                          selectedThreadMechanic === c.mechanicId ? "bg-red-50" : "hover:bg-zinc-50"
+                        }`}
+                      >
+                        {c.unreadCount > 0 && <span className="w-2 h-2 rounded-full bg-red-600 mt-1.5 shrink-0" />}
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center justify-between gap-2">
+                            <p className="text-[12.5px] font-bold text-zinc-900 truncate">{c.mechanic?.name ?? "Unknown mechanic"}</p>
+                            <span className="text-[10px] text-zinc-300 shrink-0">{formatDate(c.lastMessage.created_at)}</span>
                           </div>
-                          <p className="text-[11px] text-zinc-300 shrink-0 whitespace-nowrap">{formatDate(m.created_at)}</p>
-                        </button>
-
-                        {isOpen && (
-                          <div className="px-5 pb-4 border-t border-zinc-100 pt-3 space-y-2.5">
-                            <textarea
-                              value={replyDrafts[m.id] ?? ""}
-                              onChange={(e) => setReplyDrafts((prev) => ({ ...prev, [m.id]: e.target.value }))}
-                              placeholder="Type a quick reply…"
-                              rows={3}
-                              autoFocus
-                              className="w-full rounded-xl border border-zinc-200 px-3 py-2 text-[13px] outline-none focus:border-red-400 resize-none"
-                            />
-                            <button
-                              onClick={() => handleSendReply(m)}
-                              disabled={replySavingId === m.id || !(replyDrafts[m.id] ?? "").trim()}
-                              className="flex items-center gap-2 bg-red-600 hover:bg-red-500 disabled:opacity-40 text-white font-bold px-4 py-2 rounded-xl text-[12px] transition-all"
-                            >
-                              <Send size={13} /> {replySavingId === m.id ? "Sending…" : "Send reply"}
-                            </button>
-                          </div>
+                          <p className="text-[11.5px] text-zinc-400 truncate mt-0.5">
+                            {c.lastMessage.from_admin ? "You: " : ""}{c.lastMessage.body}
+                          </p>
+                        </div>
+                        {c.unreadCount > 0 && (
+                          <span className="text-[9px] font-black bg-red-600 text-white rounded-full min-w-[16px] h-4 flex items-center justify-center px-1 shrink-0">{c.unreadCount}</span>
                         )}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Thread */}
+                  <div className="bg-white rounded-2xl border border-zinc-200/80 shadow-sm flex flex-col overflow-hidden">
+                    {!activeThread ? (
+                      <div className="flex-1 flex items-center justify-center text-center px-6">
+                        <p className="text-[12px] text-zinc-300">Pick a conversation to see the full history and reply.</p>
                       </div>
-                    );
-                  })}
+                    ) : (
+                      <>
+                        <div className="flex items-center gap-2 px-5 py-3.5 border-b border-zinc-100">
+                          <button onClick={() => setSelectedThreadMechanic(null)} className="md:hidden text-zinc-400 hover:text-zinc-700 mr-1">
+                            <X size={16} />
+                          </button>
+                          <div className="min-w-0 flex-1">
+                            <p className="text-[13px] font-bold text-zinc-900 truncate">{activeThread.mechanic?.name ?? "Unknown mechanic"}</p>
+                            <p className="text-[11px] text-zinc-400 truncate">{activeThread.mechanic?.email ?? ""}</p>
+                          </div>
+                        </div>
+
+                        <div className="flex-1 overflow-y-auto px-5 py-4 space-y-2.5 bg-zinc-50/40">
+                          {activeThread.messages.map((m) => (
+                            <div key={m.id} className={`flex ${m.from_admin ? "justify-end" : "justify-start"}`}>
+                              <div className={`max-w-[80%] rounded-2xl px-3.5 py-2.5 text-[12.5px] leading-snug ${
+                                m.from_admin ? "bg-red-600 text-white rounded-br-sm" : "bg-white border border-zinc-200 text-zinc-700 rounded-bl-sm"
+                              }`}>
+                                <p className="whitespace-pre-wrap break-words">{m.body}</p>
+                                <p className={`text-[9.5px] mt-1 ${m.from_admin ? "text-red-100" : "text-zinc-300"}`}>{formatDate(m.created_at)}</p>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+
+                        <div className="px-4 py-3 border-t border-zinc-100 flex items-end gap-2">
+                          <textarea
+                            value={threadDraft}
+                            onChange={(e) => setThreadDraft(e.target.value)}
+                            onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSendThreadReply(); } }}
+                            placeholder="Type a quick reply…"
+                            rows={1}
+                            className="flex-1 rounded-xl border border-zinc-200 px-3 py-2.5 text-[13px] outline-none focus:border-red-400 resize-none"
+                          />
+                          <button
+                            onClick={handleSendThreadReply}
+                            disabled={threadSending || !threadDraft.trim()}
+                            className="flex items-center justify-center gap-1.5 bg-red-600 hover:bg-red-500 disabled:opacity-40 text-white font-bold px-4 py-2.5 rounded-xl text-[12px] transition-all shrink-0"
+                          >
+                            <Send size={13} />
+                          </button>
+                        </div>
+                      </>
+                    )}
+                  </div>
                 </div>
               )}
             </div>

@@ -64,6 +64,14 @@ function looksLikeEmail(s: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s.trim());
 }
 
+type SupportMsgRow = {
+  id: string;
+  body: string;
+  from_admin: boolean;
+  read: boolean;
+  created_at: string;
+};
+
 export default function MessagesPage() {
   const router = useRouter();
   const [checkingAuth, setCheckingAuth] = useState(true);
@@ -77,10 +85,11 @@ export default function MessagesPage() {
   const [unreadOnly, setUnreadOnly] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [showSupportModal, setShowSupportModal] = useState(false);
+  const [supportThread, setSupportThread] = useState<SupportMsgRow[]>([]);
+  const [supportThreadLoading, setSupportThreadLoading] = useState(false);
   const [supportBody, setSupportBody] = useState("");
   const [supportSaving, setSupportSaving] = useState(false);
   const [supportError, setSupportError] = useState("");
-  const [supportSent, setSupportSent] = useState(false);
 
   const unreadCount = useUnreadMessagesCount(mechanicId);
 
@@ -141,27 +150,44 @@ export default function MessagesPage() {
     await supabase.from("messages").delete().eq("id", m.id);
   }
 
-  function openSupportModal() {
+  async function openSupportModal() {
     setSupportBody("");
     setSupportError("");
-    setSupportSent(false);
     setShowSupportModal(true);
+    setSupportThreadLoading(true);
+
+    const { data } = await supabase
+      .from("support_messages")
+      .select("id, body, from_admin, read, created_at")
+      .eq("mechanic_id", mechanicId)
+      .order("created_at", { ascending: true });
+    const thread = (data as SupportMsgRow[]) ?? [];
+    setSupportThread(thread);
+    setSupportThreadLoading(false);
+
+    const unreadIds = thread.filter((m) => m.from_admin && !m.read).map((m) => m.id);
+    if (unreadIds.length > 0) {
+      setSupportThread((prev) => prev.map((m) => (unreadIds.includes(m.id) ? { ...m, read: true } : m)));
+      await supabase.from("support_messages").update({ read: true }).in("id", unreadIds);
+    }
   }
 
   async function handleSendSupport() {
     if (!supportBody.trim()) return;
+    const text = supportBody.trim();
     setSupportSaving(true);
     setSupportError("");
     const { data, error } = await supabase
       .from("support_messages")
-      .insert({ mechanic_id: mechanicId, body: supportBody.trim() })
-      .select("id");
+      .insert({ mechanic_id: mechanicId, body: text, from_admin: false })
+      .select("id, body, from_admin, read, created_at");
     setSupportSaving(false);
     if (error || !data || data.length === 0) {
       setSupportError("Couldn't send your message. Try again.");
       return;
     }
-    setSupportSent(true);
+    setSupportThread((prev) => [...prev, data[0] as SupportMsgRow]);
+    setSupportBody("");
   }
 
   if (checkingAuth) {
@@ -398,49 +424,60 @@ export default function MessagesPage() {
         </div>
       </div>
 
-      {/* ══ CONTACT SUPPORT MODAL ══ */}
+      {/* ══ CONTACT SUPPORT MODAL (full conversation) ══ */}
       {showSupportModal && (
         <div className="fixed inset-0 z-50 bg-zinc-900/40 flex items-center justify-center p-4" onClick={() => setShowSupportModal(false)}>
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-100">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md h-[75vh] max-h-[560px] flex flex-col" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-100 shrink-0">
               <div className="flex items-center gap-2">
                 <LifeBuoy size={16} className="text-zinc-700" />
-                <h2 className="text-[15px] font-black text-zinc-900">Contact Support</h2>
+                <div>
+                  <h2 className="text-[15px] font-black text-zinc-900 leading-tight">Contact Support</h2>
+                  <p className="text-[11px] text-zinc-400 leading-tight">Maintly Team</p>
+                </div>
               </div>
               <button onClick={() => setShowSupportModal(false)} className="text-zinc-400 hover:text-zinc-700"><X size={18} /></button>
             </div>
 
-            <div className="px-6 py-5 space-y-3">
-              {supportSent ? (
-                <div className="text-center py-6">
-                  <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-emerald-50 mb-3">
-                    <Send size={18} className="text-emerald-600" />
-                  </div>
-                  <p className="text-[13px] font-bold text-zinc-800">Message sent!</p>
-                  <p className="text-[12px] text-zinc-400 mt-1">The Maintly team will reply right here in your Messages inbox.</p>
-                  <button onClick={() => setShowSupportModal(false)} className="mt-4 text-[12px] font-bold text-zinc-500 hover:text-zinc-800">Close</button>
-                </div>
+            <div className="flex-1 overflow-y-auto px-5 py-4 space-y-2.5 bg-zinc-50/40">
+              {supportThreadLoading ? (
+                <p className="text-[12px] text-zinc-300 text-center py-8">Loading…</p>
+              ) : supportThread.length === 0 ? (
+                <p className="text-[12px] text-zinc-300 text-center py-8">Any question or issue — write it below and the team will reply right here.</p>
               ) : (
-                <>
-                  <p className="text-[12px] text-zinc-400">Any question or issue — write it here and the team will get back to you directly in this inbox.</p>
-                  <textarea
-                    value={supportBody}
-                    onChange={(e) => setSupportBody(e.target.value)}
-                    placeholder="What's up?"
-                    rows={4}
-                    autoFocus
-                    className="w-full rounded-xl border border-zinc-200 px-3 py-2 text-[13px] outline-none focus:border-red-400 resize-none"
-                  />
-                  {supportError && <p className="text-[12px] text-red-600">{supportError}</p>}
-                  <button
-                    onClick={handleSendSupport}
-                    disabled={supportSaving || !supportBody.trim()}
-                    className="w-full flex items-center justify-center gap-2 bg-zinc-900 hover:bg-zinc-800 disabled:opacity-40 text-white font-bold py-2.5 rounded-xl text-[13px] transition-all"
-                  >
-                    <Send size={14} /> {supportSaving ? "Sending…" : "Send to Support"}
-                  </button>
-                </>
+                supportThread.map((m) => (
+                  <div key={m.id} className={`flex ${m.from_admin ? "justify-start" : "justify-end"}`}>
+                    <div className={`max-w-[80%] rounded-2xl px-3.5 py-2.5 text-[12.5px] leading-snug ${
+                      m.from_admin ? "bg-white border border-zinc-200 text-zinc-700 rounded-bl-sm" : "bg-zinc-900 text-white rounded-br-sm"
+                    }`}>
+                      <p className="whitespace-pre-wrap break-words">{m.body}</p>
+                      <p className={`text-[9.5px] mt-1 ${m.from_admin ? "text-zinc-300" : "text-zinc-400"}`}>{formatDateDMY(m.created_at)}</p>
+                    </div>
+                  </div>
+                ))
               )}
+            </div>
+
+            <div className="px-4 py-3 border-t border-zinc-100 shrink-0 space-y-1.5">
+              {supportError && <p className="text-[11px] text-red-600 px-1">{supportError}</p>}
+              <div className="flex items-end gap-2">
+                <textarea
+                  value={supportBody}
+                  onChange={(e) => setSupportBody(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSendSupport(); } }}
+                  placeholder="Type a message…"
+                  rows={1}
+                  autoFocus
+                  className="flex-1 rounded-xl border border-zinc-200 px-3 py-2.5 text-[13px] outline-none focus:border-red-400 resize-none"
+                />
+                <button
+                  onClick={handleSendSupport}
+                  disabled={supportSaving || !supportBody.trim()}
+                  className="flex items-center justify-center gap-1.5 bg-zinc-900 hover:bg-zinc-800 disabled:opacity-40 text-white font-bold px-4 py-2.5 rounded-xl text-[12px] transition-all shrink-0"
+                >
+                  <Send size={13} />
+                </button>
+              </div>
             </div>
           </div>
         </div>
