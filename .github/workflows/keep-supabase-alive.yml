@@ -1,0 +1,20 @@
+name: Keep Supabase Alive
+
+# Supabase's free tier pauses a project after 1 week with no activity. This
+# job just visits a page that makes a real (harmless, read-only) query
+# against the database every few days, so the project never sits idle long
+# enough to trigger that pause. Costs nothing — GitHub Actions' free tier
+# covers this many times over.
+
+on:
+  schedule:
+    - cron: "0 12 */3 * *"   # every 3 days at 12:00 UTC — well under the 7-day pause window
+  workflow_dispatch: {}       # lets you trigger it manually from the Actions tab to test it
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping MaintlyQR (touches Supabase so the free-tier project stays active)
+        run: |
+          curl -sS -o /dev/null -w "Ping response: %{http_code}\n" "https://maintlyqr.com/asset/keepalive-ping/report"
