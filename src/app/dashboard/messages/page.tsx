@@ -462,10 +462,10 @@ export default function MessagesPage() {
                         </p>
                       )}
                       <div className={`max-w-[80%] rounded-2xl px-3.5 py-2.5 text-[12.5px] leading-snug ${
-                        m.from_admin ? "bg-white border border-zinc-200 text-zinc-700 rounded-bl-sm" : "bg-zinc-900 text-white rounded-br-sm"
+                        m.from_admin ? "bg-white border border-zinc-200 text-zinc-700 rounded-bl-sm" : "bg-blue-600 text-white rounded-br-sm"
                       }`}>
                         <p className="whitespace-pre-wrap break-words">{m.body}</p>
-                        <p className={`text-[9.5px] mt-1 ${m.from_admin ? "text-zinc-300" : "text-zinc-400"}`}>{formatDateDMY(m.created_at)} · {formatTime(m.created_at)}</p>
+                        <p className={`text-[9.5px] mt-1 ${m.from_admin ? "text-zinc-300" : "text-blue-100"}`}>{formatDateDMY(m.created_at)} · {formatTime(m.created_at)}</p>
                       </div>
                     </div>
                   );

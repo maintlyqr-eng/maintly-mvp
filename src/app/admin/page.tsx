@@ -502,6 +502,15 @@ export default function AdminPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Support conversations aren't realtime — refetch every time this tab is
+  // opened so a reply is never composed against a stale, half-loaded thread.
+  useEffect(() => {
+    if (section === "support" && adminAuthed) {
+      loadSupportMessages();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [section, adminAuthed]);
+
   async function handleAdminLogin(e: React.FormEvent) {
     e.preventDefault();
     setLoginError("");
