@@ -256,7 +256,7 @@ export default function HomePage() {
       )}
 
       {/* ════ HERO ════ */}
-      <section className="relative z-10 flex flex-col items-center text-center px-4 flex-1 pb-8 md:pb-0" style={{paddingTop:'3vh'}}>
+      <section className="relative z-10 flex flex-col items-center text-center px-4 flex-1 pb-8 md:pb-0" style={{paddingTop:'2vh'}}>
 
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
@@ -280,10 +280,10 @@ export default function HomePage() {
         </p>
 
         {/* ── ACTION CARDS ── */}
-        <div className="flex flex-col md:flex-row items-stretch w-full max-w-[540px] rounded-2xl overflow-hidden shadow-[0_8px_50px_rgba(0,0,0,0.13)] border border-zinc-200/80" style={{marginTop:'2.5vh'}}>
+        <div className="flex flex-col md:flex-row items-stretch w-full max-w-[540px] rounded-2xl overflow-hidden shadow-[0_8px_50px_rgba(0,0,0,0.13)] border border-zinc-200/80" style={{marginTop:'1.8vh'}}>
 
           {/* SCAN QR */}
-          <div className="flex-1 bg-zinc-900 flex flex-col items-center text-center px-7 rounded-t-2xl md:rounded-t-none md:rounded-l-2xl" style={{paddingTop:'2.5vh', paddingBottom:'2.5vh'}}>
+          <div className="flex-1 bg-zinc-900 flex flex-col items-center text-center px-7 rounded-t-2xl md:rounded-t-none md:rounded-l-2xl" style={{paddingTop:'2.1vh', paddingBottom:'2.1vh'}}>
             <div className="rounded-full bg-red-600/15 border border-red-600/30 flex items-center justify-center mb-3" style={{width:'clamp(40px,4vw,56px)', height:'clamp(40px,4vw,56px)'}}>
               <Camera className="text-red-500" style={{width:'clamp(18px,1.8vw,26px)', height:'clamp(18px,1.8vw,26px)'}} />
             </div>
@@ -310,7 +310,7 @@ export default function HomePage() {
           </div>
 
           {/* ENTER QR */}
-          <div className="flex-1 bg-white flex flex-col items-center text-center px-7 rounded-b-2xl md:rounded-b-none md:rounded-r-2xl" style={{paddingTop:'2.5vh', paddingBottom:'2.5vh'}}>
+          <div className="flex-1 bg-white flex flex-col items-center text-center px-7 rounded-b-2xl md:rounded-b-none md:rounded-r-2xl" style={{paddingTop:'2.1vh', paddingBottom:'2.1vh'}}>
             <div className="rounded-full bg-zinc-100 border border-zinc-200 flex items-center justify-center mb-3" style={{width:'clamp(40px,4vw,56px)', height:'clamp(40px,4vw,56px)'}}>
               <Keyboard className="text-zinc-500" style={{width:'clamp(16px,1.5vw,22px)', height:'clamp(16px,1.5vw,22px)'}} />
             </div>
@@ -339,24 +339,15 @@ export default function HomePage() {
           </div>
         </div>
 
-        <div className="flex items-center gap-2 text-zinc-500" style={{marginTop:'1.2vh'}}>
+        <div className="flex items-center gap-3 text-zinc-500" style={{marginTop:'1vh'}}>
           <ShieldCheck className="text-red-500 shrink-0" style={{width:'clamp(11px,0.9vw,14px)', height:'clamp(11px,0.9vw,14px)'}} />
           <span style={{fontSize:'clamp(10px,0.8vw,12px)'}}>Open history. No login required.</span>
-        </div>
-
-        {/* ── SOCIAL PROOF ── */}
-        <div className="flex items-center gap-4" style={{marginTop:'1.2vh'}}>
-          <p className="tracking-[0.25em] text-zinc-400 font-semibold uppercase" style={{fontSize:'clamp(7px,0.55vw,9px)'}}>Trusted by Professionals Worldwide</p>
           <div className="flex -space-x-2">
             {["#dc2626","#1d4ed8","#16a34a","#d97706","#7c3aed"].map((color, i) => (
-              <div key={i} className="rounded-full border-2 border-white flex items-center justify-center text-white font-black" style={{background:color, width:'clamp(22px,2vw,28px)', height:'clamp(22px,2vw,28px)', fontSize:'clamp(7px,0.55vw,9px)'}}>
+              <div key={i} className="rounded-full border-2 border-white flex items-center justify-center text-white font-black" style={{background:color, width:'clamp(18px,1.6vw,22px)', height:'clamp(18px,1.6vw,22px)', fontSize:'clamp(6px,0.5vw,8px)'}}>
                 {["JM","AS","RK","LP","TW"][i]}
               </div>
             ))}
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="bg-red-600 text-white font-black rounded-full px-2" style={{fontSize:'clamp(8px,0.65vw,10px)', padding:'2px 8px'}}>{stats ? stats.machines.toLocaleString() : "—"}</span>
-            <span className="text-zinc-500 font-medium" style={{fontSize:'clamp(9px,0.7vw,11px)'}}>machines tracked</span>
           </div>
         </div>
 
@@ -368,7 +359,7 @@ export default function HomePage() {
             { icon: Wrench, value: stats ? stats.mechanics.toLocaleString() : "—", label: "Verified Mechanics" },
             { icon: TrendingUp, value: null, label: "Growing Every Day" },
           ].map(({ icon: Icon, value, label }, i) => (
-            <div key={label} className={["flex flex-col items-center text-center px-3 border-white/10", i % 2 === 0 ? "border-r" : "", i < 2 ? "border-b" : "", "md:border-b-0", i < 3 ? "md:border-r" : "md:border-r-0"].filter(Boolean).join(" ")} style={{paddingTop:'clamp(10px,1.4vh,18px)', paddingBottom:'clamp(10px,1.4vh,18px)'}}>
+            <div key={label} className={["flex flex-col items-center text-center px-3 border-white/10", i % 2 === 0 ? "border-r" : "", i < 2 ? "border-b" : "", "md:border-b-0", i < 3 ? "md:border-r" : "md:border-r-0"].filter(Boolean).join(" ")} style={{paddingTop:'clamp(8px,1vh,14px)', paddingBottom:'clamp(8px,1vh,14px)'}}>
               <Icon className="text-red-500 mb-1" style={{width:'clamp(14px,1.2vw,18px)', height:'clamp(14px,1.2vw,18px)'}} />
               {value !== null && (
                 <p className="font-black text-white leading-tight" style={{fontSize:'clamp(15px,1.6vw,22px)'}}>{value}</p>
@@ -379,7 +370,7 @@ export default function HomePage() {
         </div>
 
         {/* ── PILLARS ── */}
-        <div className="w-full max-w-[540px] grid grid-cols-2 md:grid-cols-4 rounded-2xl overflow-hidden border border-zinc-200 bg-white/92 backdrop-blur-sm shadow-sm" style={{marginTop:'1.2vh'}}>
+        <div className="w-full max-w-[540px] grid grid-cols-2 md:grid-cols-4 rounded-2xl overflow-hidden border border-zinc-200 bg-white/92 backdrop-blur-sm shadow-sm" style={{marginTop:'0.9vh'}}>
           {[
             { icon: ShieldCheck, title: "100% Secure", sub: "Your data is safe and encrypted" },
             { icon: Globe, title: "Access Anywhere", sub: "Global access to your maintenance history" },
