@@ -17,7 +17,7 @@ export default function LegalLayout({ children, title, subtitle, docNumber, effe
         <div className="max-w-5xl mx-auto px-6 h-16 flex items-center justify-between">
           <Link href="/" className="flex items-center">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/images/qr-gear.png" alt="MaintlyQR" style={{ width: 52, height: 52, objectFit: "contain" }} />
+            <img src="/images/qr-gear-real.png" alt="MaintlyQR" style={{ width: 52, height: 52, objectFit: "contain" }} />
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/images/Maintly.png" alt="" style={{ width: 108, objectFit: "contain", marginLeft: -12 }} />
           </Link>
@@ -60,7 +60,7 @@ export default function LegalLayout({ children, title, subtitle, docNumber, effe
         <div className="max-w-5xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-2">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/images/qr-gear.png" alt="" style={{ width: 28, height: 28, objectFit: "contain" }} />
+            <img src="/images/qr-gear-real.png" alt="" style={{ width: 28, height: 28, objectFit: "contain" }} />
             <span className="text-xs font-semibold tracking-widest text-zinc-400 uppercase">MaintlyQR™</span>
           </div>
           <div className="flex flex-wrap justify-center gap-x-6 gap-y-1 text-xs text-zinc-400">

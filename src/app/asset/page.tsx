@@ -88,7 +88,7 @@ export default function AssetPage() {
       <header className="bg-white border-b border-zinc-200 px-6 py-3 flex items-center justify-between">
         <div className="flex items-center gap-6">
           <div className="flex items-center gap-2">
-            <Image src="/images/qr-gear.png" alt="Maintly" width={32} height={32} className="object-contain" />
+            <Image src="/images/qr-gear-real.png" alt="Maintly" width={32} height={32} className="object-contain" />
             <div>
               <span className="text-[16px] font-black tracking-tight leading-none">
                 <span className="text-zinc-900">MAIN</span><span className="text-red-600">TLY</span>
@@ -185,7 +185,7 @@ export default function AssetPage() {
             <p className="text-[10px] text-zinc-400 self-start mt-1 leading-relaxed">This QR code is linked to a verified asset record.</p>
 
             <div className="mt-4 p-3 border-2 border-red-200 rounded-xl">
-              <Image src="/images/qr-gear.png" alt="QR Code" width={140} height={140} className="object-contain" />
+              <Image src="/images/qr-gear-real.png" alt="QR Code" width={140} height={140} className="object-contain" />
             </div>
             <p className="text-[9px] text-zinc-400 mt-3 font-mono">SCAN ID: {asset.scanId}</p>
           </div>

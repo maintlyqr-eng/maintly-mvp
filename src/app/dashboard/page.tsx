@@ -533,7 +533,7 @@ export default function DashboardPage() {
 
         <div className="flex items-center justify-between px-4 py-2">
           <Link href="/" className="flex items-center">
-            <Image src="/images/qr-gear.png" alt="Maintly" width={72} height={72} priority style={{ objectFit: "contain" }} />
+            <Image src="/images/qr-gear-real.png" alt="Maintly" width={72} height={72} priority style={{ objectFit: "contain" }} />
             <Image src="/images/Maintly.png" alt="" width={152} height={101} priority style={{ objectFit: "contain", marginLeft: -18 }} />
           </Link>
           <button onClick={() => setSidebarOpen(false)} className="md:hidden text-zinc-400 hover:text-zinc-700 mr-2">

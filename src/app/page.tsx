@@ -180,7 +180,7 @@ export default function HomePage() {
       <nav className="relative z-50 flex items-center justify-between pl-3 pr-4 md:pr-8 bg-transparent border-b border-white/10 shrink-0 h-16 md:h-[9vh]">
         <a href="/" className="flex items-center">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/images/qr-gear_crop.png" alt="Maintly" className="w-10 h-10 md:w-[clamp(40px,7vh,84px)] md:h-[clamp(40px,7vh,84px)] object-contain" />
+          <img src="/images/qr-gear-real.png" alt="Maintly" className="w-10 h-10 md:w-[clamp(40px,7vh,84px)] md:h-[clamp(40px,7vh,84px)] object-contain" />
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/images/Maintly_crop.png" alt="" className="w-[88px] md:w-[clamp(84px,14.6vh,175px)] object-contain -ml-2 md:-ml-3" />
         </a>
@@ -258,13 +258,15 @@ export default function HomePage() {
       {/* ════ HERO ════ */}
       <section className="relative z-10 flex flex-col items-center text-center px-4 flex-1 pb-8 md:pb-0" style={{paddingTop:'1.3vh'}}>
 
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src="/images/qr-gear_crop.png"
-          alt=""
-          className="object-contain drop-shadow-[0_8px_24px_rgba(0,0,0,0.15)]"
-          style={{ width: 'clamp(56px,min(8vw,9vh),96px)', height: 'clamp(56px,min(8vw,9vh),96px)', marginBottom: '0.8vh' }}
-        />
+        <a href="/" aria-label="Maintly home" className="transition-transform hover:scale-105 active:scale-95">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/images/qr-gear-real.png"
+            alt="Maintly"
+            className="object-contain drop-shadow-[0_8px_24px_rgba(0,0,0,0.15)] cursor-pointer"
+            style={{ width: 'clamp(56px,min(8vw,9vh),96px)', height: 'clamp(56px,min(8vw,9vh),96px)', marginBottom: '0.8vh' }}
+          />
+        </a>
 
         <h1 className="font-black leading-[1.05] tracking-tight text-zinc-900 uppercase" style={{fontSize:'clamp(28px,min(5vw,6.2vh),52px)'}}>
           Every Machine<br />Has a <span className="text-red-600">Story.</span>
