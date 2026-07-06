@@ -207,9 +207,6 @@ export default function HomePage() {
             <a href="/login" className="flex items-center gap-2 text-zinc-700 hover:text-zinc-900 font-black tracking-wide rounded-xl transition-all border border-zinc-300 hover:border-zinc-400 uppercase px-4 py-2" style={{fontSize:'clamp(10px,0.75vw,12px)'}}>
               <User size={13} /> Login
             </a>
-            <a href="/register" className="flex items-center gap-2 bg-red-600 hover:bg-red-500 text-white font-black tracking-wide rounded-xl transition-all shadow-md shadow-red-900/20 uppercase px-5 py-2" style={{fontSize:'clamp(10px,0.75vw,12px)'}}>
-              Get Started <ArrowRight size={13} />
-            </a>
           </div>
         )}
         </div>
@@ -241,9 +238,6 @@ export default function HomePage() {
               </div>
             ) : (
               <div className="flex flex-col gap-2">
-                <a href="/register" onClick={() => setMobileMenuOpen(false)} className="flex items-center justify-center gap-2 bg-red-600 hover:bg-red-500 text-white font-black tracking-wide rounded-xl transition-all shadow-md shadow-red-900/20 uppercase px-5 py-3 text-[13px]">
-                  Get Started <ArrowRight size={14} />
-                </a>
                 <a href="/login" onClick={() => setMobileMenuOpen(false)} className="flex items-center justify-center gap-2 text-zinc-700 font-black tracking-wide rounded-xl transition-all border border-zinc-300 uppercase px-5 py-3 text-[13px]">
                   <User size={14} /> Login
                 </a>
@@ -254,7 +248,7 @@ export default function HomePage() {
       )}
 
       {/* ════ HERO ════ */}
-      <section className="relative z-10 flex flex-col items-center text-center px-4 flex-1 pb-8 md:pb-0" style={{paddingTop:'0.4vh'}}>
+      <section className="relative z-10 flex flex-col items-center text-center px-4 flex-1 pb-8 md:pb-0" style={{paddingTop:'1vh'}}>
 
         <a href="/" aria-label="Maintly home" className="transition-transform duration-300 ease-out hover:scale-[1.3] active:scale-95">
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -262,7 +256,7 @@ export default function HomePage() {
             src="/images/qr-gear-real.png"
             alt="Maintly"
             className="object-contain drop-shadow-[0_8px_24px_rgba(0,0,0,0.15)] cursor-pointer"
-            style={{ width: 'clamp(120px,min(18vw,20.5vh),260px)', height: 'clamp(120px,min(18vw,20.5vh),260px)', marginBottom: '0.5vh' }}
+            style={{ width: 'clamp(130px,min(19vw,22.5vh),300px)', height: 'clamp(130px,min(19vw,22.5vh),300px)', marginBottom: '0.6vh' }}
           />
         </a>
 
@@ -270,9 +264,9 @@ export default function HomePage() {
           Every Machine<br />Has a <span className="text-red-600">Story.</span>
         </h1>
 
-        <div className="w-14 h-[3px] bg-red-600 rounded-full" style={{marginTop:'0.6vh'}} />
+        <div className="w-14 h-[3px] bg-red-600 rounded-full" style={{marginTop:'0.8vh'}} />
 
-        <p className="font-semibold text-zinc-800" style={{fontSize:'clamp(13px,1.2vw,18px)', marginTop:'0.5vh'}}>
+        <p className="font-semibold text-zinc-800" style={{fontSize:'clamp(13px,1.2vw,18px)', marginTop:'0.6vh'}}>
           <span className="text-red-600 font-black">One QR.</span> Lifetime Maintenance History.
         </p>
         <p className="text-zinc-500 max-w-lg leading-[1.4]" style={{fontSize:'clamp(11px,0.9vw,14px)', marginTop:'0.2vh'}}>
@@ -379,11 +373,11 @@ export default function HomePage() {
             { icon: Clock, title: "Full History" },
             { icon: TrendingUp, title: "Built to Grow" },
           ].map(({ icon: Icon, title }, i) => (
-            <div key={title} className={["flex flex-row items-center justify-center gap-1.5 px-2 border-zinc-200", i % 2 === 0 ? "border-r" : "", i < 2 ? "border-b" : "", "md:border-b-0", i < 3 ? "md:border-r" : "md:border-r-0"].filter(Boolean).join(" ")} style={{paddingTop:'clamp(6px,0.7vh,10px)', paddingBottom:'clamp(6px,0.7vh,10px)'}}>
-              <div className="rounded-full border border-red-200 bg-red-50 flex items-center justify-center text-red-500 shrink-0" style={{width:'clamp(18px,1.6vw,22px)', height:'clamp(18px,1.6vw,22px)'}}>
-                <Icon style={{width:'clamp(9px,0.8vw,12px)', height:'clamp(9px,0.8vw,12px)'}} />
+            <div key={title} className={["flex flex-row items-center justify-center gap-1 px-1 border-zinc-200", i % 2 === 0 ? "border-r" : "", i < 2 ? "border-b" : "", "md:border-b-0", i < 3 ? "md:border-r" : "md:border-r-0"].filter(Boolean).join(" ")} style={{paddingTop:'clamp(6px,0.7vh,10px)', paddingBottom:'clamp(6px,0.7vh,10px)'}}>
+              <div className="rounded-full border border-red-200 bg-red-50 flex items-center justify-center text-red-500 shrink-0" style={{width:'clamp(16px,1.4vw,20px)', height:'clamp(16px,1.4vw,20px)'}}>
+                <Icon style={{width:'clamp(8px,0.75vw,11px)', height:'clamp(8px,0.75vw,11px)'}} />
               </div>
-              <p className="font-black tracking-wide text-zinc-800 leading-tight uppercase whitespace-nowrap" style={{fontSize:'clamp(7px,0.62vw,9.5px)'}}>{title}</p>
+              <p className="font-black tracking-normal text-zinc-800 leading-tight uppercase whitespace-nowrap" style={{fontSize:'clamp(6.5px,0.56vw,8.5px)'}}>{title}</p>
             </div>
           ))}
         </div>
