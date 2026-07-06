@@ -256,7 +256,7 @@ export default function HomePage() {
       {/* ════ HERO ════ */}
       <section className="relative z-10 flex flex-col items-center text-center px-4 flex-1 pb-8 md:pb-0" style={{paddingTop:'0.4vh'}}>
 
-        <a href="/" aria-label="Maintly home" className="transition-transform hover:scale-105 active:scale-95">
+        <a href="/" aria-label="Maintly home" className="transition-transform duration-300 ease-out hover:scale-[1.3] active:scale-95">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src="/images/qr-gear-real.png"
@@ -359,12 +359,14 @@ export default function HomePage() {
             { icon: Wrench, value: stats ? stats.mechanics.toLocaleString() : "—", label: "Verified Mechanics" },
             { icon: TrendingUp, value: null, label: "Growing Every Day" },
           ].map(({ icon: Icon, value, label }, i) => (
-            <div key={label} className={["flex flex-col items-center text-center px-3 border-white/10", i % 2 === 0 ? "border-r" : "", i < 2 ? "border-b" : "", "md:border-b-0", i < 3 ? "md:border-r" : "md:border-r-0"].filter(Boolean).join(" ")} style={{paddingTop:'clamp(4px,0.5vh,8px)', paddingBottom:'clamp(4px,0.5vh,8px)'}}>
-              <Icon className="text-red-500 mb-1" style={{width:'clamp(14px,1.2vw,18px)', height:'clamp(14px,1.2vw,18px)'}} />
-              {value !== null && (
-                <p className="font-black text-white leading-tight" style={{fontSize:'clamp(15px,1.6vw,22px)'}}>{value}</p>
-              )}
-              <p className="text-zinc-400 font-semibold uppercase tracking-wide leading-tight" style={{fontSize:'clamp(7px,0.6vw,9px)', marginTop: value !== null ? '1px' : '4px'}}>{label}</p>
+            <div key={label} className={["flex flex-row items-center justify-center gap-1.5 px-2 border-white/10", i % 2 === 0 ? "border-r" : "", i < 2 ? "border-b" : "", "md:border-b-0", i < 3 ? "md:border-r" : "md:border-r-0"].filter(Boolean).join(" ")} style={{paddingTop:'clamp(6px,0.8vh,11px)', paddingBottom:'clamp(6px,0.8vh,11px)'}}>
+              <Icon className="text-red-500 shrink-0" style={{width:'clamp(13px,1.1vw,17px)', height:'clamp(13px,1.1vw,17px)'}} />
+              <div className="flex flex-col items-start leading-none">
+                {value !== null && (
+                  <p className="font-black text-white leading-none" style={{fontSize:'clamp(13px,1.3vw,18px)'}}>{value}</p>
+                )}
+                <p className="text-zinc-400 font-semibold uppercase tracking-wide leading-tight whitespace-nowrap" style={{fontSize:'clamp(6.5px,0.55vw,8.5px)', marginTop: value !== null ? '1px' : '0'}}>{label}</p>
+              </div>
             </div>
           ))}
         </div>
@@ -372,17 +374,16 @@ export default function HomePage() {
         {/* ── PILLARS ── */}
         <div className="w-full max-w-[540px] grid grid-cols-2 md:grid-cols-4 rounded-2xl overflow-hidden border border-zinc-200 bg-white/92 backdrop-blur-sm shadow-sm" style={{marginTop:'0.4vh'}}>
           {[
-            { icon: ShieldCheck, title: "100% Secure", sub: "Your data is safe and encrypted" },
-            { icon: Globe, title: "Access Anywhere", sub: "Global access to your maintenance history" },
-            { icon: Clock, title: "Full History", sub: "Every service, every part, every time" },
-            { icon: TrendingUp, title: "Built to Grow", sub: "Scalable for individuals and enterprises" },
-          ].map(({ icon: Icon, title, sub }, i) => (
-            <div key={title} className={["flex flex-col items-center text-center px-3 border-zinc-200", i % 2 === 0 ? "border-r" : "", i < 2 ? "border-b" : "", "md:border-b-0", i < 3 ? "md:border-r" : "md:border-r-0"].filter(Boolean).join(" ")} style={{paddingTop:'clamp(3px,0.4vh,6px)', paddingBottom:'clamp(3px,0.4vh,6px)'}}>
-              <div className="rounded-full border border-red-200 bg-red-50 flex items-center justify-center text-red-500 shrink-0" style={{width:'clamp(24px,2.2vw,30px)', height:'clamp(24px,2.2vw,30px)', marginBottom:'clamp(4px,0.5vh,8px)'}}>
-                <Icon style={{width:'clamp(10px,0.9vw,13px)', height:'clamp(10px,0.9vw,13px)'}} />
+            { icon: ShieldCheck, title: "100% Secure" },
+            { icon: Globe, title: "Access Anywhere" },
+            { icon: Clock, title: "Full History" },
+            { icon: TrendingUp, title: "Built to Grow" },
+          ].map(({ icon: Icon, title }, i) => (
+            <div key={title} className={["flex flex-row items-center justify-center gap-1.5 px-2 border-zinc-200", i % 2 === 0 ? "border-r" : "", i < 2 ? "border-b" : "", "md:border-b-0", i < 3 ? "md:border-r" : "md:border-r-0"].filter(Boolean).join(" ")} style={{paddingTop:'clamp(6px,0.7vh,10px)', paddingBottom:'clamp(6px,0.7vh,10px)'}}>
+              <div className="rounded-full border border-red-200 bg-red-50 flex items-center justify-center text-red-500 shrink-0" style={{width:'clamp(18px,1.6vw,22px)', height:'clamp(18px,1.6vw,22px)'}}>
+                <Icon style={{width:'clamp(9px,0.8vw,12px)', height:'clamp(9px,0.8vw,12px)'}} />
               </div>
-              <p className="font-black tracking-wide text-zinc-800 leading-tight uppercase" style={{fontSize:'clamp(7px,0.6vw,9px)', marginBottom:'2px'}}>{title}</p>
-              <p className="text-zinc-400 leading-tight" style={{fontSize:'clamp(7px,0.58vw,8.5px)'}}>{sub}</p>
+              <p className="font-black tracking-wide text-zinc-800 leading-tight uppercase whitespace-nowrap" style={{fontSize:'clamp(7px,0.62vw,9.5px)'}}>{title}</p>
             </div>
           ))}
         </div>
