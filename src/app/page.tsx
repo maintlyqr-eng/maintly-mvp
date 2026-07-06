@@ -262,11 +262,11 @@ export default function HomePage() {
             src="/images/qr-gear-real.png"
             alt="Maintly"
             className="object-contain drop-shadow-[0_8px_24px_rgba(0,0,0,0.15)] cursor-pointer"
-            style={{ width: 'clamp(56px,min(8vw,9vh),96px)', height: 'clamp(56px,min(8vw,9vh),96px)', marginBottom: '0.8vh' }}
+            style={{ width: 'clamp(90px,min(12vw,13vh),170px)', height: 'clamp(90px,min(12vw,13vh),170px)', marginBottom: '0.8vh' }}
           />
         </a>
 
-        <h1 className="font-black leading-[1.05] tracking-tight text-zinc-900 uppercase" style={{fontSize:'clamp(28px,min(5vw,6.2vh),52px)'}}>
+        <h1 className="font-black leading-[1.02] tracking-tighter text-zinc-900 uppercase" style={{fontSize:'clamp(32px,min(5.8vw,7.2vh),60px)'}}>
           Every Machine<br />Has a <span className="text-red-600">Story.</span>
         </h1>
 
