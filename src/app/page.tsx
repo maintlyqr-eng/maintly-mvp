@@ -177,7 +177,7 @@ export default function HomePage() {
       <div className="absolute inset-0 z-0 bg-white/15 pointer-events-none" />
 
       {/* ════ NAVBAR ════ */}
-      <nav className="relative z-50 flex items-center justify-between pl-3 pr-4 md:pr-8 bg-transparent border-b border-white/10 shrink-0 h-16 md:h-[9vh]">
+      <nav className="relative z-50 flex items-center justify-between pl-3 pr-4 md:pr-8 bg-transparent border-b border-white/10 shrink-0 h-16 md:h-[7.2vh]">
         <a href="/" className="flex items-center">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/images/maintly-logo-full.png" alt="MaintlyQR" className="h-10 md:h-[clamp(40px,7vh,84px)] w-auto object-contain" />
@@ -254,7 +254,7 @@ export default function HomePage() {
       )}
 
       {/* ════ HERO ════ */}
-      <section className="relative z-10 flex flex-col items-center text-center px-4 flex-1 pb-8 md:pb-0" style={{paddingTop:'1.3vh'}}>
+      <section className="relative z-10 flex flex-col items-center text-center px-4 flex-1 pb-8 md:pb-0" style={{paddingTop:'0.4vh'}}>
 
         <a href="/" aria-label="Maintly home" className="transition-transform hover:scale-105 active:scale-95">
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -262,28 +262,28 @@ export default function HomePage() {
             src="/images/qr-gear-real.png"
             alt="Maintly"
             className="object-contain drop-shadow-[0_8px_24px_rgba(0,0,0,0.15)] cursor-pointer"
-            style={{ width: 'clamp(90px,min(12vw,13vh),170px)', height: 'clamp(90px,min(12vw,13vh),170px)', marginBottom: '0.8vh' }}
+            style={{ width: 'clamp(120px,min(18vw,20.5vh),260px)', height: 'clamp(120px,min(18vw,20.5vh),260px)', marginBottom: '0.5vh' }}
           />
         </a>
 
-        <h1 className="font-black leading-[1.02] tracking-tighter text-zinc-900 uppercase" style={{fontSize:'clamp(32px,min(5.8vw,7.2vh),60px)'}}>
+        <h1 className="font-black leading-[0.98] tracking-tighter text-zinc-900 uppercase" style={{fontSize:'clamp(36px,min(7.2vw,8.8vh),74px)'}}>
           Every Machine<br />Has a <span className="text-red-600">Story.</span>
         </h1>
 
-        <div className="w-14 h-[3px] bg-red-600 rounded-full" style={{marginTop:'1vh'}} />
+        <div className="w-14 h-[3px] bg-red-600 rounded-full" style={{marginTop:'0.6vh'}} />
 
-        <p className="font-semibold text-zinc-800" style={{fontSize:'clamp(13px,1.2vw,18px)', marginTop:'0.8vh'}}>
+        <p className="font-semibold text-zinc-800" style={{fontSize:'clamp(13px,1.2vw,18px)', marginTop:'0.5vh'}}>
           <span className="text-red-600 font-black">One QR.</span> Lifetime Maintenance History.
         </p>
-        <p className="text-zinc-500 max-w-lg leading-relaxed" style={{fontSize:'clamp(11px,0.9vw,14px)', marginTop:'0.5vh'}}>
+        <p className="text-zinc-500 max-w-lg leading-[1.4]" style={{fontSize:'clamp(11px,0.9vw,14px)', marginTop:'0.2vh'}}>
           Scan any QR code and instantly access the complete maintenance history of any machine, anywhere in the world.
         </p>
 
         {/* ── ACTION CARDS ── */}
-        <div className="flex flex-col md:flex-row items-stretch w-full max-w-[540px] rounded-2xl overflow-hidden shadow-[0_8px_50px_rgba(0,0,0,0.13)] border border-zinc-200/80" style={{marginTop:'1.2vh'}}>
+        <div className="flex flex-col md:flex-row items-stretch w-full max-w-[540px] rounded-2xl overflow-hidden shadow-[0_8px_50px_rgba(0,0,0,0.13)] border border-zinc-200/80" style={{marginTop:'0.8vh'}}>
 
           {/* SCAN QR */}
-          <div className="flex-1 bg-zinc-900 flex flex-col items-center text-center px-7 rounded-t-2xl md:rounded-t-none md:rounded-l-2xl" style={{paddingTop:'1.5vh', paddingBottom:'1.5vh'}}>
+          <div className="flex-1 bg-zinc-900 flex flex-col items-center text-center px-7 rounded-t-2xl md:rounded-t-none md:rounded-l-2xl" style={{paddingTop:'0.9vh', paddingBottom:'0.9vh'}}>
             <div className="rounded-full bg-red-600/15 border border-red-600/30 flex items-center justify-center mb-3" style={{width:'clamp(40px,4vw,56px)', height:'clamp(40px,4vw,56px)'}}>
               <Camera className="text-red-500" style={{width:'clamp(18px,1.8vw,26px)', height:'clamp(18px,1.8vw,26px)'}} />
             </div>
@@ -310,7 +310,7 @@ export default function HomePage() {
           </div>
 
           {/* ENTER QR */}
-          <div className="flex-1 bg-white flex flex-col items-center text-center px-7 rounded-b-2xl md:rounded-b-none md:rounded-r-2xl" style={{paddingTop:'1.5vh', paddingBottom:'1.5vh'}}>
+          <div className="flex-1 bg-white flex flex-col items-center text-center px-7 rounded-b-2xl md:rounded-b-none md:rounded-r-2xl" style={{paddingTop:'0.9vh', paddingBottom:'0.9vh'}}>
             <div className="rounded-full bg-zinc-100 border border-zinc-200 flex items-center justify-center mb-3" style={{width:'clamp(40px,4vw,56px)', height:'clamp(40px,4vw,56px)'}}>
               <Keyboard className="text-zinc-500" style={{width:'clamp(16px,1.5vw,22px)', height:'clamp(16px,1.5vw,22px)'}} />
             </div>
@@ -339,7 +339,7 @@ export default function HomePage() {
           </div>
         </div>
 
-        <div className="flex items-center gap-3 text-zinc-500" style={{marginTop:'0.7vh'}}>
+        <div className="flex items-center gap-3 text-zinc-500" style={{marginTop:'0.4vh'}}>
           <ShieldCheck className="text-red-500 shrink-0" style={{width:'clamp(11px,0.9vw,14px)', height:'clamp(11px,0.9vw,14px)'}} />
           <span style={{fontSize:'clamp(10px,0.8vw,12px)'}}>Open history. No login required.</span>
           <div className="flex -space-x-2">
@@ -352,14 +352,14 @@ export default function HomePage() {
         </div>
 
         {/* ── LIVE STATS ── */}
-        <div className="w-full max-w-[540px] grid grid-cols-2 md:grid-cols-4 rounded-2xl overflow-hidden bg-zinc-900 shadow-lg" style={{marginTop:'0.9vh'}}>
+        <div className="w-full max-w-[540px] grid grid-cols-2 md:grid-cols-4 rounded-2xl overflow-hidden bg-zinc-900 shadow-lg" style={{marginTop:'0.5vh'}}>
           {[
             { icon: Globe, value: stats ? stats.machines.toLocaleString() : "—", label: "Machines Tracked" },
             { icon: FileText, value: stats ? stats.services.toLocaleString() : "—", label: "Services Logged" },
             { icon: Wrench, value: stats ? stats.mechanics.toLocaleString() : "—", label: "Verified Mechanics" },
             { icon: TrendingUp, value: null, label: "Growing Every Day" },
           ].map(({ icon: Icon, value, label }, i) => (
-            <div key={label} className={["flex flex-col items-center text-center px-3 border-white/10", i % 2 === 0 ? "border-r" : "", i < 2 ? "border-b" : "", "md:border-b-0", i < 3 ? "md:border-r" : "md:border-r-0"].filter(Boolean).join(" ")} style={{paddingTop:'clamp(6px,0.8vh,11px)', paddingBottom:'clamp(6px,0.8vh,11px)'}}>
+            <div key={label} className={["flex flex-col items-center text-center px-3 border-white/10", i % 2 === 0 ? "border-r" : "", i < 2 ? "border-b" : "", "md:border-b-0", i < 3 ? "md:border-r" : "md:border-r-0"].filter(Boolean).join(" ")} style={{paddingTop:'clamp(4px,0.5vh,8px)', paddingBottom:'clamp(4px,0.5vh,8px)'}}>
               <Icon className="text-red-500 mb-1" style={{width:'clamp(14px,1.2vw,18px)', height:'clamp(14px,1.2vw,18px)'}} />
               {value !== null && (
                 <p className="font-black text-white leading-tight" style={{fontSize:'clamp(15px,1.6vw,22px)'}}>{value}</p>
@@ -370,14 +370,14 @@ export default function HomePage() {
         </div>
 
         {/* ── PILLARS ── */}
-        <div className="w-full max-w-[540px] grid grid-cols-2 md:grid-cols-4 rounded-2xl overflow-hidden border border-zinc-200 bg-white/92 backdrop-blur-sm shadow-sm" style={{marginTop:'0.7vh'}}>
+        <div className="w-full max-w-[540px] grid grid-cols-2 md:grid-cols-4 rounded-2xl overflow-hidden border border-zinc-200 bg-white/92 backdrop-blur-sm shadow-sm" style={{marginTop:'0.4vh'}}>
           {[
             { icon: ShieldCheck, title: "100% Secure", sub: "Your data is safe and encrypted" },
             { icon: Globe, title: "Access Anywhere", sub: "Global access to your maintenance history" },
             { icon: Clock, title: "Full History", sub: "Every service, every part, every time" },
             { icon: TrendingUp, title: "Built to Grow", sub: "Scalable for individuals and enterprises" },
           ].map(({ icon: Icon, title, sub }, i) => (
-            <div key={title} className={["flex flex-col items-center text-center px-3 border-zinc-200", i % 2 === 0 ? "border-r" : "", i < 2 ? "border-b" : "", "md:border-b-0", i < 3 ? "md:border-r" : "md:border-r-0"].filter(Boolean).join(" ")} style={{paddingTop:'clamp(6px,0.8vh,10px)', paddingBottom:'clamp(6px,0.8vh,10px)'}}>
+            <div key={title} className={["flex flex-col items-center text-center px-3 border-zinc-200", i % 2 === 0 ? "border-r" : "", i < 2 ? "border-b" : "", "md:border-b-0", i < 3 ? "md:border-r" : "md:border-r-0"].filter(Boolean).join(" ")} style={{paddingTop:'clamp(3px,0.4vh,6px)', paddingBottom:'clamp(3px,0.4vh,6px)'}}>
               <div className="rounded-full border border-red-200 bg-red-50 flex items-center justify-center text-red-500 shrink-0" style={{width:'clamp(24px,2.2vw,30px)', height:'clamp(24px,2.2vw,30px)', marginBottom:'clamp(4px,0.5vh,8px)'}}>
                 <Icon style={{width:'clamp(10px,0.9vw,13px)', height:'clamp(10px,0.9vw,13px)'}} />
               </div>
@@ -388,7 +388,7 @@ export default function HomePage() {
         </div>
 
         {/* ── FOOTER ── */}
-        <div className="flex justify-center items-center gap-3 flex-wrap" style={{marginTop:'0.6vh', marginBottom:'0.6vh'}}>
+        <div className="flex justify-center items-center gap-3 flex-wrap" style={{marginTop:'0.15vh', marginBottom:'0.15vh'}}>
           <span className="tracking-[0.2em] text-zinc-400 font-semibold uppercase" style={{fontSize:'clamp(6.5px,0.55vw,8px)'}}>Maintly®</span>
           <span className="text-red-400" style={{fontSize:'clamp(6px,0.5vw,7px)'}}>•</span>
           <span className="tracking-[0.2em] text-zinc-400 font-semibold uppercase" style={{fontSize:'clamp(6.5px,0.55vw,8px)'}}>Maintenance. Tracked.</span>
