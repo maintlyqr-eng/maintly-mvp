@@ -180,9 +180,9 @@ export default function HomePage() {
       <nav className="relative z-50 flex items-center justify-between pl-3 pr-4 md:pr-8 bg-transparent border-b border-white/10 shrink-0 h-16 md:h-[9vh]">
         <a href="/" className="flex items-center">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/images/qr-gear.png" alt="Maintly" className="w-10 h-10 md:w-[84px] md:h-[84px] object-contain" />
+          <img src="/images/qr-gear_crop.png" alt="Maintly" className="w-10 h-10 md:w-[clamp(40px,7vh,84px)] md:h-[clamp(40px,7vh,84px)] object-contain" />
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/images/Maintly.png" alt="" className="w-[88px] md:w-[175px] object-contain -ml-2 md:-ml-5" />
+          <img src="/images/Maintly_crop.png" alt="" className="w-[88px] md:w-[clamp(84px,14.6vh,175px)] object-contain -ml-2 md:-ml-3" />
         </a>
 
         <div className="hidden md:flex items-center gap-10">
@@ -256,38 +256,38 @@ export default function HomePage() {
       )}
 
       {/* ════ HERO ════ */}
-      <section className="relative z-10 flex flex-col items-center text-center px-4 flex-1 pb-8 md:pb-0" style={{paddingTop:'2vh'}}>
+      <section className="relative z-10 flex flex-col items-center text-center px-4 flex-1 pb-8 md:pb-0" style={{paddingTop:'1.3vh'}}>
 
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          src="/images/qr-gear.png"
+          src="/images/qr-gear_crop.png"
           alt=""
           className="object-contain drop-shadow-[0_8px_24px_rgba(0,0,0,0.15)]"
-          style={{ width: 'clamp(70px,9vw,130px)', height: 'clamp(70px,9vw,130px)', marginBottom: '1.2vh' }}
+          style={{ width: 'clamp(56px,min(8vw,9vh),96px)', height: 'clamp(56px,min(8vw,9vh),96px)', marginBottom: '0.8vh' }}
         />
 
-        <h1 className="font-black leading-[1.05] tracking-tight text-zinc-900" style={{fontSize:'clamp(36px,5.5vw,68px)'}}>
+        <h1 className="font-black leading-[1.05] tracking-tight text-zinc-900 uppercase" style={{fontSize:'clamp(28px,min(5vw,6.2vh),52px)'}}>
           Every Machine<br />Has a <span className="text-red-600">Story.</span>
         </h1>
 
-        <div className="w-14 h-[3px] bg-red-600 rounded-full" style={{marginTop:'1.5vh'}} />
+        <div className="w-14 h-[3px] bg-red-600 rounded-full" style={{marginTop:'1vh'}} />
 
-        <p className="font-semibold text-zinc-800" style={{fontSize:'clamp(13px,1.2vw,18px)', marginTop:'1.5vh'}}>
+        <p className="font-semibold text-zinc-800" style={{fontSize:'clamp(13px,1.2vw,18px)', marginTop:'0.8vh'}}>
           <span className="text-red-600 font-black">One QR.</span> Lifetime Maintenance History.
         </p>
-        <p className="text-zinc-500 max-w-lg leading-relaxed" style={{fontSize:'clamp(11px,0.9vw,14px)', marginTop:'0.8vh'}}>
+        <p className="text-zinc-500 max-w-lg leading-relaxed" style={{fontSize:'clamp(11px,0.9vw,14px)', marginTop:'0.5vh'}}>
           Scan any QR code and instantly access the complete maintenance history of any machine, anywhere in the world.
         </p>
 
         {/* ── ACTION CARDS ── */}
-        <div className="flex flex-col md:flex-row items-stretch w-full max-w-[540px] rounded-2xl overflow-hidden shadow-[0_8px_50px_rgba(0,0,0,0.13)] border border-zinc-200/80" style={{marginTop:'1.8vh'}}>
+        <div className="flex flex-col md:flex-row items-stretch w-full max-w-[540px] rounded-2xl overflow-hidden shadow-[0_8px_50px_rgba(0,0,0,0.13)] border border-zinc-200/80" style={{marginTop:'1.2vh'}}>
 
           {/* SCAN QR */}
-          <div className="flex-1 bg-zinc-900 flex flex-col items-center text-center px-7 rounded-t-2xl md:rounded-t-none md:rounded-l-2xl" style={{paddingTop:'2.1vh', paddingBottom:'2.1vh'}}>
+          <div className="flex-1 bg-zinc-900 flex flex-col items-center text-center px-7 rounded-t-2xl md:rounded-t-none md:rounded-l-2xl" style={{paddingTop:'1.5vh', paddingBottom:'1.5vh'}}>
             <div className="rounded-full bg-red-600/15 border border-red-600/30 flex items-center justify-center mb-3" style={{width:'clamp(40px,4vw,56px)', height:'clamp(40px,4vw,56px)'}}>
               <Camera className="text-red-500" style={{width:'clamp(18px,1.8vw,26px)', height:'clamp(18px,1.8vw,26px)'}} />
             </div>
-            <h2 className="font-black tracking-[0.12em] text-white mb-1 uppercase" style={{fontSize:'clamp(10px,0.8vw,13px)'}}>Scan QR Code</h2>
+            <h2 className="font-black tracking-[0.06em] text-white mb-1 uppercase whitespace-nowrap" style={{fontSize:'clamp(10px,0.7vw,12px)'}}>Scan QR Code</h2>
             <p className="text-zinc-400 leading-tight flex-1" style={{fontSize:'clamp(9px,0.7vw,11px)', marginBottom:'1.5vh'}}>
               Use your camera to<br />scan any QR code
             </p>
@@ -310,11 +310,11 @@ export default function HomePage() {
           </div>
 
           {/* ENTER QR */}
-          <div className="flex-1 bg-white flex flex-col items-center text-center px-7 rounded-b-2xl md:rounded-b-none md:rounded-r-2xl" style={{paddingTop:'2.1vh', paddingBottom:'2.1vh'}}>
+          <div className="flex-1 bg-white flex flex-col items-center text-center px-7 rounded-b-2xl md:rounded-b-none md:rounded-r-2xl" style={{paddingTop:'1.5vh', paddingBottom:'1.5vh'}}>
             <div className="rounded-full bg-zinc-100 border border-zinc-200 flex items-center justify-center mb-3" style={{width:'clamp(40px,4vw,56px)', height:'clamp(40px,4vw,56px)'}}>
               <Keyboard className="text-zinc-500" style={{width:'clamp(16px,1.5vw,22px)', height:'clamp(16px,1.5vw,22px)'}} />
             </div>
-            <h2 className="font-black tracking-[0.12em] text-zinc-900 mb-1 uppercase" style={{fontSize:'clamp(10px,0.8vw,13px)'}}>Enter QR Code</h2>
+            <h2 className="font-black tracking-[0.06em] text-zinc-900 mb-1 uppercase whitespace-nowrap" style={{fontSize:'clamp(10px,0.7vw,12px)'}}>Enter QR Code</h2>
             <p className="text-zinc-400 leading-tight flex-1" style={{fontSize:'clamp(9px,0.7vw,11px)', marginBottom:'1.5vh'}}>
               Type or paste your<br />Maintly code
             </p>
@@ -339,7 +339,7 @@ export default function HomePage() {
           </div>
         </div>
 
-        <div className="flex items-center gap-3 text-zinc-500" style={{marginTop:'1vh'}}>
+        <div className="flex items-center gap-3 text-zinc-500" style={{marginTop:'0.7vh'}}>
           <ShieldCheck className="text-red-500 shrink-0" style={{width:'clamp(11px,0.9vw,14px)', height:'clamp(11px,0.9vw,14px)'}} />
           <span style={{fontSize:'clamp(10px,0.8vw,12px)'}}>Open history. No login required.</span>
           <div className="flex -space-x-2">
@@ -352,14 +352,14 @@ export default function HomePage() {
         </div>
 
         {/* ── LIVE STATS ── */}
-        <div className="w-full max-w-[540px] grid grid-cols-2 md:grid-cols-4 rounded-2xl overflow-hidden bg-zinc-900 shadow-lg" style={{marginTop:'1.2vh'}}>
+        <div className="w-full max-w-[540px] grid grid-cols-2 md:grid-cols-4 rounded-2xl overflow-hidden bg-zinc-900 shadow-lg" style={{marginTop:'0.9vh'}}>
           {[
             { icon: Globe, value: stats ? stats.machines.toLocaleString() : "—", label: "Machines Tracked" },
             { icon: FileText, value: stats ? stats.services.toLocaleString() : "—", label: "Services Logged" },
             { icon: Wrench, value: stats ? stats.mechanics.toLocaleString() : "—", label: "Verified Mechanics" },
             { icon: TrendingUp, value: null, label: "Growing Every Day" },
           ].map(({ icon: Icon, value, label }, i) => (
-            <div key={label} className={["flex flex-col items-center text-center px-3 border-white/10", i % 2 === 0 ? "border-r" : "", i < 2 ? "border-b" : "", "md:border-b-0", i < 3 ? "md:border-r" : "md:border-r-0"].filter(Boolean).join(" ")} style={{paddingTop:'clamp(8px,1vh,14px)', paddingBottom:'clamp(8px,1vh,14px)'}}>
+            <div key={label} className={["flex flex-col items-center text-center px-3 border-white/10", i % 2 === 0 ? "border-r" : "", i < 2 ? "border-b" : "", "md:border-b-0", i < 3 ? "md:border-r" : "md:border-r-0"].filter(Boolean).join(" ")} style={{paddingTop:'clamp(6px,0.8vh,11px)', paddingBottom:'clamp(6px,0.8vh,11px)'}}>
               <Icon className="text-red-500 mb-1" style={{width:'clamp(14px,1.2vw,18px)', height:'clamp(14px,1.2vw,18px)'}} />
               {value !== null && (
                 <p className="font-black text-white leading-tight" style={{fontSize:'clamp(15px,1.6vw,22px)'}}>{value}</p>
@@ -370,14 +370,14 @@ export default function HomePage() {
         </div>
 
         {/* ── PILLARS ── */}
-        <div className="w-full max-w-[540px] grid grid-cols-2 md:grid-cols-4 rounded-2xl overflow-hidden border border-zinc-200 bg-white/92 backdrop-blur-sm shadow-sm" style={{marginTop:'0.9vh'}}>
+        <div className="w-full max-w-[540px] grid grid-cols-2 md:grid-cols-4 rounded-2xl overflow-hidden border border-zinc-200 bg-white/92 backdrop-blur-sm shadow-sm" style={{marginTop:'0.7vh'}}>
           {[
             { icon: ShieldCheck, title: "100% Secure", sub: "Your data is safe and encrypted" },
             { icon: Globe, title: "Access Anywhere", sub: "Global access to your maintenance history" },
             { icon: Clock, title: "Full History", sub: "Every service, every part, every time" },
             { icon: TrendingUp, title: "Built to Grow", sub: "Scalable for individuals and enterprises" },
           ].map(({ icon: Icon, title, sub }, i) => (
-            <div key={title} className={["flex flex-col items-center text-center px-3 border-zinc-200", i % 2 === 0 ? "border-r" : "", i < 2 ? "border-b" : "", "md:border-b-0", i < 3 ? "md:border-r" : "md:border-r-0"].filter(Boolean).join(" ")} style={{paddingTop:'clamp(8px,1vh,14px)', paddingBottom:'clamp(8px,1vh,14px)'}}>
+            <div key={title} className={["flex flex-col items-center text-center px-3 border-zinc-200", i % 2 === 0 ? "border-r" : "", i < 2 ? "border-b" : "", "md:border-b-0", i < 3 ? "md:border-r" : "md:border-r-0"].filter(Boolean).join(" ")} style={{paddingTop:'clamp(6px,0.8vh,10px)', paddingBottom:'clamp(6px,0.8vh,10px)'}}>
               <div className="rounded-full border border-red-200 bg-red-50 flex items-center justify-center text-red-500 shrink-0" style={{width:'clamp(24px,2.2vw,30px)', height:'clamp(24px,2.2vw,30px)', marginBottom:'clamp(4px,0.5vh,8px)'}}>
                 <Icon style={{width:'clamp(10px,0.9vw,13px)', height:'clamp(10px,0.9vw,13px)'}} />
               </div>
@@ -388,7 +388,7 @@ export default function HomePage() {
         </div>
 
         {/* ── FOOTER ── */}
-        <div className="flex justify-center items-center gap-3 flex-wrap" style={{marginTop:'1vh', marginBottom:'1vh'}}>
+        <div className="flex justify-center items-center gap-3 flex-wrap" style={{marginTop:'0.6vh', marginBottom:'0.6vh'}}>
           <span className="tracking-[0.2em] text-zinc-400 font-semibold uppercase" style={{fontSize:'clamp(6.5px,0.55vw,8px)'}}>Maintly®</span>
           <span className="text-red-400" style={{fontSize:'clamp(6px,0.5vw,7px)'}}>•</span>
           <span className="tracking-[0.2em] text-zinc-400 font-semibold uppercase" style={{fontSize:'clamp(6.5px,0.55vw,8px)'}}>Maintenance. Tracked.</span>
@@ -415,7 +415,7 @@ export default function HomePage() {
           <div className="flex items-center justify-between px-5 pt-safe-top py-4 shrink-0" style={{paddingTop: 'max(env(safe-area-inset-top), 16px)'}}>
             <div className="flex items-center gap-2.5">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/images/Maintly.png" alt="Maintly" style={{height: 18, objectFit: 'contain', filter: 'brightness(0) invert(1)'}} />
+              <img src="/images/Maintly_crop.png" alt="Maintly" style={{height: 18, objectFit: 'contain', filter: 'brightness(0) invert(1)'}} />
             </div>
             <button
               onClick={closeCamera}
