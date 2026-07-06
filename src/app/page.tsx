@@ -180,9 +180,7 @@ export default function HomePage() {
       <nav className="relative z-50 flex items-center justify-between pl-3 pr-4 md:pr-8 bg-transparent border-b border-white/10 shrink-0 h-16 md:h-[9vh]">
         <a href="/" className="flex items-center">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/images/qr-gear-real.png" alt="Maintly" className="w-10 h-10 md:w-[clamp(40px,7vh,84px)] md:h-[clamp(40px,7vh,84px)] object-contain" />
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/images/Maintly_crop.png" alt="" className="w-[88px] md:w-[clamp(84px,14.6vh,175px)] object-contain -ml-2 md:-ml-3" />
+          <img src="/images/maintly-logo-full.png" alt="MaintlyQR" className="h-10 md:h-[clamp(40px,7vh,84px)] w-auto object-contain" />
         </a>
 
         <div className="hidden md:flex items-center gap-10">

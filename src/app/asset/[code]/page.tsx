@@ -278,8 +278,7 @@ export default function AssetPublicPage() {
         <h1 className="text-[20px] font-black text-zinc-900 mb-2">QR Code Not Found</h1>
         <p className="text-[14px] text-zinc-500 max-w-xs">This QR code doesn&apos;t match any asset in our system.</p>
         <div className="mt-8 flex items-center gap-0">
-          <Image src="/images/qr-gear-real.png" alt="Maintly" width={64} height={64} className="object-contain mt-2" />
-          <Image src="/images/Maintly.png" alt="Maintly" width={140} height={140} className="object-contain w-[140px] h-auto -ml-4 mt-2" />
+          <Image src="/images/maintly-logo-full.png" alt="MaintlyQR" width={217} height={64} className="object-contain mt-2" />
         </div>
       </div>
     );
@@ -294,8 +293,7 @@ export default function AssetPublicPage() {
       {/* ── HEADER ── */}
       <div className="bg-white border-b border-zinc-200 px-4 py-3 flex items-center justify-between sticky top-0 z-10 shadow-sm">
         <a href="/" className="flex items-center">
-          <Image src="/images/qr-gear-real.png" alt="Maintly" width={64} height={64} className="object-contain mt-2" />
-          <Image src="/images/Maintly.png" alt="Maintly" width={140} height={140} className="object-contain w-[140px] h-auto -ml-4 mt-2" />
+          <Image src="/images/maintly-logo-full.png" alt="MaintlyQR" width={217} height={64} className="object-contain mt-2" />
         </a>
         <div className="flex items-center gap-3">
           <a href={`/asset/${code}/report`} target="_blank" rel="noopener noreferrer"

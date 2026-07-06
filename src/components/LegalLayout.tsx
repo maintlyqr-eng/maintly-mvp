@@ -17,9 +17,7 @@ export default function LegalLayout({ children, title, subtitle, docNumber, effe
         <div className="max-w-5xl mx-auto px-6 h-16 flex items-center justify-between">
           <Link href="/" className="flex items-center">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/images/qr-gear-real.png" alt="MaintlyQR" style={{ width: 52, height: 52, objectFit: "contain" }} />
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/images/Maintly.png" alt="" style={{ width: 108, objectFit: "contain", marginLeft: -12 }} />
+            <img src="/images/maintly-logo-full.png" alt="MaintlyQR" style={{ height: 52, width: "auto", objectFit: "contain" }} />
           </Link>
           <div className="flex items-center gap-6 text-xs font-medium text-zinc-500 tracking-wide uppercase">
             <Link href="/legal" className="hover:text-red-600 transition-colors">Legal Hub</Link>
