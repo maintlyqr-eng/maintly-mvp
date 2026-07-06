@@ -3,8 +3,10 @@
 import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowRight, ShieldCheck, Camera, Keyboard, User, ChevronDown, Globe, Clock, TrendingUp, LogOut, LayoutGrid, X, ZoomIn, Menu } from "lucide-react";
+import { ArrowRight, ShieldCheck, Camera, Keyboard, User, ChevronDown, Globe, Clock, TrendingUp, LogOut, LayoutGrid, X, ZoomIn, Menu, Wrench, FileText } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+
+type PublicStats = { machines: number; services: number; mechanics: number };
 
 export default function HomePage() {
   const router = useRouter();
@@ -12,6 +14,7 @@ export default function HomePage() {
   const [userName, setUserName] = useState("");
   const [qrCode, setQrCode] = useState("");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [stats, setStats] = useState<PublicStats | null>(null);
 
   // Camera scanner states
   const [showCamera, setShowCamera]   = useState(false);
@@ -42,6 +45,22 @@ export default function HomePage() {
   useEffect(() => {
     return () => { stopCamera(); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Real, live platform stats for the trust bar — no made-up numbers.
+  // get_public_stats() is a security-definer function (migration 016) that
+  // only ever returns three counts, never any row-level data.
+  useEffect(() => {
+    supabase.rpc("get_public_stats").then(({ data }) => {
+      const row = data?.[0];
+      if (row) {
+        setStats({
+          machines: row.machines_count ?? 0,
+          services: row.services_count ?? 0,
+          mechanics: row.mechanics_count ?? 0,
+        });
+      }
+    });
   }, []);
 
   async function handleLogout() {
@@ -186,9 +205,14 @@ export default function HomePage() {
             </button>
           </div>
         ) : (
-          <a href="/login" className="flex items-center gap-2 bg-red-600 hover:bg-red-500 text-white font-black tracking-wide rounded-xl transition-all shadow-md shadow-red-900/20 uppercase px-5 py-2" style={{fontSize:'clamp(10px,0.75vw,12px)'}}>
-            <User size={13} /> Mechanic Login
-          </a>
+          <div className="flex items-center gap-2.5">
+            <a href="/login" className="flex items-center gap-2 text-zinc-700 hover:text-zinc-900 font-black tracking-wide rounded-xl transition-all border border-zinc-300 hover:border-zinc-400 uppercase px-4 py-2" style={{fontSize:'clamp(10px,0.75vw,12px)'}}>
+              <User size={13} /> Login
+            </a>
+            <a href="/register" className="flex items-center gap-2 bg-red-600 hover:bg-red-500 text-white font-black tracking-wide rounded-xl transition-all shadow-md shadow-red-900/20 uppercase px-5 py-2" style={{fontSize:'clamp(10px,0.75vw,12px)'}}>
+              Get Started <ArrowRight size={13} />
+            </a>
+          </div>
         )}
         </div>
 
@@ -218,9 +242,14 @@ export default function HomePage() {
                 </button>
               </div>
             ) : (
-              <a href="/login" onClick={() => setMobileMenuOpen(false)} className="flex items-center justify-center gap-2 bg-red-600 hover:bg-red-500 text-white font-black tracking-wide rounded-xl transition-all shadow-md shadow-red-900/20 uppercase px-5 py-3 text-[13px]">
-                <User size={14} /> Mechanic Login
-              </a>
+              <div className="flex flex-col gap-2">
+                <a href="/register" onClick={() => setMobileMenuOpen(false)} className="flex items-center justify-center gap-2 bg-red-600 hover:bg-red-500 text-white font-black tracking-wide rounded-xl transition-all shadow-md shadow-red-900/20 uppercase px-5 py-3 text-[13px]">
+                  Get Started <ArrowRight size={14} />
+                </a>
+                <a href="/login" onClick={() => setMobileMenuOpen(false)} className="flex items-center justify-center gap-2 text-zinc-700 font-black tracking-wide rounded-xl transition-all border border-zinc-300 uppercase px-5 py-3 text-[13px]">
+                  <User size={14} /> Login
+                </a>
+              </div>
             )}
           </div>
         </div>
@@ -228,6 +257,14 @@ export default function HomePage() {
 
       {/* ════ HERO ════ */}
       <section className="relative z-10 flex flex-col items-center text-center px-4 flex-1 pb-8 md:pb-0" style={{paddingTop:'3vh'}}>
+
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/images/qr-gear.png"
+          alt=""
+          className="object-contain drop-shadow-[0_8px_24px_rgba(0,0,0,0.15)]"
+          style={{ width: 'clamp(70px,9vw,130px)', height: 'clamp(70px,9vw,130px)', marginBottom: '1.2vh' }}
+        />
 
         <h1 className="font-black leading-[1.05] tracking-tight text-zinc-900" style={{fontSize:'clamp(36px,5.5vw,68px)'}}>
           Every Machine<br />Has a <span className="text-red-600">Story.</span>
@@ -318,9 +355,27 @@ export default function HomePage() {
             ))}
           </div>
           <div className="flex items-center gap-2">
-            <span className="bg-red-600 text-white font-black rounded-full px-2" style={{fontSize:'clamp(8px,0.65vw,10px)', padding:'2px 8px'}}>10K+</span>
-            <span className="text-zinc-500 font-medium" style={{fontSize:'clamp(9px,0.7vw,11px)'}}>machines tracked globally</span>
+            <span className="bg-red-600 text-white font-black rounded-full px-2" style={{fontSize:'clamp(8px,0.65vw,10px)', padding:'2px 8px'}}>{stats ? stats.machines.toLocaleString() : "—"}</span>
+            <span className="text-zinc-500 font-medium" style={{fontSize:'clamp(9px,0.7vw,11px)'}}>machines tracked</span>
           </div>
+        </div>
+
+        {/* ── LIVE STATS ── */}
+        <div className="w-full max-w-[540px] grid grid-cols-2 md:grid-cols-4 rounded-2xl overflow-hidden bg-zinc-900 shadow-lg" style={{marginTop:'1.2vh'}}>
+          {[
+            { icon: Globe, value: stats ? stats.machines.toLocaleString() : "—", label: "Machines Tracked" },
+            { icon: FileText, value: stats ? stats.services.toLocaleString() : "—", label: "Services Logged" },
+            { icon: Wrench, value: stats ? stats.mechanics.toLocaleString() : "—", label: "Verified Mechanics" },
+            { icon: TrendingUp, value: null, label: "Growing Every Day" },
+          ].map(({ icon: Icon, value, label }, i) => (
+            <div key={label} className={["flex flex-col items-center text-center px-3 border-white/10", i % 2 === 0 ? "border-r" : "", i < 2 ? "border-b" : "", "md:border-b-0", i < 3 ? "md:border-r" : "md:border-r-0"].filter(Boolean).join(" ")} style={{paddingTop:'clamp(10px,1.4vh,18px)', paddingBottom:'clamp(10px,1.4vh,18px)'}}>
+              <Icon className="text-red-500 mb-1" style={{width:'clamp(14px,1.2vw,18px)', height:'clamp(14px,1.2vw,18px)'}} />
+              {value !== null && (
+                <p className="font-black text-white leading-tight" style={{fontSize:'clamp(15px,1.6vw,22px)'}}>{value}</p>
+              )}
+              <p className="text-zinc-400 font-semibold uppercase tracking-wide leading-tight" style={{fontSize:'clamp(7px,0.6vw,9px)', marginTop: value !== null ? '1px' : '4px'}}>{label}</p>
+            </div>
+          ))}
         </div>
 
         {/* ── PILLARS ── */}
