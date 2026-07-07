@@ -13,14 +13,26 @@ import QrFrameShape from "@/components/QrFrameShape";
 // this sandbox can't run `npm install` (network-restricted), so run it
 // locally before building: `npm install qr-code-styling`.
 //
-// Note on frames: a frame (hand-drawn SVG via QrFrameShape.tsx, or a real
-// illustrated PNG via `frameImage`/`frameHole` in qrThemes.ts) is a live
-// on-screen / on-print decoration only. `download()` exports just the plain
-// styled QR (colors/dots/logo, no frame) as a PNG, since qr-code-styling can
-// only export what it drew, not surrounding page DOM. The frame DOES show up
-// when printing a batch from the QR Codes page's "Print Sheet" view, since
-// that prints the live page.
+// Note on frames: for illustrated PNG frames (`frameImage`/`frameHole` in
+// qrThemes.ts), `download()` composites the frame artwork and a freshly
+// rendered, print-resolution QR onto one canvas and saves that as a single
+// PNG — so the downloaded file looks exactly like what's on screen, not just
+// a plain code. For the handful of themes still using the hand-drawn SVG
+// frame (QrFrameShape.tsx — daisy, star, tennis), compositing an SVG isn't
+// wired up yet, so download() falls back to exporting just the plain styled
+// QR; the frame still shows up when printing a batch from "Print Sheet" or
+// via the new per-card Print button, since those print the live page.
 export type QrCodeCanvasHandle = { download: (filename: string) => void };
+
+function loadImageEl(src: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const img = new window.Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error(`Failed to load image: ${src}`));
+    img.src = src;
+  });
+}
 
 const QrCodeCanvas = forwardRef<QrCodeCanvasHandle, {
   code: string;
@@ -31,6 +43,20 @@ const QrCodeCanvas = forwardRef<QrCodeCanvasHandle, {
   const containerRef = useRef<HTMLDivElement>(null);
   const qrRef = useRef<any>(null);
   const def = getQrTheme(theme);
+
+  // "plain" / "svg-frame" / "image-frame" each return a differently-shaped
+  // tree, but every shape's root happens to be a plain <div> — so when
+  // switching between them (e.g. a non-framed theme to a framed one),
+  // React sees "same tag at the same position" and REUSES that DOM node
+  // instead of unmounting it, patching its attrs in place. That's normally
+  // desirable, but the qr-code-styling <canvas> was appended to it
+  // *imperatively* (outside React's render), so React has no idea it's
+  // there and never removes it — it becomes an orphaned, unclipped leftover
+  // sitting at the reused node's top-left corner underneath the new
+  // content. That was the "old QR ghost showing behind the new one" bug.
+  // Keying the root by frameMode forces a full unmount/remount across a
+  // shape change, so the orphan can never survive a theme switch.
+  const frameMode = def.frameImage ? "image-frame" : def.frame ? "svg-frame" : "plain";
 
   useEffect(() => {
     let cancelled = false;
@@ -66,8 +92,70 @@ const QrCodeCanvas = forwardRef<QrCodeCanvasHandle, {
   }, [code, theme, size]);
 
   useImperativeHandle(ref, () => ({
-    download: (filename: string) => {
-      qrRef.current?.download({ name: filename, extension: "png" });
+    download: async (filename: string) => {
+      if (!def.frameImage || !def.frameHole) {
+        qrRef.current?.download({ name: filename, extension: "png" });
+        return;
+      }
+
+      // Composite path: render a fresh, print-resolution QR (independent of
+      // whatever small `size` this instance is displayed at on screen) and
+      // draw it onto a copy of the frame artwork at the hole's position, so
+      // the exported PNG matches what's shown on screen — sticker, not just
+      // bare code.
+      const EXPORT_HOLE_PX = 900;
+      const hole = def.frameHole;
+      const aspect = def.frameAspect ?? 1;
+      const frameWidth = Math.round(EXPORT_HOLE_PX / hole.w);
+      const frameHeight = Math.round(frameWidth * aspect);
+      const qrPx = Math.round(Math.min(hole.w * frameWidth, hole.h * frameHeight) * 0.94);
+      const qrLeft = Math.round(hole.x * frameWidth + (hole.w * frameWidth - qrPx) / 2);
+      const qrTop = Math.round(hole.y * frameHeight + (hole.h * frameHeight - qrPx) / 2);
+
+      try {
+        const mod = await import("qr-code-styling");
+        const QRCodeStyling = mod.default;
+        const url = `${window.location.origin}/asset/${code}`;
+        const exportQr = new QRCodeStyling({
+          width: qrPx,
+          height: qrPx,
+          type: "canvas",
+          data: url,
+          image: def.options.logo ? "/images/qr-gear-real.png" : undefined,
+          dotsOptions: { color: def.options.dotsColor, type: def.options.dotsType },
+          backgroundOptions: { color: def.options.backgroundColor },
+          cornersSquareOptions: { color: def.options.cornersSquareColor, type: def.options.cornersSquareType },
+          cornersDotOptions: { color: def.options.cornersDotColor, type: def.options.cornersDotType },
+          imageOptions: { crossOrigin: "anonymous", margin: 4, imageSize: 0.32 },
+        });
+
+        const rawQr: Blob = await exportQr.getRawData("png");
+        const qrObjectUrl = URL.createObjectURL(rawQr);
+        const [frameImg, qrImg] = await Promise.all([loadImageEl(def.frameImage), loadImageEl(qrObjectUrl)]);
+        URL.revokeObjectURL(qrObjectUrl);
+
+        const canvas = document.createElement("canvas");
+        canvas.width = frameWidth;
+        canvas.height = frameHeight;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) throw new Error("Canvas 2D context unavailable.");
+        ctx.drawImage(frameImg, 0, 0, frameWidth, frameHeight);
+        ctx.drawImage(qrImg, qrLeft, qrTop, qrPx, qrPx);
+
+        canvas.toBlob((blob) => {
+          if (!blob) return;
+          const blobUrl = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = blobUrl;
+          a.download = `${filename}.png`;
+          a.click();
+          URL.revokeObjectURL(blobUrl);
+        }, "image/png");
+      } catch {
+        // Compositing failed for some reason (image blocked, etc.) — still
+        // give the mechanic something rather than nothing.
+        qrRef.current?.download({ name: filename, extension: "png" });
+      }
     },
   }));
 
@@ -78,7 +166,7 @@ const QrCodeCanvas = forwardRef<QrCodeCanvasHandle, {
   // full `size`) overflow out of the top-left corner instead of sitting
   // centered — that was the "QR isn't centered" bug.
   const canvasBox = (
-    <div ref={containerRef} className={!def.frame && !def.frameImage ? className : undefined} style={{ width: size, height: size }} />
+    <div key={frameMode} ref={containerRef} className={!def.frame && !def.frameImage ? className : undefined} style={{ width: size, height: size }} />
   );
 
   // Real illustrated-artwork frame (Facu's supplied PNGs, cropped to
@@ -97,7 +185,7 @@ const QrCodeCanvas = forwardRef<QrCodeCanvasHandle, {
     const qrTop = Math.round(hole.y * frameHeight + (hole.h * frameHeight - qrSize) / 2);
 
     return (
-      <div className={className} style={{ position: "relative", width: frameWidth, height: frameHeight }}>
+      <div key={frameMode} className={className} style={{ position: "relative", width: frameWidth, height: frameHeight }}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={def.frameImage}
@@ -126,7 +214,7 @@ const QrCodeCanvas = forwardRef<QrCodeCanvasHandle, {
   const cardSize = size + 16;
 
   return (
-    <div className={className} style={{ position: "relative", width: frameSize, height: frameSize }}>
+    <div key={frameMode} className={className} style={{ position: "relative", width: frameSize, height: frameSize }}>
       <div style={{ position: "absolute", inset: 0 }}>
         <QrFrameShape shape={def.frame} color={def.frameColor || "#dc2626"} size={frameSize} />
       </div>

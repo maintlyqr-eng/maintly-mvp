@@ -88,7 +88,11 @@ export default function QrCodesPage() {
   // Assign-to-new-equipment (for a blank code, from this page)
   const [assignCode, setAssignCode] = useState<string | null>(null);
 
-  const [showPrintSheet, setShowPrintSheet] = useState(false);
+  // Codes currently shown in the print-sheet overlay — set either by the
+  // bulk "Print Sheet (N)" toolbar button (from the checkbox selection) or
+  // by a single card's own "Print" button, kept deliberately independent of
+  // `selected` so printing one code doesn't disturb a bulk selection.
+  const [printCodes, setPrintCodes] = useState<string[] | null>(null);
 
   async function loadCodes() {
     setLoading(true);
@@ -220,7 +224,7 @@ export default function QrCodesPage() {
   }
 
   const initials = mechanicName.split(" ").filter(Boolean).map((p) => p[0]).join("").slice(0, 2).toUpperCase() || "ME";
-  const selectedRows = codes.filter((c) => selected.has(c.code));
+  const printRows = printCodes ? codes.filter((c) => printCodes.includes(c.code)) : [];
 
   return (
     <div className="min-h-screen bg-zinc-50 flex relative">
@@ -367,7 +371,7 @@ export default function QrCodesPage() {
             <div className="flex items-center gap-2">
               {selected.size > 0 && (
                 <button
-                  onClick={() => setShowPrintSheet(true)}
+                  onClick={() => setPrintCodes(Array.from(selected))}
                   className="flex items-center gap-2 border border-zinc-200 hover:border-zinc-300 bg-white text-zinc-700 text-[13px] font-bold px-4 py-[10px] rounded-xl transition-all"
                 >
                   <Printer size={15} /> Print Sheet ({selected.size})
@@ -447,6 +451,9 @@ export default function QrCodesPage() {
                     </button>
                     <button onClick={() => handleDownload(row)} className="flex items-center gap-1 text-[11px] font-bold text-zinc-600 hover:text-red-600 transition-colors" title="Download PNG">
                       <Download size={12} /> Download
+                    </button>
+                    <button onClick={() => setPrintCodes([row.code])} className="flex items-center gap-1 text-[11px] font-bold text-zinc-600 hover:text-red-600 transition-colors" title="Print just this code">
+                      <Printer size={12} /> Print
                     </button>
                     {!row.asset && (
                       <button onClick={() => setAssignCode(row.code)} className="flex items-center gap-1 text-[11px] font-bold text-zinc-600 hover:text-red-600 transition-colors" title="Assign to a new asset">
@@ -554,19 +561,19 @@ export default function QrCodesPage() {
       />
 
       {/* ════ PRINT SHEET ════ */}
-      {showPrintSheet && (
+      {printCodes && (
         <div id="qr-print-sheet" className="fixed inset-0 z-50 bg-white overflow-y-auto">
           <div className="no-print flex items-center justify-between px-6 py-4 border-b border-zinc-200 sticky top-0 bg-white z-10">
-            <h2 className="text-[16px] font-black text-zinc-900">Print Sheet — {selectedRows.length} code{selectedRows.length === 1 ? "" : "s"}</h2>
+            <h2 className="text-[16px] font-black text-zinc-900">Print Sheet — {printRows.length} code{printRows.length === 1 ? "" : "s"}</h2>
             <div className="flex items-center gap-2">
               <button onClick={() => window.print()} className="flex items-center gap-2 bg-red-600 hover:bg-red-500 text-white text-[13px] font-bold px-4 py-2 rounded-xl">
                 <Printer size={14} /> Print
               </button>
-              <button onClick={() => setShowPrintSheet(false)} className="text-zinc-400 hover:text-zinc-700 px-2"><X size={20} /></button>
+              <button onClick={() => setPrintCodes(null)} className="text-zinc-400 hover:text-zinc-700 px-2"><X size={20} /></button>
             </div>
           </div>
           <div className="p-8 grid grid-cols-2 sm:grid-cols-3 gap-8 max-w-4xl mx-auto">
-            {selectedRows.map((row) => (
+            {printRows.map((row) => (
               <div key={row.code} className="flex flex-col items-center text-center gap-1.5 break-inside-avoid">
                 <QrCodeCanvas code={row.code} theme={row.theme} size={130} />
                 <p className="text-[11px] font-mono font-bold text-zinc-800">{row.code}</p>
