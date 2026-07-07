@@ -8,7 +8,7 @@ import {
   LayoutGrid, FileText, Box, QrCode, Users, BarChart3, Calendar as CalendarIcon,
   Mail, FolderOpen, Settings, Search, Bell, Plus, MoreVertical,
   CheckCircle2, Clock, TrendingUp, TrendingDown, Crown, ChevronLeft, ChevronRight, LogOut,
-  ScanLine, Wrench, AlertCircle, Menu, X
+  Wrench, Menu, X
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useUnreadMessagesCount } from "@/lib/useUnreadMessages";
@@ -19,6 +19,10 @@ import HoverAvatar from "@/components/HoverAvatar";
 import ContactSupportWidget from "@/components/ContactSupportWidget";
 import CalendarDayCell, { type DayInfo } from "@/components/CalendarDayCell";
 import { buildMonthGridMondayFirst } from "@/lib/calendarGrid";
+import AddAssetChooser from "@/components/AddAssetChooser";
+import NewAssetModal from "@/components/NewAssetModal";
+import LinkExistingAssetModal from "@/components/LinkExistingAssetModal";
+import { assetTypeImg } from "@/lib/assetTypes";
 
 const navItems = [
   { icon: LayoutGrid,   label: "Dashboard",        href: "/dashboard",          active: true  },
@@ -44,14 +48,6 @@ const typeColors: Record<string, string> = {
   "Brake Service": "bg-orange-100 text-orange-700",
 };
 
-const assetTypeImg: Record<string, string> = {
-  automotive: "/images/car.png",
-  motorcycle:  "/images/moto.png",
-  generator:   "/images/generador.png",
-  machinery:   "/images/excavator.png",
-  marine:      "/images/barco.png",
-  aviation:    "/images/avion.png",
-};
 
 type AssetInfo = {
   brand: string | null;
@@ -69,13 +65,6 @@ type RealService = {
   notes: string | null;
   asset_id: string;
   assets: AssetInfo | AssetInfo[] | null;
-};
-
-type FoundAsset = {
-  name: string;
-  id: string;      // display: QR code or serial
-  assetId: string; // UUID real para insertar en BD
-  type: string;
 };
 
 type ReminderItem = {
@@ -142,120 +131,18 @@ export default function DashboardPage() {
   const [searchServiceResults, setSearchServiceResults] = useState<SearchServiceResult[]>([]);
   const [searchingServices, setSearchingServices] = useState(false);
 
-  // ── Add Equipment modal states ──
-  const [showAddAssetModal, setShowAddAssetModal] = useState(false);
-  const [addAssetTab, setAddAssetTab] = useState<"choose" | "new" | "existing">("choose");
-  const [qrInput, setQrInput] = useState("");
-  const [foundAsset, setFoundAsset] = useState<FoundAsset | null>(null);
-  const [searchError, setSearchError] = useState("");
-  const [searchLoading, setSearchLoading] = useState(false);
-  const [addSuccess, setAddSuccess] = useState(false);
+  // ── Add Equipment flow (choose → new / existing) ──
+  // Shared components (also used by the Assets page) so this behaves
+  // identically everywhere — see src/components/{AddAssetChooser,
+  // NewAssetModal,LinkExistingAssetModal}.tsx.
+  const [addStep, setAddStep] = useState<"closed" | "choose" | "new" | "existing">("closed");
 
-  // New asset form states
-  const [newBrand, setNewBrand] = useState("");
-  const [newModel, setNewModel] = useState("");
-  const [newYear, setNewYear] = useState("");
-  const [newSerial, setNewSerial] = useState("");
-
-  function closeAddAssetModal() {
-    setShowAddAssetModal(false);
-    setAddAssetTab("choose");
-    setQrInput("");
-    setFoundAsset(null);
-    setSearchError("");
-    setSearchLoading(false);
-    setAddSuccess(false);
-    setNewBrand(""); setNewModel(""); setNewYear(""); setNewSerial("");
-  }
-
-  async function handleSearchAsset() {
-    if (!qrInput.trim()) return;
-    setSearchError("");
-    setFoundAsset(null);
-    setSearchLoading(true);
-
-    // 1. Buscar en qr_codes por el código (ej: MTLY-AB12-CD34)
-    const { data: qrData } = await supabase
-      .from("qr_codes")
-      .select("asset_id, code")
-      .ilike("code", qrInput.trim())
-      .maybeSingle();
-
-    if (qrData?.asset_id) {
-      // QR encontrado → cargar el asset vinculado
-      const { data: asset, error: assetErr } = await supabase
-        .from("assets")
-        .select("id, brand, model, nickname, asset_type, vin_serial")
-        .eq("id", qrData.asset_id)
-        .single();
-
-      setSearchLoading(false);
-
-      if (assetErr || !asset) {
-        setSearchError("QR code found but the asset is not linked yet.");
-        return;
-      }
-
-      setFoundAsset({
-        name: asset.nickname || [asset.brand, asset.model].filter(Boolean).join(" ") || "Unknown Asset",
-        id: qrData.code,
-        assetId: asset.id,
-        type: asset.asset_type,
-      });
-      return;
-    }
-
-    // 2. Fallback: buscar directamente por UUID del asset
-    const { data: directAsset } = await supabase
-      .from("assets")
-      .select("id, brand, model, nickname, asset_type, vin_serial")
-      .eq("id", qrInput.trim())
-      .maybeSingle();
-
-    setSearchLoading(false);
-
-    if (!directAsset) {
-      setSearchError("No asset found with that code. Make sure you entered the QR code exactly as it appears on the sticker (e.g. MTLY-AB12-CD34).");
-      return;
-    }
-
-    setFoundAsset({
-      name: directAsset.nickname || [directAsset.brand, directAsset.model].filter(Boolean).join(" ") || "Unknown Asset",
-      id: directAsset.vin_serial || directAsset.id,
-      assetId: directAsset.id,
-      type: directAsset.asset_type,
-    });
-  }
-
-  async function handleAddToWorkshop() {
-    if (!foundAsset) return;
-
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) { router.replace("/login"); return; }
-
-    const { error } = await supabase
-      .from("mechanic_assets")
-      .upsert(
-        {
-          mechanic_id: session.user.id,
-          asset_id: foundAsset.assetId,
-          qr_code: foundAsset.id,
-        },
-        { onConflict: "mechanic_id,asset_id", ignoreDuplicates: true }
-      );
-
-    if (error) {
-      setSearchError("Error al guardar: " + error.message);
-      return;
-    }
-
-    setAddSuccess(true);
-    // Refrescar contador de assets
+  async function refreshTotalAssets(uid: string) {
     const { count } = await supabase
       .from("mechanic_assets")
       .select("*", { count: "exact", head: true })
-      .eq("mechanic_id", session.user.id);
-    setTotalAssets(count ?? totalAssets);
+      .eq("mechanic_id", uid);
+    setTotalAssets((prev) => count ?? prev);
   }
 
   useEffect(() => {
@@ -704,7 +591,7 @@ export default function DashboardPage() {
             <ContactSupportWidget mechanicId={mechanicId} variant="inline" />
             <div className="flex gap-3">
             <button
-              onClick={() => { setShowAddAssetModal(true); setAddAssetTab("choose"); }}
+              onClick={() => setAddStep("choose")}
               className="flex items-center gap-2 border border-zinc-200 bg-white hover:bg-zinc-50 active:scale-[0.98] transition-all text-zinc-700 text-[13px] font-bold px-4 py-[10px] rounded-xl shadow-sm"
             >
               <Box size={15} /> Add Equipment
@@ -893,7 +780,7 @@ export default function DashboardPage() {
                     </div>
                   </Link>
                   <button
-                    onClick={() => { setShowAddAssetModal(true); setAddAssetTab("existing"); }}
+                    onClick={() => setAddStep("existing")}
                     className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-zinc-50 transition-colors text-left"
                   >
                     <div className="w-9 h-9 rounded-xl bg-purple-50 flex items-center justify-center shrink-0">
@@ -927,196 +814,25 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* ════ MODAL: ADD EQUIPMENT ════ */}
-      {showAddAssetModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden">
-
-            {/* Modal header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-100">
-              <div className="flex items-center gap-3">
-                {addAssetTab !== "choose" && (
-                  <button
-                    onClick={() => { setAddAssetTab("choose"); setFoundAsset(null); setSearchError(""); setQrInput(""); }}
-                    className="text-zinc-400 hover:text-zinc-700 transition-colors mr-1"
-                  >
-                    <ChevronLeft size={18} />
-                  </button>
-                )}
-                <h3 className="text-[16px] font-black text-zinc-900">
-                  {addAssetTab === "choose" && "Add Equipment"}
-                  {addAssetTab === "new" && "New Equipment"}
-                  {addAssetTab === "existing" && "Link Existing Asset"}
-                </h3>
-              </div>
-              <button
-                onClick={closeAddAssetModal}
-                className="text-zinc-400 hover:text-zinc-700 text-[22px] leading-none transition-colors"
-              >×</button>
-            </div>
-
-            {/* ── STEP: CHOOSE ── */}
-            {addAssetTab === "choose" && (
-              <div className="p-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <button
-                  onClick={() => setAddAssetTab("new")}
-                  className="flex flex-col items-center gap-3 p-5 border-2 border-zinc-200 hover:border-red-300 hover:bg-red-50 rounded-2xl transition-all text-center group"
-                >
-                  <div className="w-14 h-14 rounded-2xl bg-red-50 group-hover:bg-red-100 flex items-center justify-center transition-colors">
-                    <Plus size={26} className="text-red-600" />
-                  </div>
-                  <div>
-                    <p className="text-[14px] font-black text-zinc-900">New Equipment</p>
-                    <p className="text-[11px] text-zinc-500 mt-1 leading-relaxed">Register a new machine and generate a unique QR code</p>
-                  </div>
-                </button>
-
-                <button
-                  onClick={() => setAddAssetTab("existing")}
-                  className="flex flex-col items-center gap-3 p-5 border-2 border-zinc-200 hover:border-blue-300 hover:bg-blue-50 rounded-2xl transition-all text-center group"
-                >
-                  <div className="w-14 h-14 rounded-2xl bg-blue-50 group-hover:bg-blue-100 flex items-center justify-center transition-colors">
-                    <QrCode size={26} className="text-blue-600" />
-                  </div>
-                  <div>
-                    <p className="text-[14px] font-black text-zinc-900">Existing Equipment</p>
-                    <p className="text-[11px] text-zinc-500 mt-1 leading-relaxed">Scan or enter a QR code to link an asset to your workshop</p>
-                  </div>
-                </button>
-              </div>
-            )}
-
-            {/* ── STEP: NEW EQUIPMENT ── */}
-            {addAssetTab === "new" && (
-              <div className="p-6">
-                <p className="text-[13px] text-zinc-500 mb-5">Fill in the details to register a new asset. A unique QR code will be generated automatically.</p>
-                <div className="space-y-3">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div>
-                      <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wide mb-1 block">Brand</label>
-                      <input
-                        type="text" placeholder="e.g. Ford"
-                        value={newBrand} onChange={e => setNewBrand(e.target.value)}
-                        className="w-full rounded-xl border border-zinc-200 px-3 py-2.5 text-[13px] outline-none focus:border-red-400 transition-colors"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wide mb-1 block">Model</label>
-                      <input
-                        type="text" placeholder="e.g. Ranger XLT"
-                        value={newModel} onChange={e => setNewModel(e.target.value)}
-                        className="w-full rounded-xl border border-zinc-200 px-3 py-2.5 text-[13px] outline-none focus:border-red-400 transition-colors"
-                      />
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div>
-                      <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wide mb-1 block">Year</label>
-                      <input
-                        type="number" placeholder="e.g. 2021" max={new Date().getFullYear()}
-                        value={newYear} onChange={e => setNewYear(e.target.value)}
-                        className="w-full rounded-xl border border-zinc-200 px-3 py-2.5 text-[13px] outline-none focus:border-red-400 transition-colors"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-wide mb-1 block">Serial / VIN <span className="text-zinc-400 font-normal normal-case">(optional)</span></label>
-                      <input
-                        type="text" placeholder="e.g. 1FTFW1ET5..."
-                        value={newSerial} onChange={e => setNewSerial(e.target.value)}
-                        className="w-full rounded-xl border border-zinc-200 px-3 py-2.5 text-[13px] font-mono outline-none focus:border-red-400 transition-colors"
-                      />
-                    </div>
-                  </div>
-                </div>
-                <button className="w-full mt-5 bg-red-600 hover:bg-red-500 active:scale-[0.98] text-white font-bold py-3 rounded-xl text-[13px] transition-all shadow-sm">
-                  Create Asset &amp; Generate QR
-                </button>
-              </div>
-            )}
-
-            {/* ── STEP: EXISTING EQUIPMENT — SEARCH ── */}
-            {addAssetTab === "existing" && !addSuccess && (
-              <div className="p-6">
-                <p className="text-[13px] text-zinc-500 mb-5">Enter the QR code ID of the asset to link it to your workshop account.</p>
-
-                <div className="flex gap-2 mb-3">
-                  <div className="relative flex-1">
-                    <QrCode size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
-                    <input
-                      type="text"
-                      placeholder="MTLY-AB12-CD34"
-                      value={qrInput}
-                      onChange={e => { setQrInput(e.target.value.toUpperCase()); setSearchError(""); setFoundAsset(null); }}
-                      onKeyDown={e => e.key === "Enter" && handleSearchAsset()}
-                      className="w-full rounded-xl border border-zinc-200 pl-9 pr-4 py-2.5 text-[13px] font-mono outline-none focus:border-blue-400 transition-colors"
-                    />
-                  </div>
-                  <button
-                    onClick={handleSearchAsset}
-                    disabled={searchLoading || !qrInput.trim()}
-                    className="bg-blue-600 hover:bg-blue-500 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold px-4 py-2.5 rounded-xl text-[13px] transition-colors shrink-0"
-                  >
-                    {searchLoading ? "..." : "Search"}
-                  </button>
-                </div>
-
-                {searchError && (
-                  <div className="flex items-center gap-2 text-red-600 bg-red-50 border border-red-100 rounded-xl px-3 py-2.5 mb-4">
-                    <AlertCircle size={14} className="shrink-0" />
-                    <p className="text-[12px]">{searchError}</p>
-                  </div>
-                )}
-
-                {foundAsset && (
-                  <div className="mb-4">
-                    <div className="bg-green-50 border border-green-200 rounded-xl p-4 flex items-center gap-4">
-                      <div className="w-12 h-12 rounded-xl bg-white border border-green-100 flex items-center justify-center shrink-0">
-                        <Image src={assetTypeImg[foundAsset.type] ?? "/images/car.png"} alt={foundAsset.name} width={36} height={36} className="object-contain" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-[10px] font-bold text-green-700 tracking-wide">ASSET FOUND</p>
-                        <p className="text-[15px] font-black text-zinc-900 truncate">{foundAsset.name}</p>
-                        <p className="text-[11px] text-zinc-400 font-mono">{foundAsset.id}</p>
-                      </div>
-                    </div>
-                    <button
-                      onClick={handleAddToWorkshop}
-                      className="w-full mt-3 bg-red-600 hover:bg-red-500 active:scale-[0.98] text-white font-bold py-3 rounded-xl text-[13px] transition-all shadow-sm"
-                    >
-                      Add to My Workshop
-                    </button>
-                  </div>
-                )}
-
-                <div className="flex items-center gap-2 bg-zinc-50 border border-zinc-200 rounded-xl p-3">
-                  <ScanLine size={14} className="text-zinc-400 shrink-0" />
-                  <p className="text-[11px] text-zinc-500">The code is printed on the sticker in the format <span className="font-mono font-semibold">MTLY-AB12-CD34</span>.</p>
-                </div>
-              </div>
-            )}
-
-            {/* ── STEP: SUCCESS ── */}
-            {addAssetTab === "existing" && addSuccess && (
-              <div className="p-8 text-center">
-                <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-4">
-                  <CheckCircle2 size={32} className="text-green-600" />
-                </div>
-                <h4 className="text-[18px] font-black text-zinc-900 mb-1">Asset Added!</h4>
-                <p className="text-[13px] text-zinc-500 mb-6">
-                  <span className="font-semibold text-zinc-700">{foundAsset?.name}</span> is now in your workshop. You can log services for it from your dashboard.
-                </p>
-                <button
-                  onClick={closeAddAssetModal}
-                  className="w-full bg-red-600 hover:bg-red-500 text-white font-bold py-3 rounded-xl text-[13px] transition-colors"
-                >
-                  Done
-                </button>
-              </div>
-            )}
-
-          </div>
-        </div>
-      )}
+      {/* ════ ADD EQUIPMENT FLOW (shared with the Assets page) ════ */}
+      <AddAssetChooser
+        open={addStep === "choose"}
+        onClose={() => setAddStep("closed")}
+        onChooseNew={() => setAddStep("new")}
+        onChooseExisting={() => setAddStep("existing")}
+      />
+      <NewAssetModal
+        open={addStep === "new"}
+        onClose={() => setAddStep("closed")}
+        mechanicId={mechanicId}
+        onCreated={() => refreshTotalAssets(mechanicId)}
+      />
+      <LinkExistingAssetModal
+        open={addStep === "existing"}
+        onClose={() => setAddStep("closed")}
+        mechanicId={mechanicId}
+        onLinked={() => refreshTotalAssets(mechanicId)}
+      />
 
     </div>
   );

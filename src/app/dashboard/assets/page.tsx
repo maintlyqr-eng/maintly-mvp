@@ -20,6 +20,10 @@ import { formatDateDMY, daysAgoLabel, daysUntilLabel } from "@/lib/date";
 import { computeReminderStatus, ReminderStatus, REMINDER_STATUS_LABEL, REMINDER_STATUS_COLOR } from "@/lib/reminders";
 import { getUnitLabel, getUnitShort } from "@/lib/units";
 import { validateImageFile } from "@/lib/imageValidation";
+import NewAssetModal from "@/components/NewAssetModal";
+import LinkExistingAssetModal from "@/components/LinkExistingAssetModal";
+import AddAssetChooser from "@/components/AddAssetChooser";
+import { assetTypeOptions, fuelTypeOptions, assetTypeImg } from "@/lib/assetTypes";
 import { fetchMechanicPublicProfiles } from "@/lib/mechanicPublicProfile";
 
 const STATUS_RANK: Record<ReminderStatus, number> = { none: 0, ok: 1, due_soon: 2, overdue: 3 };
@@ -58,25 +62,6 @@ const navItems = [
 
 const serviceTypeOptions = ["Oil Change", "Service", "Repair", "Inspection", "Filter Change", "Tire Change", "Brake Service", "Other"];
 
-const assetTypeImg: Record<string, string> = {
-  automotive: "/images/car.png",
-  motorcycle: "/images/moto.png",
-  generator:  "/images/generador.png",
-  machinery:  "/images/excavator.png",
-  marine:     "/images/barco.png",
-  aviation:   "/images/avion.png",
-};
-
-const assetTypeOptions = [
-  { value: "automotive", label: "Automotive" },
-  { value: "motorcycle", label: "Motorcycle" },
-  { value: "generator", label: "Generator" },
-  { value: "machinery", label: "Machinery" },
-  { value: "marine", label: "Marine" },
-  { value: "aviation", label: "Aviation" },
-];
-
-const fuelTypeOptions = ["Gasoline", "Diesel", "Electric", "Hybrid", "Other"];
 
 const typeColors: Record<string, { bg: string; text: string }> = {
   "Oil Change":    { bg: "bg-amber-100",  text: "text-amber-700" },
@@ -137,11 +122,6 @@ function assetDisplayName(a: AssetRow) {
   return a.nickname || [a.brand, a.model].filter(Boolean).join(" ") || "Unnamed asset";
 }
 
-function genCode() {
-  const raw = (crypto as any).randomUUID ? crypto.randomUUID() : Math.random().toString(36);
-  return raw.replace(/-/g, "").slice(0, 10);
-}
-
 function formatDate(dateStr: string) {
   return formatDateDMY(dateStr);
 }
@@ -181,24 +161,11 @@ export default function AssetsPage() {
   const [removeTarget, setRemoveTarget] = useState<AssetRow | null>(null);
   const [removing, setRemoving] = useState(false);
 
-  // ── New Asset modal ──
-  const [showForm, setShowForm] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [formError, setFormError] = useState("");
+  // ── Add Equipment flow (choose → new / existing) ──
+  // Shared components (also used by the dashboard's own "Add Equipment"
+  // button) so creating or linking an asset behaves identically everywhere.
+  const [addStep, setAddStep] = useState<"closed" | "choose" | "new" | "existing">("closed");
   const [copiedCode, setCopiedCode] = useState("");
-
-  const [assetType, setAssetType] = useState("automotive");
-  const [brand, setBrand] = useState("");
-  const [model, setModel] = useState("");
-  const [nickname, setNickname] = useState("");
-  const [vin, setVin] = useState("");
-  const [year, setYear] = useState("");
-  const [plate, setPlate] = useState("");
-  const [fuelType, setFuelType] = useState("");
-  const [location, setLocation] = useState("");
-  const [photoFile, setPhotoFile] = useState<File | null>(null);
-  const [photoPreview, setPhotoPreview] = useState<string>("");
-  const [customerId, setCustomerId] = useState("");
   const [customers, setCustomers] = useState<CustomerOption[]>([]);
 
   // ── Add Service modal ──
@@ -354,21 +321,6 @@ export default function AssetsPage() {
     };
   }, [router]);
 
-  function resetForm() {
-    setAssetType("automotive");
-    setBrand("");
-    setModel("");
-    setNickname("");
-    setVin("");
-    setYear("");
-    setPlate("");
-    setFuelType("");
-    setLocation("");
-    setPhotoFile(null);
-    setPhotoPreview("");
-    setCustomerId("");
-    setFormError("");
-  }
 
   async function openAddService(assetId: string) {
     setSvcAssetId(assetId);
@@ -441,89 +393,6 @@ export default function AssetsPage() {
     if (uploadError) return { url: null, error: uploadError.message };
     const { data } = supabase.storage.from("asset-photos").getPublicUrl(path);
     return { url: data.publicUrl, error: null };
-  }
-
-  async function handleCreateAsset(e: React.FormEvent) {
-    e.preventDefault();
-    setFormError("");
-
-    if (!brand.trim() || !model.trim()) {
-      setFormError("Brand and model are required.");
-      return;
-    }
-
-    const currentYear = new Date().getFullYear();
-    if (year && parseInt(year, 10) > currentYear) {
-      setFormError(`Year can't be in the future (max ${currentYear}).`);
-      return;
-    }
-
-    setSaving(true);
-
-    const { data: newAsset, error: assetError } = await supabase
-      .from("assets")
-      .insert({
-        created_by: mechanicId,
-        asset_type: assetType,
-        brand: brand.trim(),
-        model: model.trim(),
-        nickname: nickname.trim() || null,
-        vin_serial: vin.trim() || null,
-        year: year ? parseInt(year, 10) : null,
-        plate: plate.trim() || null,
-        fuel_type: fuelType || null,
-        location: location.trim() || null,
-        customer_id: customerId || null,
-      })
-      .select()
-      .single();
-
-    if (assetError || !newAsset) {
-      setFormError(assetError?.message ?? "Could not create the asset.");
-      setSaving(false);
-      return;
-    }
-
-    // Upload photo if provided
-    let photoUploadError: string | null = null;
-    if (photoFile) {
-      const { url, error } = await uploadPhoto(photoFile, newAsset.id);
-      if (url) {
-        await supabase.from("assets").update({ photo_url: url }).eq("id", newAsset.id);
-      } else {
-        photoUploadError = error ?? "Could not upload the photo.";
-      }
-    }
-
-    const code = genCode();
-    const { error: qrError } = await supabase
-      .from("qr_codes")
-      .insert({ code, asset_id: newAsset.id, created_by: mechanicId });
-
-    if (qrError) {
-      setSaving(false);
-      setFormError("Asset created, but QR could not be generated: " + qrError.message);
-      await loadAssets(mechanicId);
-      return;
-    }
-
-    // Vincular el asset al workshop del mecánico
-    await supabase.from("mechanic_assets").upsert(
-      { mechanic_id: mechanicId, asset_id: newAsset.id, qr_code: code },
-      { onConflict: "mechanic_id,asset_id", ignoreDuplicates: true }
-    );
-
-    setSaving(false);
-
-    if (photoUploadError) {
-      setFormError(`Asset created, but the photo could not be uploaded: ${photoUploadError}. You can try again from Edit Asset.`);
-      await loadAssets(mechanicId);
-      return;
-    }
-
-    resetForm();
-    setShowForm(false);
-    await loadAssets(mechanicId);
   }
 
   async function handleEditAsset(e: React.FormEvent) {
@@ -904,10 +773,10 @@ export default function AssetsPage() {
               <ChevronDown size={13} className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-400" />
             </div>
             <button
-              onClick={() => { resetForm(); setShowForm(true); }}
+              onClick={() => setAddStep("choose")}
               className="shrink-0 flex items-center justify-center gap-2 bg-red-600 hover:bg-red-500 active:scale-[0.98] transition-all text-white text-[13px] font-bold px-4 py-[10px] rounded-xl shadow-sm"
             >
-              <Plus size={15} /> New Asset
+              <Plus size={15} /> Add Equipment
             </button>
           </div>
 
@@ -925,10 +794,10 @@ export default function AssetsPage() {
               <h2 className="text-[16px] font-black text-zinc-900 mb-1">No assets yet</h2>
               <p className="text-[13px] text-zinc-500 mb-5">Create your first asset to generate its QR code and start logging services.</p>
               <button
-                onClick={() => { resetForm(); setShowForm(true); }}
+                onClick={() => setAddStep("choose")}
                 className="inline-flex items-center gap-2 bg-red-600 hover:bg-red-500 transition-all text-white text-[13px] font-bold px-5 py-[11px] rounded-xl"
               >
-                <Plus size={15} /> New Asset
+                <Plus size={15} /> Add Equipment
               </button>
             </div>
           ) : visibleAssets.length === 0 ? (
@@ -1098,134 +967,25 @@ export default function AssetsPage() {
         </div>
       </div>
 
-      {/* ════ NEW ASSET MODAL ════ */}
-      {showForm && (
-        <div className="fixed inset-0 z-50 bg-zinc-900/40 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-200">
-              <h2 className="text-[16px] font-black text-zinc-900">New Asset</h2>
-              <button onClick={() => setShowForm(false)} className="text-zinc-400 hover:text-zinc-700"><X size={18} /></button>
-            </div>
-
-            <form onSubmit={handleCreateAsset} className="px-6 py-5">
-              <div className="mb-4">
-                <label className="text-[12px] font-bold text-zinc-700">Asset type</label>
-                <select value={assetType} onChange={(e) => setAssetType(e.target.value)} className="w-full mt-1 rounded-xl border border-zinc-200 px-3 py-[10px] text-[13px] outline-none focus:border-red-500">
-                  {assetTypeOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-                </select>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
-                <div>
-                  <label className="text-[12px] font-bold text-zinc-700">Brand *</label>
-                  <input type="text" required value={brand} onChange={(e) => setBrand(e.target.value)} placeholder="e.g. Ford" className="w-full mt-1 rounded-xl border border-zinc-200 px-3 py-[10px] text-[13px] outline-none focus:border-red-500" />
-                </div>
-                <div>
-                  <label className="text-[12px] font-bold text-zinc-700">Model *</label>
-                  <input type="text" required value={model} onChange={(e) => setModel(e.target.value)} placeholder="e.g. Ranger XLT" className="w-full mt-1 rounded-xl border border-zinc-200 px-3 py-[10px] text-[13px] outline-none focus:border-red-500" />
-                </div>
-              </div>
-
-              <div className="mb-4">
-                <label className="text-[12px] font-bold text-zinc-700">Nickname (optional)</label>
-                <input type="text" value={nickname} onChange={(e) => setNickname(e.target.value)} placeholder="e.g. Work Truck #2" className="w-full mt-1 rounded-xl border border-zinc-200 px-3 py-[10px] text-[13px] outline-none focus:border-red-500" />
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
-                <div>
-                  <label className="text-[12px] font-bold text-zinc-700">VIN / Serial</label>
-                  <input type="text" value={vin} onChange={(e) => setVin(e.target.value)} className="w-full mt-1 rounded-xl border border-zinc-200 px-3 py-[10px] text-[13px] outline-none focus:border-red-500" />
-                </div>
-                <div>
-                  <label className="text-[12px] font-bold text-zinc-700">Year</label>
-                  <input type="number" max={new Date().getFullYear()} value={year} onChange={(e) => setYear(e.target.value)} placeholder="2024" className="w-full mt-1 rounded-xl border border-zinc-200 px-3 py-[10px] text-[13px] outline-none focus:border-red-500" />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
-                <div>
-                  <label className="text-[12px] font-bold text-zinc-700">Plate</label>
-                  <input type="text" value={plate} onChange={(e) => setPlate(e.target.value)} className="w-full mt-1 rounded-xl border border-zinc-200 px-3 py-[10px] text-[13px] outline-none focus:border-red-500" />
-                </div>
-                <div>
-                  <label className="text-[12px] font-bold text-zinc-700">Fuel type</label>
-                  <select value={fuelType} onChange={(e) => setFuelType(e.target.value)} className="w-full mt-1 rounded-xl border border-zinc-200 px-3 py-[10px] text-[13px] outline-none focus:border-red-500">
-                    <option value="">—</option>
-                    {fuelTypeOptions.map((f) => <option key={f} value={f}>{f}</option>)}
-                  </select>
-                </div>
-              </div>
-
-              <div className="mb-4">
-                <label className="text-[12px] font-bold text-zinc-700">Location (optional)</label>
-                <input type="text" value={location} onChange={(e) => setLocation(e.target.value)} placeholder="e.g. Main shop" className="w-full mt-1 rounded-xl border border-zinc-200 px-3 py-[10px] text-[13px] outline-none focus:border-red-500" />
-              </div>
-
-              <div className="mb-4">
-                <CustomerPicker
-                  mechanicId={mechanicId}
-                  customers={customers}
-                  value={customerId}
-                  onChange={setCustomerId}
-                  onCreated={(c) => setCustomers((prev) => [...prev, c].sort((a, b) => a.name.localeCompare(b.name)))}
-                />
-              </div>
-
-              {/* Photo upload */}
-              <div className="mb-5">
-                <label className="text-[12px] font-bold text-zinc-700">Photo (optional)</label>
-                <div className="mt-1 flex items-center gap-3">
-                  <label className="flex items-center gap-2 cursor-pointer border border-zinc-200 hover:border-red-400 rounded-xl px-4 py-[10px] text-[12px] font-bold text-zinc-600 hover:text-red-600 transition-colors">
-                    <Camera size={14} />
-                    {photoFile ? "Change photo" : "Upload photo"}
-                    <input
-                      type="file"
-                      accept="image/*"
-                      className="hidden"
-                      onChange={(e) => {
-                        const f = e.target.files?.[0] ?? null;
-                        e.target.value = "";
-                        if (f) {
-                          const err = validateImageFile(f);
-                          if (err) { setFormError(err); return; }
-                        }
-                        setFormError("");
-                        setPhotoFile(f);
-                        if (f) setPhotoPreview(URL.createObjectURL(f));
-                        else setPhotoPreview("");
-                      }}
-                    />
-                  </label>
-                  {photoPreview && (
-                    <div className="relative w-14 h-14 rounded-xl overflow-hidden border border-zinc-200 shrink-0">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={photoPreview} alt="Preview" className="w-full h-full object-cover" />
-                      <button
-                        type="button"
-                        onClick={() => { setPhotoFile(null); setPhotoPreview(""); }}
-                        className="absolute top-0.5 right-0.5 w-4 h-4 bg-zinc-900/60 rounded-full flex items-center justify-center text-white"
-                      >
-                        <X size={9} />
-                      </button>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {formError && (
-                <div className="mb-4 rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-[12px] text-red-700">{formError}</div>
-              )}
-
-              <div className="flex gap-3">
-                <button type="button" onClick={() => setShowForm(false)} className="flex-1 border border-zinc-200 text-zinc-700 font-bold py-[11px] rounded-xl text-[13px] hover:bg-zinc-50">Cancel</button>
-                <button type="submit" disabled={saving} className="flex-1 bg-red-600 hover:bg-red-500 disabled:opacity-60 transition-all text-white font-bold py-[11px] rounded-xl text-[13px]">
-                  {saving ? "Creating..." : "Create & Generate QR"}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      {/* ════ ADD EQUIPMENT FLOW (shared with the dashboard's own button) ════ */}
+      <AddAssetChooser
+        open={addStep === "choose"}
+        onClose={() => setAddStep("closed")}
+        onChooseNew={() => setAddStep("new")}
+        onChooseExisting={() => setAddStep("existing")}
+      />
+      <NewAssetModal
+        open={addStep === "new"}
+        onClose={() => setAddStep("closed")}
+        mechanicId={mechanicId}
+        onCreated={() => loadAssets(mechanicId)}
+      />
+      <LinkExistingAssetModal
+        open={addStep === "existing"}
+        onClose={() => setAddStep("closed")}
+        mechanicId={mechanicId}
+        onLinked={() => loadAssets(mechanicId)}
+      />
 
       {/* ════ EDIT ASSET MODAL ════ */}
       {showEditForm && editingAsset && (
