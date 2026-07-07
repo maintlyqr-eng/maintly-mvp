@@ -129,8 +129,15 @@ const QrCodeCanvas = forwardRef<QrCodeCanvasHandle, {
           imageOptions: { crossOrigin: "anonymous", margin: 4, imageSize: 0.32 },
         });
 
-        const rawQr: Blob = await exportQr.getRawData("png");
-        const qrObjectUrl = URL.createObjectURL(rawQr);
+        // getRawData is typed to also cover qr-code-styling's Node/SVG paths
+        // (Blob | Buffer | null), even though in this "use client" browser
+        // context with type: "canvas" it's always a Blob in practice. Handle
+        // all three so the type checker (and a genuinely failed render) are
+        // both covered, instead of asserting straight to Blob.
+        const rawQr = await exportQr.getRawData("png");
+        if (!rawQr) throw new Error("QR export returned no data.");
+        const qrBlob = rawQr instanceof Blob ? rawQr : new Blob([rawQr]);
+        const qrObjectUrl = URL.createObjectURL(qrBlob);
         const [frameImg, qrImg] = await Promise.all([loadImageEl(def.frameImage), loadImageEl(qrObjectUrl)]);
         URL.revokeObjectURL(qrObjectUrl);
 
