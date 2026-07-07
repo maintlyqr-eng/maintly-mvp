@@ -136,7 +136,16 @@ const QrCodeCanvas = forwardRef<QrCodeCanvasHandle, {
         // both covered, instead of asserting straight to Blob.
         const rawQr = await exportQr.getRawData("png");
         if (!rawQr) throw new Error("QR export returned no data.");
-        const qrBlob = rawQr instanceof Blob ? rawQr : new Blob([rawQr]);
+        // Node's Buffer types its underlying .buffer as ArrayBufferLike
+        // (which also covers SharedArrayBuffer), which TS's DOM lib won't
+        // structurally accept as a BlobPart even though a real Buffer is
+        // always backed by a plain ArrayBuffer. `new Uint8Array(rawQr)`
+        // copies the bytes into a fresh Uint8Array with its own genuine
+        // ArrayBuffer, sidestepping the mismatch — this branch never
+        // actually runs in this "use client" browser context anyway
+        // (type: "canvas" always yields a Blob), it's just here to satisfy
+        // getRawData's wider Node/SVG-path return type.
+        const qrBlob = rawQr instanceof Blob ? rawQr : new Blob([new Uint8Array(rawQr)]);
         const qrObjectUrl = URL.createObjectURL(qrBlob);
         const [frameImg, qrImg] = await Promise.all([loadImageEl(def.frameImage), loadImageEl(qrObjectUrl)]);
         URL.revokeObjectURL(qrObjectUrl);
