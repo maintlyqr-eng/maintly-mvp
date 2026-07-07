@@ -70,25 +70,35 @@ const QrCodeCanvas = forwardRef<QrCodeCanvasHandle, {
     },
   }));
 
-  const qrCard = (
-    <div
-      ref={containerRef}
-      className={def.frame ? "bg-white rounded-2xl shadow-sm p-2" : className}
-      style={{ width: size, height: size }}
-    />
+  // The raw canvas box — always exactly size×size, no padding on it. Padding
+  // for the framed look lives on a SEPARATE wrapper below; putting padding
+  // directly on this div while also pinning it to a fixed pixel size shrank
+  // its content box, which made the qr-code-styling canvas (rendered at the
+  // full `size`) overflow out of the top-left corner instead of sitting
+  // centered — that was the "QR isn't centered" bug.
+  const canvasBox = (
+    <div ref={containerRef} className={!def.frame ? className : undefined} style={{ width: size, height: size }} />
   );
 
-  if (!def.frame) return qrCard;
+  if (!def.frame) return canvasBox;
 
   const frameSize = Math.round(size * 1.55);
+  const cardSize = size + 16;
 
   return (
     <div className={className} style={{ position: "relative", width: frameSize, height: frameSize }}>
       <div style={{ position: "absolute", inset: 0 }}>
         <QrFrameShape shape={def.frame} color={def.frameColor || "#dc2626"} size={frameSize} />
       </div>
-      <div style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)" }}>
-        {qrCard}
+      <div
+        className="bg-white rounded-2xl shadow-sm"
+        style={{
+          position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)",
+          width: cardSize, height: cardSize,
+          display: "flex", alignItems: "center", justifyContent: "center",
+        }}
+      >
+        {canvasBox}
       </div>
     </div>
   );
