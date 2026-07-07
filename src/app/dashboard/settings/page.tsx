@@ -250,7 +250,7 @@ export default function SettingsPage() {
           </button>
         </div>
 
-        <nav className="flex-1 px-3 -mt-4 overflow-y-auto">
+        <nav className="flex-1 px-3 overflow-y-auto">
           {navItems.map((item) => (
             <Link
               key={item.label}

@@ -110,8 +110,16 @@ export default function ServicesPage() {
   // Pre-fill the asset filter from a deep link (e.g. the dashboard's top search bar: /dashboard/services?asset=...)
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const assetId = new URLSearchParams(window.location.search).get("asset");
+    const params = new URLSearchParams(window.location.search);
+    const assetId = params.get("asset");
     if (assetId) setFilterAsset(assetId);
+
+    // The dashboard's own "Add Service" button (and anywhere else that
+    // wants a generic "log a service, pick the asset" entry point) links
+    // here with ?new=1 instead of just landing on the list — this opens the
+    // same Add Service modal used by the button below, asset picker and all.
+    if (params.get("new") === "1") handleOpenAddService();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Add Service modal
@@ -383,7 +391,7 @@ export default function ServicesPage() {
           </button>
         </div>
 
-        <nav className="flex-1 px-3 -mt-4 overflow-y-auto">
+        <nav className="flex-1 px-3 overflow-y-auto">
           {navItems.map((item) => (
             <Link
               key={item.label}

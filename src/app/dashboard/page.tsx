@@ -597,7 +597,7 @@ export default function DashboardPage() {
               <Box size={15} /> Add Equipment
             </button>
             <Link
-              href="/dashboard/services"
+              href="/dashboard/services?new=1"
               className="flex items-center gap-2 bg-red-600 hover:bg-red-500 active:scale-[0.98] transition-all text-white text-[13px] font-bold px-4 py-[10px] rounded-xl shadow-sm"
             >
               <Plus size={15} /> Add Service
@@ -634,7 +634,7 @@ export default function DashboardPage() {
                 {realServices.length === 0 ? (
                   <div className="text-center py-10">
                     <p className="text-[13px] text-zinc-400 mb-3">No services recorded yet.</p>
-                    <Link href="/dashboard/services" className="text-[12px] font-bold text-red-600 hover:text-red-700">Log your first service →</Link>
+                    <Link href="/dashboard/services?new=1" className="text-[12px] font-bold text-red-600 hover:text-red-700">Log your first service →</Link>
                   </div>
                 ) : (
                   <div className="overflow-x-auto -mx-5 px-5">
