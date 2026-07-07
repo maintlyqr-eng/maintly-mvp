@@ -11,6 +11,7 @@ import {
 import { supabase } from "@/lib/supabase";
 import { formatDateDMY } from "@/lib/date";
 import { getUnitLabel, getUnitShort, formatUnitValue } from "@/lib/units";
+import { fetchMechanicPublicProfiles } from "@/lib/mechanicPublicProfile";
 
 const assetTypeImg: Record<string, string> = {
   automotive: "/images/car.png",
@@ -151,10 +152,16 @@ export default function AssetPublicPage() {
   async function loadServices(assetId: string) {
     const { data } = await supabase
       .from("service_records")
-      .select("id, service_date, service_type, km_hours, notes, created_at, mechanics(name, verified, profession)")
+      .select("id, service_date, service_type, km_hours, notes, created_at, mechanic_id")
       .eq("asset_id", assetId)
       .order("service_date", { ascending: false });
-    setServices((data as ServiceRecord[]) ?? []);
+    const rows = (data as (ServiceRecord & { mechanic_id: string | null })[]) ?? [];
+
+    // `mechanics` itself is locked to "read your own row only" — the name/
+    // verified/profession shown here for OTHER mechanics comes from the
+    // public-safe `mechanic_public_profile` view instead (see lib/mechanicPublicProfile.ts).
+    const profiles = await fetchMechanicPublicProfiles(supabase, rows.map((r) => r.mechanic_id));
+    setServices(rows.map((r) => ({ ...r, mechanics: r.mechanic_id ? profiles.get(r.mechanic_id) ?? null : null })));
   }
 
   async function handleAddToWorkshop() {

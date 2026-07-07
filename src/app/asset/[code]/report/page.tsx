@@ -6,6 +6,7 @@ import { Droplets, Wrench, Hammer, Search, Filter, Disc3, Disc, Settings, MapPin
 import { supabase } from "@/lib/supabase";
 import { formatDateDMY } from "@/lib/date";
 import { getUnitShort, formatUnitValue } from "@/lib/units";
+import { fetchMechanicPublicProfiles } from "@/lib/mechanicPublicProfile";
 
 type AssetData = {
   id: string;
@@ -110,11 +111,15 @@ export default function AssetReportPage() {
 
       const { data: svcRows } = await supabase
         .from("service_records")
-        .select("id, service_date, service_type, km_hours, notes, mechanics(name, verified, profession)")
+        .select("id, service_date, service_type, km_hours, notes, mechanic_id")
         .eq("asset_id", qrRow.asset_id)
         .order("service_date", { ascending: false });
 
-      setServices((svcRows as unknown as ServiceRecord[]) ?? []);
+      const rows = (svcRows as (ServiceRecord & { mechanic_id: string | null })[]) ?? [];
+      // See lib/mechanicPublicProfile.ts — `mechanics` is owner-only now, so
+      // other mechanics' name/verified/profession come from the public view.
+      const profiles = await fetchMechanicPublicProfiles(supabase, rows.map((r) => r.mechanic_id));
+      setServices(rows.map((r) => ({ ...r, mechanics: r.mechanic_id ? profiles.get(r.mechanic_id) ?? null : null })));
       setLoading(false);
     }
 

@@ -272,6 +272,8 @@ export default function AdminPage() {
   const [newAssetDays, setNewAssetDays]       = useState<DayBucket[]>([]);
   const [newQrDays, setNewQrDays]             = useState<DayBucket[]>([]);
   const [newServiceDays, setNewServiceDays]   = useState<DayBucket[]>([]);
+  const [dataTruncatedNotice, setDataTruncatedNotice] = useState<string | null>(null);
+  const [mechanicsTotalCount, setMechanicsTotalCount] = useState<number | null>(null);
 
   // ── Accounts / Mechanics UI state ──
   const [accountSearch, setAccountSearch] = useState("");
@@ -321,31 +323,39 @@ export default function AdminPage() {
   async function loadData() {
     setRefreshing(true);
 
-    const [
-      { data: mechRows },
-      { data: svcRows },
-      { data: assetRows },
-      { data: qrRows },
-      { data: maRows },
-      { count: scansTodayCount },
-      { data: scanWeekRows },
-    ] = await Promise.all([
-      supabase.from("mechanics")
-        .select("id, name, email, workshop_name, is_mechanic, verified, suspended, created_at, photo_url, profession, certificate_path, verification_status, verification_requested_at, verification_reviewed_at, verification_note")
-        .order("created_at", { ascending: false }),
-      supabase.from("service_records")
-        .select("id, service_date, service_type, mechanic_id, asset_id, customer_id, mechanics(name), assets(brand, model, nickname)")
-        .order("service_date", { ascending: false })
-        .limit(2000),
-      supabase.from("assets")
-        .select("id, asset_type, brand, model, nickname, vin_serial, plate, created_by, created_at"),
-      supabase.from("qr_codes").select("code, asset_id, created_by, created_at"),
-      supabase.from("mechanic_assets").select("mechanic_id"),
+    // mechanics/assets/qr_codes/service_records/mechanic_assets are read
+    // through a service-role API route rather than the browser's anon-key
+    // client — see /api/admin/bulk-data for why. The two qr_scans queries
+    // stay direct since that table's RLS is already narrow (see migration
+    // 006) and they're small, date-filtered reads.
+    const [bulkRes, { count: scansTodayCount }, { data: scanWeekRows }] = await Promise.all([
+      fetch("/api/admin/bulk-data").then((r) => r.json()).catch(() => null),
       supabase.from("qr_scans").select("*", { count: "exact", head: true })
         .gte("scanned_at", new Date(new Date().setHours(0, 0, 0, 0)).toISOString()),
       supabase.from("qr_scans").select("scanned_at")
         .gte("scanned_at", new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()),
     ]);
+
+    if (!bulkRes || bulkRes.error) {
+      flash(bulkRes?.error || "Couldn't load platform data.", "error");
+      setRefreshing(false);
+      setLoading(false);
+      return;
+    }
+
+    const mechRows = bulkRes.mechanics;
+    const svcRows = bulkRes.serviceRecords;
+    const assetRows = bulkRes.assets;
+    const qrRows = bulkRes.qrCodes;
+    const maRows = bulkRes.mechanicAssets;
+
+    const truncatedParts: string[] = [];
+    if (bulkRes.mechanicsTruncated) truncatedParts.push(`accounts (showing ${bulkRes.mechanics.length.toLocaleString()} of ${bulkRes.mechanicsTotal.toLocaleString()})`);
+    if (bulkRes.assetsTruncated) truncatedParts.push(`assets (showing ${bulkRes.assets.length.toLocaleString()} of ${bulkRes.assetsTotal.toLocaleString()})`);
+    if (bulkRes.qrCodesTruncated) truncatedParts.push(`QR codes (showing ${bulkRes.qrCodes.length.toLocaleString()} of ${bulkRes.qrCodesTotal.toLocaleString()})`);
+    if (bulkRes.serviceRecordsTruncated) truncatedParts.push(`services (showing ${bulkRes.serviceRecords.length.toLocaleString()} of ${bulkRes.serviceRecordsTotal.toLocaleString()} — oldest are hidden)`);
+    setDataTruncatedNotice(truncatedParts.length > 0 ? `Some lists are capped for performance: ${truncatedParts.join(", ")}. Time to add real pagination.` : null);
+    setMechanicsTotalCount(bulkRes.mechanicsTotal ?? null);
 
     const accountRows = (mechRows ?? []) as AccountRow[];
     setAccounts(accountRows);
@@ -692,7 +702,7 @@ export default function AdminPage() {
   }
 
   // ── Derived data ──
-  const totalUsers = accounts.length;
+  const totalUsers = mechanicsTotalCount ?? accounts.length;
   const totalMechanicAccounts = accounts.filter((a) => a.is_mechanic).length;
   const totalVerifiedMechanics = accounts.filter((a) => a.is_mechanic && a.verified).length;
   const totalAssets = assets.length;
@@ -942,6 +952,12 @@ export default function AdminPage() {
             actionMsg.tone === "ok" ? "bg-emerald-50 border-emerald-200 text-emerald-700" : "bg-red-50 border-red-200 text-red-700"
           }`}>
             {actionMsg.text}
+          </div>
+        )}
+
+        {dataTruncatedNotice && (
+          <div className="mx-4 md:mx-8 mt-4 rounded-xl px-4 py-2.5 text-[12px] font-semibold border bg-amber-50 border-amber-200 text-amber-700">
+            {dataTruncatedNotice}
           </div>
         )}
 

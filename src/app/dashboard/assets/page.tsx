@@ -19,6 +19,8 @@ import CustomerPicker, { CustomerOption } from "@/components/CustomerPicker";
 import { formatDateDMY, daysAgoLabel, daysUntilLabel } from "@/lib/date";
 import { computeReminderStatus, ReminderStatus, REMINDER_STATUS_LABEL, REMINDER_STATUS_COLOR } from "@/lib/reminders";
 import { getUnitLabel, getUnitShort } from "@/lib/units";
+import { validateImageFile } from "@/lib/imageValidation";
+import { fetchMechanicPublicProfiles } from "@/lib/mechanicPublicProfile";
 
 const STATUS_RANK: Record<ReminderStatus, number> = { none: 0, ok: 1, due_soon: 2, overdue: 3 };
 
@@ -399,10 +401,15 @@ export default function AssetsPage() {
     setShowHistoryModal(true);
     const { data } = await supabase
       .from("service_records")
-      .select("id, service_date, service_type, km_hours, notes, mechanics(name)")
+      .select("id, service_date, service_type, km_hours, notes, mechanic_id")
       .eq("asset_id", a.id)
       .order("service_date", { ascending: false });
-    setHistoryRecords((data as unknown as ServiceRecord[]) ?? []);
+    const rows = (data as unknown as (ServiceRecord & { mechanic_id: string | null })[]) ?? [];
+    // An asset can have services logged by OTHER mechanics too (shared/multi-shop
+    // assets) — `mechanics` is owner-only now, so their name comes from the
+    // public-safe view instead. See lib/mechanicPublicProfile.ts.
+    const profiles = await fetchMechanicPublicProfiles(supabase, rows.map((r) => r.mechanic_id));
+    setHistoryRecords(rows.map((r) => ({ ...r, mechanics: r.mechanic_id ? profiles.get(r.mechanic_id) ?? null : null })));
     setHistoryLoading(false);
   }
 
@@ -424,6 +431,8 @@ export default function AssetsPage() {
   }
 
   async function uploadPhoto(file: File, assetId: string): Promise<{ url: string | null; error: string | null }> {
+    const validationError = validateImageFile(file);
+    if (validationError) return { url: null, error: validationError };
     const ext = file.name.split(".").pop() ?? "jpg";
     const path = `${assetId}.${ext}`;
     const { error: uploadError } = await supabase.storage
@@ -1175,6 +1184,12 @@ export default function AssetsPage() {
                       className="hidden"
                       onChange={(e) => {
                         const f = e.target.files?.[0] ?? null;
+                        e.target.value = "";
+                        if (f) {
+                          const err = validateImageFile(f);
+                          if (err) { setFormError(err); return; }
+                        }
+                        setFormError("");
                         setPhotoFile(f);
                         if (f) setPhotoPreview(URL.createObjectURL(f));
                         else setPhotoPreview("");
@@ -1294,6 +1309,12 @@ export default function AssetsPage() {
                       className="hidden"
                       onChange={(e) => {
                         const f = e.target.files?.[0] ?? null;
+                        e.target.value = "";
+                        if (f) {
+                          const err = validateImageFile(f);
+                          if (err) { setEditError(err); return; }
+                        }
+                        setEditError("");
                         setEditPhotoFile(f);
                         if (f) setEditPhotoPreview(URL.createObjectURL(f));
                       }}

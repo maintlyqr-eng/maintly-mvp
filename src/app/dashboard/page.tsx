@@ -306,7 +306,9 @@ export default function DashboardPage() {
         supabase
           .from("service_records")
           .select("service_date, service_type, assets(nickname, brand, model)")
-          .eq("mechanic_id", session.user.id),
+          .eq("mechanic_id", session.user.id)
+          .order("service_date", { ascending: false })
+          .limit(3000), // dashboard calendar dots only — bounds payload for very long-tenured accounts
         supabase
           .from("calendar_tasks")
           .select("task_date, done, title")

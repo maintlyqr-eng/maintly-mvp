@@ -17,6 +17,7 @@ import AvatarCropModal from "@/components/AvatarCropModal";
 import HoverAvatar from "@/components/HoverAvatar";
 import ContactSupportWidget from "@/components/ContactSupportWidget";
 import ProfessionVerificationForm, { VerificationStatusCard } from "@/components/ProfessionVerificationForm";
+import { validateImageFile } from "@/lib/imageValidation";
 
 const navItems = [
   { icon: LayoutGrid, label: "Dashboard", href: "/dashboard" },
@@ -121,6 +122,9 @@ export default function SettingsPage() {
     e.target.value = ""; // allow picking the same file again later
     if (!file) return;
 
+    const err = validateImageFile(file);
+    if (err) { setPhotoMsg({ text: err, ok: false }); return; }
+
     const reader = new FileReader();
     reader.onload = () => setCropImageSrc(reader.result as string);
     reader.readAsDataURL(file);
@@ -128,6 +132,9 @@ export default function SettingsPage() {
 
   async function uploadPhoto(file: File) {
     if (!mechanicId) return;
+
+    const validationError = validateImageFile(file);
+    if (validationError) { setPhotoMsg({ text: validationError, ok: false }); return; }
 
     setPhotoMsg(null);
     setPhotoUploading(true);
