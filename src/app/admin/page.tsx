@@ -69,6 +69,15 @@ type QrRow = {
 
 type AssetTypeCount = { type: string; count: number };
 type DayBucket = { label: string; count: number };
+type UsageMetrics = {
+  dbSizeMB: number;
+  dbLimitMB: number;
+  dbPercent: number;
+  storageSizeMB: number;
+  storageLimitMB: number;
+  storagePercent: number;
+  checkedAt: string;
+};
 
 type Section = "dashboard" | "accounts" | "mechanics" | "verifications" | "assets" | "services" | "qr" | "support";
 
@@ -194,6 +203,28 @@ function StatCard({ label, value, icon: Icon, accent, sub }: {
   );
 }
 
+function UsageBar({ label, usedMB, limitMB, percent }: {
+  label: string; usedMB: number; limitMB: number; percent: number;
+}) {
+  const color = percent >= 80 ? "bg-red-500" : percent >= 60 ? "bg-amber-500" : "bg-emerald-500";
+  return (
+    <div className="mb-4 last:mb-0">
+      <div className="flex items-baseline justify-between mb-1.5">
+        <span className="text-[12px] font-semibold text-zinc-700">{label}</span>
+        <span className="text-[11px] text-zinc-400 font-medium">
+          {usedMB.toLocaleString()} MB / {limitMB.toLocaleString()} MB · {percent}%
+        </span>
+      </div>
+      <div className="h-2 rounded-full bg-zinc-100 overflow-hidden">
+        <div
+          className={`h-full rounded-full ${color} transition-all`}
+          style={{ width: `${Math.min(100, Math.max(2, percent))}%` }}
+        />
+      </div>
+    </div>
+  );
+}
+
 function SectionTitle({ children }: { children: React.ReactNode }) {
   return <h2 className="text-[13px] font-bold text-zinc-900 tracking-tight">{children}</h2>;
 }
@@ -274,6 +305,7 @@ export default function AdminPage() {
   const [newServiceDays, setNewServiceDays]   = useState<DayBucket[]>([]);
   const [dataTruncatedNotice, setDataTruncatedNotice] = useState<string | null>(null);
   const [mechanicsTotalCount, setMechanicsTotalCount] = useState<number | null>(null);
+  const [usageMetrics, setUsageMetrics] = useState<UsageMetrics | null>(null);
 
   // ── Accounts / Mechanics UI state ──
   const [accountSearch, setAccountSearch] = useState("");
@@ -342,6 +374,14 @@ export default function AdminPage() {
       setLoading(false);
       return;
     }
+
+    // Non-critical: platform usage vs. Supabase Free plan limits (DB size,
+    // Storage size). Fails silently until the get_usage_metrics() SQL
+    // function is created — the rest of the panel shouldn't break over this.
+    fetch("/api/admin/usage-check")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => { if (data && !data.error) setUsageMetrics(data as UsageMetrics); })
+      .catch(() => {});
 
     const mechRows = bulkRes.mechanics;
     const svcRows = bulkRes.serviceRecords;
@@ -976,6 +1016,21 @@ export default function AdminPage() {
                 <StatCard label="Scans Today"         value={scansToday}             icon={ScanLine}  accent="bg-pink-500" />
                 <StatCard label="Scans This Week"     value={scansWeek}              icon={ScanLine}  accent="bg-indigo-500" />
               </div>
+
+              {usageMetrics && (
+                <div className="bg-white rounded-2xl border border-zinc-200/80 p-6 shadow-sm">
+                  <SectionTitle>Uso de la plataforma (Supabase Free)</SectionTitle>
+                  <div className="mt-3">
+                    <UsageBar label="Base de datos" usedMB={usageMetrics.dbSizeMB} limitMB={usageMetrics.dbLimitMB} percent={usageMetrics.dbPercent} />
+                    <UsageBar label="Storage (fotos)" usedMB={usageMetrics.storageSizeMB} limitMB={usageMetrics.storageLimitMB} percent={usageMetrics.storagePercent} />
+                  </div>
+                  {(usageMetrics.dbPercent >= 70 || usageMetrics.storagePercent >= 70) && (
+                    <p className="mt-3 text-[11px] font-semibold text-amber-600">
+                      Te estás acercando a un límite del plan Free — es buen momento para evaluar Supabase Pro.
+                    </p>
+                  )}
+                </div>
+              )}
 
               <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
                 <div className="bg-white rounded-2xl border border-zinc-200/80 p-6 shadow-sm">
