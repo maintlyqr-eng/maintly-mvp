@@ -6,12 +6,14 @@ import { useParams, useRouter } from "next/navigation";
 import {
   ShieldCheck, Calendar, Gauge, Wrench, CheckCircle2, MapPin,
   Hash, Fuel, AlertCircle, ChevronDown, ChevronUp, UserCircle2,
-  Plus, BookMarked, LogIn, X, ChevronRight, MessageCircle, Send
+  Plus, BookMarked, LogIn, X, ChevronRight, MessageCircle, Send,
+  QrCode, UserPlus
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { formatDateDMY } from "@/lib/date";
 import { getUnitLabel, getUnitShort, formatUnitValue } from "@/lib/units";
 import { fetchMechanicPublicProfiles } from "@/lib/mechanicPublicProfile";
+import NewAssetModal from "@/components/NewAssetModal";
 
 const assetTypeImg: Record<string, string> = {
   automotive: "/images/car.png",
@@ -68,6 +70,12 @@ export default function AssetPublicPage() {
   // Asset data
   const [loading, setLoading]   = useState(true);
   const [notFound, setNotFound] = useState(false);
+  // A code that exists in qr_codes but has no asset_id yet — a blank code
+  // printed ahead of time and stuck on equipment, or requested from
+  // /dashboard/qr-codes but not assigned yet. Distinct from notFound
+  // (which means the code doesn't exist in our system at all).
+  const [isBlank, setIsBlank]   = useState(false);
+  const [showAssignModal, setShowAssignModal] = useState(false);
   const [asset, setAsset]       = useState<AssetData | null>(null);
   const [services, setServices] = useState<ServiceRecord[]>([]);
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -118,7 +126,14 @@ export default function AssetPublicPage() {
 
       // QR → asset
       const { data: qrRow } = await supabase.from("qr_codes").select("asset_id").eq("code", code).single();
-      if (!qrRow?.asset_id) { setNotFound(true); setLoading(false); return; }
+      if (!qrRow) { setNotFound(true); setLoading(false); return; }
+      if (!qrRow.asset_id) {
+        // Valid code, part of the MaintlyQR World, just not assigned yet.
+        setIsBlank(true);
+        supabase.from("qr_scans").insert({ code, asset_id: null }).then(() => {});
+        setLoading(false);
+        return;
+      }
 
       const { data: assetData } = await supabase
         .from("assets")
@@ -259,6 +274,61 @@ export default function AssetPublicPage() {
       <div className="min-h-screen bg-zinc-50 flex flex-col items-center justify-center gap-4">
         <div className="w-10 h-10 border-4 border-red-600 border-t-transparent rounded-full animate-spin" />
         <p className="text-zinc-400 text-[14px]">Loading maintenance history...</p>
+      </div>
+    );
+  }
+
+  // ── BLANK / UNASSIGNED CODE ──────────────────────────────────────────────
+  if (isBlank) {
+    return (
+      <div className="min-h-screen bg-zinc-50 flex flex-col items-center justify-center px-6 text-center">
+        <div className="w-16 h-16 rounded-full bg-red-50 border border-red-100 flex items-center justify-center mb-4">
+          <QrCode size={28} className="text-red-500" />
+        </div>
+        <h1 className="text-[20px] font-black text-zinc-900 mb-2">This QR is part of the MaintlyQR World</h1>
+        <p className="text-[14px] text-zinc-500 max-w-xs mb-6">
+          {isLoggedIn
+            ? "No equipment has been assigned to this code yet. Assign it now to start its maintenance history."
+            : "No equipment has been assigned to this code yet. Log in as a Maintler to assign it — it only takes a few seconds."}
+        </p>
+
+        {isLoggedIn ? (
+          <button
+            onClick={() => setShowAssignModal(true)}
+            className="flex items-center gap-2 bg-red-600 hover:bg-red-500 active:scale-[0.98] transition-all text-white font-bold px-5 py-3 rounded-xl text-[13px] shadow-lg shadow-red-900/20"
+          >
+            <Plus size={15} /> Assign Equipment to this QR
+          </button>
+        ) : (
+          <div className="flex flex-col gap-2 w-full max-w-[280px]">
+            <button
+              onClick={() => router.push(`/login?redirect=/asset/${code}`)}
+              className="flex items-center justify-center gap-2 bg-red-600 hover:bg-red-500 active:scale-[0.98] transition-all text-white font-bold py-3 rounded-xl text-[13px] shadow-lg shadow-red-900/20"
+            >
+              <LogIn size={14} /> Login to Assign this QR
+            </button>
+            <button
+              onClick={() => router.push("/register")}
+              className="flex items-center justify-center gap-2 border border-zinc-200 hover:bg-zinc-50 transition-colors text-zinc-700 font-bold py-3 rounded-xl text-[13px] bg-white"
+            >
+              <UserPlus size={14} /> Create an Account
+            </button>
+          </div>
+        )}
+
+        <div className="mt-8 flex items-center gap-0">
+          <Image src="/images/maintly-logo-full.png" alt="MaintlyQR" width={217} height={64} className="object-contain mt-2" />
+        </div>
+
+        {isLoggedIn && mechanicId && (
+          <NewAssetModal
+            open={showAssignModal}
+            onClose={() => setShowAssignModal(false)}
+            mechanicId={mechanicId}
+            existingCode={code}
+            onCreated={() => { setShowAssignModal(false); window.location.reload(); }}
+          />
+        )}
       </div>
     );
   }

@@ -19,11 +19,18 @@ export default function NewAssetModal({
   onClose,
   mechanicId,
   onCreated,
+  existingCode,
 }: {
   open: boolean;
   onClose: () => void;
   mechanicId: string;
   onCreated: (assetId: string) => void;
+  // When set, this asset gets attached to an already-issued QR code
+  // (created blank via the QR Codes page, or scanned off a physical
+  // sticker that hadn't been assigned yet) instead of generating a brand
+  // new one — see the "MaintlyQR World" blank-QR flow on the public
+  // /asset/[code] page and the "Assign" action on /dashboard/qr-codes.
+  existingCode?: string;
 }) {
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState("");
@@ -121,10 +128,10 @@ export default function NewAssetModal({
       }
     }
 
-    const code = genAssetQrCode();
-    const { error: qrError } = await supabase
-      .from("qr_codes")
-      .insert({ code, asset_id: newAsset.id, created_by: mechanicId });
+    const code = existingCode || genAssetQrCode();
+    const { error: qrError } = existingCode
+      ? await supabase.from("qr_codes").update({ asset_id: newAsset.id, created_by: mechanicId }).eq("code", existingCode)
+      : await supabase.from("qr_codes").insert({ code, asset_id: newAsset.id, created_by: mechanicId });
 
     if (qrError) {
       setSaving(false);
@@ -155,7 +162,7 @@ export default function NewAssetModal({
     <div className="fixed inset-0 z-50 bg-zinc-900/40 flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-200">
-          <h2 className="text-[16px] font-black text-zinc-900">New Asset</h2>
+          <h2 className="text-[16px] font-black text-zinc-900">{existingCode ? "Assign Equipment to this QR" : "New Asset"}</h2>
           <button onClick={onClose} className="text-zinc-400 hover:text-zinc-700"><X size={18} /></button>
         </div>
 
@@ -270,7 +277,7 @@ export default function NewAssetModal({
           <div className="flex gap-3">
             <button type="button" onClick={onClose} className="flex-1 border border-zinc-200 text-zinc-700 font-bold py-[11px] rounded-xl text-[13px] hover:bg-zinc-50">Cancel</button>
             <button type="submit" disabled={saving} className="flex-1 bg-red-600 hover:bg-red-500 disabled:opacity-60 transition-all text-white font-bold py-[11px] rounded-xl text-[13px]">
-              {saving ? "Creating..." : "Create & Generate QR"}
+              {saving ? "Saving..." : existingCode ? "Create & Assign" : "Create & Generate QR"}
             </button>
           </div>
         </form>

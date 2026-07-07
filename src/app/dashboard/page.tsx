@@ -29,7 +29,7 @@ const navItems = [
   { icon: FileText,     label: "My Services",      href: "/dashboard/services", active: false },
   { icon: Bell,         label: "Scheduled Services", href: "/dashboard/scheduled", active: false },
   { icon: Box,          label: "Assets",           href: "/dashboard/assets",   active: false },
-  { icon: QrCode,       label: "QR Codes",         href: "/dashboard/assets",   active: false },
+  { icon: QrCode,       label: "QR Codes",         href: "/dashboard/qr-codes", active: false },
   { icon: Users,        label: "Customers",        href: "/dashboard/customers",                   active: false },
   { icon: BarChart3,    label: "Reports",          href: "/dashboard/reports",  active: false },
   { icon: CalendarIcon, label: "Calendar",         href: "/dashboard/calendar", active: false },
