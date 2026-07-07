@@ -13,7 +13,9 @@ export type QrCornerDotType = "square" | "dot";
 // a sun, industry-flavored motifs, etc.) — see QrFrameShape.tsx. The QR
 // itself always sits on a plain white card in the center so the frame never
 // touches the actual modules and scannability is never compromised.
-export type QrFrameShape = "flower" | "sun" | "star" | "wave" | "mountain";
+export type QrFrameShape =
+  | "flower" | "sun" | "star" | "wave" | "mountain"
+  | "daisy" | "wrench" | "gear" | "soccer" | "tennis" | "skull" | "crossbones" | "shield";
 
 export interface QrThemeDef {
   id: string;
@@ -164,6 +166,110 @@ export const qrThemes: QrThemeDef[] = [
       dotsColor: "#18181b", dotsType: "classy-rounded", backgroundColor: "#ffffff",
       cornersSquareColor: "#15803d", cornersSquareType: "square",
       cornersDotColor: "#15803d", cornersDotType: "square", logo: false,
+    },
+  },
+  {
+    id: "daisy",
+    name: "Daisy",
+    description: "Thin white petals — a softer, more delicate flower than Bloom.",
+    category: "playful",
+    frame: "daisy",
+    frameColor: "#f4f4f5",
+    options: {
+      dotsColor: "#27272a", dotsType: "dots", backgroundColor: "#ffffff",
+      cornersSquareColor: "#f59e0b", cornersSquareType: "dot",
+      cornersDotColor: "#f59e0b", cornersDotType: "dot", logo: false,
+    },
+  },
+  {
+    id: "wrench-cross",
+    name: "Lug Wrench",
+    description: "A tire iron/lug wrench cross — built for the actual mechanic's shop.",
+    category: "industry",
+    frame: "wrench",
+    frameColor: "#52525b",
+    options: {
+      dotsColor: "#18181b", dotsType: "square", backgroundColor: "#ffffff",
+      cornersSquareColor: "#52525b", cornersSquareType: "square",
+      cornersDotColor: "#52525b", cornersDotType: "square", logo: false,
+    },
+  },
+  {
+    id: "gear-ring",
+    name: "Gear Ring",
+    description: "A big cog frame — an industrial alternative to the small Maintly logo.",
+    category: "industry",
+    frame: "gear",
+    frameColor: "#f97316",
+    options: {
+      dotsColor: "#18181b", dotsType: "classy", backgroundColor: "#ffffff",
+      cornersSquareColor: "#f97316", cornersSquareType: "square",
+      cornersDotColor: "#f97316", cornersDotType: "square", logo: false,
+    },
+  },
+  {
+    id: "soccer",
+    name: "Soccer Ball",
+    description: "A soccer-ball texture ring, for sports equipment and gear.",
+    category: "industry",
+    frame: "soccer",
+    frameColor: "#18181b",
+    options: {
+      dotsColor: "#18181b", dotsType: "square", backgroundColor: "#ffffff",
+      cornersSquareColor: "#18181b", cornersSquareType: "square",
+      cornersDotColor: "#18181b", cornersDotType: "square", logo: false,
+    },
+  },
+  {
+    id: "tennis",
+    name: "Tennis Ball",
+    description: "Lime green with the classic curved seam.",
+    category: "industry",
+    frame: "tennis",
+    frameColor: "#a3e635",
+    options: {
+      dotsColor: "#27272a", dotsType: "dots", backgroundColor: "#ffffff",
+      cornersSquareColor: "#65a30d", cornersSquareType: "dot",
+      cornersDotColor: "#65a30d", cornersDotType: "dot", logo: false,
+    },
+  },
+  {
+    id: "skull",
+    name: "Skull",
+    description: "A bold skull frame — a favorite for motorcycles and off-road gear.",
+    category: "playful",
+    frame: "skull",
+    frameColor: "#e4e4e7",
+    options: {
+      dotsColor: "#18181b", dotsType: "square", backgroundColor: "#ffffff",
+      cornersSquareColor: "#18181b", cornersSquareType: "square",
+      cornersDotColor: "#18181b", cornersDotType: "square", logo: false,
+    },
+  },
+  {
+    id: "crossbones",
+    name: "Skull & Crossbones",
+    description: "Skull and crossed bones — pirate-flag style.",
+    category: "playful",
+    frame: "crossbones",
+    frameColor: "#e4e4e7",
+    options: {
+      dotsColor: "#18181b", dotsType: "square", backgroundColor: "#ffffff",
+      cornersSquareColor: "#18181b", cornersSquareType: "square",
+      cornersDotColor: "#18181b", cornersDotType: "square", logo: false,
+    },
+  },
+  {
+    id: "shield",
+    name: "Shield",
+    description: "A shield outline — a serious, protective look for a badge or certificate feel.",
+    category: "professional",
+    frame: "shield",
+    frameColor: "#0f172a",
+    options: {
+      dotsColor: "#0f172a", dotsType: "square", backgroundColor: "#ffffff",
+      cornersSquareColor: "#0f172a", cornersSquareType: "square",
+      cornersDotColor: "#0f172a", cornersDotType: "square", logo: false,
     },
   },
 ];
