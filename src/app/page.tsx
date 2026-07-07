@@ -363,8 +363,8 @@ export default function HomePage() {
             href="/asset/demogen001"
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-1 font-bold text-red-600 hover:text-red-700 transition-colors whitespace-nowrap"
-            style={{fontSize:'clamp(10px,0.8vw,12px)'}}
+            className="flex items-center gap-1.5 font-black uppercase tracking-wide text-white bg-red-600 hover:bg-red-500 active:scale-[0.97] transition-all rounded-full shadow-md shadow-red-900/25 whitespace-nowrap"
+            style={{fontSize:'clamp(9px,0.75vw,11px)', padding:'clamp(5px,0.7vh,8px) clamp(10px,1vw,14px)'}}
           >
             View Live Example <ExternalLink style={{width:'clamp(9px,0.75vw,11px)', height:'clamp(9px,0.75vw,11px)'}} />
           </a>

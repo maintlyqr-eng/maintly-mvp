@@ -168,7 +168,7 @@ export default function AssetReportPage() {
       {/* ══════════════════════════════════════════
           REPORT — A4 container
       ══════════════════════════════════════════ */}
-      <div style={{ width: "210mm", minHeight: "297mm", margin: "0 auto", background: "#fff", fontFamily: "'Inter', Arial, sans-serif", color: "#111" }}>
+      <div style={{ width: "210mm", minHeight: "297mm", margin: "0 auto", background: "#fff", fontFamily: "'Inter', Arial, sans-serif", color: "#111", paddingBottom: 176 }}>
 
         {/* ── TOP HEADER BAR ── */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 24px 10px", borderBottom: "3px solid #dc2626" }}>
@@ -343,57 +343,53 @@ export default function AssetReportPage() {
           )}
         </div>
 
-        {/* ── REPORT SUMMARY ── */}
-        <div style={{ margin: "0 24px 14px", border: "1px solid #e4e4e7", borderRadius: 10, padding: "14px 20px" }}>
-          <div style={{ fontSize: 9, fontWeight: 900, color: "#dc2626", letterSpacing: 2, marginBottom: 10 }}>REPORT SUMMARY</div>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <div style={{ display: "flex", gap: 32 }}>
-              {[
-                { value: String(services.length), label: "TOTAL SERVICES" },
-                ...(maxKmHrs > 0 ? [{ value: maxKmHrs.toLocaleString(), label: "LAST READING" }] : []),
-                { value: "100%", label: "VERIFIED RECORDS" },
-              ].map(({ value, label }) => (
-                <div key={label} style={{ textAlign: "center" }}>
-                  <div style={{ fontSize: 26, fontWeight: 900, color: "#111", lineHeight: 1 }}>{value}</div>
-                  <div style={{ fontSize: 8, color: "#aaa", fontWeight: 700, letterSpacing: 1, marginTop: 3 }}>{label}</div>
+        {/* ══ FIXED PAGE FOOTER — repeats on every printed page ══ */}
+        <div style={{ position: "fixed", bottom: 0, left: "50%", transform: "translateX(-50%)", width: "210mm", zIndex: 10 }}>
+
+          {/* ── REPORT SUMMARY ── */}
+          <div style={{ margin: "0 24px 10px", border: "1px solid #e4e4e7", borderRadius: 10, padding: "14px 20px", background: "#fff" }}>
+            <div style={{ fontSize: 9, fontWeight: 900, color: "#dc2626", letterSpacing: 2, marginBottom: 10 }}>REPORT SUMMARY</div>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div style={{ display: "flex", gap: 32 }}>
+                {[
+                  { value: String(services.length), label: "TOTAL SERVICES" },
+                  ...(maxKmHrs > 0 ? [{ value: maxKmHrs.toLocaleString(), label: "LAST READING" }] : []),
+                  { value: "100%", label: "VERIFIED RECORDS" },
+                ].map(({ value, label }) => (
+                  <div key={label} style={{ textAlign: "center" }}>
+                    <div style={{ fontSize: 26, fontWeight: 900, color: "#111", lineHeight: 1 }}>{value}</div>
+                    <div style={{ fontSize: 8, color: "#aaa", fontWeight: 700, letterSpacing: 1, marginTop: 3 }}>{label}</div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Maintly seal */}
+              <div style={{
+                width: 76, height: 76, borderRadius: "50%",
+                border: "3px solid #dc2626",
+                display: "flex", flexDirection: "column",
+                alignItems: "center", justifyContent: "center",
+                textAlign: "center", flexShrink: 0,
+                background: "radial-gradient(circle, #fff5f5 0%, #fff 60%)",
+              }}>
+                <div style={{ fontSize: 9, fontWeight: 900, letterSpacing: 1 }}>
+                  <span style={{ color: "#111" }}>MAIN</span><span style={{ color: "#dc2626" }}>TLY</span>
                 </div>
-              ))}
-            </div>
-
-            {/* Maintly seal */}
-            <div style={{
-              width: 76, height: 76, borderRadius: "50%",
-              border: "3px solid #dc2626",
-              display: "flex", flexDirection: "column",
-              alignItems: "center", justifyContent: "center",
-              textAlign: "center", flexShrink: 0,
-              background: "radial-gradient(circle, #fff5f5 0%, #fff 60%)",
-            }}>
-              <div style={{ fontSize: 9, fontWeight: 900, letterSpacing: 1 }}>
-                <span style={{ color: "#111" }}>MAIN</span><span style={{ color: "#dc2626" }}>TLY</span>
+                <div style={{ width: 40, height: 1, background: "#dc2626", margin: "3px 0" }} />
+                <div style={{ fontSize: 7, color: "#dc2626", fontWeight: 700, letterSpacing: 1 }}>VERIFIED</div>
               </div>
-              <div style={{ width: 40, height: 1, background: "#dc2626", margin: "3px 0" }} />
-              <div style={{ fontSize: 7, color: "#dc2626", fontWeight: 700, letterSpacing: 1 }}>VERIFIED</div>
             </div>
           </div>
-        </div>
 
-        {/* ── FOOTER ── */}
-        <div style={{ background: "#111", padding: "12px 24px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          {/* ── FOOTER BAR ── */}
+          <div style={{ background: "#fff", borderTop: "2px solid #dc2626", padding: "10px 24px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/images/qr-gear-real.png" alt="Maintly" style={{ width: 26, height: 26, objectFit: "contain", filter: "brightness(10)" }} />
-            <div>
-              <div style={{ fontWeight: 900, fontSize: 12, letterSpacing: 1, color: "#fff" }}>
-                MAIN<span style={{ color: "#dc2626" }}>TLY</span>
-              </div>
-              <div style={{ fontSize: 7, color: "#888", letterSpacing: 1 }}>MAINTENANCE. TRACKED.</div>
+            <img src="/images/maintly-logo-full.png" alt="MaintlyQR" style={{ height: 26, width: "auto", objectFit: "contain" }} />
+            <div style={{ textAlign: "center", color: "#888", fontSize: 9, lineHeight: 1.6 }}>
+              Trusted by professionals worldwide.<br />One QR. Lifetime Maintenance History.
             </div>
+            <div style={{ color: "#dc2626", fontSize: 10, fontWeight: 700 }}>maintlyqr.com</div>
           </div>
-          <div style={{ textAlign: "center", color: "#aaa", fontSize: 9, lineHeight: 1.6 }}>
-            Trusted by professionals worldwide.<br />One QR. Lifetime Maintenance History.
-          </div>
-          <div style={{ color: "#dc2626", fontSize: 10, fontWeight: 700 }}>maintly.com</div>
         </div>
       </div>
     </>
