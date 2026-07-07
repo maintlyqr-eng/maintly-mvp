@@ -184,10 +184,18 @@ export default function HomePage() {
         </a>
 
         <div className="hidden md:flex items-center gap-10">
-          {["Product","How It Works","Industries","Pricing","Resources","API","About"].map((item) => (
-            <a key={item} href="#" className="text-zinc-700 hover:text-zinc-900 font-medium transition-colors flex items-center gap-[3px]" style={{fontSize:'clamp(11px,0.85vw,13px)'}}>
-              {item}
-              {["Product","Resources"].includes(item) && <ChevronDown size={10} className="opacity-40" />}
+          {[
+            { label: "Product", href: "#" },
+            { label: "How It Works", href: "#" },
+            { label: "Industries", href: "/industries" },
+            { label: "Pricing", href: "#" },
+            { label: "Resources", href: "#" },
+            { label: "API", href: "#" },
+            { label: "About", href: "#" },
+          ].map(({ label, href }) => (
+            <a key={label} href={href} className="text-zinc-700 hover:text-zinc-900 font-medium transition-colors flex items-center gap-[3px]" style={{fontSize:'clamp(11px,0.85vw,13px)'}}>
+              {label}
+              {["Product","Resources"].includes(label) && <ChevronDown size={10} className="opacity-40" />}
             </a>
           ))}
         </div>
@@ -221,9 +229,17 @@ export default function HomePage() {
 
       {mobileMenuOpen && (
         <div className="md:hidden relative z-40 bg-white border-b border-zinc-200 shadow-lg flex flex-col px-5 py-4 gap-1">
-          {["Product","How It Works","Industries","Pricing","Resources","API","About"].map((item) => (
-            <a key={item} href="#" onClick={() => setMobileMenuOpen(false)} className="text-zinc-700 hover:text-zinc-900 font-medium py-2 border-b border-zinc-100 last:border-0">
-              {item}
+          {[
+            { label: "Product", href: "#" },
+            { label: "How It Works", href: "#" },
+            { label: "Industries", href: "/industries" },
+            { label: "Pricing", href: "#" },
+            { label: "Resources", href: "#" },
+            { label: "API", href: "#" },
+            { label: "About", href: "#" },
+          ].map(({ label, href }) => (
+            <a key={label} href={href} onClick={() => setMobileMenuOpen(false)} className="text-zinc-700 hover:text-zinc-900 font-medium py-2 border-b border-zinc-100 last:border-0">
+              {label}
             </a>
           ))}
           <div className="pt-3">
