@@ -13,12 +13,12 @@ interface MarketingLayoutProps {
 
 const NAV_ITEMS: { label: string; href: string }[] = [
   { label: "Product", href: "/product" },
-  { label: "How It Works", href: "#" },
+  { label: "How It Works", href: "/how-it-works" },
   { label: "Industries", href: "/industries" },
-  { label: "Pricing", href: "#" },
-  { label: "Resources", href: "#" },
-  { label: "API", href: "#" },
-  { label: "About", href: "#" },
+  { label: "Pricing", href: "/pricing" },
+  { label: "Resources", href: "/resources" },
+  { label: "API", href: "/api" },
+  { label: "About", href: "/about" },
 ];
 
 export default function MarketingLayout({ children, eyebrow, title, subtitle }: MarketingLayoutProps) {

@@ -3,7 +3,7 @@
 import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowRight, ShieldCheck, Camera, Keyboard, User, ChevronDown, Globe, Clock, TrendingUp, LogOut, LayoutGrid, X, ZoomIn, Menu, Wrench, FileText, ExternalLink } from "lucide-react";
+import { ArrowRight, ShieldCheck, Camera, Keyboard, User, Globe, Clock, TrendingUp, LogOut, LayoutGrid, X, ZoomIn, Menu, Wrench, FileText, ExternalLink } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 
 type PublicStats = { machines: number; services: number; mechanics: number };
@@ -186,16 +186,15 @@ export default function HomePage() {
         <div className="hidden md:flex items-center gap-10">
           {[
             { label: "Product", href: "/product" },
-            { label: "How It Works", href: "#" },
+            { label: "How It Works", href: "/how-it-works" },
             { label: "Industries", href: "/industries" },
-            { label: "Pricing", href: "#" },
-            { label: "Resources", href: "#" },
-            { label: "API", href: "#" },
-            { label: "About", href: "#" },
+            { label: "Pricing", href: "/pricing" },
+            { label: "Resources", href: "/resources" },
+            { label: "API", href: "/api" },
+            { label: "About", href: "/about" },
           ].map(({ label, href }) => (
-            <a key={label} href={href} className="text-zinc-700 hover:text-zinc-900 font-medium transition-colors flex items-center gap-[3px]" style={{fontSize:'clamp(11px,0.85vw,13px)'}}>
+            <a key={label} href={href} className="text-zinc-700 hover:text-zinc-900 font-medium transition-colors" style={{fontSize:'clamp(11px,0.85vw,13px)'}}>
               {label}
-              {["Resources"].includes(label) && <ChevronDown size={10} className="opacity-40" />}
             </a>
           ))}
         </div>
@@ -231,12 +230,12 @@ export default function HomePage() {
         <div className="md:hidden relative z-40 bg-white border-b border-zinc-200 shadow-lg flex flex-col px-5 py-4 gap-1">
           {[
             { label: "Product", href: "/product" },
-            { label: "How It Works", href: "#" },
+            { label: "How It Works", href: "/how-it-works" },
             { label: "Industries", href: "/industries" },
-            { label: "Pricing", href: "#" },
-            { label: "Resources", href: "#" },
-            { label: "API", href: "#" },
-            { label: "About", href: "#" },
+            { label: "Pricing", href: "/pricing" },
+            { label: "Resources", href: "/resources" },
+            { label: "API", href: "/api" },
+            { label: "About", href: "/about" },
           ].map(({ label, href }) => (
             <a key={label} href={href} onClick={() => setMobileMenuOpen(false)} className="text-zinc-700 hover:text-zinc-900 font-medium py-2 border-b border-zinc-100 last:border-0">
               {label}
