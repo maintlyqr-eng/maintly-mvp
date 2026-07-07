@@ -185,7 +185,7 @@ export default function HomePage() {
 
         <div className="hidden md:flex items-center gap-10">
           {[
-            { label: "Product", href: "#" },
+            { label: "Product", href: "/product" },
             { label: "How It Works", href: "#" },
             { label: "Industries", href: "/industries" },
             { label: "Pricing", href: "#" },
@@ -195,7 +195,7 @@ export default function HomePage() {
           ].map(({ label, href }) => (
             <a key={label} href={href} className="text-zinc-700 hover:text-zinc-900 font-medium transition-colors flex items-center gap-[3px]" style={{fontSize:'clamp(11px,0.85vw,13px)'}}>
               {label}
-              {["Product","Resources"].includes(label) && <ChevronDown size={10} className="opacity-40" />}
+              {["Resources"].includes(label) && <ChevronDown size={10} className="opacity-40" />}
             </a>
           ))}
         </div>
@@ -230,7 +230,7 @@ export default function HomePage() {
       {mobileMenuOpen && (
         <div className="md:hidden relative z-40 bg-white border-b border-zinc-200 shadow-lg flex flex-col px-5 py-4 gap-1">
           {[
-            { label: "Product", href: "#" },
+            { label: "Product", href: "/product" },
             { label: "How It Works", href: "#" },
             { label: "Industries", href: "/industries" },
             { label: "Pricing", href: "#" },

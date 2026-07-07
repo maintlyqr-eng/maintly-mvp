@@ -12,7 +12,7 @@ interface MarketingLayoutProps {
 }
 
 const NAV_ITEMS: { label: string; href: string }[] = [
-  { label: "Product", href: "#" },
+  { label: "Product", href: "/product" },
   { label: "How It Works", href: "#" },
   { label: "Industries", href: "/industries" },
   { label: "Pricing", href: "#" },
