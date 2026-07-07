@@ -7,7 +7,7 @@ const STEPS = [
   { icon: QrCode, title: "Attach the QR", sub: "Stick a tamper-proof Maintly QR on the machine. Takes seconds, lasts for the life of the equipment." },
   { icon: Smartphone, title: "Anyone Scans It", sub: "No app, no login. Any phone camera opens the machine's full history instantly." },
   { icon: Eye, title: "History Is Visible", sub: "Every past service — dates, parts, notes, who did the work — right there for anyone to see." },
-  { icon: UserCheck, title: "Mechanics Log New Work", sub: "Registered mechanics add new service records in seconds, building the permanent record." },
+  { icon: UserCheck, title: "Maintlers Log New Work", sub: "Any logged-in Maintler adds new service records in seconds, building the permanent record." },
 ];
 
 export default function HowItWorksPage() {

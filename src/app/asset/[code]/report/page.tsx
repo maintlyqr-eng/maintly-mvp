@@ -200,7 +200,7 @@ export default function AssetReportPage() {
 
               <div style={{ display: "flex", gap: 20, marginTop: 12 }}>
                 {[
-                  { title: "100% VERIFIED", sub: "All records verified\nby registered mechanics" },
+                  { title: "100% VERIFIED", sub: "All records verified\nby registered Maintlers" },
                   { title: "GLOBAL ACCESS", sub: "Trusted by professionals\nworldwide" },
                 ].map(({ title, sub }) => (
                   <div key={title} style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
@@ -329,9 +329,9 @@ export default function AssetReportPage() {
                         <div style={{ fontWeight: 700, color: "#222", fontSize: 10 }}>{mechName}</div>
                         <div style={{ display: "flex", alignItems: "center", gap: 3, marginTop: 2 }}>
                           {mech?.verified ? (
-                            <span style={{ color: "#dc2626", fontSize: 8, fontWeight: 700 }}>✓ VERIFIED MECHANIC</span>
+                            <span style={{ color: "#dc2626", fontSize: 8, fontWeight: 700 }}>✓ VERIFIED MAINTLER</span>
                           ) : (
-                            <span style={{ color: "#aaa", fontSize: 8, fontWeight: 700 }}>○ COMMUNITY MECHANIC</span>
+                            <span style={{ color: "#aaa", fontSize: 8, fontWeight: 700 }}>○ MAINTLER</span>
                           )}
                         </div>
                       </td>

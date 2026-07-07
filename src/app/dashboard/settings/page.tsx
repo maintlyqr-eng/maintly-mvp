@@ -7,7 +7,7 @@ import { useRouter } from "next/navigation";
 import {
   LayoutGrid, FileText, Box, QrCode, Users, BarChart3, Calendar as CalendarIcon,
   Mail, FolderOpen, Settings as SettingsIcon, Bell, X, LogOut, Crown, Menu,
-  ShieldCheck, Wrench, CalendarDays, KeyRound, AlertCircle, CheckCircle2, Camera,
+  ShieldCheck, CalendarDays, KeyRound, AlertCircle, CheckCircle2, Camera,
   Image as ImageIcon,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
@@ -273,7 +273,7 @@ export default function SettingsPage() {
           )}
           <div className="flex-1 min-w-0">
             <p className="text-[12px] font-bold text-zinc-800 leading-tight truncate">{name || email}</p>
-            <p className="text-[10px] text-zinc-400 leading-tight">Maintly Mechanic</p>
+            <p className="text-[10px] text-zinc-400 leading-tight">Maintly Maintler</p>
           </div>
         </div>
       </aside>
@@ -302,7 +302,7 @@ export default function SettingsPage() {
                 )}
                 <div className="hidden sm:block text-left">
                   <p className="text-[12px] font-bold text-zinc-800 leading-tight">{name || email}</p>
-                  <p className="text-[10px] text-zinc-400 leading-tight">Mechanic</p>
+                  <p className="text-[10px] text-zinc-400 leading-tight">Maintler</p>
                 </div>
               </div>
               <button
@@ -319,7 +319,7 @@ export default function SettingsPage() {
         <div className="flex-1 overflow-y-auto p-4 md:p-7 max-w-2xl">
 
           {/* ── ACCOUNT STATUS ── */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
             <div className="bg-white rounded-2xl border border-zinc-200 p-4 shadow-sm flex items-center gap-3">
               <div className="w-9 h-9 rounded-xl bg-zinc-50 flex items-center justify-center shrink-0"><CalendarDays size={16} className="text-zinc-500" /></div>
               <div>
@@ -328,21 +328,12 @@ export default function SettingsPage() {
               </div>
             </div>
             <div className="bg-white rounded-2xl border border-zinc-200 p-4 shadow-sm flex items-center gap-3">
-              <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${isMechanic ? "bg-blue-50" : "bg-zinc-50"}`}>
-                <Wrench size={16} className={isMechanic ? "text-blue-500" : "text-zinc-400"} />
-              </div>
-              <div>
-                <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-wide">Mechanic</p>
-                <p className="text-[13px] font-bold text-zinc-800">{isMechanic ? "Active" : "Not activated"}</p>
-              </div>
-            </div>
-            <div className="bg-white rounded-2xl border border-zinc-200 p-4 shadow-sm flex items-center gap-3">
               <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${verified ? "bg-emerald-50" : "bg-zinc-50"}`}>
                 <ShieldCheck size={16} className={verified ? "text-emerald-500" : "text-zinc-400"} />
               </div>
               <div>
-                <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-wide">Verification</p>
-                <p className="text-[13px] font-bold text-zinc-800">{verified ? "Verified Mechanic" : isMechanic ? "Community Mechanic" : "—"}</p>
+                <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-wide">Status</p>
+                <p className="text-[13px] font-bold text-zinc-800">{verified ? "Verified Maintler" : "Maintler"}</p>
               </div>
             </div>
           </div>

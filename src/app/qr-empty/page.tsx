@@ -68,7 +68,7 @@ export default function QrEmptyPage() {
 
               {/* Divider note */}
               <p className="text-center text-[10px] text-zinc-400 mb-2.5">
-                Only <span className="font-bold text-red-600">registered mechanics</span> can assign assets.
+                Log in as a <span className="font-bold text-red-600">Maintler</span> to assign this asset.
               </p>
 
               {/* Login button */}
@@ -137,7 +137,7 @@ export default function QrEmptyPage() {
 
           {/* Divider note */}
           <p className="text-center text-[10px] text-zinc-400 mb-2.5">
-            Only <span className="font-bold text-red-600">registered mechanics</span> can assign assets.
+            Log in as a <span className="font-bold text-red-600">Maintler</span> to assign this asset.
           </p>
 
           {/* Login button */}

@@ -6,9 +6,9 @@ import { QrCode, Clock, ShieldCheck, Globe, UserCheck, Layers, ArrowRight } from
 const FEATURES = [
   { icon: QrCode, title: "One QR Per Machine", sub: "Stick it once. Every scan pulls up the complete, permanent history — no app to install." },
   { icon: Clock, title: "Full Service History", sub: "Every inspection, repair, and part change — logged with dates, notes, and who did the work." },
-  { icon: ShieldCheck, title: "Verified Mechanics", sub: "Services logged by registered mechanics carry a Verified badge, building trust automatically." },
+  { icon: ShieldCheck, title: "Verified Maintlers", sub: "Services logged by verified Maintlers carry a Verified badge, building trust automatically." },
   { icon: Globe, title: "No Login to View", sub: "Anyone can scan and see the history instantly. Free, worldwide, no account needed." },
-  { icon: UserCheck, title: "Free for Mechanics", sub: "Registering and logging services is free. Verified status is optional, for extra credibility." },
+  { icon: UserCheck, title: "Free for Every Maintler", sub: "Registering and logging services is free. Verified professional status is optional, for extra credibility." },
   { icon: Layers, title: "Built for Every Machine", sub: "Cars, generators, HVAC, boats, aircraft and more — one system for everything you maintain." },
 ];
 

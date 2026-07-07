@@ -103,7 +103,7 @@ export default function RegisterPage() {
             <div className="inline-flex items-center justify-center w-14 h-14 rounded-full border border-red-100 bg-red-50 mb-4">
               <Wrench size={24} className="text-red-600" />
             </div>
-            <h2 className="text-[26px] font-black text-zinc-900">Become a Mechanic</h2>
+            <h2 className="text-[26px] font-black text-zinc-900">Become a Maintler</h2>
             <p className="text-[13px] text-zinc-500 mt-1">Create your free Maintly account</p>
           </div>
 

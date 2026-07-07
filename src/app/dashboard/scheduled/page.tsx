@@ -293,7 +293,7 @@ export default function ScheduledServicesPage() {
           </Link>
           <div className="flex-1 min-w-0">
             <p className="text-[12px] font-bold text-zinc-800 leading-tight truncate">{mechanicName || mechanicEmail}</p>
-            <p className="text-[10px] text-zinc-400 leading-tight">Maintly Mechanic</p>
+            <p className="text-[10px] text-zinc-400 leading-tight">Maintly Maintler</p>
           </div>
         </div>
       </aside>
@@ -324,7 +324,7 @@ export default function ScheduledServicesPage() {
                 </Link>
                 <div className="hidden sm:block text-left">
                   <p className="text-[12px] font-bold text-zinc-800 leading-tight">{mechanicName || mechanicEmail}</p>
-                  <p className="text-[10px] text-zinc-400 leading-tight">Mechanic</p>
+                  <p className="text-[10px] text-zinc-400 leading-tight">Maintler</p>
                 </div>
               </div>
               <button

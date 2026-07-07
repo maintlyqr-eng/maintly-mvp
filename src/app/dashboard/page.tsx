@@ -580,7 +580,7 @@ export default function DashboardPage() {
           </Link>
           <div className="flex-1 min-w-0">
             <p className="text-[12px] font-bold text-zinc-800 leading-tight truncate">{displayName}</p>
-            <p className="text-[10px] text-zinc-400 leading-tight">Maintly Mechanic</p>
+            <p className="text-[10px] text-zinc-400 leading-tight">Maintly Maintler</p>
           </div>
         </div>
       </aside>
@@ -595,7 +595,7 @@ export default function DashboardPage() {
             </button>
             <div className="min-w-0">
               <h1 className="text-[17px] md:text-[20px] font-black text-zinc-900 truncate">Dashboard</h1>
-              <p className="hidden sm:block text-[12px] text-zinc-400 truncate">Welcome back, {mechanicName || "Mechanic"}! Here&apos;s what&apos;s happening with your maintenance work.</p>
+              <p className="hidden sm:block text-[12px] text-zinc-400 truncate">Welcome back, {mechanicName || "Maintler"}! Here&apos;s what&apos;s happening with your maintenance work.</p>
             </div>
           </div>
 
@@ -681,7 +681,7 @@ export default function DashboardPage() {
                 </Link>
                 <div className="hidden sm:block text-left">
                   <p className="text-[12px] font-bold text-zinc-800 leading-tight">{displayName}</p>
-                  <p className="text-[10px] text-zinc-400 leading-tight">Mechanic</p>
+                  <p className="text-[10px] text-zinc-400 leading-tight">Maintler</p>
                 </div>
               </div>
               <button

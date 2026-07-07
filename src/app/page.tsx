@@ -374,7 +374,7 @@ export default function HomePage() {
           {[
             { icon: Globe, value: stats ? stats.machines.toLocaleString() : "—", label: "Machines Tracked" },
             { icon: FileText, value: stats ? stats.services.toLocaleString() : "—", label: "Services Logged" },
-            { icon: Wrench, value: stats ? stats.mechanics.toLocaleString() : "—", label: "Verified Mechanics" },
+            { icon: Wrench, value: stats ? stats.mechanics.toLocaleString() : "—", label: "Verified Maintlers" },
             { icon: TrendingUp, value: null, label: "Growing Every Day" },
           ].map(({ icon: Icon, value, label }, i) => (
             <div key={label} className={["flex flex-row items-center justify-center gap-1.5 px-2 border-white/10", i % 2 === 0 ? "border-r" : "", i < 2 ? "border-b" : "", "md:border-b-0", i < 3 ? "md:border-r" : "md:border-r-0"].filter(Boolean).join(" ")} style={{paddingTop:'clamp(6px,0.8vh,11px)', paddingBottom:'clamp(6px,0.8vh,11px)'}}>

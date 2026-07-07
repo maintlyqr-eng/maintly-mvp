@@ -22,7 +22,7 @@ export default function PricingPage() {
           <ul className="space-y-2.5 mb-6 flex-1">
             {[
               "Scan and view any machine's history — no account needed",
-              "Free registration as a Maintly mechanic",
+              "Free registration as a Maintler",
               "Log unlimited services",
               "Add machines to your workshop",
             ].map((item) => (
@@ -45,7 +45,7 @@ export default function PricingPage() {
           <div className="w-11 h-11 rounded-full bg-red-50 border border-red-200 flex items-center justify-center text-red-600 mb-4">
             <ShieldCheck size={20} />
           </div>
-          <h3 className="font-black text-zinc-900 text-lg mb-1">Verified Mechanic</h3>
+          <h3 className="font-black text-zinc-900 text-lg mb-1">Verified Maintler</h3>
           <p className="text-3xl font-black text-zinc-900 mb-4">Ask us</p>
           <ul className="space-y-2.5 mb-6 flex-1">
             {[
@@ -60,7 +60,7 @@ export default function PricingPage() {
             ))}
           </ul>
           <a
-            href="mailto:support@maintlyqr.com?subject=Verified%20Mechanic"
+            href="mailto:support@maintlyqr.com?subject=Verified%20Maintler"
             className="text-center border border-zinc-300 hover:border-zinc-400 text-zinc-700 font-black tracking-wide rounded-xl transition-all uppercase px-6 py-3 text-[13px]"
           >
             Get Notified

@@ -12,12 +12,12 @@ const SECTIONS = [
   {
     icon: Target,
     title: "Our Mission",
-    sub: "Give every machine a permanent, verifiable maintenance record — tied to the machine itself, accessible with a single scan, anywhere in the world.",
+    sub: "Give every machine a permanent, verifiable maintenance record — tied to the machine itself, accessible with a single scan, anywhere in the world. Every Maintler helps preserve the story of an asset.",
   },
   {
     icon: Users,
     title: "Who We're For",
-    sub: "Mechanics, electricians, and refrigeration technicians — the people who do the maintenance that keeps everything else running — plus every owner who wants proof of it.",
+    sub: "Mechanics, electricians, HVAC technicians, fleet managers, inspectors, and every owner who wants proof of the work — anyone who maintains an asset is a Maintler.",
   },
 ];
 

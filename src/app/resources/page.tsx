@@ -6,7 +6,7 @@ import { FileText, LifeBuoy, BookOpen, Newspaper } from "lucide-react";
 const RESOURCES = [
   { icon: FileText, title: "Legal Hub", sub: "Terms of service, privacy policy, and cookie policy.", href: "/legal", tag: null },
   { icon: LifeBuoy, title: "Support", sub: "Questions or issues? We reply personally.", href: "mailto:support@maintlyqr.com", tag: null },
-  { icon: BookOpen, title: "Help Center", sub: "Guides and answers for mechanics and owners.", href: "#", tag: "Coming Soon" },
+  { icon: BookOpen, title: "Help Center", sub: "Guides and answers for every Maintler.", href: "#", tag: "Coming Soon" },
   { icon: Newspaper, title: "Blog", sub: "Updates and stories from the field.", href: "#", tag: "Coming Soon" },
 ];
 

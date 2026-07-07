@@ -75,18 +75,13 @@ export default function AssetPublicPage() {
   const [mechanicId, setMechanicId]     = useState<string | null>(null);
   const [mechanicName, setMechanicName] = useState("");
   const [isLoggedIn, setIsLoggedIn]     = useState(false);
-  const [isMechanicActive, setIsMechanicActive] = useState(false);
 
   // Workshop
   const [inWorkshop, setInWorkshop]         = useState(false);
   const [addingWorkshop, setAddingWorkshop] = useState(false);
   const [workshopDone, setWorkshopDone]     = useState(false);
 
-  // "Become a Mechanic" gate
-  const [showMechanicGate, setShowMechanicGate] = useState(false);
-  const [activatingMechanic, setActivatingMechanic] = useState(false);
-
-  // Contact the mechanic
+  // Contact the Maintler
   const [showContactForm, setShowContactForm] = useState(false);
   const [contactName, setContactName] = useState("");
   const [contactInfo, setContactInfo] = useState("");
@@ -116,8 +111,8 @@ export default function AssetPublicPage() {
       if (session) {
         setIsLoggedIn(true);
         setMechanicId(session.user.id);
-        const { data: m } = await supabase.from("mechanics").select("name, is_mechanic").eq("id", session.user.id).single();
-        if (m) { setMechanicName(m.name); setIsMechanicActive(!!m.is_mechanic); }
+        const { data: m } = await supabase.from("mechanics").select("name").eq("id", session.user.id).single();
+        if (m) { setMechanicName(m.name); }
       }
 
       // QR → asset
@@ -176,25 +171,12 @@ export default function AssetPublicPage() {
 
   function handleAddServiceClick() {
     if (!isLoggedIn) { router.push(`/login?redirect=/asset/${code}`); return; }
-    if (!isMechanicActive) { setShowMechanicGate(true); return; }
-    setShowServiceForm(true);
-  }
-
-  async function handleBecomeMechanic() {
-    if (!mechanicId || activatingMechanic) return;
-    setActivatingMechanic(true);
-    const { error } = await supabase.from("mechanics").update({ is_mechanic: true }).eq("id", mechanicId).select("id");
-    setActivatingMechanic(false);
-    if (error) return;
-    setIsMechanicActive(true);
-    setShowMechanicGate(false);
     setShowServiceForm(true);
   }
 
   async function handleAddService(e: React.FormEvent) {
     e.preventDefault();
     if (!isLoggedIn) { router.push(`/login?redirect=/asset/${code}`); return; }
-    if (!isMechanicActive) { setShowServiceForm(false); setShowMechanicGate(true); return; }
     if (!asset || savingSvc) return;
     setSvcError("");
 
@@ -240,7 +222,7 @@ export default function AssetPublicPage() {
       return;
     }
     if (!asset.created_by) {
-      setContactError("This asset doesn't have a mechanic to contact yet.");
+      setContactError("This asset doesn't have a Maintler to contact yet.");
       return;
     }
 
@@ -432,11 +414,11 @@ export default function AssetPublicPage() {
                                 <span className="text-[11px] text-zinc-400">{mech.name}</span>
                                 {mech.verified ? (
                                   <span className="flex items-center gap-1 text-[10px] font-semibold text-blue-600">
-                                    <span className="w-1.5 h-1.5 rounded-full bg-blue-500 shrink-0" /> Verified Mechanic
+                                    <span className="w-1.5 h-1.5 rounded-full bg-blue-500 shrink-0" /> Verified Maintler
                                   </span>
                                 ) : (
                                   <span className="flex items-center gap-1 text-[10px] font-semibold text-zinc-400">
-                                    <span className="w-1.5 h-1.5 rounded-full border border-zinc-300 shrink-0" /> Community Mechanic
+                                    <span className="w-1.5 h-1.5 rounded-full border border-zinc-300 shrink-0" /> Maintler
                                   </span>
                                 )}
                               </div>
@@ -469,7 +451,7 @@ export default function AssetPublicPage() {
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-[12px] font-bold text-zinc-800">Have a question about this {asset.asset_type}?</p>
-              <p className="text-[11px] text-zinc-400">Send a message to the mechanic who manages it.</p>
+              <p className="text-[11px] text-zinc-400">Send a message to the Maintler who manages it.</p>
             </div>
             <button
               onClick={() => setShowContactForm(true)}
@@ -548,12 +530,12 @@ export default function AssetPublicPage() {
           </div>
         ) : (
           <div className="max-w-lg mx-auto px-4 pt-3 pb-1">
-            <p className="text-[11px] text-zinc-400 text-center mb-2">Are you a mechanic? Log in to add services or link this asset to your workshop.</p>
+            <p className="text-[11px] text-zinc-400 text-center mb-2">Log in to add services or link this asset to your workshop.</p>
             <button
               onClick={() => router.push(`/login?redirect=/asset/${code}`)}
               className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl font-bold text-[14px] bg-zinc-900 hover:bg-zinc-800 text-white shadow-sm transition-all active:scale-[0.97]"
             >
-              <LogIn size={16} /> Log in as Mechanic
+              <LogIn size={16} /> Log in as Maintler
               <ChevronRight size={15} className="opacity-60" />
             </button>
           </div>
@@ -648,35 +630,7 @@ export default function AssetPublicPage() {
         </div>
       )}
 
-      {/* ══ BECOME A MECHANIC GATE ═══════════════════════════════════════════════ */}
-      {showMechanicGate && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6 text-center">
-            <div className="w-12 h-12 rounded-full bg-red-50 flex items-center justify-center mx-auto mb-3">
-              <Wrench size={20} className="text-red-500" />
-            </div>
-            <h3 className="text-[16px] font-black text-zinc-900 mb-2">Become a Mechanic</h3>
-            <p className="text-[13px] text-zinc-500 mb-5">To add maintenance records, your account needs to be activated as a mechanic.</p>
-            <div className="flex gap-3">
-              <button
-                onClick={() => setShowMechanicGate(false)}
-                className="flex-1 border border-zinc-200 text-zinc-700 font-bold py-3 rounded-xl text-[13px] hover:bg-zinc-50"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleBecomeMechanic}
-                disabled={activatingMechanic}
-                className="flex-1 bg-red-600 hover:bg-red-500 disabled:opacity-60 text-white font-bold py-3 rounded-xl text-[13px] transition-all"
-              >
-                {activatingMechanic ? "Activating…" : "Become a Mechanic"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ══ CONTACT THE MECHANIC (bottom sheet) ═══════════════════════════════ */}
+      {/* ══ CONTACT THE MAINTLER (bottom sheet) ═══════════════════════════════ */}
       {showContactForm && (
         <div className="fixed inset-0 z-50 flex flex-col justify-end">
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={closeContactForm} />
@@ -690,7 +644,7 @@ export default function AssetPublicPage() {
 
             <div className="flex items-center justify-between px-5 py-3 border-b border-zinc-100">
               <div>
-                <h3 className="text-[16px] font-black text-zinc-900">Message the Mechanic</h3>
+                <h3 className="text-[16px] font-black text-zinc-900">Message the Maintler</h3>
                 <p className="text-[12px] text-zinc-400">{assetName}</p>
               </div>
               <button onClick={closeContactForm}
@@ -705,7 +659,7 @@ export default function AssetPublicPage() {
                   <CheckCircle2 size={22} className="text-emerald-500" />
                 </div>
                 <h4 className="text-[15px] font-black text-zinc-900 mb-1">Message sent!</h4>
-                <p className="text-[13px] text-zinc-500 mb-6">The mechanic will get back to you using the contact info you left.</p>
+                <p className="text-[13px] text-zinc-500 mb-6">The Maintler will get back to you using the contact info you left.</p>
                 <button onClick={closeContactForm}
                   className="w-full bg-zinc-900 hover:bg-zinc-800 text-white font-bold py-3 rounded-2xl text-[13px] transition-all">
                   Done
@@ -720,7 +674,7 @@ export default function AssetPublicPage() {
                 </div>
                 <div>
                   <label className="text-[11px] font-bold text-zinc-500 uppercase tracking-widest mb-1.5 block">Email or phone</label>
-                  <input value={contactInfo} onChange={(e) => setContactInfo(e.target.value)} placeholder="So the mechanic can reply to you"
+                  <input value={contactInfo} onChange={(e) => setContactInfo(e.target.value)} placeholder="So the Maintler can reply to you"
                     className="w-full bg-zinc-50 border border-zinc-200 focus:border-blue-400 focus:bg-white rounded-xl px-4 py-3 text-[14px] text-zinc-900 placeholder-zinc-400 outline-none transition-all" />
                 </div>
                 <div>
