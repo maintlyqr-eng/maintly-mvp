@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { X, Camera } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { authedFetch } from "@/lib/apiAuth";
 import { validateImageFile } from "@/lib/imageValidation";
 import { uploadAssetPhoto, genAssetQrCode } from "@/lib/uploadAssetPhoto";
 import { assetTypeOptions, fuelTypeOptions } from "@/lib/assetTypes";
@@ -129,9 +130,29 @@ export default function NewAssetModal({
     }
 
     const code = existingCode || genAssetQrCode();
-    const { error: qrError } = existingCode
-      ? await supabase.from("qr_codes").update({ asset_id: newAsset.id, created_by: mechanicId }).eq("code", existingCode)
-      : await supabase.from("qr_codes").insert({ code, asset_id: newAsset.id, created_by: mechanicId });
+    let qrError: { message: string } | null = null;
+
+    if (existingCode) {
+      // Claiming a pre-existing blank code (scanned off a sticker, or
+      // picked from /dashboard/qr-codes) needs the service-role-backed
+      // /api/qr-codes route, not a direct client update — a plain mechanic
+      // session has no RLS permission to update someone else's qr_codes
+      // row, and a blank code very often belongs to a DIFFERENT mechanic
+      // than the one now assigning it (that's the whole point of the
+      // "MaintlyQR World" flow: anyone can register equipment they find a
+      // blank sticker on).
+      const res = await authedFetch("/api/qr-codes", {
+        method: "POST",
+        body: JSON.stringify({ action: "assign", code: existingCode, assetId: newAsset.id }),
+      });
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({}));
+        qrError = { message: json.error || "Couldn't assign this QR code." };
+      }
+    } else {
+      const { error } = await supabase.from("qr_codes").insert({ code, asset_id: newAsset.id, created_by: mechanicId });
+      qrError = error;
+    }
 
     if (qrError) {
       setSaving(false);

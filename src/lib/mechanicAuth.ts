@@ -9,10 +9,10 @@ import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 // This is the first "mechanic-facing" API route auth path in the codebase
 // — every existing route so far is either admin-only (isAdminRequest, an
 // HMAC cookie) or fully open and secured purely by RLS on direct
-// client-to-Supabase calls. This one exists because a couple of QR Codes
-// actions (generating blank codes, reissuing a lost one) need a
-// server-side cross-table check — "does this mechanic actually manage this
-// asset?" — that isn't safe to trust from the client alone.
+// client-to-Supabase calls. This one exists because the QR Codes
+// "personalize" action needs a server-side cross-table check — "does this
+// mechanic actually manage this code's asset?" — that isn't safe to trust
+// from the client alone.
 export async function getMechanicIdFromRequest(req: NextRequest): Promise<string | null> {
   const authHeader = req.headers.get("authorization") || "";
   const token = authHeader.replace(/^Bearer\s+/i, "").trim();

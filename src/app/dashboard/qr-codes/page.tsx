@@ -7,7 +7,7 @@ import { useRouter } from "next/navigation";
 import {
   LayoutGrid, FileText, Box, QrCode, Users, BarChart3, Calendar as CalendarIcon,
   Mail, FolderOpen, Settings, Bell, Plus, X, LogOut, Crown, Menu,
-  Search, Download, Printer, Sparkles, ScanLine, RefreshCw, Tag, Wrench,
+  Search, Download, Printer, Sparkles, ScanLine, Tag, Wrench,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { authedFetch } from "@/lib/apiAuth";
@@ -17,7 +17,7 @@ import ContactSupportWidget from "@/components/ContactSupportWidget";
 import QrCodeCanvas, { type QrCodeCanvasHandle } from "@/components/QrCodeCanvas";
 import QrThemePicker from "@/components/QrThemePicker";
 import NewAssetModal from "@/components/NewAssetModal";
-import { getQrTheme, DEFAULT_QR_THEME } from "@/lib/qrThemes";
+import { DEFAULT_QR_THEME } from "@/lib/qrThemes";
 import { formatDateDMY } from "@/lib/date";
 
 const navItems = [
@@ -87,10 +87,6 @@ export default function QrCodesPage() {
 
   // Assign-to-new-equipment (for a blank code, from this page)
   const [assignCode, setAssignCode] = useState<string | null>(null);
-
-  // Reissue confirm
-  const [confirmReissue, setConfirmReissue] = useState<string | null>(null);
-  const [reissuing, setReissuing] = useState(false);
 
   const [showPrintSheet, setShowPrintSheet] = useState(false);
 
@@ -209,21 +205,6 @@ export default function QrCodesPage() {
 
     setCodes((prev) => prev.map((c) => c.code === personalizeCode.code ? { ...c, theme: pTheme, label: pLabel.trim() || null } : c));
     setPersonalizeCode(null);
-  }
-
-  async function handleReissue(row: QrCodeRow) {
-    if (!row.asset) return;
-    setReissuing(true);
-    const res = await authedFetch("/api/qr-codes", {
-      method: "POST",
-      body: JSON.stringify({ action: "reissue", assetId: row.asset.id }),
-    });
-    const json = await res.json().catch(() => ({}));
-    setReissuing(false);
-    setConfirmReissue(null);
-    if (!res.ok) { setPageMsg({ text: json.error || "Couldn't reissue this code.", ok: false }); return; }
-    setPageMsg({ text: "New QR generated — the old sticker no longer works. Print the new one from the list below.", ok: true });
-    await loadCodes();
   }
 
   function handleDownload(row: QrCodeRow) {
@@ -472,22 +453,10 @@ export default function QrCodesPage() {
                         <Tag size={12} /> Assign
                       </button>
                     )}
-                    {row.asset && (
-                      confirmReissue === row.code ? (
-                        <span className="flex items-center gap-1.5 text-[10.5px]">
-                          <span className="text-red-600 font-semibold">Issue a new code?</span>
-                          <button disabled={reissuing} onClick={() => handleReissue(row)} className="font-bold text-white bg-red-600 hover:bg-red-500 px-2 py-0.5 rounded-lg">
-                            {reissuing ? "..." : "Yes"}
-                          </button>
-                          <button onClick={() => setConfirmReissue(null)} className="font-semibold text-zinc-400 hover:text-zinc-700">No</button>
-                        </span>
-                      ) : (
-                        <button onClick={() => setConfirmReissue(row.code)} className="flex items-center gap-1 text-[11px] font-bold text-zinc-600 hover:text-red-600 transition-colors" title="Lost or damaged sticker — issue a replacement">
-                          <RefreshCw size={12} /> Reissue
-                        </button>
-                      )
-                    )}
                   </div>
+                  {row.asset && (
+                    <p className="text-[9.5px] text-zinc-300 mt-1.5">Sticker lost or damaged? Just download/print this same code again — it never stops belonging to this equipment.</p>
+                  )}
                 </div>
               ))}
             </div>

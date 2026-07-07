@@ -78,7 +78,12 @@ export async function GET(req: NextRequest) {
 // POST body shapes:
 //   { action: "generate_blank", count, theme? }  → returns { codes: [...] }
 //   { action: "personalize", code, theme?, label? }
-//   { action: "reissue", assetId }                → returns { code: newCode }
+//
+// Deliberately no "reissue"/replace-the-code action: a code is meant to
+// stay permanently tied to its asset for the asset's whole life (Facu was
+// explicit about this — a lost or damaged sticker gets reprinted from the
+// same code via the Download/Print Sheet actions on the dashboard, it
+// never gets swapped for a new one).
 export async function POST(req: NextRequest) {
   const mechanicId = await getMechanicIdFromRequest(req);
   if (!mechanicId) return NextResponse.json({ error: "Not authorized." }, { status: 401 });
@@ -134,25 +139,34 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true });
   }
 
-  if (body.action === "reissue") {
+  // Claim a blank code for a newly-created asset — used both by the
+  // "MaintlyQR World" public scan flow (src/app/asset/[code]/page.tsx) and
+  // the "Assign" action on /dashboard/qr-codes. Deliberately NOT scoped to
+  // "codes I created" — a blank code very often belongs to a different
+  // mechanic than the one now registering equipment they found it stuck
+  // to, and that's exactly the point of the flow. The only real guard
+  // needed is that the code is still genuinely unclaimed.
+  if (body.action === "assign") {
+    const code = body.code;
     const assetId = body.assetId;
+    if (!code || typeof code !== "string") return NextResponse.json({ error: "Missing code." }, { status: 400 });
     if (!assetId || typeof assetId !== "string") return NextResponse.json({ error: "Missing assetId." }, { status: 400 });
 
-    const { count: manageCount } = await admin.from("mechanic_assets").select("*", { count: "exact", head: true })
-      .eq("mechanic_id", mechanicId).eq("asset_id", assetId);
-    if (!manageCount) return NextResponse.json({ error: "You don't manage this asset." }, { status: 403 });
+    const { data: row } = await admin.from("qr_codes").select("code, asset_id").eq("code", code).single();
+    if (!row) return NextResponse.json({ error: "QR code not found." }, { status: 404 });
+    if (row.asset_id) return NextResponse.json({ error: "This QR code is already assigned to an asset." }, { status: 409 });
 
-    const newCode = genCode();
-    const { error: insertError } = await admin.from("qr_codes").insert({
-      code: newCode, asset_id: assetId, created_by: mechanicId, theme: DEFAULT_QR_THEME,
-    });
-    if (insertError) return NextResponse.json({ error: insertError.message }, { status: 500 });
+    // The asset must actually be one this mechanic just created/owns —
+    // guards against blindly pointing an arbitrary code at an arbitrary
+    // asset id.
+    const { data: assetRow } = await admin.from("assets").select("created_by").eq("id", assetId).single();
+    if (!assetRow || assetRow.created_by !== mechanicId) {
+      return NextResponse.json({ error: "You don't own this asset." }, { status: 403 });
+    }
 
-    // Free whichever old code(s) pointed at this asset so a found lost
-    // sticker doesn't keep working once a replacement has been issued.
-    await admin.from("qr_codes").update({ asset_id: null }).eq("asset_id", assetId).neq("code", newCode);
-
-    return NextResponse.json({ ok: true, code: newCode });
+    const { error } = await admin.from("qr_codes").update({ asset_id: assetId, created_by: mechanicId }).eq("code", code);
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ ok: true });
   }
 
   return NextResponse.json({ error: "Unknown action." }, { status: 400 });
