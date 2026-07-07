@@ -44,7 +44,7 @@ type AssetData = {
   plate: string | null; fuel_type: string | null; location: string | null;
   created_by: string | null;
 };
-type MechanicInfo = { name: string; verified?: boolean | null };
+type MechanicInfo = { name: string; verified?: boolean | null; profession?: string | null };
 type ServiceRecord = {
   id: string; service_date: string; service_type: string;
   km_hours: number | null; notes: string | null; created_at: string;
@@ -151,7 +151,7 @@ export default function AssetPublicPage() {
   async function loadServices(assetId: string) {
     const { data } = await supabase
       .from("service_records")
-      .select("id, service_date, service_type, km_hours, notes, created_at, mechanics(name, verified)")
+      .select("id, service_date, service_type, km_hours, notes, created_at, mechanics(name, verified, profession)")
       .eq("asset_id", assetId)
       .order("service_date", { ascending: false });
     setServices((data as ServiceRecord[]) ?? []);
@@ -414,7 +414,7 @@ export default function AssetPublicPage() {
                                 <span className="text-[11px] text-zinc-400">{mech.name}</span>
                                 {mech.verified ? (
                                   <span className="flex items-center gap-1 text-[10px] font-semibold text-blue-600">
-                                    <span className="w-1.5 h-1.5 rounded-full bg-blue-500 shrink-0" /> Verified Maintler
+                                    <span className="w-1.5 h-1.5 rounded-full bg-blue-500 shrink-0" /> {mech.profession ? `${mech.profession} Maintler` : "Verified Maintler"}
                                   </span>
                                 ) : (
                                   <span className="flex items-center gap-1 text-[10px] font-semibold text-zinc-400">

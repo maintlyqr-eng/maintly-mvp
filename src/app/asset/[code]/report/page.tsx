@@ -21,7 +21,7 @@ type AssetData = {
   photo_url: string | null;
 };
 
-type MechanicInfo = { name: string; verified?: boolean | null };
+type MechanicInfo = { name: string; verified?: boolean | null; profession?: string | null };
 
 type ServiceRecord = {
   id: string;
@@ -110,7 +110,7 @@ export default function AssetReportPage() {
 
       const { data: svcRows } = await supabase
         .from("service_records")
-        .select("id, service_date, service_type, km_hours, notes, mechanics(name, verified)")
+        .select("id, service_date, service_type, km_hours, notes, mechanics(name, verified, profession)")
         .eq("asset_id", qrRow.asset_id)
         .order("service_date", { ascending: false });
 
@@ -329,7 +329,7 @@ export default function AssetReportPage() {
                         <div style={{ fontWeight: 700, color: "#222", fontSize: 10 }}>{mechName}</div>
                         <div style={{ display: "flex", alignItems: "center", gap: 3, marginTop: 2 }}>
                           {mech?.verified ? (
-                            <span style={{ color: "#dc2626", fontSize: 8, fontWeight: 700 }}>✓ VERIFIED MAINTLER</span>
+                            <span style={{ color: "#dc2626", fontSize: 8, fontWeight: 700 }}>✓ {mech.profession ? `${mech.profession.toUpperCase()} MAINTLER` : "VERIFIED MAINTLER"}</span>
                           ) : (
                             <span style={{ color: "#aaa", fontSize: 8, fontWeight: 700 }}>○ MAINTLER</span>
                           )}

@@ -29,6 +29,12 @@ type AccountRow = {
   suspended: boolean;
   created_at: string;
   photo_url: string | null;
+  profession: string | null;
+  certificate_path: string | null;
+  verification_status: "none" | "pending" | "verified" | "rejected" | null;
+  verification_requested_at: string | null;
+  verification_reviewed_at: string | null;
+  verification_note: string | null;
 };
 
 type ServiceRow = {
@@ -64,7 +70,7 @@ type QrRow = {
 type AssetTypeCount = { type: string; count: number };
 type DayBucket = { label: string; count: number };
 
-type Section = "dashboard" | "accounts" | "mechanics" | "assets" | "services" | "qr" | "support";
+type Section = "dashboard" | "accounts" | "mechanics" | "verifications" | "assets" | "services" | "qr" | "support";
 
 type SupportMessageRow = {
   id: string;
@@ -325,7 +331,7 @@ export default function AdminPage() {
       { data: scanWeekRows },
     ] = await Promise.all([
       supabase.from("mechanics")
-        .select("id, name, email, workshop_name, is_mechanic, verified, suspended, created_at, photo_url")
+        .select("id, name, email, workshop_name, is_mechanic, verified, suspended, created_at, photo_url, profession, certificate_path, verification_status, verification_requested_at, verification_reviewed_at, verification_note")
         .order("created_at", { ascending: false }),
       supabase.from("service_records")
         .select("id, service_date, service_type, mechanic_id, asset_id, customer_id, mechanics(name), assets(brand, model, nickname)")
@@ -581,6 +587,39 @@ export default function AdminPage() {
     return true;
   }
 
+  const [verificationBusyId, setVerificationBusyId] = useState<string | null>(null);
+
+  async function handleApproveVerification(a: AccountRow) {
+    setVerificationBusyId(a.id);
+    const ok = await patchAccount(a.id, {
+      verified: true,
+      is_mechanic: true,
+      verification_status: "verified",
+      verification_reviewed_at: new Date().toISOString(),
+    });
+    setVerificationBusyId(null);
+    if (ok) flash(`${a.name} verified as ${a.profession ?? "a"} Maintler.`);
+  }
+
+  async function handleRejectVerification(a: AccountRow) {
+    setVerificationBusyId(a.id);
+    const ok = await patchAccount(a.id, {
+      verified: false,
+      verification_status: "rejected",
+      verification_reviewed_at: new Date().toISOString(),
+    });
+    setVerificationBusyId(null);
+    if (ok) flash(`Verification request declined for ${a.name}.`);
+  }
+
+  async function handleViewCertificate(a: AccountRow) {
+    if (!a.certificate_path) return;
+    const res = await adminFetch("/api/admin/certificate-url", "POST", { id: a.id });
+    if (!res.ok) { flash(res.error, "error"); return; }
+    const url = (res.data as { url?: string })?.url;
+    if (url) window.open(url, "_blank", "noopener,noreferrer");
+  }
+
   async function handleSaveDetail() {
     if (!detailAccount) return;
     setDetailSaving(true);
@@ -678,6 +717,12 @@ export default function AdminPage() {
       .filter((a) => a.is_mechanic)
       .filter((a) => (mechanicPendingOnly ? !a.verified : true));
   }, [accounts, mechanicPendingOnly]);
+
+  const pendingVerifications = useMemo(() => {
+    return accounts
+      .filter((a) => a.verification_status === "pending")
+      .sort((a, b) => (a.verification_requested_at ?? "").localeCompare(b.verification_requested_at ?? ""));
+  }, [accounts]);
 
   const visibleAssets = useMemo(() => {
     const q = assetSearch.trim().toLowerCase();
@@ -793,13 +838,14 @@ export default function AdminPage() {
     { id: "dashboard", label: "Dashboard", icon: BarChart3 },
     { id: "accounts",  label: "Accounts",  icon: Users     },
     { id: "mechanics", label: "Mechanics", icon: Wrench    },
+    { id: "verifications", label: "Verifications", icon: ShieldCheck },
     { id: "assets",    label: "Assets",    icon: Box       },
     { id: "services",  label: "Services",  icon: ClipboardList },
     { id: "qr",        label: "QR Manager", icon: QrCode   },
     { id: "support",   label: "Support",   icon: LifeBuoy  },
   ];
   const sectionLabels: Record<Section, string> = {
-    dashboard: "Dashboard", accounts: "Accounts", mechanics: "Mechanics",
+    dashboard: "Dashboard", accounts: "Accounts", mechanics: "Mechanics", verifications: "Verifications",
     assets: "Assets", services: "Services", qr: "QR Manager", support: "Support",
   };
   const unreadSupportCount = supportMessages.filter((m) => !m.from_admin && !m.read).length;
@@ -844,6 +890,13 @@ export default function AdminPage() {
                   section === id ? "bg-white text-red-600" : "bg-red-600 text-white"
                 }`}>
                   {unreadSupportCount}
+                </span>
+              )}
+              {id === "verifications" && pendingVerifications.length > 0 && (
+                <span className={`ml-auto text-[10px] font-black px-1.5 py-0.5 rounded-full leading-none ${
+                  section === id ? "bg-white text-red-600" : "bg-amber-500 text-white"
+                }`}>
+                  {pendingVerifications.length}
                 </span>
               )}
             </button>
@@ -1121,6 +1174,69 @@ export default function AdminPage() {
                   </table>
                 </div>
               </div>
+            </div>
+          )}
+
+          {/* ── VERIFICATION REQUESTS ─────────────────────────────────────── */}
+          {section === "verifications" && (
+            <div className="space-y-4">
+              <SectionTitle>{pendingVerifications.length} Pending {pendingVerifications.length === 1 ? "Request" : "Requests"}</SectionTitle>
+
+              {pendingVerifications.length === 0 ? (
+                <div className="bg-white rounded-2xl border border-zinc-200/80 shadow-sm py-16 text-center">
+                  <ShieldCheck size={28} className="text-zinc-200 mx-auto mb-3" />
+                  <p className="text-[13px] text-zinc-300">No pending verification requests.</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {pendingVerifications.map((a) => (
+                    <div key={a.id} className="bg-white rounded-2xl border border-zinc-200/80 shadow-sm p-5 flex flex-col sm:flex-row sm:items-center gap-4">
+                      <div className="flex items-center gap-3 flex-1 min-w-0">
+                        {a.photo_url ? (
+                          <HoverAvatar src={a.photo_url} size={40} className="shrink-0" />
+                        ) : (
+                          <div className={`w-10 h-10 rounded-full flex items-center justify-center text-[13px] font-black shrink-0 ${getAvatarColor(a.name)}`}>
+                            {getInitials(a.name)}
+                          </div>
+                        )}
+                        <div className="min-w-0">
+                          <p className="text-[13px] font-bold text-zinc-900 truncate">{a.name}</p>
+                          <p className="text-[11px] text-zinc-400 truncate">{a.email}</p>
+                          <div className="flex items-center gap-2 mt-1">
+                            <Pill tone="amber">{a.profession}</Pill>
+                            {a.verification_requested_at && (
+                              <span className="text-[10px] text-zinc-400">Requested {formatDate(a.verification_requested_at)}</span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <button
+                          onClick={() => handleViewCertificate(a)}
+                          disabled={!a.certificate_path}
+                          className="text-[11px] font-bold px-3 py-2 rounded-lg border border-zinc-200 text-zinc-600 hover:bg-zinc-50 transition-colors disabled:opacity-40"
+                        >
+                          View Certificate
+                        </button>
+                        <button
+                          onClick={() => handleRejectVerification(a)}
+                          disabled={verificationBusyId === a.id}
+                          className="text-[11px] font-bold px-3 py-2 rounded-lg border border-red-200 text-red-600 hover:bg-red-50 transition-colors disabled:opacity-40"
+                        >
+                          Reject
+                        </button>
+                        <button
+                          onClick={() => handleApproveVerification(a)}
+                          disabled={verificationBusyId === a.id}
+                          className="text-[11px] font-bold px-3 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white transition-colors disabled:opacity-40"
+                        >
+                          {verificationBusyId === a.id ? "Working…" : "Approve"}
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 

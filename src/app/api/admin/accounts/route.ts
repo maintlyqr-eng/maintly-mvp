@@ -3,14 +3,20 @@ import { isAdminRequest } from "@/lib/adminAuth";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 
 // PATCH: update role/status flags or basic profile fields on a mechanic
-// (= account) row. Body: { id, is_mechanic?, verified?, suspended?, name?, workshop_name? }
+// (= account) row. Body: { id, is_mechanic?, verified?, suspended?, name?,
+// workshop_name?, verification_status?, verification_reviewed_at?, verification_note? }
+const VERIFICATION_STATUSES = ["none", "pending", "verified", "rejected"];
+
 export async function PATCH(req: NextRequest) {
   if (!isAdminRequest(req)) {
     return NextResponse.json({ error: "Not authorized." }, { status: 401 });
   }
 
   const body = await req.json().catch(() => ({}));
-  const { id, is_mechanic, verified, suspended, name, workshop_name } = body ?? {};
+  const {
+    id, is_mechanic, verified, suspended, name, workshop_name,
+    verification_status, verification_reviewed_at, verification_note,
+  } = body ?? {};
 
   if (!id || typeof id !== "string") {
     return NextResponse.json({ error: "Missing account id." }, { status: 400 });
@@ -22,6 +28,11 @@ export async function PATCH(req: NextRequest) {
   if (typeof suspended === "boolean") updates.suspended = suspended;
   if (typeof name === "string") updates.name = name.trim();
   if (typeof workshop_name === "string") updates.workshop_name = workshop_name.trim() || null;
+  if (typeof verification_status === "string" && VERIFICATION_STATUSES.includes(verification_status)) {
+    updates.verification_status = verification_status;
+  }
+  if (typeof verification_reviewed_at === "string") updates.verification_reviewed_at = verification_reviewed_at;
+  if (typeof verification_note === "string" || verification_note === null) updates.verification_note = verification_note;
 
   if (Object.keys(updates).length === 0) {
     return NextResponse.json({ error: "Nothing to update." }, { status: 400 });

@@ -50,7 +50,7 @@ export default function RegisterPage() {
 
     // If Supabase requires email confirmation, there is no session yet.
     if (data.session) {
-      router.push("/dashboard");
+      router.push("/register/profession");
     } else {
       setConfirmEmailSent(true);
     }

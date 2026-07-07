@@ -16,6 +16,7 @@ import { formatDateDMY } from "@/lib/date";
 import AvatarCropModal from "@/components/AvatarCropModal";
 import HoverAvatar from "@/components/HoverAvatar";
 import ContactSupportWidget from "@/components/ContactSupportWidget";
+import ProfessionVerificationForm, { VerificationStatusCard } from "@/components/ProfessionVerificationForm";
 
 const navItems = [
   { icon: LayoutGrid, label: "Dashboard", href: "/dashboard" },
@@ -41,6 +42,12 @@ export default function SettingsPage() {
   const [createdAt, setCreatedAt] = useState("");
   const [isMechanic, setIsMechanic] = useState(false);
   const [verified, setVerified] = useState(false);
+
+  // Profession & verification
+  const [profession, setProfession] = useState<string | null>(null);
+  const [verificationStatus, setVerificationStatus] = useState<"none" | "pending" | "verified" | "rejected">("none");
+  const [verificationNote, setVerificationNote] = useState<string | null>(null);
+  const [showVerificationForm, setShowVerificationForm] = useState(false);
 
   // Profile form
   const [name, setName] = useState("");
@@ -76,7 +83,7 @@ export default function SettingsPage() {
 
       const { data: mechanic } = await supabase
         .from("mechanics")
-        .select("name, workshop_name, created_at, is_mechanic, verified, photo_url")
+        .select("name, workshop_name, created_at, is_mechanic, verified, photo_url, profession, verification_status, verification_note")
         .eq("id", session.user.id)
         .single();
 
@@ -87,6 +94,9 @@ export default function SettingsPage() {
         setIsMechanic(!!mechanic.is_mechanic);
         setVerified(!!mechanic.verified);
         setPhotoUrl(mechanic.photo_url ?? "");
+        setProfession(mechanic.profession ?? null);
+        setVerificationStatus((mechanic.verification_status as "none" | "pending" | "verified" | "rejected") ?? "none");
+        setVerificationNote(mechanic.verification_note ?? null);
       }
 
       if (active) setCheckingAuth(false);
@@ -333,9 +343,44 @@ export default function SettingsPage() {
               </div>
               <div>
                 <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-wide">Status</p>
-                <p className="text-[13px] font-bold text-zinc-800">{verified ? "Verified Maintler" : "Maintler"}</p>
+                <p className="text-[13px] font-bold text-zinc-800">{verified && profession ? `${profession} Maintler` : verified ? "Verified Maintler" : "Maintler"}</p>
               </div>
             </div>
+          </div>
+
+          {/* ── PROFESSION & VERIFICATION ── */}
+          <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm p-6 mb-6">
+            <h2 className="text-[14px] font-black text-zinc-900 mb-1">Profession & Verification</h2>
+            <p className="text-[12px] text-zinc-400 mb-5">
+              Optional. Declare your profession and upload a certificate to earn a verified badge on every service you log.
+            </p>
+
+            {verificationStatus !== "none" && !showVerificationForm && (
+              <div className="space-y-3">
+                <VerificationStatusCard status={verificationStatus} profession={profession} note={verificationNote} />
+                <button
+                  type="button"
+                  onClick={() => setShowVerificationForm(true)}
+                  className="text-[12px] font-bold text-zinc-500 hover:text-red-600 transition-colors"
+                >
+                  {verificationStatus === "verified" ? "Update profession or certificate" : "Edit and resubmit"}
+                </button>
+              </div>
+            )}
+
+            {(verificationStatus === "none" || showVerificationForm) && (
+              <ProfessionVerificationForm
+                mechanicId={mechanicId}
+                initialProfession={profession}
+                onSubmitted={(p) => {
+                  setProfession(p);
+                  setVerificationStatus("pending");
+                  setVerificationNote(null);
+                  setVerified(false);
+                  setShowVerificationForm(false);
+                }}
+              />
+            )}
           </div>
 
           {/* ── PROFILE ── */}
