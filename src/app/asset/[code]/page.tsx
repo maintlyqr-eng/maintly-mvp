@@ -33,6 +33,11 @@ const typeColors: Record<string, { bg: string; text: string }> = {
 
 const SERVICE_TYPES = ["Oil Change", "Service", "Repair", "Inspection", "Filter Change", "Tire Change", "Brake Service", "Other"];
 
+// Fixed code for the public homepage demo asset ("Demo Generator"). Its
+// public page is read-only for everyone: no adding services, no joining a
+// workshop, no contacting a mechanic — it's just a live example.
+const DEMO_ASSET_CODE = "demogen001";
+
 type AssetData = {
   id: string; asset_type: string; brand: string | null; model: string | null;
   nickname: string | null; vin_serial: string | null; year: number | null;
@@ -57,6 +62,7 @@ export default function AssetPublicPage() {
   const params   = useParams();
   const router   = useRouter();
   const code     = params?.code as string;
+  const isDemo   = code === DEMO_ASSET_CODE;
 
   // Asset data
   const [loading, setLoading]   = useState(true);
@@ -296,6 +302,11 @@ export default function AssetPublicPage() {
           <Image src="/images/maintly-logo-full.png" alt="MaintlyQR" width={217} height={64} className="object-contain mt-2" />
         </a>
         <div className="flex items-center gap-3">
+          {isDemo && (
+            <div className="flex items-center gap-1.5 text-[11px] text-blue-600 font-bold bg-blue-50 border border-blue-200 px-2 py-1 rounded-lg">
+              Live Example
+            </div>
+          )}
           <a href={`/asset/${code}/report`} target="_blank" rel="noopener noreferrer"
             className="flex items-center gap-1.5 bg-red-600 hover:bg-red-500 text-white text-[11px] font-bold px-3 py-1.5 rounded-lg transition-colors">
             📄 Report
@@ -451,7 +462,7 @@ export default function AssetPublicPage() {
         </div>
 
         {/* ── CONTACT THE MECHANIC ── */}
-        {asset.created_by && asset.created_by !== mechanicId && (
+        {!isDemo && asset.created_by && asset.created_by !== mechanicId && (
           <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm px-5 py-4 flex items-center gap-3">
             <div className="w-9 h-9 rounded-xl bg-blue-50 flex items-center justify-center shrink-0">
               <MessageCircle size={16} className="text-blue-500" />
@@ -487,7 +498,19 @@ export default function AssetPublicPage() {
       <div className="fixed bottom-0 inset-x-0 z-40 bg-white border-t border-zinc-200 shadow-[0_-4px_24px_rgba(0,0,0,0.08)]"
         style={{paddingBottom: 'max(env(safe-area-inset-bottom), 12px)'}}>
 
-        {isLoggedIn ? (
+        {isDemo ? (
+          <div className="max-w-lg mx-auto px-4 pt-3 pb-1 text-center">
+            <p className="text-[12px] text-zinc-500 mb-2">
+              This is a live example of a Maintly report. Machines and services shown here are for demonstration only.
+            </p>
+            <a
+              href="/register"
+              className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl font-bold text-[14px] bg-red-600 hover:bg-red-500 text-white shadow-sm transition-all active:scale-[0.97]"
+            >
+              Create Your Own — Free
+            </a>
+          </div>
+        ) : isLoggedIn ? (
           <div className="max-w-lg mx-auto px-4 pt-3 pb-1 space-y-2">
 
             {/* Mechanic greeting */}

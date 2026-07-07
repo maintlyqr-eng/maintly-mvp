@@ -3,7 +3,7 @@
 import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowRight, ShieldCheck, Camera, Keyboard, User, ChevronDown, Globe, Clock, TrendingUp, LogOut, LayoutGrid, X, ZoomIn, Menu, Wrench, FileText } from "lucide-react";
+import { ArrowRight, ShieldCheck, Camera, Keyboard, User, ChevronDown, Globe, Clock, TrendingUp, LogOut, LayoutGrid, X, ZoomIn, Menu, Wrench, FileText, ExternalLink } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 
 type PublicStats = { machines: number; services: number; mechanics: number };
@@ -349,7 +349,7 @@ export default function HomePage() {
           </div>
         </div>
 
-        <div className="flex items-center gap-3 text-zinc-500" style={{marginTop:'0.4vh'}}>
+        <div className="flex flex-wrap items-center justify-center gap-3 text-zinc-500" style={{marginTop:'0.4vh'}}>
           <ShieldCheck className="text-red-500 shrink-0" style={{width:'clamp(11px,0.9vw,14px)', height:'clamp(11px,0.9vw,14px)'}} />
           <span style={{fontSize:'clamp(10px,0.8vw,12px)'}}>Open history. No login required.</span>
           <div className="flex -space-x-2">
@@ -359,6 +359,15 @@ export default function HomePage() {
               </div>
             ))}
           </div>
+          <a
+            href="/asset/demogen001"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-1 font-bold text-red-600 hover:text-red-700 transition-colors whitespace-nowrap"
+            style={{fontSize:'clamp(10px,0.8vw,12px)'}}
+          >
+            View Live Example <ExternalLink style={{width:'clamp(9px,0.75vw,11px)', height:'clamp(9px,0.75vw,11px)'}} />
+          </a>
         </div>
 
         {/* ── LIVE STATS ── */}
