@@ -376,9 +376,24 @@ function TeamChatPageInner() {
   // router.replace() afterwards clears the query param so re-clicking the
   // same notification later (or a stale bookmarked link) still triggers a
   // real change next time instead of silently no-op'ing.
+  //
+  // Also waits for `!conversationsLoading` before opening anything — Facu's
+  // next report: the unread "1" badge on the conversation (and on the
+  // "Chats" tab) stayed stuck even after opening the thread from a
+  // notification. openConversation() clears a conversation's unread count
+  // by updating it inside the *existing* `conversations` array in local
+  // state; on a fresh page load, this effect and loadConversations() (in
+  // the auth-init effect above) both kick off around the same time, and if
+  // openConversation() ran first it was zeroing out a row that didn't
+  // exist yet in `conversations` — a no-op — and loadConversations()'s own
+  // fetch then overwrote state with the still-unread count it had already
+  // read from the database moments earlier. Waiting for the initial list
+  // load to finish first means the row genuinely exists by the time it
+  // needs zeroing, and nothing runs afterward to stomp on it.
   useEffect(() => {
     const withId = searchParams.get("with");
     if (!withId || !mechanicId || withId === mechanicId || withId === selectedId) return;
+    if (conversationsLoading) return;
 
     let active = true;
     (async () => {
@@ -395,7 +410,7 @@ function TeamChatPageInner() {
 
     return () => { active = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchParams, mechanicId]);
+  }, [searchParams, mechanicId, conversationsLoading]);
 
   // Live delivery — Facu's feedback: Team Chat felt dead, needing a manual
   // refresh to see anything new. This subscribes to Supabase Realtime for
