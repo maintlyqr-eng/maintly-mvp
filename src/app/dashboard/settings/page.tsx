@@ -9,9 +9,11 @@ import {
   Mail, FolderOpen, Settings as SettingsIcon, Bell, X, LogOut, Crown, Menu,
   ShieldCheck, CalendarDays, KeyRound, AlertCircle, CheckCircle2, Camera,
   Image as ImageIcon,
+  MessageCircle,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useUnreadMessagesCount } from "@/lib/useUnreadMessages";
+import { useUnreadMechanicMessages } from "@/lib/useUnreadMechanicMessages";
 import { formatDateDMY } from "@/lib/date";
 import AvatarCropModal from "@/components/AvatarCropModal";
 import HoverAvatar from "@/components/HoverAvatar";
@@ -29,6 +31,7 @@ const navItems = [
   { icon: BarChart3, label: "Reports", href: "/dashboard/reports" },
   { icon: CalendarIcon, label: "Calendar", href: "/dashboard/calendar" },
   { icon: Mail, label: "Messages", href: "/dashboard/messages" },
+  { icon: MessageCircle, label: "Team Chat", href: "/dashboard/team-chat" },
   { icon: FolderOpen, label: "Document Library", href: "/dashboard/documents" },
   { icon: SettingsIcon, label: "Settings", href: "/dashboard/settings" },
 ];
@@ -39,6 +42,7 @@ export default function SettingsPage() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [mechanicId, setMechanicId] = useState("");
   const unreadMessages = useUnreadMessagesCount(mechanicId);
+  const unreadMechanicMessages = useUnreadMechanicMessages(mechanicId);
   const [email, setEmail] = useState("");
   const [createdAt, setCreatedAt] = useState("");
   const [isMechanic, setIsMechanic] = useState(false);
@@ -266,6 +270,9 @@ export default function SettingsPage() {
               {item.label}
               {item.label === "Messages" && unreadMessages > 0 && (
                 <span className="ml-auto bg-red-600 text-white text-[9px] font-bold rounded-full min-w-[16px] h-4 flex items-center justify-center px-1">{unreadMessages}</span>
+              )}
+              {item.label === "Team Chat" && unreadMechanicMessages > 0 && (
+                <span className="ml-auto bg-red-600 text-white text-[9px] font-bold rounded-full min-w-[16px] h-4 flex items-center justify-center px-1">{unreadMechanicMessages}</span>
               )}
             </Link>
           ))}

@@ -8,10 +8,12 @@ import {
   LayoutGrid, FileText, Box, QrCode, Users, BarChart3, Calendar as CalendarIcon,
   Mail, FolderOpen, Settings, Bell, Plus, X, LogOut, Crown, Menu,
   Search, Download, Printer, Sparkles, ScanLine, Tag, Wrench,
+  MessageCircle,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { authedFetch } from "@/lib/apiAuth";
 import { useUnreadMessagesCount } from "@/lib/useUnreadMessages";
+import { useUnreadMechanicMessages } from "@/lib/useUnreadMechanicMessages";
 import HoverAvatar from "@/components/HoverAvatar";
 import ContactSupportWidget from "@/components/ContactSupportWidget";
 import QrCodeCanvas, { type QrCodeCanvasHandle } from "@/components/QrCodeCanvas";
@@ -30,6 +32,7 @@ const navItems = [
   { icon: BarChart3, label: "Reports", href: "/dashboard/reports" },
   { icon: CalendarIcon, label: "Calendar", href: "/dashboard/calendar" },
   { icon: Mail, label: "Messages", href: "/dashboard/messages" },
+  { icon: MessageCircle, label: "Team Chat", href: "/dashboard/team-chat" },
   { icon: FolderOpen, label: "Document Library", href: "/dashboard/documents" },
   { icon: Settings, label: "Settings", href: "/dashboard/settings" },
 ];
@@ -57,6 +60,7 @@ export default function QrCodesPage() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [mechanicId, setMechanicId] = useState("");
   const unreadMessages = useUnreadMessagesCount(mechanicId);
+  const unreadMechanicMessages = useUnreadMechanicMessages(mechanicId);
   const [mechanicName, setMechanicName] = useState("");
   const [mechanicPhoto, setMechanicPhoto] = useState("");
   const [mechanicEmail, setMechanicEmail] = useState("");
@@ -297,6 +301,9 @@ export default function QrCodesPage() {
               {item.label}
               {item.label === "Messages" && unreadMessages > 0 && (
                 <span className="ml-auto bg-red-600 text-white text-[9px] font-bold rounded-full min-w-[16px] h-4 flex items-center justify-center px-1">{unreadMessages}</span>
+              )}
+              {item.label === "Team Chat" && unreadMechanicMessages > 0 && (
+                <span className="ml-auto bg-red-600 text-white text-[9px] font-bold rounded-full min-w-[16px] h-4 flex items-center justify-center px-1">{unreadMechanicMessages}</span>
               )}
             </Link>
           ))}
