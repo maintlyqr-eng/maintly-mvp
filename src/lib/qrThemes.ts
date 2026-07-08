@@ -43,6 +43,15 @@ export interface QrThemeDef {
   frameImage?: string; // path under /public, e.g. "/images/qr-frames/qr-flower.png"
   frameHole?: QrFrameHole;
   frameAspect?: number; // source image height / width, so layout doesn't jump waiting on image load
+  // Crop the rendered QR into a circle (CSS clip) instead of leaving it a
+  // square card — for frames whose "hole" is round (a ring/gear opening)
+  // rather than an actual square card, a square QR either looks oversized
+  // (touches the ring) or leaves visible corners poking past the circle.
+  // Needs a high error-correction level (see QrCodeCanvas.tsx) since the
+  // four corner areas of the QR data get clipped away — real, common
+  // technique for "circular QR" designs; the code stays scannable because
+  // the finder patterns and enough redundant data survive inside the circle.
+  roundClip?: boolean;
   options: {
     dotsColor: string;
     dotsType: QrDotType;
@@ -441,31 +450,38 @@ export const qrThemes: QrThemeDef[] = [
   {
     id: "gear-ring",
     name: "Gear Ring",
-    description: "A big illustrated cog frame — an industrial alternative to the small Maintly logo. All-red finder patterns (no black outline anywhere in the QR itself), a small white card sitting clear inside the ring, no white poking past the ring's edge.",
+    description: "A big illustrated cog frame with a clean red ring — the QR itself is round (dot-style modules, clipped to a circle) so it drops straight into the ring's own circular opening with no square corners poking past it.",
     category: "industry",
-    frameImage: "/images/qr-frames/qr-gear-ring.png", frameAspect: 0.9788,
-    // Hole shrunk on purpose (was x:0.3178,y:0.3203,w:0.3686,h:0.368): the old
-    // hole matched the artwork's original white square almost exactly, which
-    // meant the QR card's square corners poked out past the artwork's round
-    // ring at the diagonals, and its flat edges nearly touched the ring —
-    // reading as a messy, oversized white square instead of a QR sitting
-    // cleanly inside the ring. The artwork was edited to match (a modest
-    // pull-back, reclaimed sliver kept plain white — no new color added, per
-    // explicit request), so the square's corners now clear the ring instead
-    // of poking past it.
-    frameHole: { x: 0.341102, y: 0.339827, w: 0.322034, h: 0.329004 },
+    // Replaced with a proper high-res source (Facu's own asset, 1254x1254,
+    // perfectly circular ring — old one was a low-res 236x231 crop that had
+    // wavered ~10-15px between measured angles). frameAspect 1.0: square image.
+    frameImage: "/images/qr-frames/qr-gear-ring.png", frameAspect: 1.0,
+    // Measured directly off the new asset (radial scan at 8 angles from the
+    // image's own center, ~624,608 px of 1254): white circle holds a clean
+    // radius out to ~300px, red ring runs ~307-328px, black ring ~330-380px.
+    // hole.w/h is a square whose *inscribed circle* (roundClip below) has a
+    // ~275px radius — comfortable margin inside the white circle, well clear
+    // of the red ring, instead of trying to inscribe a square in the circle.
+    frameHole: { x: 0.2643, y: 0.2516, w: 0.4666, h: 0.4666 },
+    roundClip: true,
     options: {
-      // White background: the QR needs its own opaque white card for the
-      // dark modules to have proper scan contrast against the artwork.
+      // White background: the QR needs its own opaque white backing for the
+      // dark modules to have proper scan contrast against the artwork. The
+      // roundClip crop hides the corners of this square canvas, leaving only
+      // the inscribed circle visible.
       //
       // CONFIRMED (explicit user answer): cornersSquareColor must be red,
       // not black. The user wants zero black in the QR's own finder-pattern
       // corners — only the frame artwork's black ring (baked into
       // qr-gear-ring.png, not configurable here) stays black. Do not revert
       // this to black again without a fresh explicit request.
-      dotsColor: "#18181b", dotsType: "square", backgroundColor: "#ffffff",
-      cornersSquareColor: "#dc2626", cornersSquareType: "square",
-      cornersDotColor: "#dc2626", cornersDotType: "square", logo: false,
+      //
+      // dotsType "dots" + cornersSquareType/cornersDotType "dot": round
+      // modules throughout, so the whole code reads as circular blobs rather
+      // than a square grid with a circular crop slapped over it.
+      dotsColor: "#18181b", dotsType: "dots", backgroundColor: "#ffffff",
+      cornersSquareColor: "#dc2626", cornersSquareType: "dot",
+      cornersDotColor: "#dc2626", cornersDotType: "dot", logo: false,
     },
   },
   {

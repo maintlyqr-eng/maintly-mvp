@@ -85,6 +85,12 @@ const QrCodeCanvas = forwardRef<QrCodeCanvasHandle, {
         type: "canvas",
         data: url,
         image: def.options.logo ? "/images/qr-gear-real.png" : undefined,
+        // roundClip themes crop away the QR's four corners (see the CSS
+        // border-radius on the wrapping div below and the canvas clip in
+        // download()), so bump error correction to "H" (~30% recoverable)
+        // to keep the code reliably scannable despite the missing corners.
+        // Other themes keep the library default (no corners lost, no need).
+        qrOptions: def.roundClip ? { errorCorrectionLevel: "H" } : undefined,
         dotsOptions: { color: def.options.dotsColor, type: def.options.dotsType },
         backgroundOptions: { color: def.options.backgroundColor },
         cornersSquareOptions: { color: def.options.cornersSquareColor, type: def.options.cornersSquareType },
@@ -144,6 +150,7 @@ const QrCodeCanvas = forwardRef<QrCodeCanvasHandle, {
           type: "canvas",
           data: url,
           image: def.options.logo ? "/images/qr-gear-real.png" : undefined,
+          qrOptions: def.roundClip ? { errorCorrectionLevel: "H" } : undefined,
           dotsOptions: { color: def.options.dotsColor, type: def.options.dotsType },
           backgroundOptions: { color: def.options.backgroundColor },
           cornersSquareOptions: { color: def.options.cornersSquareColor, type: def.options.cornersSquareType },
@@ -178,7 +185,21 @@ const QrCodeCanvas = forwardRef<QrCodeCanvasHandle, {
         const ctx = canvas.getContext("2d");
         if (!ctx) throw new Error("Canvas 2D context unavailable.");
         ctx.drawImage(frameImg, 0, 0, frameWidth, frameHeight);
-        ctx.drawImage(qrImg, qrLeft, qrTop, qrPx, qrPx);
+        if (def.roundClip) {
+          // Clip to the circle inscribed in the QR's own square box before
+          // drawing it, matching the on-screen border-radius:50% crop —
+          // otherwise the exported file would show the square corners the
+          // live preview hides.
+          ctx.save();
+          ctx.beginPath();
+          ctx.arc(qrLeft + qrPx / 2, qrTop + qrPx / 2, qrPx / 2, 0, Math.PI * 2);
+          ctx.closePath();
+          ctx.clip();
+          ctx.drawImage(qrImg, qrLeft, qrTop, qrPx, qrPx);
+          ctx.restore();
+        } else {
+          ctx.drawImage(qrImg, qrLeft, qrTop, qrPx, qrPx);
+        }
 
         canvas.toBlob((blob) => {
           if (!blob) return;
@@ -248,6 +269,7 @@ const QrCodeCanvas = forwardRef<QrCodeCanvasHandle, {
           style={{
             position: "absolute", left: qrLeft, top: qrTop, width: qrSize, height: qrSize,
             display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden",
+            borderRadius: def.roundClip ? "50%" : undefined,
           }}
         >
           <div style={{ width: size, height: size, transform: qrSize !== size ? `scale(${qrSize / size})` : undefined }}>
