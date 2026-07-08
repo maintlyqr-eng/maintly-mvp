@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
   ShieldCheck, CalendarDays, AlertCircle, LogIn, UserPlus,
@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { formatDateDMY } from "@/lib/date";
+import MaintlerCardCanvas, { type MaintlerCardCanvasHandle } from "@/components/MaintlerCardCanvas";
 
 // Maintler QR business card — Item 4 of the feature backlog. Every
 // mechanic gets a permanent code (see migration 024) that resolves here,
@@ -131,6 +132,7 @@ export default function MaintlerPublicPage() {
   const [saveError, setSaveError] = useState("");
 
   const [linkCopied, setLinkCopied] = useState(false);
+  const ownCardRef = useRef<MaintlerCardCanvasHandle>(null);
 
   useEffect(() => {
     if (!code) { setNotFound(true); setLoading(false); return; }
@@ -447,13 +449,41 @@ export default function MaintlerPublicPage() {
         )}
 
         {isSelf && (
-          <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm px-5 py-4 flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-red-50 flex items-center justify-center shrink-0">
-              <UserCircle2 size={16} className="text-red-500" />
+          <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm px-5 py-4">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-9 h-9 rounded-xl bg-red-50 flex items-center justify-center shrink-0">
+                <UserCircle2 size={16} className="text-red-500" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-[12px] font-bold text-zinc-800">This is your own Maintler card.</p>
+                <p className="text-[11px] text-zinc-400">Download or send the printable card below — the full editable version also lives in Settings.</p>
+              </div>
             </div>
-            <div className="min-w-0">
-              <p className="text-[12px] font-bold text-zinc-800">This is your own Maintler card.</p>
-              <p className="text-[11px] text-zinc-400">Share this QR or link so other Maintlers can save and message you directly.</p>
+            <div className="flex items-center gap-4">
+              <MaintlerCardCanvas
+                ref={ownCardRef}
+                code={code}
+                name={name}
+                workshopName={profile.workshop_name}
+                photoUrl={profile.photo_url}
+                verified={profile.verified}
+                profession={profile.verified ? profile.profession : null}
+                previewWidth={110}
+              />
+              <div className="flex flex-col gap-2">
+                <button
+                  onClick={() => ownCardRef.current?.download(`maintlyqr-${name}`)}
+                  className="flex items-center gap-1.5 text-[11.5px] font-bold text-white bg-zinc-900 hover:bg-zinc-800 px-3.5 py-2.5 rounded-xl transition-colors"
+                >
+                  <Download size={13} /> Download
+                </button>
+                <button
+                  onClick={() => ownCardRef.current?.share(`maintlyqr-${name}`)}
+                  className="flex items-center gap-1.5 text-[11.5px] font-bold text-zinc-600 hover:text-red-600 border border-zinc-200 hover:bg-zinc-50 px-3.5 py-2.5 rounded-xl transition-colors"
+                >
+                  <Share2 size={13} /> Send
+                </button>
+              </div>
             </div>
           </div>
         )}

@@ -9,7 +9,7 @@ import {
   Mail, FolderOpen, Settings as SettingsIcon, Bell, X, LogOut, Crown, Menu,
   ShieldCheck, CalendarDays, KeyRound, AlertCircle, CheckCircle2, Camera,
   Image as ImageIcon,
-  MessageCircle, Download, Copy, Check,
+  MessageCircle, Download, Copy, Check, Share2, Printer,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import NotificationBell from "@/components/NotificationBell";
@@ -21,8 +21,7 @@ import HoverAvatar from "@/components/HoverAvatar";
 import ContactSupportWidget from "@/components/ContactSupportWidget";
 import ProfessionVerificationForm, { VerificationStatusCard } from "@/components/ProfessionVerificationForm";
 import { validateImageFile } from "@/lib/imageValidation";
-import QrCodeCanvas, { type QrCodeCanvasHandle } from "@/components/QrCodeCanvas";
-import { DEFAULT_QR_THEME } from "@/lib/qrThemes";
+import MaintlerCardCanvas, { type MaintlerCardCanvasHandle } from "@/components/MaintlerCardCanvas";
 
 const navItems = [
   { icon: LayoutGrid, label: "Dashboard", href: "/dashboard" },
@@ -78,7 +77,7 @@ export default function SettingsPage() {
   // resolves to a public profile at /maintler/<code>.
   const [maintlerCode, setMaintlerCode] = useState("");
   const [cardLinkCopied, setCardLinkCopied] = useState(false);
-  const cardCanvasRef = useRef<QrCodeCanvasHandle>(null);
+  const cardCanvasRef = useRef<MaintlerCardCanvasHandle>(null);
 
   // Password form
   const [newPassword, setNewPassword] = useState("");
@@ -148,6 +147,16 @@ export default function SettingsPage() {
   function handleDownloadCard() {
     if (!maintlerCode) return;
     cardCanvasRef.current?.download(`maintlyqr-${workshopName || name || "maintler-card"}`);
+  }
+
+  function handleShareCard() {
+    if (!maintlerCode) return;
+    cardCanvasRef.current?.share(`maintlyqr-${workshopName || name || "maintler-card"}`);
+  }
+
+  function handlePrintCard() {
+    if (!maintlerCode) return;
+    cardCanvasRef.current?.print();
   }
 
   function handleFileSelected(e: React.ChangeEvent<HTMLInputElement>) {
@@ -406,9 +415,22 @@ export default function SettingsPage() {
 
             {maintlerCode ? (
               <div className="flex flex-col sm:flex-row gap-5 items-start">
-                <div className="shrink-0 self-center sm:self-start p-3 rounded-2xl border border-zinc-100 bg-zinc-50">
-                  <QrCodeCanvas ref={cardCanvasRef} code={maintlerCode} theme={DEFAULT_QR_THEME} linkPath="maintler" size={140} />
-                </div>
+                {/* The actual printable/shareable ID card — photo, name,
+                    verified pill, and the QR composited into one image, not
+                    just a bare QR code. Facu's follow-up after the first cut
+                    only showed a plain QR with no card design around it:
+                    "no quedo tan parecido a lo q te pase... ademas no se ve
+                    el QR y tampoco tengo forma de imprimirla o mandarla." */}
+                <MaintlerCardCanvas
+                  ref={cardCanvasRef}
+                  code={maintlerCode}
+                  name={name || email}
+                  workshopName={workshopName}
+                  photoUrl={photoUrl}
+                  verified={verified}
+                  profession={verified ? profession : null}
+                  previewWidth={180}
+                />
                 <div className="flex-1 min-w-0 w-full space-y-3">
                   <div>
                     <label className="text-[11px] font-bold text-zinc-500 uppercase tracking-widest mb-1.5 block">Public link</label>
@@ -426,12 +448,24 @@ export default function SettingsPage() {
                       </button>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     <button
                       onClick={handleDownloadCard}
                       className="flex items-center gap-1.5 text-[11.5px] font-bold text-white bg-zinc-900 hover:bg-zinc-800 px-3.5 py-2.5 rounded-xl transition-colors"
                     >
-                      <Download size={13} /> Download PNG
+                      <Download size={13} /> Download Card
+                    </button>
+                    <button
+                      onClick={handleShareCard}
+                      className="flex items-center gap-1.5 text-[11.5px] font-bold text-zinc-600 hover:text-red-600 border border-zinc-200 hover:bg-zinc-50 px-3.5 py-2.5 rounded-xl transition-colors"
+                    >
+                      <Share2 size={13} /> Send
+                    </button>
+                    <button
+                      onClick={handlePrintCard}
+                      className="flex items-center gap-1.5 text-[11.5px] font-bold text-zinc-600 hover:text-red-600 border border-zinc-200 hover:bg-zinc-50 px-3.5 py-2.5 rounded-xl transition-colors"
+                    >
+                      <Printer size={13} /> Print
                     </button>
                     <Link
                       href={`/maintler/${maintlerCode}`}
@@ -442,8 +476,10 @@ export default function SettingsPage() {
                     </Link>
                   </div>
                   <p className="text-[11px] text-zinc-400">
-                    Anyone who scans this or visits the link sees your name, workshop, verified status, and member-since date —
-                    and, if they&apos;re a Maintler themselves, a Save and Message button straight to you.
+                    Send uses your phone or browser&apos;s own share sheet (WhatsApp, Messages, AirDrop, etc.) where available —
+                    on desktop it just downloads the card instead. Anyone who scans it or visits the link sees your name,
+                    workshop, verified status, and real activity stats — and, if they&apos;re a Maintler themselves,
+                    a Save and Message button straight to you.
                   </p>
                 </div>
               </div>

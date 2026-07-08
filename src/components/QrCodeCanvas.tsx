@@ -22,7 +22,16 @@ import QrFrameShape from "@/components/QrFrameShape";
 // wired up yet, so download() falls back to exporting just the plain styled
 // QR; the frame still shows up when printing a batch from "Print Sheet" or
 // via the new per-card Print button, since those print the live page.
-export type QrCodeCanvasHandle = { download: (filename: string) => void };
+export type QrCodeCanvasHandle = {
+  download: (filename: string) => void;
+  // Same fully-composited (frame + print-resolution QR) image as
+  // download(), but returned as a Blob instead of triggering a file save —
+  // for callers that want to draw this QR into something bigger (the
+  // Maintler ID card in MaintlerCardCanvas.tsx composites this exact blob
+  // alongside a photo and text onto its own canvas, rather than
+  // duplicating the frame-compositing math a second time).
+  getBlob: () => Promise<Blob | null>;
+};
 
 // Which public page this code should resolve to when scanned. Defaults to
 // "asset" (unchanged behavior for every existing call site — the qr-codes
@@ -136,105 +145,120 @@ const QrCodeCanvas = forwardRef<QrCodeCanvasHandle, {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [code, theme, size, linkPath]);
 
-  useImperativeHandle(ref, () => ({
-    download: async (filename: string) => {
-      if (!def.frameImage || !def.frameHole) {
-        qrRef.current?.download({ name: filename, extension: "png" });
-        return;
+  // Shared by download() and getBlob() — see the QrCodeCanvasHandle type
+  // comment for why getBlob exists (MaintlerCardCanvas draws this same
+  // composited image into a bigger card instead of re-deriving it).
+  // Returns null on total failure (caller falls back to the plain
+  // qr-code-styling export, same as this function always used to do
+  // inline before it was split out).
+  async function buildCompositedBlob(): Promise<Blob | null> {
+    if (!def.frameImage || !def.frameHole) {
+      if (!qrRef.current) return null;
+      const raw = await qrRef.current.getRawData("png");
+      if (!raw) return null;
+      return raw instanceof Blob ? raw : new Blob([new Uint8Array(raw)]);
+    }
+
+    // Composite path: render a fresh, print-resolution QR (independent of
+    // whatever small `size` this instance is displayed at on screen) and
+    // draw it onto a copy of the frame artwork at the hole's position, so
+    // the exported PNG matches what's shown on screen — sticker, not just
+    // bare code.
+    const EXPORT_HOLE_PX = 900;
+    const hole = def.frameHole;
+    const aspect = def.frameAspect ?? 1;
+    const frameWidth = Math.round(EXPORT_HOLE_PX / hole.w);
+    const frameHeight = Math.round(frameWidth * aspect);
+    const qrPx = Math.round(Math.min(hole.w * frameWidth, hole.h * frameHeight) * 0.94);
+    const qrLeft = Math.round(hole.x * frameWidth + (hole.w * frameWidth - qrPx) / 2);
+    const qrTop = Math.round(hole.y * frameHeight + (hole.h * frameHeight - qrPx) / 2);
+
+    try {
+      const mod = await import("qr-code-styling");
+      const QRCodeStyling = mod.default;
+      const url = `${window.location.origin}/${linkPath}/${code}`;
+      const exportQr = new QRCodeStyling({
+        width: qrPx,
+        height: qrPx,
+        type: "canvas",
+        data: url,
+        image: def.options.logo ? "/images/qr-gear-real.png" : undefined,
+        // See the matching comment in the render effect above — must omit
+        // the key entirely for non-roundClip themes, not pass `undefined`.
+        ...(def.roundClip ? { qrOptions: { errorCorrectionLevel: "H" as const } } : {}),
+        dotsOptions: { color: def.options.dotsColor, type: def.options.dotsType },
+        backgroundOptions: { color: def.options.backgroundColor },
+        cornersSquareOptions: { color: def.options.cornersSquareColor, type: def.options.cornersSquareType },
+        cornersDotOptions: { color: def.options.cornersDotColor, type: def.options.cornersDotType },
+        imageOptions: { crossOrigin: "anonymous", margin: 4, imageSize: 0.32 },
+      });
+
+      // getRawData is typed to also cover qr-code-styling's Node/SVG paths
+      // (Blob | Buffer | null), even though in this "use client" browser
+      // context with type: "canvas" it's always a Blob in practice. Handle
+      // all three so the type checker (and a genuinely failed render) are
+      // both covered, instead of asserting straight to Blob.
+      const rawQr = await exportQr.getRawData("png");
+      if (!rawQr) throw new Error("QR export returned no data.");
+      // Node's Buffer types its underlying .buffer as ArrayBufferLike
+      // (which also covers SharedArrayBuffer), which TS's DOM lib won't
+      // structurally accept as a BlobPart even though a real Buffer is
+      // always backed by a plain ArrayBuffer. `new Uint8Array(rawQr)`
+      // copies the bytes into a fresh Uint8Array with its own genuine
+      // ArrayBuffer, sidestepping the mismatch — this branch never
+      // actually runs in this "use client" browser context anyway
+      // (type: "canvas" always yields a Blob), it's just here to satisfy
+      // getRawData's wider Node/SVG-path return type.
+      const qrBlob = rawQr instanceof Blob ? rawQr : new Blob([new Uint8Array(rawQr)]);
+      const qrObjectUrl = URL.createObjectURL(qrBlob);
+      const [frameImg, qrImg] = await Promise.all([loadImageEl(def.frameImage), loadImageEl(qrObjectUrl)]);
+      URL.revokeObjectURL(qrObjectUrl);
+
+      const canvas = document.createElement("canvas");
+      canvas.width = frameWidth;
+      canvas.height = frameHeight;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) throw new Error("Canvas 2D context unavailable.");
+      ctx.drawImage(frameImg, 0, 0, frameWidth, frameHeight);
+      if (def.roundClip) {
+        // Clip to the circle inscribed in the QR's own square box before
+        // drawing it, matching the on-screen border-radius:50% crop —
+        // otherwise the exported file would show the square corners the
+        // live preview hides.
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(qrLeft + qrPx / 2, qrTop + qrPx / 2, qrPx / 2, 0, Math.PI * 2);
+        ctx.closePath();
+        ctx.clip();
+        ctx.drawImage(qrImg, qrLeft, qrTop, qrPx, qrPx);
+        ctx.restore();
+      } else {
+        ctx.drawImage(qrImg, qrLeft, qrTop, qrPx, qrPx);
       }
 
-      // Composite path: render a fresh, print-resolution QR (independent of
-      // whatever small `size` this instance is displayed at on screen) and
-      // draw it onto a copy of the frame artwork at the hole's position, so
-      // the exported PNG matches what's shown on screen — sticker, not just
-      // bare code.
-      const EXPORT_HOLE_PX = 900;
-      const hole = def.frameHole;
-      const aspect = def.frameAspect ?? 1;
-      const frameWidth = Math.round(EXPORT_HOLE_PX / hole.w);
-      const frameHeight = Math.round(frameWidth * aspect);
-      const qrPx = Math.round(Math.min(hole.w * frameWidth, hole.h * frameHeight) * 0.94);
-      const qrLeft = Math.round(hole.x * frameWidth + (hole.w * frameWidth - qrPx) / 2);
-      const qrTop = Math.round(hole.y * frameHeight + (hole.h * frameHeight - qrPx) / 2);
+      return await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/png"));
+    } catch {
+      return null;
+    }
+  }
 
-      try {
-        const mod = await import("qr-code-styling");
-        const QRCodeStyling = mod.default;
-        const url = `${window.location.origin}/${linkPath}/${code}`;
-        const exportQr = new QRCodeStyling({
-          width: qrPx,
-          height: qrPx,
-          type: "canvas",
-          data: url,
-          image: def.options.logo ? "/images/qr-gear-real.png" : undefined,
-          // See the matching comment in the render effect above — must omit
-          // the key entirely for non-roundClip themes, not pass `undefined`.
-          ...(def.roundClip ? { qrOptions: { errorCorrectionLevel: "H" as const } } : {}),
-          dotsOptions: { color: def.options.dotsColor, type: def.options.dotsType },
-          backgroundOptions: { color: def.options.backgroundColor },
-          cornersSquareOptions: { color: def.options.cornersSquareColor, type: def.options.cornersSquareType },
-          cornersDotOptions: { color: def.options.cornersDotColor, type: def.options.cornersDotType },
-          imageOptions: { crossOrigin: "anonymous", margin: 4, imageSize: 0.32 },
-        });
-
-        // getRawData is typed to also cover qr-code-styling's Node/SVG paths
-        // (Blob | Buffer | null), even though in this "use client" browser
-        // context with type: "canvas" it's always a Blob in practice. Handle
-        // all three so the type checker (and a genuinely failed render) are
-        // both covered, instead of asserting straight to Blob.
-        const rawQr = await exportQr.getRawData("png");
-        if (!rawQr) throw new Error("QR export returned no data.");
-        // Node's Buffer types its underlying .buffer as ArrayBufferLike
-        // (which also covers SharedArrayBuffer), which TS's DOM lib won't
-        // structurally accept as a BlobPart even though a real Buffer is
-        // always backed by a plain ArrayBuffer. `new Uint8Array(rawQr)`
-        // copies the bytes into a fresh Uint8Array with its own genuine
-        // ArrayBuffer, sidestepping the mismatch — this branch never
-        // actually runs in this "use client" browser context anyway
-        // (type: "canvas" always yields a Blob), it's just here to satisfy
-        // getRawData's wider Node/SVG-path return type.
-        const qrBlob = rawQr instanceof Blob ? rawQr : new Blob([new Uint8Array(rawQr)]);
-        const qrObjectUrl = URL.createObjectURL(qrBlob);
-        const [frameImg, qrImg] = await Promise.all([loadImageEl(def.frameImage), loadImageEl(qrObjectUrl)]);
-        URL.revokeObjectURL(qrObjectUrl);
-
-        const canvas = document.createElement("canvas");
-        canvas.width = frameWidth;
-        canvas.height = frameHeight;
-        const ctx = canvas.getContext("2d");
-        if (!ctx) throw new Error("Canvas 2D context unavailable.");
-        ctx.drawImage(frameImg, 0, 0, frameWidth, frameHeight);
-        if (def.roundClip) {
-          // Clip to the circle inscribed in the QR's own square box before
-          // drawing it, matching the on-screen border-radius:50% crop —
-          // otherwise the exported file would show the square corners the
-          // live preview hides.
-          ctx.save();
-          ctx.beginPath();
-          ctx.arc(qrLeft + qrPx / 2, qrTop + qrPx / 2, qrPx / 2, 0, Math.PI * 2);
-          ctx.closePath();
-          ctx.clip();
-          ctx.drawImage(qrImg, qrLeft, qrTop, qrPx, qrPx);
-          ctx.restore();
-        } else {
-          ctx.drawImage(qrImg, qrLeft, qrTop, qrPx, qrPx);
-        }
-
-        canvas.toBlob((blob) => {
-          if (!blob) return;
-          const blobUrl = URL.createObjectURL(blob);
-          const a = document.createElement("a");
-          a.href = blobUrl;
-          a.download = `${filename}.png`;
-          a.click();
-          URL.revokeObjectURL(blobUrl);
-        }, "image/png");
-      } catch {
+  useImperativeHandle(ref, () => ({
+    download: async (filename: string) => {
+      const blob = await buildCompositedBlob();
+      if (!blob) {
         // Compositing failed for some reason (image blocked, etc.) — still
         // give the mechanic something rather than nothing.
         qrRef.current?.download({ name: filename, extension: "png" });
+        return;
       }
+      const blobUrl = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = blobUrl;
+      a.download = `${filename}.png`;
+      a.click();
+      URL.revokeObjectURL(blobUrl);
     },
+    getBlob: () => buildCompositedBlob(),
   }));
 
   // The raw canvas box — always exactly size×size, no padding on it. Padding
