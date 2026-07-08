@@ -169,6 +169,13 @@ function TeamChatPageInner() {
   const selectedInfoRef = useRef<MechanicInfo | null>(null);
   useEffect(() => { selectedInfoRef.current = selectedInfo; }, [selectedInfo]);
 
+  // Guards the tab-refocus resync effect further down against running
+  // twice at once — visibilitychange and focus routinely fire back-to-back
+  // (practically simultaneously) when a browser tab regains focus, which
+  // used to fire two full resync() passes concurrently. See that effect's
+  // comment for the actual bug this was tangled up in.
+  const resyncInFlightRef = useRef(false);
+
   // Now that the thread pane scrolls internally instead of the whole page
   // (see the h-dvh layout fix above), it needs to actually land on the
   // newest message on its own — otherwise opening a conversation would
@@ -280,7 +287,22 @@ function TeamChatPageInner() {
       .map((id) => {
         const info = infoById.get(id);
         const a = agg.get(id)!;
-        return info ? { counterparty: info, ...a } : null;
+        if (!info) return null;
+        // A conversation that's actively open on screen should never come
+        // back from this fetch showing as unread, no matter what the
+        // database's `read` flag says at the exact instant this query ran.
+        // Marking a thread's messages read (see openConversation below) is
+        // a separate async write that can still be in flight — and this
+        // function itself gets re-run from the tab-refocus resync effect
+        // further down, which fires on every alt-tab, app switch, or phone
+        // unlock. Facu's report: "aunque este en el chat a veces aparece
+        // la notificacion... esto pasa en la compu y en el celu" — exactly
+        // that race, on both platforms, since both trigger the same
+        // focus/visibilitychange listeners. Deriving unread straight from
+        // selectedIdRef here means the result is correct regardless of
+        // whether this fetch or the read-marking write lands first.
+        const unread = id === selectedIdRef.current ? 0 : a.unread;
+        return { counterparty: info, ...a, unread };
       })
       .filter((x): x is ConversationSummary => !!x)
       .sort((a, b) => (a.lastAt < b.lastAt ? 1 : -1));
@@ -589,13 +611,48 @@ function TeamChatPageInner() {
   // to the tab. `supabase.realtime.connect()` additionally nudges the
   // socket to reconnect right away rather than waiting for its own
   // internal retry timer.
+  // Follow-up bug found after the mobile resync fix above shipped: "hay
+  // algun tema con las notificaciones xq aunque este en el chat a veces
+  // aparece la notificacion o a veces salgo del chat y me aparece
+  // notificacion de algun msj q ya vi... esto pasa en la compu y en el
+  // celu." Root cause was actually introduced by this very effect: resync()
+  // fired loadConversations() (a fresh, authoritative read straight from
+  // the database) and openConversation() (which re-marks the open thread's
+  // messages as read) at the same time, without waiting for either to
+  // finish. Whichever of the two happened to resolve LAST won the final
+  // setConversations() call — and if a message had arrived only moments
+  // before the resync (visibilitychange + focus fire on essentially every
+  // alt-tab, app switch, or screen unlock, on both desktop and mobile), the
+  // read-marking write might not have committed to the database yet, so
+  // loadConversations() would legitimately still see it as unread. If that
+  // stale read landed after openConversation()'s corrective zero, the
+  // badge would flash back on for a conversation Facu was already looking
+  // at — explaining both halves of the report (still inside the chat, or
+  // just having stepped out of it) on both platforms, since both trigger
+  // the exact same listeners here.
+  //
+  // Fixed at the source in loadConversations() itself (see the `unread =
+  // id === selectedIdRef.current ? 0 : a.unread` line above) — it no
+  // longer trusts the database's read flag at all for whichever
+  // conversation is currently open, so the result is correct regardless of
+  // which of these two calls finishes first. Sequencing them here too
+  // (await one, then the other) and guarding against the visibilitychange
+  // + focus double-fire with resyncInFlightRef just avoids doing the same
+  // network round-trips twice for no reason — belt and suspenders, not
+  // load-bearing for correctness anymore.
   useEffect(() => {
     if (!mechanicId) return;
 
-    function resync() {
-      supabase.realtime.connect();
-      loadConversations(mechanicId);
-      if (selectedInfoRef.current) openConversation(selectedInfoRef.current);
+    async function resync() {
+      if (resyncInFlightRef.current) return;
+      resyncInFlightRef.current = true;
+      try {
+        supabase.realtime.connect();
+        await loadConversations(mechanicId);
+        if (selectedInfoRef.current) await openConversation(selectedInfoRef.current);
+      } finally {
+        resyncInFlightRef.current = false;
+      }
     }
 
     function onVisibilityChange() {
