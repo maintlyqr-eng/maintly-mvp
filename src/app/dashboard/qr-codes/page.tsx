@@ -104,6 +104,32 @@ export default function QrCodesPage() {
     { label: "L", value: 260 },
     { label: "XL", value: 340 },
   ];
+  const PRINT_SIZE_MIN = 80;
+  const PRINT_SIZE_MAX = 400;
+  // Per-code overrides on top of `printSize` — so a sheet can mix sizes
+  // (e.g. most codes small for parts, one big one for a truck door) instead
+  // of every code on the sheet being forced to the same size. Codes not in
+  // here just use the global `printSize`. Changing the global size/preset
+  // clears these, since "set them all to X" is the more common intent when
+  // touching the global control — per-code tweaks are for the exceptions.
+  const [printSizeOverrides, setPrintSizeOverrides] = useState<Record<string, number>>({});
+
+  function sizeForPrint(code: string) {
+    return printSizeOverrides[code] ?? printSize;
+  }
+
+  function nudgeCodeSize(code: string, delta: number) {
+    setPrintSizeOverrides((prev) => {
+      const current = prev[code] ?? printSize;
+      const next = Math.min(PRINT_SIZE_MAX, Math.max(PRINT_SIZE_MIN, current + delta));
+      return { ...prev, [code]: next };
+    });
+  }
+
+  function applyGlobalPrintSize(value: number) {
+    setPrintSize(value);
+    setPrintSizeOverrides({});
+  }
 
   async function loadCodes() {
     setLoading(true);
@@ -584,23 +610,26 @@ export default function QrCodesPage() {
                 <button onClick={() => setPrintCodes(null)} className="text-zinc-400 hover:text-zinc-700 px-2"><X size={20} /></button>
               </div>
             </div>
-            <div className="flex items-center gap-3 px-6 pb-4 flex-wrap">
-              <span className="text-[11px] font-bold text-zinc-500">Size:</span>
+            <div className="flex items-center gap-3 px-6 pb-2 flex-wrap">
+              <span className="text-[11px] font-bold text-zinc-500">Size (all):</span>
               {PRINT_SIZE_PRESETS.map((p) => (
                 <button
-                  key={p.label} type="button" onClick={() => setPrintSize(p.value)}
+                  key={p.label} type="button" onClick={() => applyGlobalPrintSize(p.value)}
                   className={`px-3 py-1 rounded-lg text-[11px] font-bold border-2 transition-all ${printSize === p.value ? "border-red-500 bg-red-50 text-red-600" : "border-zinc-200 text-zinc-600 hover:border-zinc-300"}`}
                 >
                   {p.label}
                 </button>
               ))}
               <input
-                type="range" min={80} max={400} step={10} value={printSize}
-                onChange={(e) => setPrintSize(Number(e.target.value))}
+                type="range" min={PRINT_SIZE_MIN} max={PRINT_SIZE_MAX} step={10} value={printSize}
+                onChange={(e) => applyGlobalPrintSize(Number(e.target.value))}
                 className="w-40 accent-red-600"
               />
               <span className="text-[11px] text-zinc-400 tabular-nums">{printSize}px</span>
             </div>
+            <p className="px-6 pb-3 text-[10.5px] text-zinc-400">
+              Need one code bigger or smaller than the rest? Use the −/+ under its own preview below — the size above sets the baseline for everyone.
+            </p>
           </div>
           {/* flex-wrap + justify-center instead of a CSS grid: with a grid,
               a single code (or a partial last row) sits pinned to the first
@@ -610,13 +639,37 @@ export default function QrCodesPage() {
               (including a lone item or a short last row) regardless of
               count. */}
           <div className="p-8 flex flex-wrap justify-center gap-8 max-w-4xl mx-auto">
-            {printRows.map((row) => (
-              <div key={row.code} style={{ width: printSize + 50 }} className="flex flex-col items-center text-center gap-1.5 break-inside-avoid">
-                <QrCodeCanvas code={row.code} theme={row.theme} size={printSize} />
-                <p className="text-[11px] font-mono font-bold text-zinc-800">{row.code}</p>
-                {row.label && <p className="text-[10px] text-zinc-500">{row.label}</p>}
-              </div>
-            ))}
+            {printRows.map((row) => {
+              const codeSize = sizeForPrint(row.code);
+              const isOverridden = printSizeOverrides[row.code] !== undefined;
+              return (
+                <div key={row.code} style={{ width: Math.max(codeSize + 50, 130) }} className="flex flex-col items-center text-center gap-1.5 break-inside-avoid">
+                  <QrCodeCanvas code={row.code} theme={row.theme} size={codeSize} />
+                  <p className="text-[11px] font-mono font-bold text-zinc-800">{row.code}</p>
+                  {row.label && <p className="text-[10px] text-zinc-500">{row.label}</p>}
+                  {/* Per-code size nudge — hidden from the actual printout,
+                      just here so a mix of sizes on one sheet is possible
+                      without a full slider per card cluttering the layout. */}
+                  <div className="no-print flex items-center gap-1.5 mt-0.5">
+                    <button
+                      type="button" onClick={() => nudgeCodeSize(row.code, -20)}
+                      className="w-5 h-5 flex items-center justify-center rounded border border-zinc-200 text-zinc-500 hover:border-red-300 hover:text-red-600 text-[12px] font-bold leading-none"
+                      title="Smaller"
+                    >
+                      −
+                    </button>
+                    <span className={`text-[10px] tabular-nums ${isOverridden ? "text-red-600 font-bold" : "text-zinc-400"}`}>{codeSize}px</span>
+                    <button
+                      type="button" onClick={() => nudgeCodeSize(row.code, 20)}
+                      className="w-5 h-5 flex items-center justify-center rounded border border-zinc-200 text-zinc-500 hover:border-red-300 hover:text-red-600 text-[12px] font-bold leading-none"
+                      title="Bigger"
+                    >
+                      +
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
