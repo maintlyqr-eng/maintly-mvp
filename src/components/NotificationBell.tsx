@@ -57,6 +57,30 @@ export default function NotificationBell({
   const [items, setItems] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+
+  // The dropdown used to be positioned with plain Tailwind (`absolute
+  // right-0 w-80`), anchored purely to this component's own little
+  // `relative` wrapper. That looks right on desktop, where the wrapper
+  // sits comfortably inside the header, but on a narrow phone screen the
+  // 320px-wide panel can extend past the edge of the viewport — Facu's
+  // report: "en la compu se ve bien pero en el celu queda fuera de
+  // pantalla." Fixed positioning computed from the button's actual
+  // on-screen position sidesteps that (and any per-page header layout
+  // differences) instead of guessing a breakpoint-specific class.
+  const [panelStyle, setPanelStyle] = useState<{ top: number; left: number; width: number } | null>(null);
+
+  function computePanelPosition() {
+    const btn = buttonRef.current;
+    if (!btn) return;
+    const rect = btn.getBoundingClientRect();
+    const margin = 12;
+    const width = Math.min(320, window.innerWidth - margin * 2);
+    let left = rect.right - width; // align the panel's right edge under the bell, like before
+    left = Math.min(left, window.innerWidth - width - margin);
+    left = Math.max(left, margin);
+    setPanelStyle({ top: rect.bottom + 8, left, width });
+  }
 
   const totalUnread = unreadMessagesCount + unreadMechanicCount;
 
@@ -150,14 +174,30 @@ export default function NotificationBell({
   useEffect(() => {
     if (!open) return;
     fetchNotifications();
+    computePanelPosition();
+
     function onClickOutside(e: MouseEvent) {
       if (containerRef.current && !containerRef.current.contains(e.target as Node)) setOpen(false);
     }
+    function onResize() { computePanelPosition(); }
     document.addEventListener("mousedown", onClickOutside);
-    return () => document.removeEventListener("mousedown", onClickOutside);
+    window.addEventListener("resize", onResize);
+    return () => {
+      document.removeEventListener("mousedown", onClickOutside);
+      window.removeEventListener("resize", onResize);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
+  // Note on the "clicking a Team Chat notification sends me outside the
+  // conversation" bug Facu reported: the actual fix lives in Team Chat's
+  // own page, not here. router.push() to /dashboard/team-chat?with=<id>
+  // does update the URL correctly even when you're already sitting on that
+  // route with a different (or no) thread open — but the page's effect
+  // that reads `with` and opens the matching thread only ran once on
+  // mount, so a same-page query-string change was silently ignored. Team
+  // Chat now has a dedicated effect keyed on useSearchParams() so it
+  // reacts every time `with` changes, not just on first load.
   function goTo(href: string) {
     setOpen(false);
     router.push(href);
@@ -166,6 +206,7 @@ export default function NotificationBell({
   return (
     <div className="relative" ref={containerRef}>
       <button
+        ref={buttonRef}
         onClick={() => setOpen((o) => !o)}
         className="relative text-zinc-500 hover:text-zinc-800 transition-colors"
       >
@@ -177,8 +218,11 @@ export default function NotificationBell({
         )}
       </button>
 
-      {open && (
-        <div className="absolute right-0 mt-2 w-80 max-w-[90vw] bg-white rounded-2xl border border-zinc-200 shadow-lg z-50 overflow-hidden">
+      {open && panelStyle && (
+        <div
+          style={{ position: "fixed", top: panelStyle.top, left: panelStyle.left, width: panelStyle.width }}
+          className="bg-white rounded-2xl border border-zinc-200 shadow-lg z-50 overflow-hidden"
+        >
           <div className="px-4 py-3 border-b border-zinc-100">
             <p className="text-[13px] font-bold text-zinc-800">Notifications</p>
           </div>

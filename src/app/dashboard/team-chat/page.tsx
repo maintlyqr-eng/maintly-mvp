@@ -353,19 +353,6 @@ function TeamChatPageInner() {
       await loadSavedContacts(session.user.id);
       await loadBlocks(session.user.id);
       if (active) setCheckingAuth(false);
-
-      // Deep link from the notification bell (or anywhere else) —
-      // /dashboard/team-chat?with=<mechanicId> opens straight into that
-      // conversation instead of landing on the bare conversation list.
-      const withId = searchParams.get("with");
-      if (withId && withId !== session.user.id) {
-        const { data: info } = await supabase
-          .from("mechanics")
-          .select("id, name, email, workshop_name, photo_url")
-          .eq("id", withId)
-          .single();
-        if (active && info) openConversation(info as MechanicInfo);
-      }
     }
 
     init();
@@ -376,6 +363,39 @@ function TeamChatPageInner() {
 
     return () => { active = false; listener.subscription.unsubscribe(); };
   }, [router]);
+
+  // Deep link from the notification bell (or anywhere else) —
+  // /dashboard/team-chat?with=<mechanicId> should open straight into that
+  // conversation. This used to live inline inside the auth-init effect
+  // above, which only ever runs once on mount — so if you were *already*
+  // sitting on this page and clicked a new notification, router.push()
+  // updated the URL but nothing re-ran to open the matching thread, and
+  // you stayed wherever you were ("me manda afuera de la conversación en
+  // vez de adentro"). Keying a dedicated effect on searchParams instead
+  // means it fires every time `with` changes, not just on first load.
+  // router.replace() afterwards clears the query param so re-clicking the
+  // same notification later (or a stale bookmarked link) still triggers a
+  // real change next time instead of silently no-op'ing.
+  useEffect(() => {
+    const withId = searchParams.get("with");
+    if (!withId || !mechanicId || withId === mechanicId || withId === selectedId) return;
+
+    let active = true;
+    (async () => {
+      const { data: info } = await supabase
+        .from("mechanics")
+        .select("id, name, email, workshop_name, photo_url")
+        .eq("id", withId)
+        .single();
+      if (active && info) {
+        openConversation(info as MechanicInfo);
+        router.replace("/dashboard/team-chat", { scroll: false });
+      }
+    })();
+
+    return () => { active = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, mechanicId]);
 
   // Live delivery — Facu's feedback: Team Chat felt dead, needing a manual
   // refresh to see anything new. This subscribes to Supabase Realtime for
