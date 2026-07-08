@@ -9,7 +9,7 @@ import {
   Mail, FolderOpen, Settings as SettingsIcon, Bell, X, LogOut, Crown, Menu,
   ShieldCheck, CalendarDays, KeyRound, AlertCircle, CheckCircle2, Camera,
   Image as ImageIcon,
-  MessageCircle,
+  MessageCircle, Download, Copy, Check,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import NotificationBell from "@/components/NotificationBell";
@@ -21,6 +21,8 @@ import HoverAvatar from "@/components/HoverAvatar";
 import ContactSupportWidget from "@/components/ContactSupportWidget";
 import ProfessionVerificationForm, { VerificationStatusCard } from "@/components/ProfessionVerificationForm";
 import { validateImageFile } from "@/lib/imageValidation";
+import QrCodeCanvas, { type QrCodeCanvasHandle } from "@/components/QrCodeCanvas";
+import { DEFAULT_QR_THEME } from "@/lib/qrThemes";
 
 const navItems = [
   { icon: LayoutGrid, label: "Dashboard", href: "/dashboard" },
@@ -70,6 +72,14 @@ export default function SettingsPage() {
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Maintler QR business card (see migration 024) — every mechanic gets a
+  // permanent maintler_code, generated automatically at signup (or
+  // backfilled for existing accounts by that same migration), that
+  // resolves to a public profile at /maintler/<code>.
+  const [maintlerCode, setMaintlerCode] = useState("");
+  const [cardLinkCopied, setCardLinkCopied] = useState(false);
+  const cardCanvasRef = useRef<QrCodeCanvasHandle>(null);
+
   // Password form
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -89,7 +99,7 @@ export default function SettingsPage() {
 
       const { data: mechanic } = await supabase
         .from("mechanics")
-        .select("name, workshop_name, created_at, is_mechanic, verified, photo_url, profession, verification_status, verification_note")
+        .select("name, workshop_name, created_at, is_mechanic, verified, photo_url, profession, verification_status, verification_note, maintler_code")
         .eq("id", session.user.id)
         .single();
 
@@ -103,6 +113,7 @@ export default function SettingsPage() {
         setProfession(mechanic.profession ?? null);
         setVerificationStatus((mechanic.verification_status as "none" | "pending" | "verified" | "rejected") ?? "none");
         setVerificationNote(mechanic.verification_note ?? null);
+        setMaintlerCode(mechanic.maintler_code ?? "");
       }
 
       if (active) setCheckingAuth(false);
@@ -120,6 +131,23 @@ export default function SettingsPage() {
   async function handleLogout() {
     await supabase.auth.signOut();
     router.replace("/login");
+  }
+
+  async function handleCopyCardLink() {
+    if (!maintlerCode) return;
+    const url = `${window.location.origin}/maintler/${maintlerCode}`;
+    try {
+      await navigator.clipboard.writeText(url);
+      setCardLinkCopied(true);
+      setTimeout(() => setCardLinkCopied(false), 2000);
+    } catch {
+      // Clipboard API unavailable — nothing more useful to fall back to.
+    }
+  }
+
+  function handleDownloadCard() {
+    if (!maintlerCode) return;
+    cardCanvasRef.current?.download(`maintlyqr-${workshopName || name || "maintler-card"}`);
   }
 
   function handleFileSelected(e: React.ChangeEvent<HTMLInputElement>) {
@@ -361,6 +389,53 @@ export default function SettingsPage() {
                 <p className="text-[13px] font-bold text-zinc-800">{verified && profession ? `${profession} Maintler` : verified ? "Verified Maintler" : "Maintler"}</p>
               </div>
             </div>
+          </div>
+
+          {/* ── MY MAINTLER CARD ── */}
+          <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm p-6 mb-6">
+            <h2 className="text-[14px] font-black text-zinc-900 mb-1">My Maintler Card</h2>
+            <p className="text-[12px] text-zinc-400 mb-5">
+              Your own permanent QR — a business card other Maintlers can scan to find, save, and message you directly.
+              Print it, share the link, or add it to your workshop&apos;s signage.
+            </p>
+
+            {maintlerCode ? (
+              <div className="flex flex-col sm:flex-row gap-5 items-start">
+                <div className="shrink-0 self-center sm:self-start p-3 rounded-2xl border border-zinc-100 bg-zinc-50">
+                  <QrCodeCanvas ref={cardCanvasRef} code={maintlerCode} theme={DEFAULT_QR_THEME} linkPath="maintler" size={140} />
+                </div>
+                <div className="flex-1 min-w-0 w-full space-y-3">
+                  <div>
+                    <label className="text-[11px] font-bold text-zinc-500 uppercase tracking-widest mb-1.5 block">Public link</label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        readOnly
+                        value={`maintlyqr.com/maintler/${maintlerCode}`}
+                        className="flex-1 min-w-0 bg-zinc-50 border border-zinc-200 rounded-xl px-3 py-2.5 text-[12.5px] text-zinc-600 font-mono truncate"
+                      />
+                      <button
+                        onClick={handleCopyCardLink}
+                        className="shrink-0 flex items-center gap-1.5 text-[11.5px] font-bold text-zinc-600 hover:text-zinc-900 border border-zinc-200 hover:bg-zinc-50 px-3 py-2.5 rounded-xl transition-colors"
+                      >
+                        {cardLinkCopied ? <><Check size={13} className="text-emerald-500" /> Copied</> : <><Copy size={13} /> Copy</>}
+                      </button>
+                    </div>
+                  </div>
+                  <button
+                    onClick={handleDownloadCard}
+                    className="flex items-center gap-1.5 text-[11.5px] font-bold text-white bg-zinc-900 hover:bg-zinc-800 px-3.5 py-2.5 rounded-xl transition-colors"
+                  >
+                    <Download size={13} /> Download PNG
+                  </button>
+                  <p className="text-[11px] text-zinc-400">
+                    Anyone who scans this or visits the link sees your name, workshop, verified status, and member-since date —
+                    and, if they&apos;re a Maintler themselves, a Save and Message button straight to you.
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <p className="text-[12px] text-zinc-300">Loading your card…</p>
+            )}
           </div>
 
           {/* ── PROFESSION & VERIFICATION ── */}

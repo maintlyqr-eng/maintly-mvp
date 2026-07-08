@@ -24,6 +24,14 @@ import QrFrameShape from "@/components/QrFrameShape";
 // via the new per-card Print button, since those print the live page.
 export type QrCodeCanvasHandle = { download: (filename: string) => void };
 
+// Which public page this code should resolve to when scanned. Defaults to
+// "asset" (unchanged behavior for every existing call site — the qr-codes
+// dashboard, print sheets, the blank-code assign flow). The Maintler QR
+// business card (Item 4 of the feature backlog) reuses this exact same
+// rendering/theming/download machinery instead of a second QR component,
+// just pointed at /maintler/<code> instead of /asset/<code>.
+type QrLinkPath = "asset" | "maintler";
+
 function loadImageEl(src: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const img = new window.Image();
@@ -39,7 +47,8 @@ const QrCodeCanvas = forwardRef<QrCodeCanvasHandle, {
   theme: string;
   size?: number;
   className?: string;
-}>(function QrCodeCanvas({ code, theme, size = 220, className }, ref) {
+  linkPath?: QrLinkPath;
+}>(function QrCodeCanvas({ code, theme, size = 220, className, linkPath = "asset" }, ref) {
   const containerRef = useRef<HTMLDivElement>(null);
   const qrRef = useRef<any>(null);
   const def = getQrTheme(theme);
@@ -66,7 +75,7 @@ const QrCodeCanvas = forwardRef<QrCodeCanvasHandle, {
       if (cancelled || !containerRef.current || !mod) return;
       const QRCodeStyling = mod.default;
 
-      const url = `${window.location.origin}/asset/${code}`;
+      const url = `${window.location.origin}/${linkPath}/${code}`;
 
       // Render at higher internal resolution than the on-screen `size` —
       // qr-code-styling's canvas bitmap is exactly width×height pixels, so
@@ -125,7 +134,7 @@ const QrCodeCanvas = forwardRef<QrCodeCanvasHandle, {
     render();
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [code, theme, size]);
+  }, [code, theme, size, linkPath]);
 
   useImperativeHandle(ref, () => ({
     download: async (filename: string) => {
@@ -151,7 +160,7 @@ const QrCodeCanvas = forwardRef<QrCodeCanvasHandle, {
       try {
         const mod = await import("qr-code-styling");
         const QRCodeStyling = mod.default;
-        const url = `${window.location.origin}/asset/${code}`;
+        const url = `${window.location.origin}/${linkPath}/${code}`;
         const exportQr = new QRCodeStyling({
           width: qrPx,
           height: qrPx,
