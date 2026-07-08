@@ -441,7 +441,7 @@ export const qrThemes: QrThemeDef[] = [
   {
     id: "gear-ring",
     name: "Gear Ring",
-    description: "A big illustrated cog frame — an industrial alternative to the small Maintly logo. Black-outline, red-center finder patterns for a bold, classic scan look, sitting straight on the gear's own white circle with no separate white card behind it.",
+    description: "A big illustrated cog frame — an industrial alternative to the small Maintly logo. All-red finder patterns (no black outline anywhere in the QR itself) for a bold, clean scan look, sitting straight on the gear's own white circle with no separate white card behind it.",
     category: "industry",
     frameImage: "/images/qr-frames/qr-gear-ring.png", frameAspect: 0.9788,
     frameHole: { x: 0.3178, y: 0.3203, w: 0.3686, h: 0.368 },
@@ -453,11 +453,13 @@ export const qrThemes: QrThemeDef[] = [
       // QR's dark modules sit directly on the artwork's circle instead —
       // no seam, no separate square card, just the gear.
       //
-      // Confirmed with a reference screenshot: the finder patterns should be
-      // a black hollow square (cornersSquareColor) with a red center square
-      // (cornersDotColor) — the classic two-tone look, not all-red.
+      // CONFIRMED (explicit user answer): cornersSquareColor must be red,
+      // not black. The user wants zero black in the QR's own finder-pattern
+      // corners — only the frame artwork's black ring (baked into
+      // qr-gear-ring.png, not configurable here) stays black. Do not revert
+      // this to black again without a fresh explicit request.
       dotsColor: "#18181b", dotsType: "square", backgroundColor: "transparent",
-      cornersSquareColor: "#18181b", cornersSquareType: "square",
+      cornersSquareColor: "#dc2626", cornersSquareType: "square",
       cornersDotColor: "#dc2626", cornersDotType: "square", logo: false,
     },
   },
