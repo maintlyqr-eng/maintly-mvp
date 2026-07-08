@@ -441,24 +441,29 @@ export const qrThemes: QrThemeDef[] = [
   {
     id: "gear-ring",
     name: "Gear Ring",
-    description: "A big illustrated cog frame — an industrial alternative to the small Maintly logo. All-red finder patterns (no black outline anywhere in the QR itself) for a bold, clean scan look, sitting straight on the gear's own white circle with no separate white card behind it.",
+    description: "A big illustrated cog frame — an industrial alternative to the small Maintly logo. All-red finder patterns (no black outline anywhere in the QR itself), a small white card sitting clear inside the ring, no white poking past the ring's edge.",
     category: "industry",
     frameImage: "/images/qr-frames/qr-gear-ring.png", frameAspect: 0.9788,
-    frameHole: { x: 0.3178, y: 0.3203, w: 0.3686, h: 0.368 },
+    // Hole shrunk on purpose (was x:0.3178,y:0.3203,w:0.3686,h:0.368): the old
+    // hole matched the artwork's original white square almost exactly, which
+    // meant the QR card's square corners poked out past the artwork's round
+    // ring at the diagonals, and its flat edges nearly touched the ring —
+    // reading as a messy, oversized white square instead of a QR sitting
+    // cleanly inside the ring. The artwork was edited to match (a modest
+    // pull-back, reclaimed sliver kept plain white — no new color added, per
+    // explicit request), so the square's corners now clear the ring instead
+    // of poking past it.
+    frameHole: { x: 0.341102, y: 0.339827, w: 0.322034, h: 0.329004 },
     options: {
-      // Transparent, not white: the gear artwork's inner circle already has
-      // its own (slightly shaded/glossy) white fill. A flat pure-white QR
-      // background laid on top of it created a faint but visible square
-      // seam where the two whites didn't quite match. Transparent lets the
-      // QR's dark modules sit directly on the artwork's circle instead —
-      // no seam, no separate square card, just the gear.
+      // White background: the QR needs its own opaque white card for the
+      // dark modules to have proper scan contrast against the artwork.
       //
       // CONFIRMED (explicit user answer): cornersSquareColor must be red,
       // not black. The user wants zero black in the QR's own finder-pattern
       // corners — only the frame artwork's black ring (baked into
       // qr-gear-ring.png, not configurable here) stays black. Do not revert
       // this to black again without a fresh explicit request.
-      dotsColor: "#18181b", dotsType: "square", backgroundColor: "transparent",
+      dotsColor: "#18181b", dotsType: "square", backgroundColor: "#ffffff",
       cornersSquareColor: "#dc2626", cornersSquareType: "square",
       cornersDotColor: "#dc2626", cornersDotType: "square", logo: false,
     },
