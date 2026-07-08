@@ -48,6 +48,16 @@ export default function RegisterPage() {
       return;
     }
 
+    // Fire-and-forget welcome email — never block or fail signup on this.
+    // The in-app welcome message (Messages inbox) is handled separately, on
+    // the database side (see supabase/migrations/018_add_welcome_message.sql),
+    // so it lands even if this request never completes.
+    fetch("/api/send-welcome-email", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, email }),
+    }).catch(() => {});
+
     // If Supabase requires email confirmation, there is no session yet.
     if (data.session) {
       router.push("/register/profession");
