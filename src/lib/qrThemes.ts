@@ -441,7 +441,7 @@ export const qrThemes: QrThemeDef[] = [
   {
     id: "gear-ring",
     name: "Gear Ring",
-    description: "A big illustrated cog frame — an industrial alternative to the small Maintly logo. Black-and-red finder patterns for a bold, classic scan look, sitting straight on the gear's own white circle with no separate white card behind it.",
+    description: "A big illustrated cog frame — an industrial alternative to the small Maintly logo. All-red finder patterns (no black corner outline) for a bold, clean scan look, sitting straight on the gear's own white circle with no separate white card behind it.",
     category: "industry",
     frameImage: "/images/qr-frames/qr-gear-ring.png", frameAspect: 0.9788,
     frameHole: { x: 0.3178, y: 0.3203, w: 0.3686, h: 0.368 },
@@ -452,8 +452,13 @@ export const qrThemes: QrThemeDef[] = [
       // seam where the two whites didn't quite match. Transparent lets the
       // QR's dark modules sit directly on the artwork's circle instead —
       // no seam, no separate square card, just the gear.
+      //
+      // cornersSquareColor is red (not black) on purpose: the finder-pattern
+      // outer square used to be black (#18181b), which read as an unwanted
+      // "black square outline" around the QR. Both the outer square and the
+      // inner dot are red now, so there's no black left in the corners at all.
       dotsColor: "#18181b", dotsType: "square", backgroundColor: "transparent",
-      cornersSquareColor: "#18181b", cornersSquareType: "square",
+      cornersSquareColor: "#dc2626", cornersSquareType: "square",
       cornersDotColor: "#dc2626", cornersDotType: "square", logo: false,
     },
   },
