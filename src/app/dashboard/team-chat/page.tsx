@@ -15,7 +15,6 @@ import NotificationBell from "@/components/NotificationBell";
 import HoverAvatar from "@/components/HoverAvatar";
 import ContactSupportWidget from "@/components/ContactSupportWidget";
 import { useUnreadMessagesCount } from "@/lib/useUnreadMessages";
-import { useUnreadMechanicMessages } from "@/lib/useUnreadMechanicMessages";
 import { formatDateDMY } from "@/lib/date";
 
 // Mechanic-to-mechanic direct messaging — a second, independent inbox from
@@ -117,7 +116,11 @@ function TeamChatPageInner() {
   const [mechanicEmail, setMechanicEmail] = useState("");
 
   const unreadMessages = useUnreadMessagesCount(mechanicId);
-  const unreadMechanicMessages = useUnreadMechanicMessages(mechanicId);
+  // No useUnreadMechanicMessages() call on this page — unlike the other 11
+  // dashboard pages, Team Chat already tracks a race-free unread count of
+  // its own (`totalUnread`, derived from `conversations` below), so it uses
+  // that everywhere instead. See the comment by the "Team Chat" nav badge
+  // further down for why.
 
   const [conversations, setConversations] = useState<ConversationSummary[]>([]);
   const [conversationsLoading, setConversationsLoading] = useState(true);
@@ -164,21 +167,65 @@ function TeamChatPageInner() {
   // (see the h-dvh layout fix above), it needs to actually land on the
   // newest message on its own — otherwise opening a conversation would
   // show you the *oldest* messages first, which is arguably worse than
-  // the old scroll-the-whole-page behavior. First cut used
-  // threadEndRef.current.scrollIntoView() on a sentinel div, but Facu
-  // still had to scroll down manually every time — scrollIntoView asks
-  // the browser to find and scroll whichever ancestor it decides is "the"
-  // scrollable one, which is exactly the kind of thing that quietly
-  // misbehaves across mobile browsers. Setting the message container's
-  // own scrollTop directly is unambiguous: there's only one container
-  // this could possibly mean. useLayoutEffect (not useEffect) so this
-  // runs synchronously right after the DOM updates, before the browser
-  // paints — no flash of "still scrolled to the middle" before it jumps.
+  // the old scroll-the-whole-page behavior.
+  //
+  // This went through two earlier cuts that both still left Facu having
+  // to scroll manually sometimes: scrollIntoView() on a sentinel div (too
+  // unreliable about which ancestor it decides to scroll), then a plain
+  // scrollTop = scrollHeight in a useLayoutEffect (fixed the manual-click
+  // case, but arriving via the notification bell — a fresh page load —
+  // still needed a scroll). The bell case's remaining gap: right after
+  // the thread first renders, things like the counterparty's avatar image
+  // in the header are still loading over the network, and when they
+  // finish they can shift the page's layout — including the message
+  // container's scrollable height — *after* this effect already set
+  // scrollTop once. A plain effect has no way to know content grew later.
+  //
+  // A ResizeObserver on the actual message content (not the scroll
+  // container itself, whose own box size is fixed by the flex layout —
+  // it's the inner content that grows) re-applies the same scroll
+  // whenever the content's real height changes, for any reason, at any
+  // time — not just once, right after this effect runs. `stickToBottomRef`
+  // keeps this from fighting a Maintler who's deliberately scrolled up to
+  // read older messages: it's reset to "yes, stay pinned" whenever a
+  // different conversation is opened or a message is sent, and cleared as
+  // soon as a scroll away from the bottom is detected.
   const threadContainerRef = useRef<HTMLDivElement>(null);
-  useLayoutEffect(() => {
+  const threadContentRef = useRef<HTMLDivElement>(null);
+  const stickToBottomRef = useRef(true);
+
+  function scrollThreadToBottom() {
     const el = threadContainerRef.current;
     if (el) el.scrollTop = el.scrollHeight;
+  }
+
+  // Opening a (possibly different) conversation should always start
+  // pinned to its latest message, regardless of where a previous
+  // conversation was left scrolled.
+  useLayoutEffect(() => {
+    stickToBottomRef.current = true;
+  }, [selectedId]);
+
+  useLayoutEffect(() => {
+    if (stickToBottomRef.current) scrollThreadToBottom();
   }, [thread, selectedId, threadLoading]);
+
+  useEffect(() => {
+    const contentEl = threadContentRef.current;
+    if (!contentEl) return;
+    const ro = new ResizeObserver(() => {
+      if (stickToBottomRef.current) scrollThreadToBottom();
+    });
+    ro.observe(contentEl);
+    return () => ro.disconnect();
+  }, [selectedId]);
+
+  function handleThreadScroll() {
+    const el = threadContainerRef.current;
+    if (!el) return;
+    const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+    stickToBottomRef.current = distanceFromBottom < 80;
+  }
 
   async function loadConversations(myId: string) {
     setConversationsLoading(true);
@@ -623,6 +670,9 @@ function TeamChatPageInner() {
     const text = body.trim();
     setSending(true);
     setComposeError("");
+    // Sending should always land you on your own new message, even if
+    // you'd scrolled up to read older ones first — same as WhatsApp.
+    stickToBottomRef.current = true;
     const { data, error: err } = await supabase
       .from("mechanic_messages")
       .insert({ sender_id: mechanicId, recipient_id: selectedId, body: text })
@@ -735,8 +785,26 @@ function TeamChatPageInner() {
               {item.label === "Messages" && unreadMessages > 0 && (
                 <span className="ml-auto bg-red-600 text-white text-[9px] font-bold rounded-full min-w-[16px] h-4 flex items-center justify-center px-1">{unreadMessages}</span>
               )}
-              {item.label === "Team Chat" && unreadMechanicMessages > 0 && (
-                <span className="ml-auto bg-red-600 text-white text-[9px] font-bold rounded-full min-w-[16px] h-4 flex items-center justify-center px-1">{unreadMechanicMessages}</span>
+              {/* Uses totalUnread (derived from this page's own `conversations`
+                  state), not the useUnreadMechanicMessages() hook every
+                  other dashboard page uses for this badge — Facu's report:
+                  sitting inside a conversation and getting a
+                  new message from that same person still briefly flashed
+                  "1" here (and on the bell) even though the message was
+                  visibly right there on screen. The hook increments
+                  optimistically the instant the INSERT event arrives and
+                  only corrects itself once a separate follow-up UPDATE
+                  (marking the message read) round-trips back — a real gap
+                  where the count is momentarily wrong. `totalUnread` has no
+                  such gap: the realtime handler that builds `conversations`
+                  already knows synchronously, in the same event, whether
+                  the message's thread is the one currently open, and never
+                  counts it as unread in the first place. Only this page has
+                  that context, so this substitution is local to Team Chat —
+                  the other 11 pages keep using the hook, which is correct
+                  there (no open conversation to exclude). */}
+              {item.label === "Team Chat" && totalUnread > 0 && (
+                <span className="ml-auto bg-red-600 text-white text-[9px] font-bold rounded-full min-w-[16px] h-4 flex items-center justify-center px-1">{totalUnread}</span>
               )}
             </Link>
           ))}
@@ -782,7 +850,11 @@ function TeamChatPageInner() {
             </div>
           </div>
           <div className="flex items-center gap-2 md:gap-4 shrink-0">
-            <NotificationBell mechanicId={mechanicId} unreadMessagesCount={unreadMessages} unreadMechanicCount={unreadMechanicMessages} />
+            {/* unreadMechanicCount uses totalUnread here too, same reasoning
+                as the sidebar badge above — avoids the bell flashing "1"
+                for a message that just arrived in the conversation you're
+                already looking at. */}
+            <NotificationBell mechanicId={mechanicId} unreadMessagesCount={unreadMessages} unreadMechanicCount={totalUnread} />
             <div className="flex items-center gap-3 md:pl-3 md:border-l border-zinc-200">
               <div className="flex items-center gap-2.5">
                 <Link href="/dashboard/settings" className="shrink-0">
@@ -1079,33 +1151,39 @@ function TeamChatPageInner() {
                   </div>
                 )}
 
-                <div ref={threadContainerRef} className="flex-1 min-h-0 overflow-y-auto px-5 py-4 space-y-2.5 bg-zinc-50/40">
-                  {threadLoading ? (
-                    <p className="text-[12px] text-zinc-300 text-center py-8">Loading…</p>
-                  ) : thread.length === 0 ? (
-                    <p className="text-[12px] text-zinc-300 text-center py-8">No messages yet — say hi!</p>
-                  ) : (
-                    thread.map((m, i) => {
-                      const fromMe = m.sender_id === mechanicId;
-                      const prev = thread[i - 1];
-                      const showLabel = !prev || (prev.sender_id === mechanicId) !== fromMe;
-                      return (
-                        <div key={m.id} className={`flex flex-col ${fromMe ? "items-end" : "items-start"}`}>
-                          {showLabel && (
-                            <p className={`text-[10px] font-black uppercase tracking-wide mb-1 px-1 ${fromMe ? "text-zinc-500" : "text-zinc-400"}`}>
-                              {fromMe ? "You" : displayName(selectedInfo)}
-                            </p>
-                          )}
-                          <div className={`max-w-[80%] rounded-2xl px-3.5 py-2.5 text-[12.5px] leading-snug ${
-                            fromMe ? "bg-blue-600 text-white rounded-br-sm" : "bg-white border border-zinc-200 text-zinc-700 rounded-bl-sm"
-                          }`}>
-                            <p className="whitespace-pre-wrap break-words">{m.body}</p>
-                            <p className={`text-[9.5px] mt-1 ${fromMe ? "text-blue-100" : "text-zinc-300"}`}>{formatDateDMY(m.created_at)} · {formatTime(m.created_at)}</p>
+                <div
+                  ref={threadContainerRef}
+                  onScroll={handleThreadScroll}
+                  className="flex-1 min-h-0 overflow-y-auto px-5 py-4 bg-zinc-50/40"
+                >
+                  <div ref={threadContentRef} className="space-y-2.5">
+                    {threadLoading ? (
+                      <p className="text-[12px] text-zinc-300 text-center py-8">Loading…</p>
+                    ) : thread.length === 0 ? (
+                      <p className="text-[12px] text-zinc-300 text-center py-8">No messages yet — say hi!</p>
+                    ) : (
+                      thread.map((m, i) => {
+                        const fromMe = m.sender_id === mechanicId;
+                        const prev = thread[i - 1];
+                        const showLabel = !prev || (prev.sender_id === mechanicId) !== fromMe;
+                        return (
+                          <div key={m.id} className={`flex flex-col ${fromMe ? "items-end" : "items-start"}`}>
+                            {showLabel && (
+                              <p className={`text-[10px] font-black uppercase tracking-wide mb-1 px-1 ${fromMe ? "text-zinc-500" : "text-zinc-400"}`}>
+                                {fromMe ? "You" : displayName(selectedInfo)}
+                              </p>
+                            )}
+                            <div className={`max-w-[80%] rounded-2xl px-3.5 py-2.5 text-[12.5px] leading-snug ${
+                              fromMe ? "bg-blue-600 text-white rounded-br-sm" : "bg-white border border-zinc-200 text-zinc-700 rounded-bl-sm"
+                            }`}>
+                              <p className="whitespace-pre-wrap break-words">{m.body}</p>
+                              <p className={`text-[9.5px] mt-1 ${fromMe ? "text-blue-100" : "text-zinc-300"}`}>{formatDateDMY(m.created_at)} · {formatTime(m.created_at)}</p>
+                            </div>
                           </div>
-                        </div>
-                      );
-                    })
-                  )}
+                        );
+                      })
+                    )}
+                  </div>
                 </div>
 
                 {selectedIsBlocked ? (
