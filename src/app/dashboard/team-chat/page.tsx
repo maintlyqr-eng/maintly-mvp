@@ -135,6 +135,7 @@ export default function TeamChatPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [searchResults, setSearchResults] = useState<MechanicInfo[]>([]);
   const [searching, setSearching] = useState(false);
+  const [searchError, setSearchError] = useState("");
 
   const [activeTab, setActiveTab] = useState<"chats" | "network">("chats");
   const [connections, setConnections] = useState<ConnectionSummary[]>([]);
@@ -311,26 +312,47 @@ export default function TeamChatPage() {
   // documented PostgREST behavior, not a supabase-js quirk). Using "%"
   // here silently searched for literal percent signs and never matched
   // anything, which is why the picker always showed "No Maintlers found."
-  // no matter what was typed, even an exact known email.
+  // no matter what was typed, even an exact known email. That bug is fixed
+  // now, but if results are STILL empty after this fix, the next most
+  // likely cause is RLS on the mechanics table not actually allowing a
+  // logged-in Maintler to read other Maintlers' rows (the schema we have on
+  // file says it should, via a public-read policy, but that file may be
+  // stale). The unfiltered "browse" query below (fired the moment the
+  // modal opens, before anything is typed) is the diagnostic for that: if
+  // it also comes back empty even though more than one Maintler account
+  // exists, that points at RLS, not at the search filter itself.
   useEffect(() => {
     if (!newChatOpen) return;
     const term = searchTerm.trim().replace(/[,()*]/g, "");
-    // A single letter is enough to start suggesting matches — per Facu's
-    // feedback, waiting for 2+ characters felt like the picker was empty
-    // for no reason.
-    if (term.length < 1) { setSearchResults([]); setSearching(false); return; }
 
     let active = true;
     setSearching(true);
     const t = setTimeout(async () => {
-      const { data } = await supabase
+      let query = supabase
         .from("mechanics")
         .select("id, name, email, workshop_name, photo_url")
         .neq("id", mechanicId)
-        .or(`name.ilike.*${term}*,email.ilike.*${term}*,workshop_name.ilike.*${term}*`)
         .limit(8);
-      if (active) { setSearchResults((data as MechanicInfo[]) ?? []); setSearching(false); }
-    }, 300);
+
+      // Empty box: just browse — show some other Maintlers on the
+      // platform rather than a blank "type something" placeholder, per
+      // Facu's feedback that the picker should surface options quickly.
+      query = term.length >= 1
+        ? query.or(`name.ilike.*${term}*,email.ilike.*${term}*,workshop_name.ilike.*${term}*`)
+        : query.order("created_at", { ascending: false });
+
+      const { data, error: searchErr } = await query;
+      if (active) {
+        if (searchErr) {
+          console.error("[team-chat] mechanic search error:", searchErr);
+          setSearchError(searchErr.message || "Search failed — check the browser console for details.");
+        } else {
+          setSearchError("");
+        }
+        setSearchResults((data as MechanicInfo[]) ?? []);
+        setSearching(false);
+      }
+    }, term.length >= 1 ? 300 : 0);
 
     return () => { active = false; clearTimeout(t); };
   }, [searchTerm, newChatOpen, mechanicId]);
@@ -866,14 +888,22 @@ export default function TeamChatPage() {
                 />
               </div>
               {connectionActionError && <p className="text-[11px] text-red-600 px-1">{connectionActionError}</p>}
+              {searchError && <p className="text-[11px] text-red-600 px-1">{searchError}</p>}
             </div>
+            {!searching && searchResults.length > 0 && (
+              <p className="px-5 pt-2.5 text-[10px] font-black uppercase tracking-wide text-zinc-400 shrink-0">
+                {searchTerm.trim().length < 1 ? "Other Maintlers on MaintlyQR" : "Results"}
+              </p>
+            )}
             <div className="flex-1 overflow-y-auto py-2">
-              {searchTerm.trim().length < 1 ? (
-                <p className="text-[12px] text-zinc-300 text-center py-10 px-5">Start typing a name, workshop or email to find a Maintler.</p>
-              ) : searching ? (
+              {searching ? (
                 <p className="text-[12px] text-zinc-300 text-center py-10">Searching…</p>
               ) : searchResults.length === 0 ? (
-                <p className="text-[12px] text-zinc-300 text-center py-10 px-5">No Maintlers found.</p>
+                <p className="text-[12px] text-zinc-300 text-center py-10 px-5">
+                  {searchTerm.trim().length < 1
+                    ? "No other Maintlers found on MaintlyQR yet."
+                    : "No Maintlers found."}
+                </p>
               ) : (
                 searchResults.map((m) => {
                   const conn = connectionFor(m.id);
