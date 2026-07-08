@@ -572,9 +572,16 @@ export default function QrCodesPage() {
               <button onClick={() => setPrintCodes(null)} className="text-zinc-400 hover:text-zinc-700 px-2"><X size={20} /></button>
             </div>
           </div>
-          <div className="p-8 grid grid-cols-2 sm:grid-cols-3 gap-8 max-w-4xl mx-auto">
+          {/* flex-wrap + justify-center instead of a CSS grid: with a grid,
+              a single code (or a partial last row) sits pinned to the first
+              cell — left-aligned inside the centered container — instead of
+              centered on the page, which read as "off to the side / cut
+              off" when printing just one code. Flex centers every row
+              (including a lone item or a short last row) regardless of
+              count. */}
+          <div className="p-8 flex flex-wrap justify-center gap-8 max-w-4xl mx-auto">
             {printRows.map((row) => (
-              <div key={row.code} className="flex flex-col items-center text-center gap-1.5 break-inside-avoid">
+              <div key={row.code} className="w-[180px] flex flex-col items-center text-center gap-1.5 break-inside-avoid">
                 <QrCodeCanvas code={row.code} theme={row.theme} size={130} />
                 <p className="text-[11px] font-mono font-bold text-zinc-800">{row.code}</p>
                 {row.label && <p className="text-[10px] text-zinc-500">{row.label}</p>}

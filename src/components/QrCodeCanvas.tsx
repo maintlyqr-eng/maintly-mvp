@@ -68,9 +68,20 @@ const QrCodeCanvas = forwardRef<QrCodeCanvasHandle, {
 
       const url = `${window.location.origin}/asset/${code}`;
 
+      // Render at higher internal resolution than the on-screen `size` —
+      // qr-code-styling's canvas bitmap is exactly width×height pixels, so
+      // rendering natively at a small `size` (a 24-65px QR is common now
+      // that framed themes size the QR to whatever fraction of the frame
+      // the icon's hole allows) looks visibly blocky/aliased. Rendering at
+      // RENDER_SCALE× and letting CSS display it at `size` gives the
+      // browser real pixels to downsample from, the same trick as a retina
+      // image — free sharpness, no layout change.
+      const RENDER_SCALE = 3;
+      const renderSize = Math.round(size * RENDER_SCALE);
+
       const qr = new QRCodeStyling({
-        width: size,
-        height: size,
+        width: renderSize,
+        height: renderSize,
         type: "canvas",
         data: url,
         image: def.options.logo ? "/images/qr-gear-real.png" : undefined,
@@ -83,6 +94,17 @@ const QrCodeCanvas = forwardRef<QrCodeCanvasHandle, {
 
       containerRef.current.innerHTML = "";
       qr.append(containerRef.current);
+
+      // The appended <canvas> carries renderSize as its actual width/height
+      // attributes (its pixel resolution) — constrain its CSS display size
+      // back down to `size` so the higher resolution buys sharpness, not a
+      // bigger footprint.
+      const canvasEl = containerRef.current.querySelector("canvas");
+      if (canvasEl) {
+        canvasEl.style.width = `${size}px`;
+        canvasEl.style.height = `${size}px`;
+      }
+
       qrRef.current = qr;
     }
 
@@ -188,13 +210,25 @@ const QrCodeCanvas = forwardRef<QrCodeCanvasHandle, {
   // Real illustrated-artwork frame (Facu's supplied PNGs, cropped to
   // transparent icons — see qrThemes.ts). frameHole marks, as fractions of
   // the source image's own width/height, where that image's pre-drawn white
-  // placeholder square sits. We size the whole image so the hole is exactly
-  // `size` px wide, then position the QR to land inside it, scaled down a
-  // hair (0.94) so it sits inside the hole rather than touching its edge.
+  // placeholder square sits.
+  //
+  // `size` is the overall frame width — NOT the hole width. It used to be
+  // sized so the *hole* was exactly `size` px wide (frameWidth = size /
+  // hole.w), but hole.w varies a lot between icons (a soccer ball's hole
+  // takes up ~54% of the image; a palm tree's only ~32%) — so the same
+  // `size` produced wildly different on-screen footprints per theme (a
+  // palm-tree card could render ~1.7x wider than a soccer-ball one at the
+  // identical `size`), which is what overflowed/collided with neighboring
+  // cards on the print sheet ("sale corrido / cortado"). Sizing the frame
+  // directly to `size` keeps every theme's footprint consistent for
+  // layout; the QR itself just ends up proportionally smaller inside icons
+  // with a smaller hole fraction, which only matters for this on-screen
+  // preview — the actual downloaded/printed export renders the QR at a
+  // fixed high resolution regardless (see download() below).
   if (def.frameImage && def.frameHole) {
     const hole = def.frameHole;
     const aspect = def.frameAspect ?? 1;
-    const frameWidth = Math.round(size / hole.w);
+    const frameWidth = size;
     const frameHeight = Math.round(frameWidth * aspect);
     const qrSize = Math.round(Math.min(hole.w * frameWidth, hole.h * frameHeight) * 0.94);
     const qrLeft = Math.round(hole.x * frameWidth + (hole.w * frameWidth - qrSize) / 2);

@@ -441,14 +441,14 @@ export const qrThemes: QrThemeDef[] = [
   {
     id: "gear-ring",
     name: "Gear Ring",
-    description: "A big illustrated cog frame — an industrial alternative to the small Maintly logo.",
+    description: "A big illustrated cog frame — an industrial alternative to the small Maintly logo. Black-and-red finder patterns for a bold, classic scan look.",
     category: "industry",
     frameImage: "/images/qr-frames/qr-gear-ring.png", frameAspect: 0.9788,
     frameHole: { x: 0.3178, y: 0.3203, w: 0.3686, h: 0.368 },
     options: {
-      dotsColor: "#18181b", dotsType: "classy", backgroundColor: "#ffffff",
-      cornersSquareColor: "#f97316", cornersSquareType: "square",
-      cornersDotColor: "#f97316", cornersDotType: "square", logo: false,
+      dotsColor: "#18181b", dotsType: "square", backgroundColor: "#ffffff",
+      cornersSquareColor: "#18181b", cornersSquareType: "square",
+      cornersDotColor: "#dc2626", cornersDotType: "square", logo: false,
     },
   },
   {
