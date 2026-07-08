@@ -160,6 +160,18 @@ function TeamChatPageInner() {
   const selectedIdRef = useRef<string | null>(null);
   useEffect(() => { selectedIdRef.current = selectedId; }, [selectedId]);
 
+  // Now that the thread pane scrolls internally instead of the whole page
+  // (see the h-screen layout fix above), it needs to actually land on the
+  // newest message on its own — otherwise opening a long conversation
+  // would show you the *oldest* messages first, which is arguably worse
+  // than the old scroll-the-whole-page behavior. Fires whenever the
+  // loaded thread changes (new conversation opened, or a message
+  // sent/received) and whenever the selected conversation changes.
+  const threadEndRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    threadEndRef.current?.scrollIntoView({ block: "end" });
+  }, [thread, selectedId]);
+
   async function loadConversations(myId: string) {
     setConversationsLoading(true);
     const { data } = await supabase
@@ -645,7 +657,21 @@ function TeamChatPageInner() {
   const selectedIsBlocked = !!(selectedId && blockedIds.has(selectedId));
 
   return (
-    <div className="min-h-screen bg-zinc-50 flex relative">
+    // Every other dashboard page uses min-h-screen (the whole page scrolls
+    // naturally, which is fine for lists/forms). Team Chat is the one page
+    // that needs the WhatsApp-style app-shell layout Facu asked for: "cada
+    // vez q escribo tengo q escrolear para ir a la barrita de escritura,
+    // esa deberia estar siempre fija." min-h-screen only sets a *minimum*
+    // height — it doesn't cap the page at the viewport, so once a
+    // conversation grew past one screen's worth of messages the whole
+    // page (not just the message list) got taller than the viewport, and
+    // reaching the compose bar meant scrolling the entire browser window.
+    // h-screen + overflow-hidden here pins the page to exactly the
+    // viewport height, so the inner `min-h-0` + `overflow-y-auto` message
+    // list (further down) is what scrolls, while the header, sidebar, and
+    // the compose bar at the bottom stay fixed in place — same shape as
+    // WhatsApp Web.
+    <div className="h-screen bg-zinc-50 flex relative overflow-hidden">
 
       {sidebarOpen && (
         <div className="md:hidden fixed inset-0 bg-black/40 z-30" onClick={() => setSidebarOpen(false)} />
@@ -662,7 +688,7 @@ function TeamChatPageInner() {
           </button>
         </div>
 
-        <nav className="flex-1 px-3 overflow-y-auto">
+        <nav className="flex-1 min-h-0 px-3 overflow-y-auto">
           {navItems.map((item) => (
             <Link
               key={item.label}
@@ -713,7 +739,7 @@ function TeamChatPageInner() {
       </aside>
 
       {/* ════ MAIN ════ */}
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className="flex-1 flex flex-col min-w-0 min-h-0">
 
         <header className="flex items-center justify-between gap-3 px-4 md:px-7 py-4 bg-white border-b border-zinc-200">
           <div className="flex items-center gap-3 min-w-0">
@@ -755,7 +781,7 @@ function TeamChatPageInner() {
         <div className="flex-1 flex min-h-0 p-4 md:p-7 gap-4">
 
           {/* ── Conversation list / Saved Maintlers ── */}
-          <div className={`${selectedId ? "hidden md:flex" : "flex"} w-full md:w-[320px] shrink-0 flex-col bg-white rounded-2xl border border-zinc-200 shadow-sm overflow-hidden`}>
+          <div className={`${selectedId ? "hidden md:flex" : "flex"} w-full md:w-[320px] shrink-0 flex-col bg-white rounded-2xl border border-zinc-200 shadow-sm overflow-hidden min-h-0`}>
             <div className="flex items-center gap-1 px-3 pt-3 shrink-0">
               <button
                 onClick={() => setActiveTab("chats")}
@@ -792,7 +818,7 @@ function TeamChatPageInner() {
               </button>
             </div>
 
-            <div className="flex-1 overflow-y-auto">
+            <div className="flex-1 min-h-0 overflow-y-auto">
               {activeTab === "chats" ? (
                 conversationsLoading ? (
                   <p className="text-[12px] text-zinc-300 text-center py-10">Loading…</p>
@@ -886,7 +912,7 @@ function TeamChatPageInner() {
           </div>
 
           {/* ── Thread ── */}
-          <div className={`${selectedId ? "flex" : "hidden md:flex"} flex-1 flex-col bg-white rounded-2xl border border-zinc-200 shadow-sm overflow-hidden min-w-0`}>
+          <div className={`${selectedId ? "flex" : "hidden md:flex"} flex-1 flex-col bg-white rounded-2xl border border-zinc-200 shadow-sm overflow-hidden min-w-0 min-h-0`}>
             {!selectedInfo ? (
               <div className="flex-1 flex flex-col items-center justify-center text-center px-6">
                 <div className="inline-flex items-center justify-center w-14 h-14 rounded-full border border-zinc-100 bg-zinc-50 mb-4">
@@ -1023,7 +1049,7 @@ function TeamChatPageInner() {
                   </div>
                 )}
 
-                <div className="flex-1 overflow-y-auto px-5 py-4 space-y-2.5 bg-zinc-50/40">
+                <div className="flex-1 min-h-0 overflow-y-auto px-5 py-4 space-y-2.5 bg-zinc-50/40">
                   {threadLoading ? (
                     <p className="text-[12px] text-zinc-300 text-center py-8">Loading…</p>
                   ) : thread.length === 0 ? (
@@ -1050,6 +1076,7 @@ function TeamChatPageInner() {
                       );
                     })
                   )}
+                  <div ref={threadEndRef} />
                 </div>
 
                 {selectedIsBlocked ? (
@@ -1112,7 +1139,7 @@ function TeamChatPageInner() {
               {savedActionError && <p className="text-[11px] text-red-600 px-1">{savedActionError}</p>}
               {searchError && <p className="text-[11px] text-red-600 px-1">{searchError}</p>}
             </div>
-            <div className="flex-1 overflow-y-auto py-2">
+            <div className="flex-1 min-h-0 overflow-y-auto py-2">
               {searchTerm.trim().length < MIN_SEARCH_LENGTH ? (
                 <p className="text-[12px] text-zinc-300 text-center py-10 px-5">Type at least {MIN_SEARCH_LENGTH} letters of a name, workshop or email to find a Maintler.</p>
               ) : searching ? (
