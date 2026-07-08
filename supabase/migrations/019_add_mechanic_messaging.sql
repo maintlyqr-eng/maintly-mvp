@@ -36,10 +36,19 @@ create index if not exists mechanic_messages_sender_idx on public.mechanic_messa
 
 alter table public.mechanic_messages enable row level security;
 
+-- drop-if-exists guards on every policy below: this migration got run once
+-- already (at least partially — Supabase errored on "policy already
+-- exists" when re-running the raw version), so make it idempotent the same
+-- way 021/022 already are, instead of asking Facu to hand-diff what's live.
+drop policy if exists "mechanic_messages: sender or recipient can read" on public.mechanic_messages;
 create policy "mechanic_messages: sender or recipient can read"
   on public.mechanic_messages for select
   using (auth.uid() = sender_id or auth.uid() = recipient_id);
 
+-- Note: this insert policy gets replaced again by migration 022 (adds the
+-- "unless blocked" condition) — the drop here just makes 019 itself safe
+-- to re-run; 022 is what actually needs to run last for blocking to work.
+drop policy if exists "mechanic_messages: insert only as yourself" on public.mechanic_messages;
 create policy "mechanic_messages: insert only as yourself"
   on public.mechanic_messages for insert
   with check (auth.uid() = sender_id);
@@ -50,6 +59,7 @@ create policy "mechanic_messages: insert only as yourself"
 -- copy. Column-level enforcement (e.g. a mechanic can't flip someone else's
 -- hidden flag) isn't modeled here, same tradeoff support_messages already
 -- makes — the row-level check is the real boundary, not the column.
+drop policy if exists "mechanic_messages: sender or recipient can update" on public.mechanic_messages;
 create policy "mechanic_messages: sender or recipient can update"
   on public.mechanic_messages for update
   using (auth.uid() = sender_id or auth.uid() = recipient_id);

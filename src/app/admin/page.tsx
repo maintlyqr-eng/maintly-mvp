@@ -9,7 +9,7 @@ import {
   Layers, Eye, EyeOff, Menu, X, Search,
   Ban, ShieldCheck, ShieldOff, Trash2, KeyRound, UserCog,
   UserPlus, UserMinus, Plus, Link2Off, ScanLine, ClipboardList,
-  LifeBuoy, Send, MessageCircle,
+  LifeBuoy, Send, MessageCircle, Flag,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { formatDateDMY } from "@/lib/date";
@@ -79,7 +79,7 @@ type UsageMetrics = {
   checkedAt: string;
 };
 
-type Section = "dashboard" | "accounts" | "mechanics" | "verifications" | "assets" | "services" | "qr" | "support";
+type Section = "dashboard" | "accounts" | "mechanics" | "verifications" | "assets" | "services" | "qr" | "support" | "team-chat";
 
 type SupportMessageRow = {
   id: string;
@@ -97,6 +97,45 @@ type SupportConversation = {
   messages: SupportMessageRow[];
   lastMessage: SupportMessageRow;
   unreadCount: number;
+};
+
+// Team Chat oversight — Facu's own words: "esto es una pagina profesional
+// y yo quiero tener control sobre los temas que se hablan". These rows
+// come from a service-role admin route (see /api/admin/mechanic-messages),
+// which deliberately ignores hidden_for_sender / hidden_for_recipient —
+// those are per-Maintler soft-delete flags, not real deletes, so the
+// Control Center can always see the full, unfiltered history.
+type MechanicChatInfo = { name: string; email: string; workshop_name: string | null };
+
+type MechanicMsgRow = {
+  id: string;
+  sender_id: string;
+  recipient_id: string;
+  body: string;
+  read: boolean;
+  hidden_for_sender: boolean;
+  hidden_for_recipient: boolean;
+  created_at: string;
+  sender: MechanicChatInfo | null;
+  recipient: MechanicChatInfo | null;
+};
+
+type MechanicConversation = {
+  pairKey: string;
+  a: { id: string; info: MechanicChatInfo | null };
+  b: { id: string; info: MechanicChatInfo | null };
+  messages: MechanicMsgRow[];
+  lastMessage: MechanicMsgRow;
+};
+
+type MechanicReportRow = {
+  id: string;
+  reporter_id: string;
+  reported_id: string;
+  reason: string | null;
+  created_at: string;
+  reporter: { name: string; email: string } | null;
+  reported: { name: string; email: string } | null;
 };
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -327,6 +366,14 @@ export default function AdminPage() {
   const [threadSending, setThreadSending] = useState(false);
   const [confirmClearThread, setConfirmClearThread] = useState(false);
 
+  // ── Team Chat oversight (mechanic <-> mechanic, read-only for admin) ──
+  const [teamChatView, setTeamChatView] = useState<"conversations" | "reports">("conversations");
+  const [teamChatMessages, setTeamChatMessages] = useState<MechanicMsgRow[]>([]);
+  const [teamChatLoading, setTeamChatLoading] = useState(true);
+  const [selectedTeamChatPair, setSelectedTeamChatPair] = useState<string | null>(null);
+  const [mechanicReports, setMechanicReports] = useState<MechanicReportRow[]>([]);
+  const [mechanicReportsLoading, setMechanicReportsLoading] = useState(true);
+
   // ── Assets UI state ──
   const [assetSearch, setAssetSearch] = useState("");
 
@@ -507,6 +554,62 @@ export default function AdminPage() {
     return conversations.sort((a, b) => b.lastMessage.created_at.localeCompare(a.lastMessage.created_at));
   }, [supportMessages]);
 
+  async function loadTeamChatMessages() {
+    setTeamChatLoading(true);
+    try {
+      const res = await fetch("/api/admin/mechanic-messages");
+      const data = await res.json().catch(() => ({}));
+      setTeamChatMessages((data.messages as MechanicMsgRow[]) ?? []);
+    } finally {
+      setTeamChatLoading(false);
+    }
+  }
+
+  async function loadMechanicReports() {
+    setMechanicReportsLoading(true);
+    try {
+      const res = await fetch("/api/admin/mechanic-reports");
+      const data = await res.json().catch(() => ({}));
+      setMechanicReports((data.reports as MechanicReportRow[]) ?? []);
+    } finally {
+      setMechanicReportsLoading(false);
+    }
+  }
+
+  // Grouped by unordered pair (sorted id pair joined into one key) rather
+  // than by a single "mechanic_id" the way support conversations are,
+  // since here BOTH sides are ordinary Maintlers — there's no fixed
+  // counterparty to key off of the way "the admin" works for Support.
+  const teamChatConversations: MechanicConversation[] = useMemo(() => {
+    const byPair = new Map<string, MechanicMsgRow[]>();
+    for (const m of teamChatMessages) {
+      const pairKey = [m.sender_id, m.recipient_id].sort().join("|");
+      const list = byPair.get(pairKey) ?? [];
+      list.push(m);
+      byPair.set(pairKey, list);
+    }
+    const conversations: MechanicConversation[] = [];
+    for (const [pairKey, msgs] of byPair) {
+      const sorted = [...msgs].sort((a, b) => a.created_at.localeCompare(b.created_at));
+      const last = sorted[sorted.length - 1];
+      conversations.push({
+        pairKey,
+        a: { id: last.sender_id, info: last.sender },
+        b: { id: last.recipient_id, info: last.recipient },
+        messages: sorted,
+        lastMessage: last,
+      });
+    }
+    return conversations.sort((x, y) => y.lastMessage.created_at.localeCompare(x.lastMessage.created_at));
+  }, [teamChatMessages]);
+
+  const activeTeamChatThread = teamChatConversations.find((c) => c.pairKey === selectedTeamChatPair) ?? null;
+
+  function teamChatPersonLabel(m: MechanicMsgRow, id: string): string {
+    const info = id === m.sender_id ? m.sender : id === m.recipient_id ? m.recipient : null;
+    return info?.workshop_name || info?.name || info?.email || "Unknown Maintler";
+  }
+
   const activeThread = supportConversations.find((c) => c.mechanicId === selectedThreadMechanic) ?? null;
 
   async function openThread(mechanicId: string) {
@@ -588,6 +691,16 @@ export default function AdminPage() {
   useEffect(() => {
     if (section === "support" && adminAuthed) {
       loadSupportMessages();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [section, adminAuthed]);
+
+  // Same lazy-refetch-on-open pattern as Support, for the Team Chat
+  // oversight tab (both the conversation list and the reports list).
+  useEffect(() => {
+    if (section === "team-chat" && adminAuthed) {
+      loadTeamChatMessages();
+      loadMechanicReports();
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [section, adminAuthed]);
@@ -893,10 +1006,11 @@ export default function AdminPage() {
     { id: "services",  label: "Services",  icon: ClipboardList },
     { id: "qr",        label: "QR Manager", icon: QrCode   },
     { id: "support",   label: "Support",   icon: LifeBuoy  },
+    { id: "team-chat", label: "Team Chat", icon: MessageCircle },
   ];
   const sectionLabels: Record<Section, string> = {
     dashboard: "Dashboard", accounts: "Accounts", mechanics: "Mechanics", verifications: "Verifications",
-    assets: "Assets", services: "Services", qr: "QR Manager", support: "Support",
+    assets: "Assets", services: "Services", qr: "QR Manager", support: "Support", "team-chat": "Team Chat",
   };
   const unreadSupportCount = supportMessages.filter((m) => !m.from_admin && !m.read).length;
 
@@ -947,6 +1061,13 @@ export default function AdminPage() {
                   section === id ? "bg-white text-red-600" : "bg-amber-500 text-white"
                 }`}>
                   {pendingVerifications.length}
+                </span>
+              )}
+              {id === "team-chat" && mechanicReports.length > 0 && (
+                <span className={`ml-auto text-[10px] font-black px-1.5 py-0.5 rounded-full leading-none ${
+                  section === id ? "bg-white text-red-600" : "bg-amber-500 text-white"
+                }`}>
+                  {mechanicReports.length}
                 </span>
               )}
             </button>
@@ -1648,6 +1769,167 @@ export default function AdminPage() {
                           >
                             <Send size={13} />
                           </button>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {section === "team-chat" && (
+            <div className="space-y-3">
+              <p className="text-[12px] text-zinc-400">
+                Every Maintler-to-Maintler message on Team Chat, including ones a Maintler has cleared from their own view — nothing here is ever actually deleted, only hidden per-side. Read-only: the Control Center doesn't post into these threads.
+              </p>
+
+              <div className="flex items-center gap-1 bg-white rounded-xl border border-zinc-200/80 p-1 w-fit">
+                <button
+                  onClick={() => setTeamChatView("conversations")}
+                  className={`px-3 py-1.5 rounded-lg text-[12px] font-bold transition-colors ${
+                    teamChatView === "conversations" ? "bg-red-600 text-white" : "text-zinc-500 hover:bg-zinc-100"
+                  }`}
+                >
+                  Conversations
+                </button>
+                <button
+                  onClick={() => setTeamChatView("reports")}
+                  className={`px-3 py-1.5 rounded-lg text-[12px] font-bold transition-colors flex items-center gap-1.5 ${
+                    teamChatView === "reports" ? "bg-red-600 text-white" : "text-zinc-500 hover:bg-zinc-100"
+                  }`}
+                >
+                  <Flag size={12} /> Reports
+                  {mechanicReports.length > 0 && (
+                    <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-full leading-none ${
+                      teamChatView === "reports" ? "bg-white text-red-600" : "bg-amber-500 text-white"
+                    }`}>
+                      {mechanicReports.length}
+                    </span>
+                  )}
+                </button>
+              </div>
+
+              {teamChatView === "reports" ? (
+                mechanicReportsLoading ? (
+                  <div className="bg-white rounded-2xl border border-zinc-200/80 shadow-sm py-16 text-center text-[13px] text-zinc-300">
+                    Loading…
+                  </div>
+                ) : mechanicReports.length === 0 ? (
+                  <div className="bg-white rounded-2xl border border-zinc-200/80 shadow-sm py-16 text-center">
+                    <Flag size={28} className="mx-auto text-zinc-200 mb-2" />
+                    <p className="text-[13px] text-zinc-300 font-medium">No reports filed.</p>
+                  </div>
+                ) : (
+                  <div className="bg-white rounded-2xl border border-zinc-200/80 shadow-sm divide-y divide-zinc-50">
+                    {mechanicReports.map((r) => {
+                      const pairKey = [r.reporter_id, r.reported_id].sort().join("|");
+                      const hasThread = teamChatConversations.some((c) => c.pairKey === pairKey);
+                      return (
+                        <div key={r.id} className="px-5 py-4 flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="text-[12.5px] font-bold text-zinc-900">
+                              {r.reporter?.name ?? "Unknown"} <span className="font-normal text-zinc-400">reported</span> {r.reported?.name ?? "Unknown"}
+                            </p>
+                            <p className="text-[11px] text-zinc-400 mt-0.5">{r.reporter?.email} → {r.reported?.email}</p>
+                            {r.reason && <p className="text-[12px] text-zinc-600 mt-1.5 bg-amber-50 border border-amber-100 rounded-lg px-2.5 py-1.5">{r.reason}</p>}
+                            <p className="text-[10.5px] text-zinc-300 mt-1.5">{formatDate(r.created_at)} · {formatTime(r.created_at)}</p>
+                          </div>
+                          {hasThread && (
+                            <button
+                              onClick={() => { setTeamChatView("conversations"); setSelectedTeamChatPair(pairKey); }}
+                              className="text-[11px] font-bold text-red-600 hover:text-red-700 shrink-0 whitespace-nowrap"
+                            >
+                              View conversation
+                            </button>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )
+              ) : teamChatLoading ? (
+                <div className="bg-white rounded-2xl border border-zinc-200/80 shadow-sm py-16 text-center text-[13px] text-zinc-300">
+                  Loading…
+                </div>
+              ) : teamChatConversations.length === 0 ? (
+                <div className="bg-white rounded-2xl border border-zinc-200/80 shadow-sm py-16 text-center">
+                  <MessageCircle size={28} className="mx-auto text-zinc-200 mb-2" />
+                  <p className="text-[13px] text-zinc-300 font-medium">No Team Chat conversations yet.</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-[300px_1fr] gap-4 h-[calc(100vh-260px)] min-h-[420px]">
+                  {/* Conversation list */}
+                  <div className={`bg-white rounded-2xl border border-zinc-200/80 shadow-sm overflow-y-auto ${activeTeamChatThread ? "hidden md:block" : ""}`}>
+                    {teamChatConversations.map((c) => (
+                      <button
+                        key={c.pairKey}
+                        onClick={() => setSelectedTeamChatPair(c.pairKey)}
+                        className={`w-full flex items-start gap-2.5 px-4 py-3.5 text-left border-b border-zinc-50 transition-colors ${
+                          selectedTeamChatPair === c.pairKey ? "bg-red-50" : "hover:bg-zinc-50"
+                        }`}
+                      >
+                        <div className="min-w-0 flex-1">
+                          <p className="text-[12px] font-bold text-zinc-900 truncate">
+                            {c.a.info?.name ?? "Unknown"} <span className="font-normal text-zinc-400">↔</span> {c.b.info?.name ?? "Unknown"}
+                          </p>
+                          <div className="flex items-center justify-between gap-2 mt-0.5">
+                            <p className="text-[11.5px] text-zinc-400 truncate">{teamChatPersonLabel(c.lastMessage, c.lastMessage.sender_id)}: {c.lastMessage.body}</p>
+                            <span className="text-[10px] text-zinc-300 shrink-0">{formatDate(c.lastMessage.created_at)}</span>
+                          </div>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Thread */}
+                  <div className="bg-white rounded-2xl border border-zinc-200/80 shadow-sm flex flex-col overflow-hidden">
+                    {!activeTeamChatThread ? (
+                      <div className="flex-1 flex items-center justify-center text-center px-6">
+                        <p className="text-[12px] text-zinc-300">Pick a conversation to see the full history.</p>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="flex items-center gap-2 px-5 py-3.5 border-b border-zinc-100">
+                          <button onClick={() => setSelectedTeamChatPair(null)} className="md:hidden text-zinc-400 hover:text-zinc-700 mr-1">
+                            <X size={16} />
+                          </button>
+                          <div className="min-w-0 flex-1">
+                            <p className="text-[13px] font-bold text-zinc-900 truncate">
+                              {activeTeamChatThread.a.info?.name ?? "Unknown"} ↔ {activeTeamChatThread.b.info?.name ?? "Unknown"}
+                            </p>
+                            <p className="text-[11px] text-zinc-400 truncate">{activeTeamChatThread.a.info?.email} · {activeTeamChatThread.b.info?.email}</p>
+                          </div>
+                        </div>
+
+                        <div className="flex-1 overflow-y-auto px-5 py-4 space-y-2.5 bg-zinc-50/40">
+                          {activeTeamChatThread.messages.map((m, i) => {
+                            const prev = activeTeamChatThread.messages[i - 1];
+                            const showLabel = !prev || prev.sender_id !== m.sender_id;
+                            const isA = m.sender_id === activeTeamChatThread.a.id;
+                            const hiddenNote = [
+                              m.hidden_for_sender ? "cleared by sender" : null,
+                              m.hidden_for_recipient ? "cleared by recipient" : null,
+                            ].filter(Boolean).join(", ");
+                            return (
+                              <div key={m.id} className={`flex flex-col ${isA ? "items-start" : "items-end"}`}>
+                                {showLabel && (
+                                  <p className="text-[10px] font-black uppercase tracking-wide mb-1 px-1 text-zinc-400">
+                                    {teamChatPersonLabel(m, m.sender_id)}
+                                  </p>
+                                )}
+                                <div className={`max-w-[80%] rounded-2xl px-3.5 py-2.5 text-[12.5px] leading-snug ${
+                                  isA ? "bg-white border border-zinc-200 text-zinc-700 rounded-bl-sm" : "bg-red-600 text-white rounded-br-sm"
+                                }`}>
+                                  <p className="whitespace-pre-wrap break-words">{m.body}</p>
+                                  <p className={`text-[9.5px] mt-1 ${isA ? "text-zinc-300" : "text-red-100"}`}>
+                                    {formatDate(m.created_at)} · {formatTime(m.created_at)}
+                                    {hiddenNote && ` · ${hiddenNote}`}
+                                  </p>
+                                </div>
+                              </div>
+                            );
+                          })}
                         </div>
                       </>
                     )}

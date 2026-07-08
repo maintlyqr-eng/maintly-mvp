@@ -2,13 +2,13 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   LayoutGrid, FileText, Box, QrCode, Users, BarChart3, Calendar as CalendarIcon,
   Mail, FolderOpen, Settings, Bell, X, LogOut, Crown, Menu,
   MessageCircle, Search, Send, Trash2, ArrowLeft, Plus, UserCircle2,
-  UserPlus, Check,
+  Star, Ban, Flag,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import HoverAvatar from "@/components/HoverAvatar";
@@ -22,9 +22,20 @@ import { formatDateDMY } from "@/lib/date";
 // bubble/soft-delete/mark-read conventions, but unlike that widget there's
 // no fixed single counterparty ("the admin") to imply here, so this page
 // adds a real conversation list plus a mechanic-search picker to start new
-// threads (mechanics are publicly SELECT-able per the "mechanics: lectura
-// pública" RLS policy, so the picker queries mechanics directly — no new
-// API route needed).
+// threads (mechanics are publicly SELECT-able per RLS on public.mechanics,
+// so the picker queries mechanics directly — no new API route needed).
+//
+// Messaging is deliberately OPEN — any Maintler can write to any other
+// Maintler, no approval step. Facu's own words on why the first version
+// (a mutual request/accept "Connections" model) was wrong: "uno tiene que
+// primero enviarle solicitud para que se habilite el chat y eso no me
+// gusta... deberia uno poder escribirle derecho nomas y poder agregarlo
+// como amigo". So "saving" a Maintler is now a one-directional, instant
+// bookmark (see maintler_saved_contacts, migration 022) — not a
+// relationship the other person has to approve. The actual answer to "I
+// don't want messages from this person" is Block (enforced for real at
+// the database level, see the mechanic_messages insert policy in the same
+// migration) and Report (flows into the Admin Control Center).
 
 const navItems = [
   { icon: LayoutGrid, label: "Dashboard", href: "/dashboard" },
@@ -66,28 +77,16 @@ type ConversationSummary = {
   unread: number;
 };
 
-// Maintler Connections — a curated, mutual "trusted network" list, separate
-// from being able to message someone (any Maintler can message any other
-// Maintler already, no gate). This is the foundation for Item 4 in the
-// backlog: identity, belonging, a real community — and eventually the gate
-// that decides who you're even allowed to offer an asset transfer to, so
-// equipment only ever changes hands inside a relationship both sides agreed
-// to, never with a stranger.
-type ConnectionStatus = "pending" | "accepted" | "declined";
-
-type ConnectionRow = {
+type SavedContactRow = {
   id: string;
-  requester_id: string;
-  addressee_id: string;
-  status: ConnectionStatus;
+  owner_id: string;
+  saved_id: string;
   created_at: string;
 };
 
-type ConnectionSummary = {
+type SavedContact = {
   id: string;
-  otherParty: MechanicInfo;
-  direction: "incoming" | "outgoing";
-  status: ConnectionStatus;
+  contact: MechanicInfo;
   createdAt: string;
 };
 
@@ -138,9 +137,26 @@ export default function TeamChatPage() {
   const [searchError, setSearchError] = useState("");
 
   const [activeTab, setActiveTab] = useState<"chats" | "network">("chats");
-  const [connections, setConnections] = useState<ConnectionSummary[]>([]);
-  const [connectionsLoading, setConnectionsLoading] = useState(true);
-  const [connectionActionError, setConnectionActionError] = useState("");
+  const [savedContacts, setSavedContacts] = useState<SavedContact[]>([]);
+  const [savedContactsLoading, setSavedContactsLoading] = useState(true);
+  const [savedActionError, setSavedActionError] = useState("");
+
+  const [blockedIds, setBlockedIds] = useState<Set<string>>(new Set());
+  const [confirmBlock, setConfirmBlock] = useState(false);
+  const [blockActionError, setBlockActionError] = useState("");
+
+  const [reportOpen, setReportOpen] = useState(false);
+  const [reportReason, setReportReason] = useState("");
+  const [reportSending, setReportSending] = useState(false);
+  const [reportSent, setReportSent] = useState(false);
+  const [reportError, setReportError] = useState("");
+
+  // Realtime message-event callbacks are registered once (see the
+  // subscription effect below) and would otherwise close over stale state
+  // from whichever render they were created in. A ref always reads the
+  // latest selected conversation without re-subscribing on every click.
+  const selectedIdRef = useRef<string | null>(null);
+  useEffect(() => { selectedIdRef.current = selectedId; }, [selectedId]);
 
   async function loadConversations(myId: string) {
     setConversationsLoading(true);
@@ -198,20 +214,20 @@ export default function TeamChatPage() {
     setConversationsLoading(false);
   }
 
-  async function loadConnections(myId: string) {
-    setConnectionsLoading(true);
+  async function loadSavedContacts(myId: string) {
+    setSavedContactsLoading(true);
     const { data } = await supabase
-      .from("maintler_connections")
-      .select("id, requester_id, addressee_id, status, created_at")
-      .or(`requester_id.eq.${myId},addressee_id.eq.${myId}`)
+      .from("maintler_saved_contacts")
+      .select("id, owner_id, saved_id, created_at")
+      .eq("owner_id", myId)
       .order("created_at", { ascending: false });
 
-    const rows = (data as ConnectionRow[]) ?? [];
-    const ids = Array.from(new Set(rows.map((r) => (r.requester_id === myId ? r.addressee_id : r.requester_id))));
+    const rows = (data as SavedContactRow[]) ?? [];
+    const ids = rows.map((r) => r.saved_id);
 
     if (ids.length === 0) {
-      setConnections([]);
-      setConnectionsLoading(false);
+      setSavedContacts([]);
+      setSavedContactsLoading(false);
       return;
     }
 
@@ -224,52 +240,96 @@ export default function TeamChatPage() {
 
     const list = rows
       .map((r) => {
-        const otherId = r.requester_id === myId ? r.addressee_id : r.requester_id;
-        const info = infoById.get(otherId);
-        if (!info) return null;
-        return {
-          id: r.id,
-          otherParty: info,
-          direction: (r.requester_id === myId ? "outgoing" : "incoming") as "incoming" | "outgoing",
-          status: r.status,
-          createdAt: r.created_at,
-        };
+        const info = infoById.get(r.saved_id);
+        return info ? { id: r.id, contact: info, createdAt: r.created_at } : null;
       })
-      .filter((x): x is ConnectionSummary => !!x);
+      .filter((x): x is SavedContact => !!x);
 
-    setConnections(list);
-    setConnectionsLoading(false);
+    setSavedContacts(list);
+    setSavedContactsLoading(false);
   }
 
-  function connectionFor(id: string): ConnectionSummary | undefined {
-    return connections.find((c) => c.otherParty.id === id);
+  async function loadBlocks(myId: string) {
+    const { data } = await supabase
+      .from("maintler_blocks")
+      .select("blocked_id")
+      .eq("blocker_id", myId);
+    setBlockedIds(new Set(((data as { blocked_id: string }[]) ?? []).map((r) => r.blocked_id)));
   }
 
-  async function sendConnectionRequest(target: MechanicInfo) {
-    setConnectionActionError("");
+  function isSaved(id: string) {
+    return savedContacts.some((c) => c.contact.id === id);
+  }
+
+  async function saveContact(target: MechanicInfo) {
+    setSavedActionError("");
     const { data, error: err } = await supabase
-      .from("maintler_connections")
-      .insert({ requester_id: mechanicId, addressee_id: target.id, status: "pending" })
-      .select("id, requester_id, addressee_id, status, created_at");
+      .from("maintler_saved_contacts")
+      .insert({ owner_id: mechanicId, saved_id: target.id })
+      .select("id, owner_id, saved_id, created_at");
     if (err || !data || data.length === 0) {
-      setConnectionActionError("Couldn't send the connection request. Try again.");
+      setSavedActionError("Couldn't save this Maintler. Try again.");
       return;
     }
-    const row = data[0] as ConnectionRow;
-    setConnections((prev) => [{ id: row.id, otherParty: target, direction: "outgoing", status: "pending", createdAt: row.created_at }, ...prev]);
+    const row = data[0] as SavedContactRow;
+    setSavedContacts((prev) => [{ id: row.id, contact: target, createdAt: row.created_at }, ...prev]);
   }
 
-  async function respondToConnection(conn: ConnectionSummary, accept: boolean) {
-    const newStatus: ConnectionStatus = accept ? "accepted" : "declined";
-    setConnections((prev) =>
-      accept ? prev.map((c) => (c.id === conn.id ? { ...c, status: newStatus } : c)) : prev.filter((c) => c.id !== conn.id)
-    );
-    await supabase.from("maintler_connections").update({ status: newStatus, responded_at: new Date().toISOString() }).eq("id", conn.id);
+  async function unsaveContactByTargetId(targetId: string) {
+    const existing = savedContacts.find((c) => c.contact.id === targetId);
+    setSavedContacts((prev) => prev.filter((c) => c.contact.id !== targetId));
+    if (existing) {
+      await supabase.from("maintler_saved_contacts").delete().eq("id", existing.id);
+    } else {
+      await supabase.from("maintler_saved_contacts").delete().eq("owner_id", mechanicId).eq("saved_id", targetId);
+    }
   }
 
-  async function removeConnection(conn: ConnectionSummary) {
-    setConnections((prev) => prev.filter((c) => c.id !== conn.id));
-    await supabase.from("maintler_connections").delete().eq("id", conn.id);
+  async function toggleSaved(target: MechanicInfo) {
+    if (isSaved(target.id)) {
+      await unsaveContactByTargetId(target.id);
+    } else {
+      await saveContact(target);
+    }
+  }
+
+  async function handleBlock(targetId: string) {
+    setBlockActionError("");
+    setConfirmBlock(false);
+    const { error: err } = await supabase.from("maintler_blocks").insert({ blocker_id: mechanicId, blocked_id: targetId });
+    if (err) {
+      setBlockActionError("Couldn't block this Maintler. Try again.");
+      return;
+    }
+    setBlockedIds((prev) => new Set(prev).add(targetId));
+  }
+
+  async function handleUnblock(targetId: string) {
+    setBlockActionError("");
+    setBlockedIds((prev) => {
+      const next = new Set(prev);
+      next.delete(targetId);
+      return next;
+    });
+    await supabase.from("maintler_blocks").delete().eq("blocker_id", mechanicId).eq("blocked_id", targetId);
+  }
+
+  async function handleSubmitReport() {
+    if (!selectedId) return;
+    setReportSending(true);
+    setReportError("");
+    const { error: err } = await supabase
+      .from("mechanic_reports")
+      .insert({ reporter_id: mechanicId, reported_id: selectedId, reason: reportReason.trim() || null });
+    setReportSending(false);
+    if (err) {
+      setReportError("Couldn't send the report. Try again.");
+      return;
+    }
+    setReportOpen(false);
+    setReportReason("");
+    setReportSent(true);
+    setTimeout(() => setReportSent(false), 4000);
   }
 
   useEffect(() => {
@@ -288,7 +348,8 @@ export default function TeamChatPage() {
       if (active && mechanic) { setMechanicName(mechanic.name); setMechanicPhoto(mechanic.photo_url ?? ""); }
 
       await loadConversations(session.user.id);
-      await loadConnections(session.user.id);
+      await loadSavedContacts(session.user.id);
+      await loadBlocks(session.user.id);
       if (active) setCheckingAuth(false);
     }
 
@@ -300,6 +361,73 @@ export default function TeamChatPage() {
 
     return () => { active = false; listener.subscription.unsubscribe(); };
   }, [router]);
+
+  // Live delivery — Facu's feedback: Team Chat felt dead, needing a manual
+  // refresh to see anything new. This subscribes to Supabase Realtime for
+  // messages landing in MY inbox: if the sender is the conversation
+  // currently open, append it straight into the thread and mark it read
+  // immediately (the thread is visibly open, so there's nothing to leave
+  // unread); otherwise bump that conversation's unread count and preview
+  // (or add a brand-new conversation entry if this is the first message
+  // from someone who isn't in the list yet).
+  useEffect(() => {
+    if (!mechanicId) return;
+
+    const channel = supabase
+      .channel(`team-chat-incoming-${mechanicId}`)
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "mechanic_messages", filter: `recipient_id=eq.${mechanicId}` },
+        (payload) => {
+          const m = payload.new as MsgRow;
+          const threadIsOpen = selectedIdRef.current === m.sender_id;
+
+          if (threadIsOpen) {
+            setThread((prev) => [...prev, { ...m, read: true }]);
+            supabase.from("mechanic_messages").update({ read: true }).eq("id", m.id);
+          }
+
+          setConversations((prev) => {
+            const idx = prev.findIndex((c) => c.counterparty.id === m.sender_id);
+            if (idx === -1) {
+              // First message ever from this person — fetch their info
+              // async and splice them into the list once it resolves.
+              supabase
+                .from("mechanics")
+                .select("id, name, email, workshop_name, photo_url")
+                .eq("id", m.sender_id)
+                .single()
+                .then(({ data: info }) => {
+                  if (!info) return;
+                  setConversations((p2) => {
+                    if (p2.some((c) => c.counterparty.id === m.sender_id)) return p2;
+                    return [{
+                      counterparty: info as MechanicInfo,
+                      lastBody: m.body,
+                      lastAt: m.created_at,
+                      lastFromMe: false,
+                      unread: threadIsOpen ? 0 : 1,
+                    }, ...p2];
+                  });
+                });
+              return prev;
+            }
+            const next = [...prev];
+            const [moved] = next.splice(idx, 1);
+            return [{
+              ...moved,
+              lastBody: m.body,
+              lastAt: m.created_at,
+              lastFromMe: false,
+              unread: threadIsOpen ? 0 : moved.unread + 1,
+            }, ...next];
+          });
+        }
+      )
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, [mechanicId]);
 
   // Maintler search for starting a new conversation, debounced. Guards
   // against special characters (",", "(", ")", "*") in the term breaking
@@ -313,15 +441,11 @@ export default function TeamChatPage() {
   // here silently searched for literal percent signs and never matched
   // anything.
   //
-  // The "browse everyone with an empty box" behavior tried right after
-  // fixing the RLS read issue is now REMOVED per Facu's own follow-up
-  // feedback: it worked (confirmed RLS was the real bug), but showing
-  // every single Maintler on the platform the moment the modal opens
-  // doesn't scale once there are hundreds/thousands of them — a search
-  // box that dumps its entire backing table is a UX problem waiting to
-  // happen. Back to requiring a minimum length before querying at all,
-  // just a slightly more generous one (3 chars) than the very first
-  // version (which required 2).
+  // No "browse everyone with an empty box" — tried that right after fixing
+  // the RLS read issue, but Facu's own follow-up feedback was that dumping
+  // every Maintler on the platform the moment the modal opens doesn't
+  // scale once there are hundreds/thousands of them. Requires a minimum
+  // length before querying at all.
   const MIN_SEARCH_LENGTH = 3;
 
   useEffect(() => {
@@ -370,6 +494,10 @@ export default function TeamChatPage() {
     setThreadLoading(true);
     setComposeError("");
     setConfirmDeleteThread(false);
+    setConfirmBlock(false);
+    setReportOpen(false);
+    setReportReason("");
+    setReportError("");
 
     const { data } = await supabase
       .from("mechanic_messages")
@@ -416,7 +544,15 @@ export default function TeamChatPage() {
       .select("id, sender_id, recipient_id, body, read, created_at");
     setSending(false);
     if (err || !data || data.length === 0) {
-      setComposeError("Couldn't send your message. Try again.");
+      // A blocked pair fails this insert at the RLS level (see migration
+      // 022) — the raw Postgrest error is a generic policy-violation
+      // message, so show something a Maintler would actually understand
+      // instead of the SQL wording.
+      setComposeError(
+        err && /row-level security|policy/i.test(err.message ?? "")
+          ? "This message couldn't be delivered."
+          : "Couldn't send your message. Try again."
+      );
       return;
     }
     const newMsg = data[0] as MsgRow;
@@ -456,9 +592,7 @@ export default function TeamChatPage() {
 
   const initials = initialsOf(mechanicName, mechanicEmail) || "ME";
   const totalUnread = conversations.reduce((sum, c) => sum + c.unread, 0);
-  const incomingPending = connections.filter((c) => c.direction === "incoming" && c.status === "pending");
-  const outgoingPending = connections.filter((c) => c.direction === "outgoing" && c.status === "pending");
-  const acceptedConnections = connections.filter((c) => c.status === "accepted");
+  const selectedIsBlocked = !!(selectedId && blockedIds.has(selectedId));
 
   return (
     <div className="min-h-screen bg-zinc-50 flex relative">
@@ -570,7 +704,7 @@ export default function TeamChatPage() {
 
         <div className="flex-1 flex min-h-0 p-4 md:p-7 gap-4">
 
-          {/* ── Conversation list / Network ── */}
+          {/* ── Conversation list / Saved Maintlers ── */}
           <div className={`${selectedId ? "hidden md:flex" : "flex"} w-full md:w-[320px] shrink-0 flex-col bg-white rounded-2xl border border-zinc-200 shadow-sm overflow-hidden`}>
             <div className="flex items-center gap-1 px-3 pt-3 shrink-0">
               <button
@@ -590,10 +724,7 @@ export default function TeamChatPage() {
                   activeTab === "network" ? "bg-red-50 text-red-600" : "text-zinc-400 hover:bg-zinc-50"
                 }`}
               >
-                <Users size={13} /> My Network
-                {incomingPending.length > 0 && (
-                  <span className="bg-red-600 text-white text-[9px] font-black rounded-full min-w-[15px] h-[15px] flex items-center justify-center px-1">{incomingPending.length}</span>
-                )}
+                <Star size={13} /> My Maintlers
               </button>
             </div>
 
@@ -601,7 +732,7 @@ export default function TeamChatPage() {
               <p className="text-[11.5px] text-zinc-400">
                 {activeTab === "chats"
                   ? `${conversations.length} conversation${conversations.length !== 1 ? "s" : ""}`
-                  : `${acceptedConnections.length} connected Maintler${acceptedConnections.length !== 1 ? "s" : ""}`}
+                  : `${savedContacts.length} saved Maintler${savedContacts.length !== 1 ? "s" : ""}`}
               </p>
               <button
                 onClick={() => setNewChatOpen(true)}
@@ -643,6 +774,7 @@ export default function TeamChatPage() {
                         <div className="flex items-center gap-1.5">
                           {c.unread > 0 && <span className="w-1.5 h-1.5 rounded-full bg-red-600 shrink-0" />}
                           <p className="text-[12.5px] font-bold text-zinc-800 truncate">{displayName(c.counterparty)}</p>
+                          {isSaved(c.counterparty.id) && <Star size={10} className="text-amber-400 fill-amber-400 shrink-0" />}
                         </div>
                         <p className={`text-[11.5px] truncate ${c.unread > 0 ? "text-zinc-600 font-medium" : "text-zinc-400"}`}>
                           {c.lastFromMe ? "You: " : ""}{c.lastBody}
@@ -657,106 +789,48 @@ export default function TeamChatPage() {
                     </button>
                   ))
                 )
-              ) : connectionsLoading ? (
+              ) : savedContactsLoading ? (
                 <p className="text-[12px] text-zinc-300 text-center py-10">Loading…</p>
-              ) : incomingPending.length === 0 && acceptedConnections.length === 0 && outgoingPending.length === 0 ? (
+              ) : savedContacts.length === 0 ? (
                 <div className="text-center py-12 px-5">
                   <div className="inline-flex items-center justify-center w-11 h-11 rounded-full border border-zinc-100 bg-zinc-50 mb-3">
-                    <Users size={18} className="text-zinc-300" />
+                    <Star size={18} className="text-zinc-300" />
                   </div>
-                  <p className="text-[12px] text-zinc-400 mb-1">No Maintlers in your network yet.</p>
-                  <p className="text-[11px] text-zinc-300">Find a Maintler above and connect — your network is who you'll be able to hand off equipment to.</p>
+                  <p className="text-[12px] text-zinc-400 mb-1">No Maintlers saved yet.</p>
+                  <p className="text-[11px] text-zinc-300">Find a Maintler above and save them — your saved Maintlers are who you'll be able to hand off equipment to later.</p>
                 </div>
               ) : (
-                <>
-                  {incomingPending.length > 0 && (
-                    <div className="px-4 pt-3 pb-1">
-                      <p className="text-[10px] font-black uppercase tracking-wide text-zinc-400">Requests</p>
-                    </div>
-                  )}
-                  {incomingPending.map((c) => (
-                    <div key={c.id} className="flex items-center gap-3 px-4 py-3 border-b border-zinc-50">
-                      {c.otherParty.photo_url ? (
-                        <HoverAvatar src={c.otherParty.photo_url} size={34} />
-                      ) : (
-                        <div className="w-[34px] h-[34px] rounded-full bg-zinc-100 flex items-center justify-center text-zinc-500 font-bold text-[11px] shrink-0">
-                          {initialsOf(c.otherParty.name, c.otherParty.email)}
-                        </div>
-                      )}
-                      <div className="flex-1 min-w-0">
-                        <p className="text-[12.5px] font-bold text-zinc-800 truncate">{displayName(c.otherParty)}</p>
-                        <p className="text-[10.5px] text-zinc-400 truncate">wants to connect</p>
+                savedContacts.map((c) => (
+                  <div key={c.id} className="flex items-center gap-3 px-4 py-3 border-b border-zinc-50">
+                    {c.contact.photo_url ? (
+                      <HoverAvatar src={c.contact.photo_url} size={34} />
+                    ) : (
+                      <div className="w-[34px] h-[34px] rounded-full bg-zinc-100 flex items-center justify-center text-zinc-500 font-bold text-[11px] shrink-0">
+                        {initialsOf(c.contact.name, c.contact.email)}
                       </div>
-                      <div className="flex items-center gap-1.5 shrink-0">
-                        <button onClick={() => respondToConnection(c, true)} className="w-7 h-7 flex items-center justify-center rounded-lg bg-red-600 hover:bg-red-500 text-white transition-colors" title="Accept">
-                          <Check size={14} />
-                        </button>
-                        <button onClick={() => respondToConnection(c, false)} className="w-7 h-7 flex items-center justify-center rounded-lg bg-zinc-100 hover:bg-zinc-200 text-zinc-500 transition-colors" title="Decline">
-                          <X size={14} />
-                        </button>
-                      </div>
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[12.5px] font-bold text-zinc-800 truncate">{displayName(c.contact)}</p>
+                      <p className="text-[10.5px] text-zinc-400 truncate">{c.contact.email}</p>
                     </div>
-                  ))}
-
-                  {acceptedConnections.length > 0 && (
-                    <div className="px-4 pt-3 pb-1">
-                      <p className="text-[10px] font-black uppercase tracking-wide text-zinc-400">My Maintlers</p>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <button
+                        onClick={() => { setActiveTab("chats"); openConversation(c.contact); }}
+                        className="w-7 h-7 flex items-center justify-center rounded-lg bg-zinc-100 hover:bg-zinc-200 text-zinc-500 transition-colors"
+                        title="Message"
+                      >
+                        <Send size={12} />
+                      </button>
+                      <button
+                        onClick={() => unsaveContactByTargetId(c.contact.id)}
+                        className="w-7 h-7 flex items-center justify-center rounded-lg text-amber-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                        title="Remove from saved Maintlers"
+                      >
+                        <Star size={14} className="fill-current" />
+                      </button>
                     </div>
-                  )}
-                  {acceptedConnections.map((c) => (
-                    <div key={c.id} className="flex items-center gap-3 px-4 py-3 border-b border-zinc-50">
-                      {c.otherParty.photo_url ? (
-                        <HoverAvatar src={c.otherParty.photo_url} size={34} />
-                      ) : (
-                        <div className="w-[34px] h-[34px] rounded-full bg-zinc-100 flex items-center justify-center text-zinc-500 font-bold text-[11px] shrink-0">
-                          {initialsOf(c.otherParty.name, c.otherParty.email)}
-                        </div>
-                      )}
-                      <div className="flex-1 min-w-0">
-                        <p className="text-[12.5px] font-bold text-zinc-800 truncate">{displayName(c.otherParty)}</p>
-                        <p className="text-[10.5px] text-zinc-400 truncate">{c.otherParty.email}</p>
-                      </div>
-                      <div className="flex items-center gap-1 shrink-0">
-                        <button
-                          onClick={() => { setActiveTab("chats"); openConversation(c.otherParty); }}
-                          className="w-7 h-7 flex items-center justify-center rounded-lg bg-zinc-100 hover:bg-zinc-200 text-zinc-500 transition-colors"
-                          title="Message"
-                        >
-                          <Send size={12} />
-                        </button>
-                        <button
-                          onClick={() => removeConnection(c)}
-                          className="w-7 h-7 flex items-center justify-center rounded-lg text-zinc-300 hover:text-red-600 hover:bg-red-50 transition-colors"
-                          title="Remove from network"
-                        >
-                          <X size={14} />
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-
-                  {outgoingPending.length > 0 && (
-                    <div className="px-4 pt-3 pb-1">
-                      <p className="text-[10px] font-black uppercase tracking-wide text-zinc-400">Sent</p>
-                    </div>
-                  )}
-                  {outgoingPending.map((c) => (
-                    <div key={c.id} className="flex items-center gap-3 px-4 py-3 border-b border-zinc-50">
-                      {c.otherParty.photo_url ? (
-                        <HoverAvatar src={c.otherParty.photo_url} size={34} />
-                      ) : (
-                        <div className="w-[34px] h-[34px] rounded-full bg-zinc-100 flex items-center justify-center text-zinc-500 font-bold text-[11px] shrink-0">
-                          {initialsOf(c.otherParty.name, c.otherParty.email)}
-                        </div>
-                      )}
-                      <div className="flex-1 min-w-0">
-                        <p className="text-[12.5px] font-bold text-zinc-800 truncate">{displayName(c.otherParty)}</p>
-                        <p className="text-[10.5px] text-zinc-400 truncate">Request sent</p>
-                      </div>
-                      <button onClick={() => removeConnection(c)} className="text-[11px] font-semibold text-zinc-400 hover:text-red-600 shrink-0">Cancel</button>
-                    </div>
-                  ))}
-                </>
+                  </div>
+                ))
               )}
             </div>
           </div>
@@ -773,7 +847,7 @@ export default function TeamChatPage() {
               </div>
             ) : (
               <>
-                <div className="flex items-center justify-between px-5 py-3.5 border-b border-zinc-100 shrink-0">
+                <div className="flex items-center justify-between gap-2 px-5 py-3.5 border-b border-zinc-100 shrink-0">
                   <div className="flex items-center gap-2.5 min-w-0">
                     <button onClick={backToList} className="md:hidden text-zinc-400 hover:text-zinc-700 shrink-0">
                       <ArrowLeft size={18} />
@@ -790,14 +864,95 @@ export default function TeamChatPage() {
                       <p className="text-[11px] text-zinc-400 leading-tight truncate">{selectedInfo.email}</p>
                     </div>
                   </div>
-                  <button
-                    onClick={() => setConfirmDeleteThread(true)}
-                    className="text-zinc-300 hover:text-red-600 transition-colors shrink-0"
-                    title="Clear conversation (only from your side)"
-                  >
-                    <Trash2 size={16} />
-                  </button>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <button
+                      onClick={() => toggleSaved(selectedInfo)}
+                      className={`w-8 h-8 flex items-center justify-center rounded-lg transition-colors ${
+                        isSaved(selectedInfo.id) ? "text-amber-400 hover:text-amber-500 hover:bg-amber-50" : "text-zinc-300 hover:text-amber-400 hover:bg-amber-50"
+                      }`}
+                      title={isSaved(selectedInfo.id) ? "Remove from saved Maintlers" : "Save as a Maintler"}
+                    >
+                      <Star size={16} className={isSaved(selectedInfo.id) ? "fill-current" : ""} />
+                    </button>
+                    <button
+                      onClick={() => { setReportOpen((v) => !v); setConfirmBlock(false); setConfirmDeleteThread(false); }}
+                      className="w-8 h-8 flex items-center justify-center rounded-lg text-zinc-300 hover:text-amber-600 hover:bg-amber-50 transition-colors"
+                      title="Report to MaintlyQR support"
+                    >
+                      <Flag size={15} />
+                    </button>
+                    {selectedIsBlocked ? (
+                      <button
+                        onClick={() => handleUnblock(selectedInfo.id)}
+                        className="w-8 h-8 flex items-center justify-center rounded-lg text-red-500 hover:bg-red-50 transition-colors"
+                        title="Unblock"
+                      >
+                        <Ban size={15} />
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => { setConfirmBlock(true); setReportOpen(false); setConfirmDeleteThread(false); }}
+                        className="w-8 h-8 flex items-center justify-center rounded-lg text-zinc-300 hover:text-red-600 hover:bg-red-50 transition-colors"
+                        title="Block"
+                      >
+                        <Ban size={15} />
+                      </button>
+                    )}
+                    <button
+                      onClick={() => { setConfirmDeleteThread(true); setReportOpen(false); setConfirmBlock(false); }}
+                      className="w-8 h-8 flex items-center justify-center rounded-lg text-zinc-300 hover:text-red-600 hover:bg-red-50 transition-colors"
+                      title="Clear conversation (only from your side)"
+                    >
+                      <Trash2 size={15} />
+                    </button>
+                  </div>
                 </div>
+
+                {reportSent && (
+                  <div className="px-5 py-2 bg-emerald-50 border-b border-emerald-100 shrink-0">
+                    <p className="text-[11px] text-emerald-700 font-medium">Reported to the MaintlyQR team. Thanks for flagging it.</p>
+                  </div>
+                )}
+
+                {reportOpen && (
+                  <div className="px-5 py-3 bg-amber-50 border-b border-amber-100 shrink-0 space-y-2">
+                    <p className="text-[11px] text-amber-800 font-medium">Report {displayName(selectedInfo)} to the MaintlyQR team.</p>
+                    <textarea
+                      value={reportReason}
+                      onChange={(e) => setReportReason(e.target.value)}
+                      placeholder="What happened? (optional, but helps us look into it)"
+                      rows={2}
+                      className="w-full rounded-lg border border-amber-200 px-3 py-2 text-[12px] outline-none focus:border-amber-400 resize-none bg-white"
+                    />
+                    {reportError && <p className="text-[11px] text-red-600">{reportError}</p>}
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        onClick={handleSubmitReport}
+                        disabled={reportSending}
+                        className="text-[11px] font-bold text-white bg-amber-600 hover:bg-amber-500 disabled:opacity-50 px-3 py-1.5 rounded-lg transition-colors"
+                      >
+                        Send report
+                      </button>
+                      <button onClick={() => { setReportOpen(false); setReportReason(""); }} className="text-[11px] font-semibold text-zinc-500 hover:text-zinc-700 px-1.5">Cancel</button>
+                    </div>
+                  </div>
+                )}
+
+                {confirmBlock && (
+                  <div className="flex items-center justify-between gap-2 px-5 py-2.5 bg-red-50 border-b border-red-100 shrink-0">
+                    <span className="text-[11px] text-red-700 font-medium">Block {displayName(selectedInfo)}? Neither of you will be able to message the other anymore.</span>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <button onClick={() => handleBlock(selectedInfo.id)} className="text-[11px] font-bold text-white bg-red-600 hover:bg-red-500 px-2.5 py-1 rounded-lg transition-colors">Block</button>
+                      <button onClick={() => setConfirmBlock(false)} className="text-[11px] font-semibold text-zinc-400 hover:text-zinc-700 px-1.5">Cancel</button>
+                    </div>
+                  </div>
+                )}
+
+                {blockActionError && (
+                  <div className="px-5 py-2 bg-red-50 border-b border-red-100 shrink-0">
+                    <p className="text-[11px] text-red-600">{blockActionError}</p>
+                  </div>
+                )}
 
                 {confirmDeleteThread && (
                   <div className="flex items-center justify-between gap-2 px-5 py-2.5 bg-red-50 border-b border-red-100 shrink-0">
@@ -806,6 +961,15 @@ export default function TeamChatPage() {
                       <button onClick={handleDeleteThread} className="text-[11px] font-bold text-white bg-red-600 hover:bg-red-500 px-2.5 py-1 rounded-lg transition-colors">Confirm</button>
                       <button onClick={() => setConfirmDeleteThread(false)} className="text-[11px] font-semibold text-zinc-400 hover:text-zinc-700 px-1.5">Cancel</button>
                     </div>
+                  </div>
+                )}
+
+                {selectedIsBlocked && (
+                  <div className="px-5 py-2.5 bg-zinc-50 border-b border-zinc-100 shrink-0">
+                    <p className="text-[11px] text-zinc-500">
+                      You've blocked {displayName(selectedInfo)} — neither of you can send new messages here.{" "}
+                      <button onClick={() => handleUnblock(selectedInfo.id)} className="text-red-600 font-bold hover:underline">Unblock</button>
+                    </p>
                   </div>
                 )}
 
@@ -838,26 +1002,32 @@ export default function TeamChatPage() {
                   )}
                 </div>
 
-                <div className="px-4 py-3 border-t border-zinc-100 shrink-0 space-y-1.5">
-                  {composeError && <p className="text-[11px] text-red-600 px-1">{composeError}</p>}
-                  <div className="flex items-end gap-2">
-                    <textarea
-                      value={body}
-                      onChange={(e) => setBody(e.target.value)}
-                      onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
-                      placeholder="Type a message…"
-                      rows={1}
-                      className="flex-1 rounded-xl border border-zinc-200 px-3 py-2.5 text-[13px] outline-none focus:border-red-400 resize-none"
-                    />
-                    <button
-                      onClick={handleSend}
-                      disabled={sending || !body.trim()}
-                      className="flex items-center justify-center gap-1.5 bg-zinc-900 hover:bg-zinc-800 disabled:opacity-40 text-white font-bold px-4 py-2.5 rounded-xl text-[12px] transition-all shrink-0"
-                    >
-                      <Send size={13} />
-                    </button>
+                {selectedIsBlocked ? (
+                  <div className="px-4 py-4 border-t border-zinc-100 shrink-0 text-center">
+                    <p className="text-[11.5px] text-zinc-400">You can't send messages while this Maintler is blocked.</p>
                   </div>
-                </div>
+                ) : (
+                  <div className="px-4 py-3 border-t border-zinc-100 shrink-0 space-y-1.5">
+                    {composeError && <p className="text-[11px] text-red-600 px-1">{composeError}</p>}
+                    <div className="flex items-end gap-2">
+                      <textarea
+                        value={body}
+                        onChange={(e) => setBody(e.target.value)}
+                        onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
+                        placeholder="Type a message…"
+                        rows={1}
+                        className="flex-1 rounded-xl border border-zinc-200 px-3 py-2.5 text-[13px] outline-none focus:border-red-400 resize-none"
+                      />
+                      <button
+                        onClick={handleSend}
+                        disabled={sending || !body.trim()}
+                        className="flex items-center justify-center gap-1.5 bg-zinc-900 hover:bg-zinc-800 disabled:opacity-40 text-white font-bold px-4 py-2.5 rounded-xl text-[12px] transition-all shrink-0"
+                      >
+                        <Send size={13} />
+                      </button>
+                    </div>
+                  </div>
+                )}
               </>
             )}
           </div>
@@ -889,7 +1059,7 @@ export default function TeamChatPage() {
                   className="w-full rounded-xl border border-zinc-200 pl-9 pr-3 py-2.5 text-[13px] outline-none focus:border-red-400"
                 />
               </div>
-              {connectionActionError && <p className="text-[11px] text-red-600 px-1">{connectionActionError}</p>}
+              {savedActionError && <p className="text-[11px] text-red-600 px-1">{savedActionError}</p>}
               {searchError && <p className="text-[11px] text-red-600 px-1">{searchError}</p>}
             </div>
             <div className="flex-1 overflow-y-auto py-2">
@@ -901,7 +1071,7 @@ export default function TeamChatPage() {
                 <p className="text-[12px] text-zinc-300 text-center py-10 px-5">No Maintlers found.</p>
               ) : (
                 searchResults.map((m) => {
-                  const conn = connectionFor(m.id);
+                  const saved = isSaved(m.id);
                   return (
                     <div key={m.id} className="flex items-center gap-2 px-5 py-2 hover:bg-zinc-50 transition-colors">
                       <button
@@ -923,27 +1093,17 @@ export default function TeamChatPage() {
                           <p className="text-[11px] text-zinc-400 truncate">{m.email}</p>
                         </div>
                       </button>
-                      <div className="shrink-0">
-                        {!conn && (
-                          <button
-                            onClick={() => sendConnectionRequest(m)}
-                            className="flex items-center gap-1 text-[11px] font-bold text-red-600 border border-red-200 hover:bg-red-50 px-2.5 py-1.5 rounded-lg transition-colors"
-                          >
-                            <UserPlus size={12} /> Connect
-                          </button>
-                        )}
-                        {conn?.status === "pending" && conn.direction === "outgoing" && (
-                          <span className="text-[10.5px] text-zinc-400 font-semibold px-1.5">Pending</span>
-                        )}
-                        {conn?.status === "pending" && conn.direction === "incoming" && (
-                          <span className="text-[10.5px] text-zinc-400 font-semibold px-1.5">Wants to connect</span>
-                        )}
-                        {conn?.status === "accepted" && (
-                          <span className="flex items-center gap-1 text-[10.5px] text-emerald-600 font-bold px-1.5">
-                            <Check size={12} /> Connected
-                          </span>
-                        )}
-                      </div>
+                      <button
+                        onClick={() => toggleSaved(m)}
+                        className={`flex items-center gap-1 text-[11px] font-bold px-2.5 py-1.5 rounded-lg border transition-colors shrink-0 ${
+                          saved
+                            ? "text-amber-600 border-amber-200 bg-amber-50 hover:bg-amber-100"
+                            : "text-zinc-500 border-zinc-200 hover:bg-zinc-50"
+                        }`}
+                        title={saved ? "Remove from saved Maintlers" : "Save as a Maintler"}
+                      >
+                        <Star size={12} className={saved ? "fill-current" : ""} /> {saved ? "Saved" : "Save"}
+                      </button>
                     </div>
                   );
                 })
