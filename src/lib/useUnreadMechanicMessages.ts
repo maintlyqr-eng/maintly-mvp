@@ -25,12 +25,16 @@ export function useUnreadMechanicMessages(mechanicId: string) {
     if (!mechanicId) return;
     let active = true;
 
-    supabase
-      .from("mechanic_messages")
-      .select("*", { count: "exact", head: true })
-      .eq("recipient_id", mechanicId)
-      .eq("read", false)
-      .then(({ count: c }) => { if (active) setCount(c ?? 0); });
+    function refetchCount() {
+      supabase
+        .from("mechanic_messages")
+        .select("*", { count: "exact", head: true })
+        .eq("recipient_id", mechanicId)
+        .eq("read", false)
+        .then(({ count: c }) => { if (active) setCount(c ?? 0); });
+    }
+
+    refetchCount();
 
     const channel = supabase
       .channel(`unread-mechanic-messages-${mechanicId}`)
@@ -50,7 +54,29 @@ export function useUnreadMechanicMessages(mechanicId: string) {
       )
       .subscribe();
 
-    return () => { active = false; supabase.removeChannel(channel); };
+    // Mobile browsers can suspend a background tab's WebSocket (screen
+    // lock, switching apps), leaving this count stale until something
+    // forces a fresh read. Re-querying the true count whenever the tab
+    // becomes active again (rather than trusting the +1/-1 realtime math
+    // to have kept up) means this badge is never more than a glance away
+    // from correct, even if the connection dropped out entirely while
+    // backgrounded. supabase.realtime.connect() additionally nudges a
+    // stale socket to reconnect right away instead of waiting on its own
+    // retry timer.
+    function onVisibilityChange() {
+      if (document.visibilityState === "visible") { supabase.realtime.connect(); refetchCount(); }
+    }
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    window.addEventListener("focus", refetchCount);
+    window.addEventListener("online", refetchCount);
+
+    return () => {
+      active = false;
+      supabase.removeChannel(channel);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+      window.removeEventListener("focus", refetchCount);
+      window.removeEventListener("online", refetchCount);
+    };
   }, [mechanicId]);
 
   return count;

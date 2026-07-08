@@ -163,6 +163,12 @@ function TeamChatPageInner() {
   const selectedIdRef = useRef<string | null>(null);
   useEffect(() => { selectedIdRef.current = selectedId; }, [selectedId]);
 
+  // Same idea, for the visibility-regain catch-up effect further down,
+  // which needs the *full* MechanicInfo (not just the id) to re-open the
+  // conversation via openConversation().
+  const selectedInfoRef = useRef<MechanicInfo | null>(null);
+  useEffect(() => { selectedInfoRef.current = selectedInfo; }, [selectedInfo]);
+
   // Now that the thread pane scrolls internally instead of the whole page
   // (see the h-dvh layout fix above), it needs to actually land on the
   // newest message on its own — otherwise opening a conversation would
@@ -559,6 +565,52 @@ function TeamChatPageInner() {
       .subscribe();
 
     return () => { supabase.removeChannel(channel); };
+  }, [mechanicId]);
+
+  // Mobile follow-up, same day: "en la compu perfecto en el celu... a
+  // veces no llega al toque el msj sino q tengo q refrescar... y salgo de
+  // la conversacion y ahi me aparece la notificacion en la campanita."
+  // Mobile browsers routinely suspend or heavily throttle a background
+  // tab's JavaScript — locking the screen, switching apps, even just the
+  // OS deciding to deprioritize an inactive tab — and a long-lived
+  // WebSocket like Supabase Realtime's can go quietly stale during that
+  // time. It usually reconnects on its own, but not always immediately,
+  // which explains both halves of the report: a message sent while the
+  // connection was stale doesn't show up until something forces a fresh
+  // fetch (a manual page reload), and by the time Facu left Team Chat for
+  // another page, the connection (or that page's own separate fetch) had
+  // caught up, so the bell finally showed it there instead.
+  //
+  // Rather than trying to detect and repair the WebSocket's internal
+  // state, this uses the standard fix for exactly this class of problem:
+  // re-sync straight from the database whenever the tab becomes the
+  // active one again, so a stale realtime connection can never leave
+  // Facu looking at outdated data for longer than it takes to switch back
+  // to the tab. `supabase.realtime.connect()` additionally nudges the
+  // socket to reconnect right away rather than waiting for its own
+  // internal retry timer.
+  useEffect(() => {
+    if (!mechanicId) return;
+
+    function resync() {
+      supabase.realtime.connect();
+      loadConversations(mechanicId);
+      if (selectedInfoRef.current) openConversation(selectedInfoRef.current);
+    }
+
+    function onVisibilityChange() {
+      if (document.visibilityState === "visible") resync();
+    }
+
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    window.addEventListener("focus", resync);
+    window.addEventListener("online", resync);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+      window.removeEventListener("focus", resync);
+      window.removeEventListener("online", resync);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mechanicId]);
 
   // Maintler search for starting a new conversation, debounced. Guards

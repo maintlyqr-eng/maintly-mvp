@@ -167,7 +167,24 @@ export default function NotificationBell({
       )
       .subscribe();
 
-    return () => { supabase.removeChannel(channel); };
+    // Mobile browsers can suspend a background tab's realtime connection
+    // (screen lock, app switch); refetching whenever the tab becomes
+    // active again means the preview list can't stay stale for longer
+    // than it takes to glance back at it, regardless of the socket's own
+    // reconnect timing. supabase.realtime.connect() nudges it along too.
+    function onVisibilityChange() {
+      if (document.visibilityState === "visible") { supabase.realtime.connect(); fetchNotifications(); }
+    }
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    window.addEventListener("focus", fetchNotifications);
+    window.addEventListener("online", fetchNotifications);
+
+    return () => {
+      supabase.removeChannel(channel);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+      window.removeEventListener("focus", fetchNotifications);
+      window.removeEventListener("online", fetchNotifications);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mechanicId]);
 
