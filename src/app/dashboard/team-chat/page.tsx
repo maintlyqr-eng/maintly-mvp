@@ -410,10 +410,25 @@ function TeamChatPageInner() {
   // read from the database moments earlier. Waiting for the initial list
   // load to finish first means the row genuinely exists by the time it
   // needs zeroing, and nothing runs afterward to stomp on it.
+  //
+  // Also waits for `!checkingAuth` — Facu's next-next report: arriving via
+  // the bell still landed in the right conversation, but not scrolled to
+  // the latest message like a manual click does. conversationsLoading
+  // flips to false *before* checkingAuth does (loadConversations runs,
+  // then loadSavedContacts/loadBlocks, then checkingAuth is cleared), so
+  // this effect was calling openConversation() while the component was
+  // still rendering its "Loading…" placeholder — the real thread panel,
+  // and the scrollable message container the auto-scroll effect depends
+  // on, didn't exist in the DOM yet. The thread loaded correctly, but the
+  // scroll-to-bottom effect ran against a `null` ref and never got a
+  // second chance to fire once the real panel finally mounted, since none
+  // of its own dependencies changed again afterward. Waiting for the page
+  // to actually finish loading before opening anything means the message
+  // container is already there when openConversation() sets the thread.
   useEffect(() => {
     const withId = searchParams.get("with");
     if (!withId || !mechanicId || withId === mechanicId || withId === selectedId) return;
-    if (conversationsLoading) return;
+    if (conversationsLoading || checkingAuth) return;
 
     let active = true;
     (async () => {
@@ -430,7 +445,7 @@ function TeamChatPageInner() {
 
     return () => { active = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchParams, mechanicId, conversationsLoading]);
+  }, [searchParams, mechanicId, conversationsLoading, checkingAuth]);
 
   // Live delivery — Facu's feedback: Team Chat felt dead, needing a manual
   // refresh to see anything new. This subscribes to Supabase Realtime for
