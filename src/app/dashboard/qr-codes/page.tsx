@@ -678,7 +678,22 @@ export default function QrCodesPage() {
         @media print {
           body * { visibility: hidden; }
           #qr-print-sheet, #qr-print-sheet * { visibility: visible; }
-          #qr-print-sheet { position: absolute; top: 0; left: 0; width: 100%; }
+          /* The on-screen modal is "fixed inset-0 ... overflow-y-auto" so it
+             can scroll within the viewport. Those rules (right/bottom pinned
+             to the screen edge, overflow-y: auto) stay active during print
+             unless explicitly reset here — otherwise the sheet is clipped to
+             one viewport-tall page and everything past it just sits behind
+             an inert scrollbar instead of flowing onto page 2, 3, etc. */
+          #qr-print-sheet {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: auto;
+            bottom: auto;
+            width: 100%;
+            height: auto;
+            overflow: visible;
+          }
           .no-print { display: none !important; }
         }
       `}</style>
