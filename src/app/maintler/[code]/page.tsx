@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
   ShieldCheck, CalendarDays, AlertCircle, LogIn, UserPlus,
-  Star, Send, UserCircle2, Share2, Check,
+  Star, Send, UserCircle2, Share2, Check, Wrench, Box, Users, Download,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { formatDateDMY } from "@/lib/date";
@@ -23,6 +23,35 @@ import { formatDateDMY } from "@/lib/date";
 // the asset page. Save and Message are the only two actions gated behind
 // login, since both require the visitor to actually be a Maintler
 // themselves (this app has no other kind of account).
+//
+// Round 2 (same day): Facu shared a fuller card concept — a stats panel,
+// specialty icons, "Experience & Skills" bars, badges, and a "Maintly
+// Score." Every number below is computed from real logged activity via
+// get_maintler_stats()/get_maintler_specialty_breakdown() (migration
+// 025), NOT typed in by the mechanic — deliberately, to keep this
+// consistent with the "verified, tamper-proof" positioning the rest of
+// the app already has. A self-reported "90% Generators" skill bar would
+// read more like a resume than something Maintly can stand behind; a
+// bar built from how many generator services this Maintler has actually
+// logged can't be inflated the same way.
+
+const assetTypeImg: Record<string, string> = {
+  automotive: "/images/car.png",
+  motorcycle: "/images/moto.png",
+  generator: "/images/generador.png",
+  machinery: "/images/excavator.png",
+  marine: "/images/barco.png",
+  aviation: "/images/avion.png",
+};
+
+const assetTypeLabel: Record<string, string> = {
+  automotive: "Automotive",
+  motorcycle: "Motorcycles",
+  generator: "Generators",
+  machinery: "Machinery",
+  marine: "Marine",
+  aviation: "Aviation",
+};
 
 type PublicProfile = {
   id: string;
@@ -35,12 +64,51 @@ type PublicProfile = {
   maintler_code: string;
 };
 
+type MaintlerStats = {
+  services_count: number;
+  assets_count: number;
+  customers_count: number;
+  repeat_customers_count: number;
+};
+
+type SpecialtyRow = { asset_type: string; services_count: number };
+
 function displayName(p: PublicProfile) {
   return p.workshop_name || p.name;
 }
 
 function initialsOf(name: string) {
   return name.split(" ").filter(Boolean).map((p) => p[0]).join("").slice(0, 2).toUpperCase() || "M";
+}
+
+function yearsSince(iso: string) {
+  const ms = Date.now() - new Date(iso).getTime();
+  return Math.max(0, Math.floor(ms / (365.25 * 24 * 3600 * 1000)));
+}
+
+// A transparent, formula-driven score instead of an unexplained star
+// rating — every input is a number already shown elsewhere on this same
+// page, so nothing here is a hidden or "trust me" figure. Capped at 5.
+function computeScore(profile: PublicProfile, stats: MaintlerStats, specialtyCount: number, years: number) {
+  let score = 1;
+  if (profile.verified) score += 1;
+  if (stats.services_count >= 25) score += 1;
+  if (stats.services_count >= 100) score += 1;
+  if (years >= 2) score += 1;
+  if (specialtyCount >= 2) score += 1;
+  return Math.min(5, score);
+}
+
+type Badge = { label: string; icon: typeof ShieldCheck; className: string };
+
+function computeBadges(profile: PublicProfile, stats: MaintlerStats, specialtyCount: number, years: number): Badge[] {
+  const badges: Badge[] = [];
+  if (profile.verified) badges.push({ label: "Verified", icon: ShieldCheck, className: "bg-emerald-50 text-emerald-700 border-emerald-200" });
+  if (stats.services_count >= 100) badges.push({ label: "100+ Services", icon: Wrench, className: "bg-blue-50 text-blue-700 border-blue-200" });
+  else if (stats.services_count >= 25) badges.push({ label: "25+ Services", icon: Wrench, className: "bg-blue-50 text-blue-700 border-blue-200" });
+  if (years >= 5) badges.push({ label: `${years}+ Years Active`, icon: CalendarDays, className: "bg-amber-50 text-amber-700 border-amber-200" });
+  if (specialtyCount >= 3) badges.push({ label: "Multi-Asset Specialist", icon: Box, className: "bg-purple-50 text-purple-700 border-purple-200" });
+  return badges;
 }
 
 export default function MaintlerPublicPage() {
@@ -51,6 +119,8 @@ export default function MaintlerPublicPage() {
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [profile, setProfile] = useState<PublicProfile | null>(null);
+  const [stats, setStats] = useState<MaintlerStats | null>(null);
+  const [specialties, setSpecialties] = useState<SpecialtyRow[]>([]);
 
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [viewerId, setViewerId] = useState<string | null>(null);
@@ -80,6 +150,14 @@ export default function MaintlerPublicPage() {
 
       if (!row) { setNotFound(true); setLoading(false); return; }
       setProfile(row as PublicProfile);
+
+      const [statsRes, specialtiesRes] = await Promise.all([
+        supabase.rpc("get_maintler_stats", { target_mechanic_id: row.id }),
+        supabase.rpc("get_maintler_specialty_breakdown", { target_mechanic_id: row.id }),
+      ]);
+      const statsRow = Array.isArray(statsRes.data) ? statsRes.data[0] : statsRes.data;
+      if (statsRow) setStats(statsRow as MaintlerStats);
+      if (Array.isArray(specialtiesRes.data)) setSpecialties(specialtiesRes.data as SpecialtyRow[]);
 
       if (session && session.user.id !== row.id) {
         const { data: savedRow } = await supabase
@@ -143,6 +221,33 @@ export default function MaintlerPublicPage() {
     }
   }
 
+  // Deliberately no phone/email on this vCard — this page is reachable by
+  // anyone with no login, and this app has no "make my phone number
+  // public" opt-in yet. A name + organization + link back to the live
+  // profile is useful on its own (a real contact card in your phone,
+  // findable by name) without exposing anything the Maintler didn't
+  // explicitly choose to publish.
+  function handleSaveContact() {
+    if (!profile) return;
+    const url = `${window.location.origin}/maintler/${code}`;
+    const lines = [
+      "BEGIN:VCARD",
+      "VERSION:3.0",
+      `FN:${name}`,
+      profile.workshop_name ? `ORG:${profile.workshop_name}` : null,
+      `URL:${url}`,
+      "NOTE:Maintler on MaintlyQR",
+      "END:VCARD",
+    ].filter(Boolean) as string[];
+    const blob = new Blob([lines.join("\n")], { type: "text/vcard" });
+    const blobUrl = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = blobUrl;
+    a.download = `${name.replace(/\s+/g, "_")}.vcf`;
+    a.click();
+    URL.revokeObjectURL(blobUrl);
+  }
+
   // ── LOADING ──────────────────────────────────────────────────────────
   if (loading) {
     return (
@@ -171,6 +276,10 @@ export default function MaintlerPublicPage() {
 
   const isSelf = !!viewerId && viewerId === profile.id;
   const name = displayName(profile);
+  const years = yearsSince(profile.created_at);
+  const totalSpecialtyServices = specialties.reduce((sum, s) => sum + s.services_count, 0);
+  const score = stats ? computeScore(profile, stats, specialties.length, years) : null;
+  const badges = stats ? computeBadges(profile, stats, specialties.length, years) : [];
 
   return (
     <div className="min-h-screen bg-zinc-50 pb-32">
@@ -180,12 +289,21 @@ export default function MaintlerPublicPage() {
         <a href="/" className="flex items-center">
           <Image src="/images/maintly-logo-full.png" alt="MaintlyQR" width={217} height={64} className="object-contain mt-2" />
         </a>
-        <button
-          onClick={handleShare}
-          className="flex items-center gap-1.5 text-[11px] font-bold text-zinc-500 hover:text-zinc-800 border border-zinc-200 hover:bg-zinc-50 px-2.5 py-1.5 rounded-lg transition-colors"
-        >
-          {linkCopied ? <><Check size={13} className="text-emerald-500" /> Copied</> : <><Share2 size={13} /> Share</>}
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleSaveContact}
+            className="flex items-center gap-1.5 text-[11px] font-bold text-zinc-500 hover:text-zinc-800 border border-zinc-200 hover:bg-zinc-50 px-2.5 py-1.5 rounded-lg transition-colors"
+            title="Save as a phone contact"
+          >
+            <Download size={13} /> <span className="hidden sm:inline">Save Contact</span>
+          </button>
+          <button
+            onClick={handleShare}
+            className="flex items-center gap-1.5 text-[11px] font-bold text-zinc-500 hover:text-zinc-800 border border-zinc-200 hover:bg-zinc-50 px-2.5 py-1.5 rounded-lg transition-colors"
+          >
+            {linkCopied ? <><Check size={13} className="text-emerald-500" /> Copied</> : <><Share2 size={13} /> Share</>}
+          </button>
+        </div>
       </div>
 
       <div className="max-w-lg mx-auto px-4 py-6 space-y-4">
@@ -233,6 +351,93 @@ export default function MaintlerPublicPage() {
             </div>
           </div>
         </div>
+
+        {/* ── MAINTLY SCORE + STATS ── */}
+        {stats && (
+          <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm overflow-hidden">
+            <div className="px-5 py-4 border-b border-zinc-100 flex items-center justify-between">
+              <div>
+                <p className="text-[11px] font-bold text-zinc-400 uppercase tracking-wide mb-1">Maintly Score</p>
+                <div className="flex items-center gap-0.5">
+                  {Array.from({ length: 5 }, (_, i) => (
+                    <Star key={i} size={16} className={i < (score ?? 0) ? "text-amber-400 fill-amber-400" : "text-zinc-200"} />
+                  ))}
+                </div>
+              </div>
+              <p className="text-[10.5px] text-zinc-400 text-right max-w-[140px] leading-tight">
+                Based on verification, activity, and logged experience — not reviews.
+              </p>
+            </div>
+            <div className="grid grid-cols-2 divide-x divide-y divide-zinc-100">
+              <div className="px-5 py-4 flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-blue-50 flex items-center justify-center shrink-0"><Wrench size={16} className="text-blue-500" /></div>
+                <div><p className="text-[16px] font-black text-zinc-900 leading-tight">{stats.services_count}</p><p className="text-[10px] text-zinc-400 font-bold uppercase tracking-wide">Services Logged</p></div>
+              </div>
+              <div className="px-5 py-4 flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-red-50 flex items-center justify-center shrink-0"><Box size={16} className="text-red-500" /></div>
+                <div><p className="text-[16px] font-black text-zinc-900 leading-tight">{stats.assets_count}</p><p className="text-[10px] text-zinc-400 font-bold uppercase tracking-wide">Assets Maintained</p></div>
+              </div>
+              <div className="px-5 py-4 flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-purple-50 flex items-center justify-center shrink-0"><Users size={16} className="text-purple-500" /></div>
+                <div><p className="text-[16px] font-black text-zinc-900 leading-tight">{stats.customers_count}</p><p className="text-[10px] text-zinc-400 font-bold uppercase tracking-wide">Customers Served</p></div>
+              </div>
+              <div className="px-5 py-4 flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-emerald-50 flex items-center justify-center shrink-0"><Star size={16} className="text-emerald-500" /></div>
+                <div><p className="text-[16px] font-black text-zinc-900 leading-tight">{stats.repeat_customers_count}</p><p className="text-[10px] text-zinc-400 font-bold uppercase tracking-wide">Repeat Customers</p></div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── BADGES ── */}
+        {badges.length > 0 && (
+          <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm px-5 py-4">
+            <p className="text-[11px] font-bold text-zinc-400 uppercase tracking-wide mb-3">Badges</p>
+            <div className="flex flex-wrap gap-2">
+              {badges.map((b) => (
+                <span key={b.label} className={`flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1.5 rounded-full border ${b.className}`}>
+                  <b.icon size={12} /> {b.label}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* ── SPECIALTIES ── */}
+        {specialties.length > 0 && (
+          <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm px-5 py-4">
+            <p className="text-[11px] font-bold text-zinc-400 uppercase tracking-wide mb-3">Specialties</p>
+            <div className="flex flex-wrap gap-3 mb-4">
+              {specialties.map((s) => (
+                <div key={s.asset_type} className="flex flex-col items-center gap-1.5 w-16">
+                  <div className="w-11 h-11 rounded-xl bg-zinc-50 border border-zinc-100 flex items-center justify-center overflow-hidden">
+                    <Image src={assetTypeImg[s.asset_type] ?? "/images/car.png"} alt={s.asset_type} width={26} height={26} className="object-contain" />
+                  </div>
+                  <p className="text-[9.5px] text-zinc-500 text-center leading-tight">{assetTypeLabel[s.asset_type] ?? s.asset_type}</p>
+                </div>
+              ))}
+            </div>
+
+            {/* ── EXPERIENCE & SKILLS (real logged-service percentages, not self-rated) ── */}
+            <p className="text-[11px] font-bold text-zinc-400 uppercase tracking-wide mb-2.5">Experience & Skills</p>
+            <div className="space-y-2.5">
+              {specialties.map((s) => {
+                const pct = totalSpecialtyServices > 0 ? Math.round((s.services_count / totalSpecialtyServices) * 100) : 0;
+                return (
+                  <div key={s.asset_type}>
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-[11.5px] font-semibold text-zinc-700">{assetTypeLabel[s.asset_type] ?? s.asset_type}</span>
+                      <span className="text-[11px] text-zinc-400">{pct}%</span>
+                    </div>
+                    <div className="h-1.5 rounded-full bg-zinc-100 overflow-hidden">
+                      <div className="h-full bg-red-600 rounded-full" style={{ width: `${pct}%` }} />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {saveError && (
           <div className="flex items-center gap-2 bg-red-50 border border-red-200 rounded-xl px-3 py-2.5">

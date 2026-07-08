@@ -347,17 +347,22 @@ export default function SettingsPage() {
           <div className="flex items-center gap-2 md:gap-4 shrink-0">
             <NotificationBell mechanicId={mechanicId} unreadMessagesCount={unreadMessages} unreadMechanicCount={unreadMechanicMessages} />
             <div className="flex items-center gap-3 md:pl-3 md:border-l border-zinc-200">
-              <div className="flex items-center gap-2.5">
+              {/* Links to this Maintler's own public card, same as every
+                  other dashboard page's header — see the matching comment
+                  there. Already on Settings here, so this is purely a
+                  shortcut to preview the public card (the "My Maintler
+                  Card" section further down also links to it). */}
+              <Link href={maintlerCode ? `/maintler/${maintlerCode}` : "/dashboard/settings"} className="flex items-center gap-2.5 group">
                 {photoUrl ? (
                   <HoverAvatar src={photoUrl} size={36} className="shrink-0" />
                 ) : (
                   <div className="w-9 h-9 rounded-full bg-red-100 flex items-center justify-center text-red-600 font-bold text-[13px] shrink-0">{initials}</div>
                 )}
                 <div className="hidden sm:block text-left">
-                  <p className="text-[12px] font-bold text-zinc-800 leading-tight">{name || email}</p>
+                  <p className="text-[12px] font-bold text-zinc-800 leading-tight group-hover:text-red-600 transition-colors">{name || email}</p>
                   <p className="text-[10px] text-zinc-400 leading-tight">Maintler</p>
                 </div>
-              </div>
+              </Link>
               <button
                 onClick={handleLogout}
                 className="flex items-center gap-1.5 text-[12px] font-semibold text-zinc-500 hover:text-red-600 hover:bg-red-50 border border-zinc-200 hover:border-red-200 px-3 py-2 rounded-xl transition-all"
@@ -421,12 +426,21 @@ export default function SettingsPage() {
                       </button>
                     </div>
                   </div>
-                  <button
-                    onClick={handleDownloadCard}
-                    className="flex items-center gap-1.5 text-[11.5px] font-bold text-white bg-zinc-900 hover:bg-zinc-800 px-3.5 py-2.5 rounded-xl transition-colors"
-                  >
-                    <Download size={13} /> Download PNG
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={handleDownloadCard}
+                      className="flex items-center gap-1.5 text-[11.5px] font-bold text-white bg-zinc-900 hover:bg-zinc-800 px-3.5 py-2.5 rounded-xl transition-colors"
+                    >
+                      <Download size={13} /> Download PNG
+                    </button>
+                    <Link
+                      href={`/maintler/${maintlerCode}`}
+                      target="_blank"
+                      className="flex items-center gap-1.5 text-[11.5px] font-bold text-zinc-600 hover:text-red-600 border border-zinc-200 hover:bg-zinc-50 px-3.5 py-2.5 rounded-xl transition-colors"
+                    >
+                      View my public card
+                    </Link>
+                  </div>
                   <p className="text-[11px] text-zinc-400">
                     Anyone who scans this or visits the link sees your name, workshop, verified status, and member-since date —
                     and, if they&apos;re a Maintler themselves, a Save and Message button straight to you.

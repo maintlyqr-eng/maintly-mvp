@@ -114,6 +114,7 @@ function TeamChatPageInner() {
   const [mechanicName, setMechanicName] = useState("");
   const [mechanicPhoto, setMechanicPhoto] = useState("");
   const [mechanicEmail, setMechanicEmail] = useState("");
+  const [maintlerCode, setMaintlerCode] = useState("");
 
   const unreadMessages = useUnreadMessagesCount(mechanicId);
   // No useUnreadMechanicMessages() call on this page — unlike the other 11
@@ -441,8 +442,8 @@ function TeamChatPageInner() {
       setMechanicEmail(session.user.email ?? "");
 
       const { data: mechanic } = await supabase
-        .from("mechanics").select("name, photo_url").eq("id", session.user.id).single();
-      if (active && mechanic) { setMechanicName(mechanic.name); setMechanicPhoto(mechanic.photo_url ?? ""); }
+        .from("mechanics").select("name, photo_url, maintler_code").eq("id", session.user.id).single();
+      if (active && mechanic) { setMechanicName(mechanic.name); setMechanicPhoto(mechanic.photo_url ?? ""); setMaintlerCode(mechanic.maintler_code ?? ""); }
 
       await loadConversations(session.user.id);
       await loadSavedContacts(session.user.id);
@@ -965,19 +966,24 @@ function TeamChatPageInner() {
                 already looking at. */}
             <NotificationBell mechanicId={mechanicId} unreadMessagesCount={unreadMessages} unreadMechanicCount={totalUnread} />
             <div className="flex items-center gap-3 md:pl-3 md:border-l border-zinc-200">
-              <div className="flex items-center gap-2.5">
-                <Link href="/dashboard/settings" className="shrink-0">
-                  {mechanicPhoto ? (
-                    <HoverAvatar src={mechanicPhoto} size={36} />
-                  ) : (
-                    <div className="w-9 h-9 rounded-full bg-red-100 flex items-center justify-center text-red-600 font-bold text-[13px]">{initials}</div>
-                  )}
-                </Link>
+              {/* Links to this Maintler's own public card (/maintler/<code>)
+                  instead of Settings — Facu's own ask: Settings is already
+                  one click away via the sidebar nav, so this top-right
+                  identity spot is freed up to jump straight to "how the
+                  world sees me" instead of duplicating that sidebar link.
+                  Falls back to Settings if maintlerCode hasn't loaded yet
+                  (e.g. migration 024 not run yet on this database). */}
+              <Link href={maintlerCode ? `/maintler/${maintlerCode}` : "/dashboard/settings"} className="flex items-center gap-2.5 group">
+                {mechanicPhoto ? (
+                  <HoverAvatar src={mechanicPhoto} size={36} />
+                ) : (
+                  <div className="w-9 h-9 rounded-full bg-red-100 flex items-center justify-center text-red-600 font-bold text-[13px]">{initials}</div>
+                )}
                 <div className="hidden sm:block text-left">
-                  <p className="text-[12px] font-bold text-zinc-800 leading-tight">{mechanicName || mechanicEmail}</p>
+                  <p className="text-[12px] font-bold text-zinc-800 leading-tight group-hover:text-red-600 transition-colors">{mechanicName || mechanicEmail}</p>
                   <p className="text-[10px] text-zinc-400 leading-tight">Maintler</p>
                 </div>
-              </div>
+              </Link>
               <button
                 onClick={handleLogout}
                 className="flex items-center gap-1.5 text-[12px] font-semibold text-zinc-500 hover:text-red-600 hover:bg-red-50 border border-zinc-200 hover:border-red-200 px-3 py-2 rounded-xl transition-all"

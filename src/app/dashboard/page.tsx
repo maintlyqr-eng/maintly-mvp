@@ -118,6 +118,7 @@ export default function DashboardPage() {
   const [mechanicName, setMechanicName] = useState("");
   const [mechanicPhoto, setMechanicPhoto] = useState("");
   const [mechanicEmail, setMechanicEmail] = useState("");
+  const [maintlerCode, setMaintlerCode] = useState("");
   const [totalServices, setTotalServices] = useState(0);
   const [totalAssets, setTotalAssets] = useState(0);
   const [realServices, setRealServices] = useState<RealService[]>([]);
@@ -176,7 +177,7 @@ export default function DashboardPage() {
         { data: taskRowsForCal },
         { data: assetRows },
       ] = await Promise.all([
-        supabase.from("mechanics").select("name, photo_url").eq("id", session.user.id).single(),
+        supabase.from("mechanics").select("name, photo_url, maintler_code").eq("id", session.user.id).single(),
         supabase.from("mechanic_assets").select("*", { count: "exact", head: true }).eq("mechanic_id", session.user.id),
         supabase
           .from("service_records")
@@ -213,7 +214,7 @@ export default function DashboardPage() {
 
       if (!active) return;
 
-      if (mechanic) { setMechanicName(mechanic.name); setMechanicPhoto(mechanic.photo_url ?? ""); }
+      if (mechanic) { setMechanicName(mechanic.name); setMechanicPhoto(mechanic.photo_url ?? ""); setMaintlerCode(mechanic.maintler_code ?? ""); }
       setTotalAssets(assetCount ?? 0);
       setRealServices((svcs as unknown as RealService[]) ?? []);
       setTotalServices(svcCount ?? 0);
@@ -566,19 +567,24 @@ export default function DashboardPage() {
             <NotificationBell mechanicId={mechanicId} unreadMessagesCount={unreadMessages} unreadMechanicCount={unreadMechanicMessages} />
 
             <div className="flex items-center gap-3 md:pl-3 md:border-l border-zinc-200">
-              <div className="flex items-center gap-2.5">
-                <Link href="/dashboard/settings" className="shrink-0">
-                  {mechanicPhoto ? (
-                    <HoverAvatar src={mechanicPhoto} size={36} />
-                  ) : (
-                    <div className="w-9 h-9 rounded-full bg-red-100 flex items-center justify-center text-red-600 font-bold text-[13px]">{initials}</div>
-                  )}
-                </Link>
+              {/* Links to this Maintler's own public card (/maintler/<code>)
+                  instead of Settings — Facu's own ask: Settings is already
+                  one click away via the sidebar nav, so this top-right
+                  identity spot is freed up to jump straight to "how the
+                  world sees me" instead of duplicating that sidebar link.
+                  Falls back to Settings if maintlerCode hasn't loaded yet
+                  (e.g. migration 024 not run yet on this database). */}
+              <Link href={maintlerCode ? `/maintler/${maintlerCode}` : "/dashboard/settings"} className="flex items-center gap-2.5 group">
+                {mechanicPhoto ? (
+                  <HoverAvatar src={mechanicPhoto} size={36} />
+                ) : (
+                  <div className="w-9 h-9 rounded-full bg-red-100 flex items-center justify-center text-red-600 font-bold text-[13px]">{initials}</div>
+                )}
                 <div className="hidden sm:block text-left">
-                  <p className="text-[12px] font-bold text-zinc-800 leading-tight">{displayName}</p>
+                  <p className="text-[12px] font-bold text-zinc-800 leading-tight group-hover:text-red-600 transition-colors">{displayName}</p>
                   <p className="text-[10px] text-zinc-400 leading-tight">Maintler</p>
                 </div>
-              </div>
+              </Link>
               <button
                 onClick={handleLogout}
                 className="flex items-center gap-1.5 text-[12px] font-semibold text-zinc-500 hover:text-red-600 hover:bg-red-50 border border-zinc-200 hover:border-red-200 px-3 py-2 rounded-xl transition-all"
