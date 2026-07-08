@@ -89,8 +89,16 @@ const QrCodeCanvas = forwardRef<QrCodeCanvasHandle, {
         // border-radius on the wrapping div below and the canvas clip in
         // download()), so bump error correction to "H" (~30% recoverable)
         // to keep the code reliably scannable despite the missing corners.
-        // Other themes keep the library default (no corners lost, no need).
-        qrOptions: def.roundClip ? { errorCorrectionLevel: "H" } : undefined,
+        // Other themes keep the library default. IMPORTANT: the key must be
+        // omitted entirely (not set to `qrOptions: undefined`) for non-
+        // roundClip themes — passing an explicit `undefined` here clobbered
+        // the library's own internal default qrOptions on every theme (not
+        // just this one), which broke rendering across the whole app the
+        // first time this shipped (every QR either vanished or, for gear
+        // ring itself, rendered but wasn't scannable). Spreading a
+        // conditionally-empty object keeps the key off the options object
+        // completely when there's nothing to override.
+        ...(def.roundClip ? { qrOptions: { errorCorrectionLevel: "H" as const } } : {}),
         dotsOptions: { color: def.options.dotsColor, type: def.options.dotsType },
         backgroundOptions: { color: def.options.backgroundColor },
         cornersSquareOptions: { color: def.options.cornersSquareColor, type: def.options.cornersSquareType },
@@ -150,7 +158,9 @@ const QrCodeCanvas = forwardRef<QrCodeCanvasHandle, {
           type: "canvas",
           data: url,
           image: def.options.logo ? "/images/qr-gear-real.png" : undefined,
-          qrOptions: def.roundClip ? { errorCorrectionLevel: "H" } : undefined,
+          // See the matching comment in the render effect above — must omit
+          // the key entirely for non-roundClip themes, not pass `undefined`.
+          ...(def.roundClip ? { qrOptions: { errorCorrectionLevel: "H" as const } } : {}),
           dotsOptions: { color: def.options.dotsColor, type: def.options.dotsType },
           backgroundOptions: { color: def.options.backgroundColor },
           cornersSquareOptions: { color: def.options.cornersSquareColor, type: def.options.cornersSquareType },

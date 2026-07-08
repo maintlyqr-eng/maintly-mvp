@@ -450,7 +450,7 @@ export const qrThemes: QrThemeDef[] = [
   {
     id: "gear-ring",
     name: "Gear Ring",
-    description: "A big illustrated cog frame with a clean red ring — the QR itself is round (dot-style modules, clipped to a circle) so it drops straight into the ring's own circular opening with no square corners poking past it.",
+    description: "A big illustrated cog frame with a clean red ring — a standard square QR sized to sit fully inside the ring's white circle, clear of the ring on every side.",
     category: "industry",
     // Replaced with a proper high-res source (Facu's own asset, 1254x1254,
     // perfectly circular ring — old one was a low-res 236x231 crop that had
@@ -459,29 +459,35 @@ export const qrThemes: QrThemeDef[] = [
     // Measured directly off the new asset (radial scan at 8 angles from the
     // image's own center, ~624,608 px of 1254): white circle holds a clean
     // radius out to ~300px, red ring runs ~307-328px, black ring ~330-380px.
-    // hole.w/h is a square whose *inscribed circle* (roundClip below) has a
-    // ~275px radius — comfortable margin inside the white circle, well clear
-    // of the red ring, instead of trying to inscribe a square in the circle.
-    frameHole: { x: 0.2643, y: 0.2516, w: 0.4666, h: 0.4666 },
-    roundClip: true,
+    // hole.w/h is a square sized so its DIAGONAL corners land at ~269px
+    // radius (190*sqrt2) — safely inside the 300px white circle on every
+    // side, including the diagonals, unlike the old hole which nearly
+    // matched the circle's own radius and let the square's corners poke
+    // past it.
+    //
+    // TRIED AND REVERTED: a roundClip (dot-style modules clipped to a
+    // circle, matching a reference photo the user liked) rendered fine but
+    // the deployed code didn't scan at all ("no me lleva a ningun lado") —
+    // almost certainly because the circular crop, with no quiet-zone margin
+    // to absorb it, sliced directly into the finder-pattern squares at the
+    // 3 corners. Reverted to a plain, unclipped square QR — same principle
+    // (shrink + reposition so nothing pokes past the ring) but with zero
+    // scan risk, since nothing about the QR itself (shape, corners, modules)
+    // is unusual. Do not reintroduce roundClip here without a real scan test
+    // on a deployed build first, not just a visual check.
+    frameHole: { x: 0.34609, y: 0.33333, w: 0.30303, h: 0.30303 },
     options: {
-      // White background: the QR needs its own opaque white backing for the
-      // dark modules to have proper scan contrast against the artwork. The
-      // roundClip crop hides the corners of this square canvas, leaving only
-      // the inscribed circle visible.
+      // White background: the QR needs its own opaque white card for the
+      // dark modules to have proper scan contrast against the artwork.
       //
       // CONFIRMED (explicit user answer): cornersSquareColor must be red,
       // not black. The user wants zero black in the QR's own finder-pattern
       // corners — only the frame artwork's black ring (baked into
       // qr-gear-ring.png, not configurable here) stays black. Do not revert
       // this to black again without a fresh explicit request.
-      //
-      // dotsType "dots" + cornersSquareType/cornersDotType "dot": round
-      // modules throughout, so the whole code reads as circular blobs rather
-      // than a square grid with a circular crop slapped over it.
-      dotsColor: "#18181b", dotsType: "dots", backgroundColor: "#ffffff",
-      cornersSquareColor: "#dc2626", cornersSquareType: "dot",
-      cornersDotColor: "#dc2626", cornersDotType: "dot", logo: false,
+      dotsColor: "#18181b", dotsType: "square", backgroundColor: "#ffffff",
+      cornersSquareColor: "#dc2626", cornersSquareType: "square",
+      cornersDotColor: "#dc2626", cornersDotType: "square", logo: false,
     },
   },
   {
