@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useRef, useState, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   LayoutGrid, FileText, Box, QrCode, Users, BarChart3, Calendar as CalendarIcon,
   Mail, FolderOpen, Settings, Bell, X, LogOut, Crown, Menu,
@@ -11,6 +11,7 @@ import {
   Star, Ban, Flag,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import NotificationBell from "@/components/NotificationBell";
 import HoverAvatar from "@/components/HoverAvatar";
 import ContactSupportWidget from "@/components/ContactSupportWidget";
 import { useUnreadMessagesCount } from "@/lib/useUnreadMessages";
@@ -105,8 +106,9 @@ function displayName(m: MechanicInfo) {
   return m.workshop_name || m.name || m.email;
 }
 
-export default function TeamChatPage() {
+function TeamChatPageInner() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [checkingAuth, setCheckingAuth] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [mechanicId, setMechanicId] = useState("");
@@ -351,6 +353,19 @@ export default function TeamChatPage() {
       await loadSavedContacts(session.user.id);
       await loadBlocks(session.user.id);
       if (active) setCheckingAuth(false);
+
+      // Deep link from the notification bell (or anywhere else) —
+      // /dashboard/team-chat?with=<mechanicId> opens straight into that
+      // conversation instead of landing on the bare conversation list.
+      const withId = searchParams.get("with");
+      if (withId && withId !== session.user.id) {
+        const { data: info } = await supabase
+          .from("mechanics")
+          .select("id, name, email, workshop_name, photo_url")
+          .eq("id", withId)
+          .single();
+        if (active && info) openConversation(info as MechanicInfo);
+      }
     }
 
     init();
@@ -676,7 +691,7 @@ export default function TeamChatPage() {
             </div>
           </div>
           <div className="flex items-center gap-2 md:gap-4 shrink-0">
-            <button className="relative text-zinc-500 hover:text-zinc-800 transition-colors"><Bell size={19} /></button>
+            <NotificationBell mechanicId={mechanicId} unreadMessagesCount={unreadMessages} unreadMechanicCount={unreadMechanicMessages} />
             <div className="flex items-center gap-3 md:pl-3 md:border-l border-zinc-200">
               <div className="flex items-center gap-2.5">
                 <Link href="/dashboard/settings" className="shrink-0">
@@ -1113,5 +1128,21 @@ export default function TeamChatPage() {
         </div>
       )}
     </div>
+  );
+}
+
+// useSearchParams() (used above for the ?with=<mechanicId> deep link from
+// the notification bell) opts the page out of static rendering unless
+// wrapped in a Suspense boundary — same pattern already used by
+// src/app/login/page.tsx for its own ?redirect= param.
+export default function TeamChatPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <div className="w-8 h-8 border-4 border-red-600 border-t-transparent rounded-full animate-spin" />
+      </div>
+    }>
+      <TeamChatPageInner />
+    </Suspense>
   );
 }

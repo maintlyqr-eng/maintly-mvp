@@ -11,6 +11,7 @@ import {
   MessageCircle,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import NotificationBell from "@/components/NotificationBell";
 import { authedFetch } from "@/lib/apiAuth";
 import { useUnreadMessagesCount } from "@/lib/useUnreadMessages";
 import { useUnreadMechanicMessages } from "@/lib/useUnreadMechanicMessages";
@@ -349,7 +350,7 @@ export default function QrCodesPage() {
             </div>
           </div>
           <div className="flex items-center gap-2 md:gap-4 shrink-0">
-            <button className="relative text-zinc-500 hover:text-zinc-800 transition-colors"><Bell size={19} /></button>
+            <NotificationBell mechanicId={mechanicId} unreadMessagesCount={unreadMessages} unreadMechanicCount={unreadMechanicMessages} />
             <div className="flex items-center gap-3 md:pl-3 md:border-l border-zinc-200">
               <div className="flex items-center gap-2.5">
                 <Link href="/dashboard/settings" className="shrink-0">
