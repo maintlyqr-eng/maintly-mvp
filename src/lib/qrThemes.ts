@@ -408,45 +408,10 @@ export const qrThemes: QrThemeDef[] = [
   },
 
   // --- Industry & hobby ---
-  {
-    id: "wave",
-    name: "Wave",
-    description: "A rolling ocean wave for marine and outdoor equipment.",
-    category: "industry",
-    frameImage: "/images/qr-frames/qr-wave.png", frameAspect: 0.9848,
-    frameHole: { x: 0.2879, y: 0.3179, w: 0.3788, h: 0.3897 },
-    options: {
-      dotsColor: "#18181b", dotsType: "classy", backgroundColor: "#ffffff",
-      cornersSquareColor: "#0891b2", cornersSquareType: "extra-rounded",
-      cornersDotColor: "#0891b2", cornersDotType: "dot", logo: false,
-    },
-  },
-  {
-    id: "peak",
-    name: "Peak",
-    description: "A mountain-and-forest scene for off-road, farm, and outdoor gear.",
-    category: "industry",
-    frameImage: "/images/qr-frames/qr-mountain.png", frameAspect: 0.8109,
-    frameHole: { x: 0.3193, y: 0.3523, w: 0.3487, h: 0.4301 },
-    options: {
-      dotsColor: "#18181b", dotsType: "classy-rounded", backgroundColor: "#ffffff",
-      cornersSquareColor: "#15803d", cornersSquareType: "square",
-      cornersDotColor: "#15803d", cornersDotType: "square", logo: false,
-    },
-  },
-  {
-    id: "wrench-cross",
-    name: "Lug Wrench",
-    description: "A tire iron/lug wrench cross — built for the actual mechanic's shop.",
-    category: "industry",
-    frameImage: "/images/qr-frames/qr-wrench.png", frameAspect: 0.9274,
-    frameHole: { x: 0.3065, y: 0.2957, w: 0.379, h: 0.4 },
-    options: {
-      dotsColor: "#18181b", dotsType: "square", backgroundColor: "#ffffff",
-      cornersSquareColor: "#52525b", cornersSquareType: "square",
-      cornersDotColor: "#52525b", cornersDotType: "square", logo: false,
-    },
-  },
+  // Gear Ring goes first in this section on purpose: it's MaintlyQR's own
+  // gear/cog motif (the flagship look, not just another decorative frame),
+  // so it should be the first thing a mechanic sees when browsing this
+  // category, not buried after four other options.
   {
     id: "gear-ring",
     name: "Gear Ring",
@@ -489,6 +454,45 @@ export const qrThemes: QrThemeDef[] = [
       dotsColor: "#18181b", dotsType: "square", backgroundColor: "#ffffff",
       cornersSquareColor: "#dc2626", cornersSquareType: "square",
       cornersDotColor: "#dc2626", cornersDotType: "square", logo: false,
+    },
+  },
+  {
+    id: "wave",
+    name: "Wave",
+    description: "A rolling ocean wave for marine and outdoor equipment.",
+    category: "industry",
+    frameImage: "/images/qr-frames/qr-wave.png", frameAspect: 0.9848,
+    frameHole: { x: 0.2879, y: 0.3179, w: 0.3788, h: 0.3897 },
+    options: {
+      dotsColor: "#18181b", dotsType: "classy", backgroundColor: "#ffffff",
+      cornersSquareColor: "#0891b2", cornersSquareType: "extra-rounded",
+      cornersDotColor: "#0891b2", cornersDotType: "dot", logo: false,
+    },
+  },
+  {
+    id: "peak",
+    name: "Peak",
+    description: "A mountain-and-forest scene for off-road, farm, and outdoor gear.",
+    category: "industry",
+    frameImage: "/images/qr-frames/qr-mountain.png", frameAspect: 0.8109,
+    frameHole: { x: 0.3193, y: 0.3523, w: 0.3487, h: 0.4301 },
+    options: {
+      dotsColor: "#18181b", dotsType: "classy-rounded", backgroundColor: "#ffffff",
+      cornersSquareColor: "#15803d", cornersSquareType: "square",
+      cornersDotColor: "#15803d", cornersDotType: "square", logo: false,
+    },
+  },
+  {
+    id: "wrench-cross",
+    name: "Lug Wrench",
+    description: "A tire iron/lug wrench cross — built for the actual mechanic's shop.",
+    category: "industry",
+    frameImage: "/images/qr-frames/qr-wrench.png", frameAspect: 0.9274,
+    frameHole: { x: 0.3065, y: 0.2957, w: 0.379, h: 0.4 },
+    options: {
+      dotsColor: "#18181b", dotsType: "square", backgroundColor: "#ffffff",
+      cornersSquareColor: "#52525b", cornersSquareType: "square",
+      cornersDotColor: "#52525b", cornersDotType: "square", logo: false,
     },
   },
   {
@@ -681,7 +685,12 @@ export const QR_THEME_CATEGORIES: { id: QrThemeDef["category"]; label: string }[
   { id: "industry", label: "Industry & hobby" },
 ];
 
-export const DEFAULT_QR_THEME = "classic";
+// Gear Ring is MaintlyQR's own flagship look — the cog motif is the brand's
+// icon, so new codes are born with it instead of the plain black-and-white
+// "classic" look. Existing codes keep whatever theme they already have;
+// this only affects codes created from now on. Change back to "classic" if
+// that's ever preferred as the safe/cheap-to-print universal default again.
+export const DEFAULT_QR_THEME = "gear-ring";
 
 export function getQrTheme(id: string | null | undefined): QrThemeDef {
   return qrThemes.find((t) => t.id === id) ?? qrThemes[0];
