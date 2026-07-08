@@ -459,11 +459,12 @@ export const qrThemes: QrThemeDef[] = [
     // Measured directly off the new asset (radial scan at 8 angles from the
     // image's own center, ~624,608 px of 1254): white circle holds a clean
     // radius out to ~300px, red ring runs ~307-328px, black ring ~330-380px.
-    // hole.w/h is a square sized so its DIAGONAL corners land at ~269px
-    // radius (190*sqrt2) — safely inside the 300px white circle on every
-    // side, including the diagonals, unlike the old hole which nearly
-    // matched the circle's own radius and let the square's corners poke
-    // past it.
+    // hole.w/h is a square sized so its DIAGONAL corners land at ~290px
+    // radius (205*sqrt2) — inside the 300px white circle on every side
+    // including the diagonals, with a little breathing room, but bigger
+    // than the first pass (which left visible unused white space before
+    // the ring — per explicit feedback, sized up until it's close without
+    // touching).
     //
     // TRIED AND REVERTED: a roundClip (dot-style modules clipped to a
     // circle, matching a reference photo the user liked) rendered fine but
@@ -475,7 +476,7 @@ export const qrThemes: QrThemeDef[] = [
     // scan risk, since nothing about the QR itself (shape, corners, modules)
     // is unusual. Do not reintroduce roundClip here without a real scan test
     // on a deployed build first, not just a visual check.
-    frameHole: { x: 0.34609, y: 0.33333, w: 0.30303, h: 0.30303 },
+    frameHole: { x: 0.33414, y: 0.32138, w: 0.32696, h: 0.32696 },
     options: {
       // White background: the QR needs its own opaque white card for the
       // dark modules to have proper scan contrast against the artwork.
