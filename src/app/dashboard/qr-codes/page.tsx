@@ -93,6 +93,17 @@ export default function QrCodesPage() {
   // by a single card's own "Print" button, kept deliberately independent of
   // `selected` so printing one code doesn't disturb a bulk selection.
   const [printCodes, setPrintCodes] = useState<string[] | null>(null);
+  // How big each code+frame prints, in CSS px (frame width, not just the
+  // QR — see QrCodeCanvas's `size` semantics). Adjustable before printing
+  // since a sticker meant for a small part and one meant for a truck door
+  // want very different sizes, and there was no way to change it before.
+  const [printSize, setPrintSize] = useState(180);
+  const PRINT_SIZE_PRESETS: { label: string; value: number }[] = [
+    { label: "S", value: 120 },
+    { label: "M", value: 180 },
+    { label: "L", value: 260 },
+    { label: "XL", value: 340 },
+  ];
 
   async function loadCodes() {
     setLoading(true);
@@ -563,13 +574,32 @@ export default function QrCodesPage() {
       {/* ════ PRINT SHEET ════ */}
       {printCodes && (
         <div id="qr-print-sheet" className="fixed inset-0 z-50 bg-white overflow-y-auto">
-          <div className="no-print flex items-center justify-between px-6 py-4 border-b border-zinc-200 sticky top-0 bg-white z-10">
-            <h2 className="text-[16px] font-black text-zinc-900">Print Sheet — {printRows.length} code{printRows.length === 1 ? "" : "s"}</h2>
-            <div className="flex items-center gap-2">
-              <button onClick={() => window.print()} className="flex items-center gap-2 bg-red-600 hover:bg-red-500 text-white text-[13px] font-bold px-4 py-2 rounded-xl">
-                <Printer size={14} /> Print
-              </button>
-              <button onClick={() => setPrintCodes(null)} className="text-zinc-400 hover:text-zinc-700 px-2"><X size={20} /></button>
+          <div className="no-print sticky top-0 bg-white z-10 border-b border-zinc-200">
+            <div className="flex items-center justify-between px-6 py-4">
+              <h2 className="text-[16px] font-black text-zinc-900">Print Sheet — {printRows.length} code{printRows.length === 1 ? "" : "s"}</h2>
+              <div className="flex items-center gap-2">
+                <button onClick={() => window.print()} className="flex items-center gap-2 bg-red-600 hover:bg-red-500 text-white text-[13px] font-bold px-4 py-2 rounded-xl">
+                  <Printer size={14} /> Print
+                </button>
+                <button onClick={() => setPrintCodes(null)} className="text-zinc-400 hover:text-zinc-700 px-2"><X size={20} /></button>
+              </div>
+            </div>
+            <div className="flex items-center gap-3 px-6 pb-4 flex-wrap">
+              <span className="text-[11px] font-bold text-zinc-500">Size:</span>
+              {PRINT_SIZE_PRESETS.map((p) => (
+                <button
+                  key={p.label} type="button" onClick={() => setPrintSize(p.value)}
+                  className={`px-3 py-1 rounded-lg text-[11px] font-bold border-2 transition-all ${printSize === p.value ? "border-red-500 bg-red-50 text-red-600" : "border-zinc-200 text-zinc-600 hover:border-zinc-300"}`}
+                >
+                  {p.label}
+                </button>
+              ))}
+              <input
+                type="range" min={80} max={400} step={10} value={printSize}
+                onChange={(e) => setPrintSize(Number(e.target.value))}
+                className="w-40 accent-red-600"
+              />
+              <span className="text-[11px] text-zinc-400 tabular-nums">{printSize}px</span>
             </div>
           </div>
           {/* flex-wrap + justify-center instead of a CSS grid: with a grid,
@@ -581,8 +611,8 @@ export default function QrCodesPage() {
               count. */}
           <div className="p-8 flex flex-wrap justify-center gap-8 max-w-4xl mx-auto">
             {printRows.map((row) => (
-              <div key={row.code} className="w-[180px] flex flex-col items-center text-center gap-1.5 break-inside-avoid">
-                <QrCodeCanvas code={row.code} theme={row.theme} size={130} />
+              <div key={row.code} style={{ width: printSize + 50 }} className="flex flex-col items-center text-center gap-1.5 break-inside-avoid">
+                <QrCodeCanvas code={row.code} theme={row.theme} size={printSize} />
                 <p className="text-[11px] font-mono font-bold text-zinc-800">{row.code}</p>
                 {row.label && <p className="text-[10px] text-zinc-500">{row.label}</p>}
               </div>
