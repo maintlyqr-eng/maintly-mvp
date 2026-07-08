@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { useEffect, useRef, useState, Suspense } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   LayoutGrid, FileText, Box, QrCode, Users, BarChart3, Calendar as CalendarIcon,
@@ -161,16 +161,24 @@ function TeamChatPageInner() {
   useEffect(() => { selectedIdRef.current = selectedId; }, [selectedId]);
 
   // Now that the thread pane scrolls internally instead of the whole page
-  // (see the h-screen layout fix above), it needs to actually land on the
-  // newest message on its own — otherwise opening a long conversation
-  // would show you the *oldest* messages first, which is arguably worse
-  // than the old scroll-the-whole-page behavior. Fires whenever the
-  // loaded thread changes (new conversation opened, or a message
-  // sent/received) and whenever the selected conversation changes.
-  const threadEndRef = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    threadEndRef.current?.scrollIntoView({ block: "end" });
-  }, [thread, selectedId]);
+  // (see the h-dvh layout fix above), it needs to actually land on the
+  // newest message on its own — otherwise opening a conversation would
+  // show you the *oldest* messages first, which is arguably worse than
+  // the old scroll-the-whole-page behavior. First cut used
+  // threadEndRef.current.scrollIntoView() on a sentinel div, but Facu
+  // still had to scroll down manually every time — scrollIntoView asks
+  // the browser to find and scroll whichever ancestor it decides is "the"
+  // scrollable one, which is exactly the kind of thing that quietly
+  // misbehaves across mobile browsers. Setting the message container's
+  // own scrollTop directly is unambiguous: there's only one container
+  // this could possibly mean. useLayoutEffect (not useEffect) so this
+  // runs synchronously right after the DOM updates, before the browser
+  // paints — no flash of "still scrolled to the middle" before it jumps.
+  const threadContainerRef = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const el = threadContainerRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [thread, selectedId, threadLoading]);
 
   async function loadConversations(myId: string) {
     setConversationsLoading(true);
@@ -666,12 +674,19 @@ function TeamChatPageInner() {
     // conversation grew past one screen's worth of messages the whole
     // page (not just the message list) got taller than the viewport, and
     // reaching the compose bar meant scrolling the entire browser window.
-    // h-screen + overflow-hidden here pins the page to exactly the
-    // viewport height, so the inner `min-h-0` + `overflow-y-auto` message
-    // list (further down) is what scrolls, while the header, sidebar, and
-    // the compose bar at the bottom stay fixed in place — same shape as
-    // WhatsApp Web.
-    <div className="h-screen bg-zinc-50 flex relative overflow-hidden">
+    //
+    // h-dvh (not h-screen) on purpose: h-screen is `height: 100vh`, and on
+    // mobile browsers 100vh is measured against the *largest* possible
+    // viewport — the one you get once the address bar auto-hides. Right
+    // after loading the page, with the address bar still showing, the
+    // real visible area is shorter than 100vh, so the bottom of an
+    // h-screen layout (the compose bar) sits partly under that bar until
+    // the page is nudged and the browser collapses it — exactly what Facu
+    // reported: "hay que mover un poco la pantalla para arriba para
+    // llegar a la barrita." h-dvh uses the *dynamic* viewport height
+    // instead, which tracks the address bar's real state, so the compose
+    // bar is fully visible immediately, no nudge needed.
+    <div className="h-dvh bg-zinc-50 flex relative overflow-hidden">
 
       {sidebarOpen && (
         <div className="md:hidden fixed inset-0 bg-black/40 z-30" onClick={() => setSidebarOpen(false)} />
@@ -1049,7 +1064,7 @@ function TeamChatPageInner() {
                   </div>
                 )}
 
-                <div className="flex-1 min-h-0 overflow-y-auto px-5 py-4 space-y-2.5 bg-zinc-50/40">
+                <div ref={threadContainerRef} className="flex-1 min-h-0 overflow-y-auto px-5 py-4 space-y-2.5 bg-zinc-50/40">
                   {threadLoading ? (
                     <p className="text-[12px] text-zinc-300 text-center py-8">Loading…</p>
                   ) : thread.length === 0 ? (
@@ -1076,7 +1091,6 @@ function TeamChatPageInner() {
                       );
                     })
                   )}
-                  <div ref={threadEndRef} />
                 </div>
 
                 {selectedIsBlocked ? (
