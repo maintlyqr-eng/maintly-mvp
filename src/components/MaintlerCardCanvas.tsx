@@ -55,7 +55,6 @@ export type MaintlerCardCanvasHandle = {
 
 const CARD_W = 1050;
 const CARD_H = 660;
-const BANNER_H = 70;
 
 function loadImageEl(src: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
@@ -115,38 +114,6 @@ function wrapText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number,
   }
   if (current && lines.length < maxLines) lines.push(current);
   return lines.slice(0, maxLines);
-}
-
-// A small concentric-arc "scan/signal" glyph for the front banner — canvas
-// has no icon font available, so this is drawn directly rather than
-// pulling in an image asset for one small detail.
-function drawSignalGlyph(ctx: CanvasRenderingContext2D, cx: number, cy: number, size: number) {
-  ctx.save();
-  ctx.strokeStyle = "#ffffff";
-  ctx.lineCap = "round";
-  for (let i = 0; i < 3; i++) {
-    const r = (size / 3) * (i + 1);
-    ctx.globalAlpha = 1 - i * 0.22;
-    ctx.lineWidth = 2.5;
-    ctx.beginPath();
-    ctx.arc(cx, cy, r, -Math.PI * 0.75, -Math.PI * 0.25);
-    ctx.stroke();
-  }
-  ctx.restore();
-}
-
-// Subtle diagonal accent line, echoing the mockup's top-right cut —
-// intentionally understated (this is a detail, not a load-bearing part of
-// the design) rather than an attempt at a pixel-exact recreation.
-function drawAccent(ctx: CanvasRenderingContext2D, w: number, h: number) {
-  ctx.save();
-  ctx.strokeStyle = "rgba(220,38,38,0.35)";
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.moveTo(w - 210, 0);
-  ctx.lineTo(w, 130);
-  ctx.stroke();
-  ctx.restore();
 }
 
 function assetTypeLabel(type: string) {
@@ -228,42 +195,36 @@ const MaintlerCardCanvas = forwardRef<MaintlerCardCanvasHandle, Props>(function 
   const domBadges = computeBadges(!!verified, effStats, activeSpecialties.length, years);
 
   // ── FRONT ──
+  // Round 8: Facu sent his actual front-card artwork (frontcard.png,
+  // 1586×992) — a finished design with the logo, per-field icons + guide
+  // lines, a verified-badge outline, the QR gear-ring frame, and the whole
+  // bottom banner (incl. the static "SCAN TO VIEW MY PROFILE" text and the
+  // signal glyph) already baked in. Instead of hand-drawing a gradient/
+  // brand-mark/banner approximation of his design, we now draw HIS image
+  // as the background and only place real, dynamic data on top: photo, QR,
+  // and each identity field over the exact spot its icon+line marks. Every
+  // coordinate below was measured directly off frontcard.png's pixels (see
+  // /tmp/card_test/ — a Python/PIL script found each circle and guide
+  // line's bounding box) and scaled from its native 1586×992 into this
+  // component's CARD_W×CARD_H canvas (scale factors are ~0.5% apart on X
+  // vs Y, close enough that circles stay circular after the stretch).
   async function drawFront(ctx: CanvasRenderingContext2D, isStale: () => boolean = () => false) {
     const W = CARD_W, H = CARD_H;
     ctx.clearRect(0, 0, W, H);
-    const contentH = H - BANNER_H;
 
-    const bg = ctx.createLinearGradient(0, 0, W, contentH);
-    bg.addColorStop(0, "#27272a");
-    bg.addColorStop(1, "#09090b");
-    ctx.fillStyle = bg;
-    ctx.fillRect(0, 0, W, contentH);
-    drawAccent(ctx, W, contentH);
-
-    // Brand mark, top-left.
-    const brandIconSize = 46;
-    const brandX = 40, brandY = 30;
-    ctx.textAlign = "left";
     try {
-      const gearIcon = await loadImageEl("/images/qr-frames/qr-gear-ring.png");
-      ctx.drawImage(gearIcon, brandX, brandY, brandIconSize, brandIconSize);
+      const bgImg = await loadImageEl("/images/frontcard.png");
+      if (isStale()) return;
+      ctx.drawImage(bgImg, 0, 0, W, H);
     } catch {
-      // Icon failed to load — the wordmark alone still identifies the card.
+      // Background art failed to load (offline, moved file) — fall back to
+      // a plain dark card so the data is still legible rather than blank.
+      ctx.fillStyle = "#09090b";
+      ctx.fillRect(0, 0, W, H);
     }
-    ctx.font = "bold 22px Arial, sans-serif";
-    ctx.fillStyle = "#e4e4e7";
-    ctx.fillText("MAINTLYQR", brandX + brandIconSize + 12, brandY + brandIconSize / 2 - 2);
-    ctx.font = "bold 9px Arial, sans-serif";
-    ctx.fillStyle = "#71717a";
-    ctx.fillText("MAINTENANCE  ·  TRACKED", brandX + brandIconSize + 12, brandY + brandIconSize / 2 + 13);
 
-    // Photo + identity block, vertically centered below the brand mark.
-    const bandTop = brandY + brandIconSize + 26;
-    const bandCy = bandTop + (contentH - bandTop) / 2;
-
-    const photoSize = 168;
-    const photoCx = 40 + photoSize / 2;
-    const photoCy = bandCy;
+    // Photo, in the circle the artwork marks on the left.
+    const photoCx = 179, photoCy = 294, photoR = 99;
     let photoDrawn = false;
     if (photoUrl) {
       try {
@@ -271,10 +232,10 @@ const MaintlerCardCanvas = forwardRef<MaintlerCardCanvasHandle, Props>(function 
         if (isStale()) return;
         ctx.save();
         ctx.beginPath();
-        ctx.arc(photoCx, photoCy, photoSize / 2, 0, Math.PI * 2);
+        ctx.arc(photoCx, photoCy, photoR, 0, Math.PI * 2);
         ctx.closePath();
         ctx.clip();
-        const scale = Math.max(photoSize / img.width, photoSize / img.height);
+        const scale = Math.max((photoR * 2) / img.width, (photoR * 2) / img.height);
         const dw = img.width * scale, dh = img.height * scale;
         ctx.drawImage(img, photoCx - dw / 2, photoCy - dh / 2, dw, dh);
         ctx.restore();
@@ -286,101 +247,85 @@ const MaintlerCardCanvas = forwardRef<MaintlerCardCanvasHandle, Props>(function 
     }
     if (!photoDrawn) {
       ctx.beginPath();
-      ctx.arc(photoCx, photoCy, photoSize / 2, 0, Math.PI * 2);
+      ctx.arc(photoCx, photoCy, photoR, 0, Math.PI * 2);
       ctx.fillStyle = "#3f3f46";
       ctx.fill();
       ctx.fillStyle = "#ffffff";
-      ctx.font = "bold 56px Arial, sans-serif";
+      ctx.font = "bold 40px Arial, sans-serif";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      ctx.fillText(initialsOf(name), photoCx, photoCy + 4);
+      ctx.fillText(initialsOf(name), photoCx, photoCy + 2);
       ctx.textBaseline = "alphabetic";
       ctx.textAlign = "left";
     }
-    ctx.beginPath();
-    ctx.arc(photoCx, photoCy, photoSize / 2, 0, Math.PI * 2);
-    ctx.lineWidth = 5;
-    ctx.strokeStyle = "#dc2626";
-    ctx.stroke();
 
-    const textX = photoCx + photoSize / 2 + 32;
-    const textMaxWidth = 420;
+    // Identity fields — one per guide line the artwork already draws
+    // (person/building/shield/wrench/pin/calendar, top to bottom). A field
+    // with no data just leaves its line blank, same as an empty form field.
+    ctx.textAlign = "left";
+    const textX = 334;
+    const textMaxWidth = 208; // guide lines end here in the artwork too
 
-    // Two-pass layout: first work out how tall this text column will be
-    // (it varies — not every Maintler has a workshop/profession/location
-    // set), THEN center that whole block against the photo's true center
-    // (bandCy), instead of always starting at a fixed offset below the
-    // brand mark. Growing downward from a fixed top (the old approach) left
-    // a large, visible gap between the photo and the text once CARD_H grew
-    // to 660 and a "Member since" line was added — exactly what Facu's
-    // screenshot showed.
-    const showWorkshop = !!(workshopName && workshopName !== name);
-    let textSpan = 0; // baseline-to-baseline distance, first line to last
-    if (showWorkshop) textSpan += 26;
-    if (verified) textSpan += 34;
-    if (profession) textSpan += 30;
-    if (location) textSpan += 24;
-    if (createdAt) textSpan += 24;
-    const topPad = 22; // ~cap-height of the 30px bold name line
-    const bottomPad = 8; // descender allowance for the last line's font
-    const blockH = textSpan + topPad + bottomPad;
-    let y = bandCy - blockH / 2 + topPad;
-
-    ctx.font = "bold 30px Arial, sans-serif";
+    ctx.font = "bold 20px Arial, sans-serif";
     ctx.fillStyle = "#ffffff";
-    ctx.fillText(truncateToWidth(ctx, name, textMaxWidth), textX, y);
+    ctx.fillText(truncateToWidth(ctx, name, textMaxWidth), textX, 214);
 
-    if (showWorkshop) {
-      y += 26;
-      ctx.font = "18px Arial, sans-serif";
+    if (workshopName && workshopName !== name) {
+      ctx.font = "13px Arial, sans-serif";
       ctx.fillStyle = "#a1a1aa";
-      ctx.fillText(truncateToWidth(ctx, workshopName!, textMaxWidth), textX, y);
+      ctx.fillText(truncateToWidth(ctx, workshopName, textMaxWidth), textX, 261);
     }
 
     if (verified) {
-      y += 34;
-      const label = "✓ VERIFIED MAINTLER";
-      ctx.font = "bold 13px Arial, sans-serif";
-      const textWidth = ctx.measureText(label).width;
-      const pillH = 27, padX = 12;
-      const pillW = textWidth + padX * 2;
-      roundRect(ctx, textX, y - pillH + 7, pillW, pillH, pillH / 2);
-      ctx.fillStyle = "rgba(16,185,129,0.16)";
+      // Fit-to-box pill matching the artwork's own outlined badge slot,
+      // rather than a free-floating pill sized off the text (the box is
+      // fixed at ~183px wide, so the label shrinks to fit it instead).
+      const pillX = 331, pillY = 285, pillW = 183, pillH = 28;
+      const label = "✓ VERIFIED";
+      let fontSize = 12;
+      ctx.font = `bold ${fontSize}px Arial, sans-serif`;
+      while (ctx.measureText(label).width > pillW - 16 && fontSize > 8) {
+        fontSize -= 1;
+        ctx.font = `bold ${fontSize}px Arial, sans-serif`;
+      }
+      roundRect(ctx, pillX, pillY, pillW, pillH, pillH / 2);
+      ctx.fillStyle = "rgba(16,185,129,0.18)";
       ctx.fill();
       ctx.fillStyle = "#34d399";
+      ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      ctx.fillText(label, textX + padX, y - pillH / 2 + 7 + 1);
+      ctx.fillText(label, pillX + pillW / 2, pillY + pillH / 2 + 1);
       ctx.textBaseline = "alphabetic";
+      ctx.textAlign = "left";
     }
 
     if (profession) {
-      y += 30;
-      ctx.font = "15px Arial, sans-serif";
+      ctx.font = "13px Arial, sans-serif";
       ctx.fillStyle = "#d4d4d8";
-      ctx.fillText(`🔧 ${truncateToWidth(ctx, profession, textMaxWidth - 22)}`, textX, y);
+      ctx.fillText(truncateToWidth(ctx, profession, textMaxWidth), textX, 350);
     }
 
     if (location) {
-      y += 24;
-      ctx.font = "15px Arial, sans-serif";
+      ctx.font = "13px Arial, sans-serif";
       ctx.fillStyle = "#a1a1aa";
-      ctx.fillText(`📍 ${truncateToWidth(ctx, location, textMaxWidth - 22)}`, textX, y);
+      ctx.fillText(truncateToWidth(ctx, location, textMaxWidth), textX, 391);
     }
 
     if (createdAt) {
-      y += 24;
-      ctx.font = "14px Arial, sans-serif";
+      ctx.font = "12px Arial, sans-serif";
       ctx.fillStyle = "#71717a";
       const memberSince = new Date(createdAt).toLocaleDateString("en-US", { day: "2-digit", month: "2-digit", year: "numeric" });
-      ctx.fillText(`📅 Member since ${memberSince}`, textX, y);
+      ctx.fillText(memberSince, textX, 428);
     }
 
-    // QR block, framed by the Gear Ring artwork — no background panel
-    // behind it, since that artwork already has its own transparent
-    // margin (round 4 fix carried over unchanged).
-    const qrBoxOuter = 296;
-    const qrCx = W - 195;
-    const qrCy = bandCy;
+    // QR, in the gear-ring circle the artwork marks on the right. qrOuter
+    // is deliberately smaller than the white circle's diameter (~163px) —
+    // a square QR image scaled to fit width/height=diameter overflows past
+    // a circle at the corners (a square inscribed in a circle of radius r
+    // maxes out at r·√2 ≈ 115px here), so this keeps the QR fully inside
+    // the circle with a small margin instead of clipping into the metal
+    // gear ring around it.
+    const qrCx = 782, qrCy = 298, qrOuter = 108;
     let qrBlob: Blob | null = null;
     try {
       qrBlob = (await qrFrontHandleRef.current?.getBlob()) ?? null;
@@ -391,7 +336,7 @@ const MaintlerCardCanvas = forwardRef<MaintlerCardCanvasHandle, Props>(function 
     if (qrBlob) {
       try {
         const qrImg = await blobToImage(qrBlob);
-        const scale = Math.min(qrBoxOuter / qrImg.width, qrBoxOuter / qrImg.height);
+        const scale = Math.min(qrOuter / qrImg.width, qrOuter / qrImg.height);
         const dw = qrImg.width * scale, dh = qrImg.height * scale;
         ctx.drawImage(qrImg, qrCx - dw / 2, qrCy - dh / 2, dw, dh);
       } catch {
@@ -400,40 +345,40 @@ const MaintlerCardCanvas = forwardRef<MaintlerCardCanvasHandle, Props>(function 
       }
     }
 
-    // Bottom banner: Maintler ID on the left, "scan to view" + a small
-    // signal glyph on the right — matching the mockup's layout (moved out
-    // of the main content area, where earlier rounds of this card used to
-    // put the "scan to view" caption directly under the QR).
-    ctx.fillStyle = "#dc2626";
-    ctx.fillRect(0, H - BANNER_H, W, BANNER_H);
-    ctx.textAlign = "left";
-    ctx.fillStyle = "rgba(255,255,255,0.75)";
-    ctx.font = "10px Arial, sans-serif";
-    ctx.fillText("MAINTLER ID", 40, H - BANNER_H + 27);
+    // Maintler ID, over the dashed placeholder in the artwork's bottom
+    // banner. Everything else in that banner ("MAINTLER ID" label, "SCAN TO
+    // VIEW MY PROFILE", the signal glyph) is already part of the image.
     ctx.fillStyle = "#ffffff";
-    ctx.font = "bold 20px Arial, sans-serif";
-    ctx.fillText(code.slice(0, 8).toUpperCase(), 40, H - BANNER_H + 50);
-
-    ctx.textAlign = "right";
-    ctx.fillStyle = "#ffffff";
-    ctx.font = "bold 12px Arial, sans-serif";
-    ctx.fillText("SCAN TO VIEW MY PROFILE", W - 70, H - BANNER_H / 2 + 4);
-    drawSignalGlyph(ctx, W - 40, H - BANNER_H / 2, 20);
-    ctx.textAlign = "left";
+    ctx.font = "bold 15px Arial, sans-serif";
+    ctx.fillText(code.slice(0, 8).toUpperCase(), 81, 562);
   }
 
   // ── BACK ──
+  // Round 8: Facu's real back-card artwork (backcard.png, 1536×1024) — a
+  // dark card with subtle corner gear/globe watermarks and a red bottom
+  // banner (with a decorative notch cut into its top edge), but with NO
+  // baked-in field placeholders — unlike the front, the content sections
+  // below (ABOUT ME/SPECIALTIES/STATS/BADGES/CONTACT/SHARE) are still laid
+  // out by this component itself, just on top of his real background
+  // instead of a hand-drawn gradient. BACK_CONTENT_H is the artwork's real
+  // banner top (measured off the source PNG the same way as the front —
+  // see /tmp/card_test/ — then scaled from 1536×1024 into CARD_W×CARD_H),
+  // replacing the old `H - BANNER_H` guess so CONTACT/SHARE never overlap
+  // the real (taller) red banner.
   async function drawBack(ctx: CanvasRenderingContext2D, isStale: () => boolean = () => false) {
     const W = CARD_W, H = CARD_H;
     ctx.clearRect(0, 0, W, H);
-    const contentH = H - BANNER_H;
+    const BACK_CONTENT_H = 552;
+    const contentH = BACK_CONTENT_H;
 
-    const bg = ctx.createLinearGradient(0, 0, W, contentH);
-    bg.addColorStop(0, "#27272a");
-    bg.addColorStop(1, "#09090b");
-    ctx.fillStyle = bg;
-    ctx.fillRect(0, 0, W, contentH);
-    drawAccent(ctx, W, contentH);
+    try {
+      const bgImg = await loadImageEl("/images/backcard.png");
+      if (isStale()) return;
+      ctx.drawImage(bgImg, 0, 0, W, H);
+    } catch {
+      ctx.fillStyle = "#09090b";
+      ctx.fillRect(0, 0, W, H);
+    }
 
     const pad = 36;
     const colLeftX = pad, colLeftW = 430;
@@ -664,21 +609,22 @@ const MaintlerCardCanvas = forwardRef<MaintlerCardCanvasHandle, Props>(function 
     ctx.fillText("Scan or share with anyone.", W - pad, shareCy + shareBoxSize / 2 + 16);
     ctx.textAlign = "left";
 
-    // Bottom banner — same brand + Maintler ID pairing as the front, so
-    // either side alone still identifies the card if separated.
-    ctx.fillStyle = "#dc2626";
-    ctx.fillRect(0, H - BANNER_H, W, BANNER_H);
+    // Brand + Maintler ID, over the artwork's (otherwise blank) red banner
+    // — same pairing as the front, so either side alone still identifies
+    // the card if separated. Both sit clear of the banner's center notch
+    // (native x 882–1067, scaled ~603–729): the wordmark ends well before
+    // it, "MAINTLER ID" is right-aligned and starts well after it.
     ctx.textAlign = "left";
     ctx.fillStyle = "#ffffff";
     ctx.font = "bold 15px Arial, sans-serif";
-    ctx.fillText("MAINTLYQR", pad, H - BANNER_H / 2 + 5);
+    ctx.fillText("MAINTLYQR", pad, BACK_CONTENT_H + 45);
     ctx.font = "10px Arial, sans-serif";
     ctx.fillStyle = "rgba(255,255,255,0.75)";
-    ctx.fillText("MAINTENANCE · TRACKED", pad, H - BANNER_H / 2 + 20);
+    ctx.fillText("MAINTENANCE · TRACKED", pad, BACK_CONTENT_H + 63);
     ctx.textAlign = "right";
     ctx.font = "bold 13px Arial, sans-serif";
     ctx.fillStyle = "#ffffff";
-    ctx.fillText(`MAINTLER ID: ${code.slice(0, 8).toUpperCase()}`, W - pad, H - BANNER_H / 2 + 5);
+    ctx.fillText(`MAINTLER ID: ${code.slice(0, 8).toUpperCase()}`, W - pad, BACK_CONTENT_H + 45);
     ctx.textAlign = "left";
   }
 
