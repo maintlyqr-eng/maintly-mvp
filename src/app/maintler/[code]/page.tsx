@@ -1,12 +1,12 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useRef, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { Suspense, useEffect, useRef, useState } from "react";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import {
   ShieldCheck, CalendarDays, AlertCircle, LogIn, UserPlus,
   Star, Send, UserCircle2, Share2, Check, Wrench, Box, Users, Download,
-  Phone, Mail, Globe,
+  Phone, Mail, Globe, Printer,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { formatDateDMY } from "@/lib/date";
@@ -32,10 +32,20 @@ import MaintlerCardCanvas, { type MaintlerCardCanvasHandle } from "@/components/
 // get_maintler_stats()/get_maintler_specialty_breakdown() (migration
 // 025), NOT typed in by the mechanic — deliberately, to keep this
 // consistent with the "verified, tamper-proof" positioning the rest of
-// the app already has. A self-reported "90% Generators" skill bar would
-// read more like a resume than something Maintly can stand behind; a
-// bar built from how many generator services this Maintler has actually
-// logged can't be inflated the same way.
+// the app already has.
+//
+// Round 4 (same day) — "para mi re podes hacer q se parezcan" /
+// "cuando toco print me muestra esto pero no tiene datos de nada" /
+// "no me gusta tener q escrolear... quisiera q sea del estilo del
+// reporte." Answered via a clarifying question: unify this into ONE
+// dense, report-style layout (like the asset's printable service
+// report at /asset/[code]/report) instead of ~9 separately-boxed cards
+// stacked with their own padding/border/shadow — and make Print output
+// THIS page (real data: stats, badges, specialties, contact), not just
+// the small photo+QR ID card. Applied the report page's own techniques:
+// one bounded document instead of many boxed sections, a horizontal
+// stat strip instead of a 2x2 grid of individually-boxed tiles, thin
+// dividers between zones instead of full card chrome per zone.
 
 const assetTypeImg: Record<string, string> = {
   automotive: "/images/car.png",
@@ -118,10 +128,12 @@ function computeBadges(profile: PublicProfile, stats: MaintlerStats, specialtyCo
   return badges;
 }
 
-export default function MaintlerPublicPage() {
+function MaintlerPublicPageContent() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const code = params?.code as string;
+  const autoPrint = searchParams.get("print") === "1";
 
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
@@ -139,6 +151,7 @@ export default function MaintlerPublicPage() {
 
   const [linkCopied, setLinkCopied] = useState(false);
   const ownCardRef = useRef<MaintlerCardCanvasHandle>(null);
+  const printedRef = useRef(false);
 
   useEffect(() => {
     if (!code) { setNotFound(true); setLoading(false); return; }
@@ -183,6 +196,20 @@ export default function MaintlerPublicPage() {
     init();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [code]);
+
+  // Deep-linked print — Settings' "Print" button (and the small ID card's
+  // own print action, previously the only print path) now opens this page
+  // with ?print=1 instead of rasterizing just the photo+QR card, per
+  // Facu's "cuando toco print me muestra esto pero no tiene datos de
+  // nada": the real, data-rich page is what should come out of Print.
+  useEffect(() => {
+    if (autoPrint && !loading && profile && !printedRef.current) {
+      printedRef.current = true;
+      // Let the just-rendered DOM (photo image, QR canvas) settle a beat
+      // before handing off to the browser's print pipeline.
+      setTimeout(() => window.print(), 300);
+    }
+  }, [autoPrint, loading, profile]);
 
   async function toggleSave() {
     if (!profile) return;
@@ -229,12 +256,14 @@ export default function MaintlerPublicPage() {
     }
   }
 
-  // Deliberately no phone/email on this vCard — this page is reachable by
-  // anyone with no login, and this app has no "make my phone number
-  // public" opt-in yet. A name + organization + link back to the live
-  // profile is useful on its own (a real contact card in your phone,
-  // findable by name) without exposing anything the Maintler didn't
-  // explicitly choose to publish.
+  function handlePrint() {
+    window.print();
+  }
+
+  // Deliberately no phone/email on this vCard — the vCard is a phone
+  // contact-book entry, not the public page itself, and a name +
+  // organization + link back to the live profile (where any contact info
+  // the Maintler chose to publish already lives) is enough for that.
   function handleSaveContact() {
     if (!profile) return;
     const url = `${window.location.origin}/maintler/${code}`;
@@ -288,16 +317,38 @@ export default function MaintlerPublicPage() {
   const totalSpecialtyServices = specialties.reduce((sum, s) => sum + s.services_count, 0);
   const score = stats ? computeScore(profile, stats, specialties.length, years) : null;
   const badges = stats ? computeBadges(profile, stats, specialties.length, years) : [];
+  const hasContact = !!(profile.phone || profile.contact_email || profile.instagram_url || profile.facebook_url || profile.website_url);
 
   return (
-    <div className="min-h-screen bg-zinc-50 pb-32">
+    <div className="min-h-screen bg-zinc-50 pb-32 print:pb-0 print:bg-white">
+
+      {/* Print-only formatting: hide chrome that makes no sense on paper
+          (top nav, sticky bottom action bar, save/share buttons), and let
+          the one document card fill the page instead of sitting in a
+          narrow centered column. Same "let the browser handle print
+          layout" spirit as the QR Codes page's own Print Sheet and the
+          asset service report. */}
+      <style jsx global>{`
+        @media print {
+          .maintler-noprint { display: none !important; }
+          .maintler-doc { max-width: 100% !important; box-shadow: none !important; border: none !important; }
+          body { background: #fff !important; }
+        }
+      `}</style>
 
       {/* ── HEADER ── */}
-      <div className="bg-white border-b border-zinc-200 px-4 py-3 flex items-center justify-between sticky top-0 z-10 shadow-sm">
+      <div className="maintler-noprint bg-white border-b border-zinc-200 px-4 py-3 flex items-center justify-between sticky top-0 z-10 shadow-sm">
         <a href="/" className="flex items-center">
           <Image src="/images/maintly-logo-full.png" alt="MaintlyQR" width={217} height={64} className="object-contain mt-2" />
         </a>
         <div className="flex items-center gap-2">
+          <button
+            onClick={handlePrint}
+            className="flex items-center gap-1.5 text-[11px] font-bold text-zinc-500 hover:text-zinc-800 border border-zinc-200 hover:bg-zinc-50 px-2.5 py-1.5 rounded-lg transition-colors"
+            title="Print this profile"
+          >
+            <Printer size={13} /> <span className="hidden sm:inline">Print</span>
+          </button>
           <button
             onClick={handleSaveContact}
             className="flex items-center gap-1.5 text-[11px] font-bold text-zinc-500 hover:text-zinc-800 border border-zinc-200 hover:bg-zinc-50 px-2.5 py-1.5 rounded-lg transition-colors"
@@ -314,11 +365,19 @@ export default function MaintlerPublicPage() {
         </div>
       </div>
 
-      <div className="max-w-lg mx-auto px-4 py-6 space-y-4">
+      <div className="maintler-doc max-w-lg mx-auto px-4 py-6">
 
-        {/* ── PROFILE CARD ── */}
+        {/* ── ONE DOCUMENT, THIN DIVIDERS INSTEAD OF ~9 SEPARATE BOXED
+               CARDS ── report-style density, same idea as the asset's
+               printable service report: one bounded card, sections
+               separated by a hairline instead of their own
+               padding+border+shadow apiece. This is what shrinks the page
+               enough to need little or no scrolling, and it's exactly
+               what Print now outputs. */}
         <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm overflow-hidden">
-          <div className="bg-gradient-to-br from-zinc-900 to-zinc-800 px-5 py-6 flex items-center gap-4">
+
+          {/* Header strip: photo, name, workshop */}
+          <div className="bg-gradient-to-br from-zinc-900 to-zinc-800 px-5 py-5 flex items-center gap-4">
             {profile.photo_url ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={profile.photo_url} alt={name} className="w-16 h-16 rounded-2xl object-cover shrink-0 border border-white/20" />
@@ -336,222 +395,196 @@ export default function MaintlerPublicPage() {
             </div>
           </div>
 
-          <div className="px-5 py-4 flex items-center gap-4">
-            <div className="flex items-center gap-2">
-              <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${profile.verified ? "bg-emerald-50" : "bg-zinc-50"}`}>
-                <ShieldCheck size={15} className={profile.verified ? "text-emerald-500" : "text-zinc-400"} />
-              </div>
-              <div>
-                <p className="text-[10px] text-zinc-400 font-bold uppercase tracking-wide">Status</p>
-                <p className="text-[12.5px] font-semibold text-zinc-700">
-                  {profile.verified && profile.profession ? `${profile.profession} Maintler` : profile.verified ? "Verified Maintler" : "Maintler"}
+          {/* Status + member since — one thin row, no boxed tiles */}
+          <div className="px-5 py-3 border-b border-zinc-100 flex items-center gap-5 text-[12px]">
+            <div className="flex items-center gap-1.5">
+              <ShieldCheck size={14} className={profile.verified ? "text-emerald-500" : "text-zinc-400"} />
+              <span className="font-semibold text-zinc-700">
+                {profile.verified && profile.profession ? `${profile.profession} Maintler` : profile.verified ? "Verified Maintler" : "Maintler"}
+              </span>
+            </div>
+            <div className="flex items-center gap-1.5 text-zinc-400">
+              <CalendarDays size={14} />
+              <span>Since {formatDateDMY(profile.created_at)}</span>
+            </div>
+          </div>
+
+          {/* Maintly Score + a horizontal stat strip (report style)
+              instead of a 2x2 grid of individually-boxed tiles */}
+          {stats && (
+            <div className="px-5 py-4 border-b border-zinc-100">
+              <div className="flex items-center justify-between mb-3">
+                <div>
+                  <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-wide mb-1">Maintly Score</p>
+                  <div className="flex items-center gap-0.5">
+                    {Array.from({ length: 5 }, (_, i) => (
+                      <Star key={i} size={14} className={i < (score ?? 0) ? "text-amber-400 fill-amber-400" : "text-zinc-200"} />
+                    ))}
+                  </div>
+                </div>
+                <p className="text-[9.5px] text-zinc-400 text-right max-w-[130px] leading-tight">
+                  Based on verification, activity, and logged experience — not reviews.
                 </p>
               </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg bg-zinc-50 flex items-center justify-center shrink-0">
-                <CalendarDays size={15} className="text-zinc-500" />
+              <div className="flex divide-x divide-zinc-100 -mx-5 px-5 pt-3 border-t border-zinc-100">
+                {[
+                  { value: stats.services_count, label: "Services", icon: Wrench, color: "text-blue-500" },
+                  { value: stats.assets_count, label: "Assets", icon: Box, color: "text-red-500" },
+                  { value: stats.customers_count, label: "Customers", icon: Users, color: "text-purple-500" },
+                  { value: stats.repeat_customers_count, label: "Repeat", icon: Star, color: "text-emerald-500" },
+                ].map(({ value, label, icon: Icon, color }) => (
+                  <div key={label} className="flex-1 flex flex-col items-center text-center px-1">
+                    <Icon size={14} className={`${color} mb-1`} />
+                    <p className="text-[15px] font-black text-zinc-900 leading-tight">{value}</p>
+                    <p className="text-[9px] text-zinc-400 font-bold uppercase tracking-wide leading-tight">{label}</p>
+                  </div>
+                ))}
               </div>
-              <div>
-                <p className="text-[10px] text-zinc-400 font-bold uppercase tracking-wide">Member since</p>
-                <p className="text-[12.5px] font-semibold text-zinc-700">{formatDateDMY(profile.created_at)}</p>
-              </div>
             </div>
-          </div>
-        </div>
+          )}
 
-        {/* ── MAINTLY SCORE + STATS ── */}
-        {stats && (
-          <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm overflow-hidden">
-            <div className="px-5 py-4 border-b border-zinc-100 flex items-center justify-between">
-              <div>
-                <p className="text-[11px] font-bold text-zinc-400 uppercase tracking-wide mb-1">Maintly Score</p>
-                <div className="flex items-center gap-0.5">
-                  {Array.from({ length: 5 }, (_, i) => (
-                    <Star key={i} size={16} className={i < (score ?? 0) ? "text-amber-400 fill-amber-400" : "text-zinc-200"} />
-                  ))}
-                </div>
-              </div>
-              <p className="text-[10.5px] text-zinc-400 text-right max-w-[140px] leading-tight">
-                Based on verification, activity, and logged experience — not reviews.
-              </p>
-            </div>
-            <div className="grid grid-cols-2 divide-x divide-y divide-zinc-100">
-              <div className="px-5 py-4 flex items-center gap-3">
-                <div className="w-9 h-9 rounded-xl bg-blue-50 flex items-center justify-center shrink-0"><Wrench size={16} className="text-blue-500" /></div>
-                <div><p className="text-[16px] font-black text-zinc-900 leading-tight">{stats.services_count}</p><p className="text-[10px] text-zinc-400 font-bold uppercase tracking-wide">Services Logged</p></div>
-              </div>
-              <div className="px-5 py-4 flex items-center gap-3">
-                <div className="w-9 h-9 rounded-xl bg-red-50 flex items-center justify-center shrink-0"><Box size={16} className="text-red-500" /></div>
-                <div><p className="text-[16px] font-black text-zinc-900 leading-tight">{stats.assets_count}</p><p className="text-[10px] text-zinc-400 font-bold uppercase tracking-wide">Assets Maintained</p></div>
-              </div>
-              <div className="px-5 py-4 flex items-center gap-3">
-                <div className="w-9 h-9 rounded-xl bg-purple-50 flex items-center justify-center shrink-0"><Users size={16} className="text-purple-500" /></div>
-                <div><p className="text-[16px] font-black text-zinc-900 leading-tight">{stats.customers_count}</p><p className="text-[10px] text-zinc-400 font-bold uppercase tracking-wide">Customers Served</p></div>
-              </div>
-              <div className="px-5 py-4 flex items-center gap-3">
-                <div className="w-9 h-9 rounded-xl bg-emerald-50 flex items-center justify-center shrink-0"><Star size={16} className="text-emerald-500" /></div>
-                <div><p className="text-[16px] font-black text-zinc-900 leading-tight">{stats.repeat_customers_count}</p><p className="text-[10px] text-zinc-400 font-bold uppercase tracking-wide">Repeat Customers</p></div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* ── BADGES ── */}
-        {badges.length > 0 && (
-          <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm px-5 py-4">
-            <p className="text-[11px] font-bold text-zinc-400 uppercase tracking-wide mb-3">Badges</p>
-            <div className="flex flex-wrap gap-2">
+          {/* Badges — compact chip row, no separate card */}
+          {badges.length > 0 && (
+            <div className="px-5 py-3 border-b border-zinc-100 flex flex-wrap gap-1.5">
               {badges.map((b) => (
-                <span key={b.label} className={`flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1.5 rounded-full border ${b.className}`}>
-                  <b.icon size={12} /> {b.label}
+                <span key={b.label} className={`flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-full border ${b.className}`}>
+                  <b.icon size={11} /> {b.label}
                 </span>
               ))}
             </div>
-          </div>
-        )}
+          )}
 
-        {/* ── SPECIALTIES ── */}
-        {specialties.length > 0 && (
-          <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm px-5 py-4">
-            <p className="text-[11px] font-bold text-zinc-400 uppercase tracking-wide mb-3">Specialties</p>
-            <div className="flex flex-wrap gap-3 mb-4">
-              {specialties.map((s) => (
-                <div key={s.asset_type} className="flex flex-col items-center gap-1.5 w-16">
-                  <div className="w-11 h-11 rounded-xl bg-zinc-50 border border-zinc-100 flex items-center justify-center overflow-hidden">
-                    <Image src={assetTypeImg[s.asset_type] ?? "/images/car.png"} alt={s.asset_type} width={26} height={26} className="object-contain" />
+          {/* Specialties + Experience & Skills merged into one block */}
+          {specialties.length > 0 && (
+            <div className="px-5 py-4 border-b border-zinc-100">
+              <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-wide mb-2.5">Specialties & Experience</p>
+              <div className="flex flex-wrap gap-2 mb-3">
+                {specialties.map((s) => (
+                  <div key={s.asset_type} className="flex items-center gap-1.5 bg-zinc-50 border border-zinc-100 rounded-lg pl-1.5 pr-2.5 py-1">
+                    <div className="w-6 h-6 rounded-md bg-white flex items-center justify-center overflow-hidden shrink-0">
+                      <Image src={assetTypeImg[s.asset_type] ?? "/images/car.png"} alt={s.asset_type} width={16} height={16} className="object-contain" />
+                    </div>
+                    <span className="text-[10.5px] font-semibold text-zinc-600">{assetTypeLabel[s.asset_type] ?? s.asset_type}</span>
                   </div>
-                  <p className="text-[9.5px] text-zinc-500 text-center leading-tight">{assetTypeLabel[s.asset_type] ?? s.asset_type}</p>
+                ))}
+              </div>
+              <div className="space-y-2">
+                {specialties.map((s) => {
+                  const pct = totalSpecialtyServices > 0 ? Math.round((s.services_count / totalSpecialtyServices) * 100) : 0;
+                  return (
+                    <div key={s.asset_type}>
+                      <div className="flex items-center justify-between mb-0.5">
+                        <span className="text-[11px] font-semibold text-zinc-700">{assetTypeLabel[s.asset_type] ?? s.asset_type}</span>
+                        <span className="text-[10px] text-zinc-400">{pct}%</span>
+                      </div>
+                      <div className="h-1 rounded-full bg-zinc-100 overflow-hidden">
+                        <div className="h-full bg-red-600 rounded-full" style={{ width: `${pct}%` }} />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Contact — 2-column grid instead of one-per-line */}
+          {hasContact && (
+            <div className="px-5 py-3 border-b border-zinc-100">
+              <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-wide mb-2">Contact</p>
+              <div className="grid grid-cols-2 gap-x-3 gap-y-1.5">
+                {profile.phone && (
+                  <a href={`tel:${profile.phone}`} className="flex items-center gap-1.5 text-[11.5px] font-semibold text-zinc-700 hover:text-red-600 transition-colors truncate">
+                    <Phone size={12} className="text-zinc-400 shrink-0" /> <span className="truncate">{profile.phone}</span>
+                  </a>
+                )}
+                {profile.contact_email && (
+                  <a href={`mailto:${profile.contact_email}`} className="flex items-center gap-1.5 text-[11.5px] font-semibold text-zinc-700 hover:text-red-600 transition-colors truncate">
+                    <Mail size={12} className="text-zinc-400 shrink-0" /> <span className="truncate">{profile.contact_email}</span>
+                  </a>
+                )}
+                {profile.instagram_url && (
+                  <a href={profile.instagram_url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-[11.5px] font-semibold text-zinc-700 hover:text-red-600 transition-colors truncate">
+                    <Globe size={12} className="text-zinc-400 shrink-0" /> Instagram
+                  </a>
+                )}
+                {profile.facebook_url && (
+                  <a href={profile.facebook_url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-[11.5px] font-semibold text-zinc-700 hover:text-red-600 transition-colors truncate">
+                    <Globe size={12} className="text-zinc-400 shrink-0" /> Facebook
+                  </a>
+                )}
+                {profile.website_url && (
+                  <a href={profile.website_url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-[11.5px] font-semibold text-zinc-700 hover:text-red-600 transition-colors truncate col-span-2">
+                    <Globe size={12} className="text-zinc-400 shrink-0" /> <span className="truncate">{profile.website_url.replace(/^https?:\/\//, "")}</span>
+                  </a>
+                )}
+              </div>
+            </div>
+          )}
+
+          {isSelf && (
+            <div className="maintler-noprint px-5 py-4 border-b border-zinc-100">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-9 h-9 rounded-xl bg-red-50 flex items-center justify-center shrink-0">
+                  <UserCircle2 size={16} className="text-red-500" />
                 </div>
-              ))}
-            </div>
-
-            {/* ── EXPERIENCE & SKILLS (real logged-service percentages, not self-rated) ── */}
-            <p className="text-[11px] font-bold text-zinc-400 uppercase tracking-wide mb-2.5">Experience & Skills</p>
-            <div className="space-y-2.5">
-              {specialties.map((s) => {
-                const pct = totalSpecialtyServices > 0 ? Math.round((s.services_count / totalSpecialtyServices) * 100) : 0;
-                return (
-                  <div key={s.asset_type}>
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-[11.5px] font-semibold text-zinc-700">{assetTypeLabel[s.asset_type] ?? s.asset_type}</span>
-                      <span className="text-[11px] text-zinc-400">{pct}%</span>
-                    </div>
-                    <div className="h-1.5 rounded-full bg-zinc-100 overflow-hidden">
-                      <div className="h-full bg-red-600 rounded-full" style={{ width: `${pct}%` }} />
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
-        {/* ── CONTACT ──
-            Facu's feedback: "no veo datos de contacto." Answered via a
-            clarifying question — he wants email/phone/socials shown,
-            always visible once a mechanic fills them in (no per-field
-            privacy toggle). All optional; the section just doesn't
-            render anything for fields left blank. This is separate from
-            the Save/Message flow below, which still requires the
-            visitor to be a logged-in Maintler — this is for anyone. */}
-        {(profile.phone || profile.contact_email || profile.instagram_url || profile.facebook_url || profile.website_url) && (
-          <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm px-5 py-4">
-            <p className="text-[11px] font-bold text-zinc-400 uppercase tracking-wide mb-3">Contact</p>
-            <div className="space-y-2.5">
-              {profile.phone && (
-                <a href={`tel:${profile.phone}`} className="flex items-center gap-2.5 text-[12.5px] font-semibold text-zinc-700 hover:text-red-600 transition-colors">
-                  <Phone size={14} className="text-zinc-400 shrink-0" /> {profile.phone}
-                </a>
-              )}
-              {profile.contact_email && (
-                <a href={`mailto:${profile.contact_email}`} className="flex items-center gap-2.5 text-[12.5px] font-semibold text-zinc-700 hover:text-red-600 transition-colors break-all">
-                  <Mail size={14} className="text-zinc-400 shrink-0" /> {profile.contact_email}
-                </a>
-              )}
-              {profile.instagram_url && (
-                <a href={profile.instagram_url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2.5 text-[12.5px] font-semibold text-zinc-700 hover:text-red-600 transition-colors break-all">
-                  <Globe size={14} className="text-zinc-400 shrink-0" /> Instagram
-                </a>
-              )}
-              {profile.facebook_url && (
-                <a href={profile.facebook_url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2.5 text-[12.5px] font-semibold text-zinc-700 hover:text-red-600 transition-colors break-all">
-                  <Globe size={14} className="text-zinc-400 shrink-0" /> Facebook
-                </a>
-              )}
-              {profile.website_url && (
-                <a href={profile.website_url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2.5 text-[12.5px] font-semibold text-zinc-700 hover:text-red-600 transition-colors break-all">
-                  <Globe size={14} className="text-zinc-400 shrink-0" /> {profile.website_url.replace(/^https?:\/\//, "")}
-                </a>
-              )}
-            </div>
-          </div>
-        )}
-
-        {saveError && (
-          <div className="flex items-center gap-2 bg-red-50 border border-red-200 rounded-xl px-3 py-2.5">
-            <AlertCircle size={14} className="text-red-500 shrink-0" />
-            <p className="text-[12px] text-red-600">{saveError}</p>
-          </div>
-        )}
-
-        {isSelf && (
-          <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm px-5 py-4">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-9 h-9 rounded-xl bg-red-50 flex items-center justify-center shrink-0">
-                <UserCircle2 size={16} className="text-red-500" />
+                <div className="min-w-0">
+                  <p className="text-[12px] font-bold text-zinc-800">This is your own Maintler card.</p>
+                  <p className="text-[11px] text-zinc-400">Download or send the printable ID card below — the full editable version also lives in Settings.</p>
+                </div>
               </div>
-              <div className="min-w-0">
-                <p className="text-[12px] font-bold text-zinc-800">This is your own Maintler card.</p>
-                <p className="text-[11px] text-zinc-400">Download or send the printable card below — the full editable version also lives in Settings.</p>
+              <div className="flex items-center gap-4">
+                <MaintlerCardCanvas
+                  ref={ownCardRef}
+                  code={code}
+                  name={name}
+                  workshopName={profile.workshop_name}
+                  photoUrl={profile.photo_url}
+                  verified={profile.verified}
+                  profession={profile.verified ? profile.profession : null}
+                  previewWidth={110}
+                />
+                <div className="flex flex-col gap-2">
+                  <button
+                    onClick={() => ownCardRef.current?.download(`maintlyqr-${name}`)}
+                    className="flex items-center gap-1.5 text-[11.5px] font-bold text-white bg-zinc-900 hover:bg-zinc-800 px-3.5 py-2.5 rounded-xl transition-colors"
+                  >
+                    <Download size={13} /> Download
+                  </button>
+                  <button
+                    onClick={() => ownCardRef.current?.share(`maintlyqr-${name}`)}
+                    className="flex items-center gap-1.5 text-[11.5px] font-bold text-zinc-600 hover:text-red-600 border border-zinc-200 hover:bg-zinc-50 px-3.5 py-2.5 rounded-xl transition-colors"
+                  >
+                    <Share2 size={13} /> Send
+                  </button>
+                </div>
               </div>
             </div>
-            <div className="flex items-center gap-4">
-              <MaintlerCardCanvas
-                ref={ownCardRef}
-                code={code}
-                name={name}
-                workshopName={profile.workshop_name}
-                photoUrl={profile.photo_url}
-                verified={profile.verified}
-                profession={profile.verified ? profile.profession : null}
-                previewWidth={110}
-              />
-              <div className="flex flex-col gap-2">
-                <button
-                  onClick={() => ownCardRef.current?.download(`maintlyqr-${name}`)}
-                  className="flex items-center gap-1.5 text-[11.5px] font-bold text-white bg-zinc-900 hover:bg-zinc-800 px-3.5 py-2.5 rounded-xl transition-colors"
-                >
-                  <Download size={13} /> Download
-                </button>
-                <button
-                  onClick={() => ownCardRef.current?.share(`maintlyqr-${name}`)}
-                  className="flex items-center gap-1.5 text-[11.5px] font-bold text-zinc-600 hover:text-red-600 border border-zinc-200 hover:bg-zinc-50 px-3.5 py-2.5 rounded-xl transition-colors"
-                >
-                  <Share2 size={13} /> Send
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
+          )}
 
-        {/* ── FOOTER ── */}
-        <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm px-5 py-4 flex items-center gap-3">
-          <ShieldCheck size={18} className="text-red-500 shrink-0" />
-          <div>
-            <p className="text-[12px] font-bold text-zinc-800">Verified by Maintly</p>
-            <p className="text-[11px] text-zinc-400">Part of the MaintlyQR World — a global community of Maintlers.</p>
+          {saveError && (
+            <div className="maintler-noprint mx-5 my-3 flex items-center gap-2 bg-red-50 border border-red-200 rounded-xl px-3 py-2.5">
+              <AlertCircle size={14} className="text-red-500 shrink-0" />
+              <p className="text-[12px] text-red-600">{saveError}</p>
+            </div>
+          )}
+
+          {/* Footer strip */}
+          <div className="px-5 py-3 bg-zinc-50 flex items-center gap-2.5">
+            <ShieldCheck size={15} className="text-red-500 shrink-0" />
+            <p className="text-[10.5px] text-zinc-500">
+              <span className="font-bold text-zinc-700">Verified by Maintly</span> · Part of the MaintlyQR World.
+            </p>
           </div>
         </div>
 
-        <p className="text-center text-[10px] text-zinc-400 pb-4">
+        <p className="text-center text-[10px] text-zinc-400 pt-3">
           Powered by <span className="font-bold text-zinc-600">Maintly</span> · Maintenance. Tracked.
         </p>
       </div>
 
       {/* ══ STICKY ACTION BAR ══════════════════════════════════════════════════ */}
       {!isSelf && (
-        <div className="fixed bottom-0 inset-x-0 z-40 bg-white border-t border-zinc-200 shadow-[0_-4px_24px_rgba(0,0,0,0.08)]"
+        <div className="maintler-noprint fixed bottom-0 inset-x-0 z-40 bg-white border-t border-zinc-200 shadow-[0_-4px_24px_rgba(0,0,0,0.08)]"
           style={{ paddingBottom: 'max(env(safe-area-inset-bottom), 12px)' }}>
 
           {isLoggedIn ? (
@@ -599,5 +632,17 @@ export default function MaintlerPublicPage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function MaintlerPublicPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-zinc-50 flex items-center justify-center">
+        <div className="w-10 h-10 border-4 border-red-600 border-t-transparent rounded-full animate-spin" />
+      </div>
+    }>
+      <MaintlerPublicPageContent />
+    </Suspense>
   );
 }

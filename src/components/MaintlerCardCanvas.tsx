@@ -88,15 +88,37 @@ const MaintlerCardCanvas = forwardRef<MaintlerCardCanvasHandle, {
     ctx.fillStyle = bg;
     ctx.fillRect(0, 0, W, H);
 
+    // Brand mark — the actual gear/QR icon graphic already used across the
+    // app (same artwork as the QR frame itself, see qrThemes.ts's Gear
+    // Ring theme), not just a plain text label. Facu, comparing this card
+    // side-by-side against his own mockup: "podes poner el logo y maintly
+    // que ya tenes para arriba."
+    ctx.textAlign = "left";
+    ctx.font = "bold 32px Arial, sans-serif";
+    const wordmark = "MAINTLYQR";
+    const wordmarkWidth = ctx.measureText(wordmark).width;
+    const brandIconSize = 56;
+    const brandGap = 16;
+    const brandLockupWidth = brandIconSize + brandGap + wordmarkWidth;
+    const brandX = W / 2 - brandLockupWidth / 2;
+    const brandY = 36;
+    try {
+      const gearIcon = await loadImageEl("/images/qr-frames/qr-gear-ring.png");
+      ctx.drawImage(gearIcon, brandX, brandY, brandIconSize, brandIconSize);
+    } catch {
+      // Icon failed to load — the wordmark alone still identifies the card.
+    }
+    ctx.fillStyle = "#e4e4e7";
+    ctx.fillText(wordmark, brandX + brandIconSize + brandGap, brandY + brandIconSize / 2 + 11);
     ctx.textAlign = "center";
-    ctx.fillStyle = "#a1a1aa";
-    ctx.font = "bold 26px Arial, sans-serif";
-    ctx.fillText("MAINTLYQR  ·  MAINTLER CARD", W / 2, 80);
+    ctx.fillStyle = "#71717a";
+    ctx.font = "bold 13px Arial, sans-serif";
+    ctx.fillText("MAINTENANCE  ·  TRACKED", W / 2, brandY + brandIconSize + 26);
 
     // Photo (circular, center-cropped) or an initials placeholder.
     const photoSize = 260;
     const photoCx = W / 2;
-    const photoCy = 150 + photoSize / 2;
+    const photoCy = 175 + photoSize / 2;
     let photoDrawn = false;
     if (photoUrl) {
       try {
@@ -169,28 +191,31 @@ const MaintlerCardCanvas = forwardRef<MaintlerCardCanvasHandle, {
     }
 
     // QR block, reusing the exact composited frame+QR image QrCodeCanvas
-    // already knows how to build (see getBlob() on that component).
-    const qrBoxOuter = 460;
-    const qrBoxY = H - 620;
+    // already knows how to build (see getBlob() on that component). No
+    // background panel behind it anymore — Facu, comparing this card
+    // against his own mockup: "ese fondo blanco cuadrado queda re feo en
+    // la q hiciste." The Gear Ring frame artwork already has its own
+    // transparent margin around the metal gear teeth (only the QR's own
+    // white circle in the middle is opaque), so drawing it straight onto
+    // the dark card background reproduces the mockup's look with nothing
+    // extra needed here.
+    const qrBoxOuter = 480;
+    const qrBoxY = H - 660;
     let qrBlob: Blob | null = null;
     try {
       qrBlob = (await qrHandleRef.current?.getBlob()) ?? null;
     } catch {
       qrBlob = null;
     }
-    roundRect(ctx, W / 2 - qrBoxOuter / 2, qrBoxY, qrBoxOuter, qrBoxOuter, 28);
-    ctx.fillStyle = "#ffffff";
-    ctx.fill();
     if (qrBlob) {
       try {
         const qrImg = await blobToImage(qrBlob);
-        const inner = qrBoxOuter - 40;
-        const scale = Math.min(inner / qrImg.width, inner / qrImg.height);
+        const scale = Math.min(qrBoxOuter / qrImg.width, qrBoxOuter / qrImg.height);
         const dw = qrImg.width * scale, dh = qrImg.height * scale;
         ctx.drawImage(qrImg, W / 2 - dw / 2, qrBoxY + (qrBoxOuter - dh) / 2, dw, dh);
       } catch {
-        // Drawing the QR image failed — the white box still shows, better
-        // than a broken canvas.
+        // Drawing the QR image failed — the rest of the card (photo, name,
+        // banner) still renders fine without it.
       }
     }
 

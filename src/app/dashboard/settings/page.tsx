@@ -176,8 +176,13 @@ export default function SettingsPage() {
   }
 
   function handlePrintCard() {
+    // Print now opens the real public profile (stats, badges, specialties,
+    // contact — not just the small photo+QR ID card) and auto-triggers the
+    // browser's print dialog there via ?print=1. Facu: "cuando toco print
+    // me muestra esto pero no tiene datos de nada" — the small ID card
+    // alone read as empty compared to what he expected Print to produce.
     if (!maintlerCode) return;
-    cardCanvasRef.current?.print();
+    window.open(`/maintler/${maintlerCode}?print=1`, "_blank");
   }
 
   function handleFileSelected(e: React.ChangeEvent<HTMLInputElement>) {
