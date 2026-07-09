@@ -1,48 +1,60 @@
 "use client";
 
-import { forwardRef, useEffect, useImperativeHandle, useRef } from "react";
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
+import { X, Download, Share2, Printer } from "lucide-react";
 import QrCodeCanvas, { type QrCodeCanvasHandle } from "@/components/QrCodeCanvas";
 import { DEFAULT_QR_THEME } from "@/lib/qrThemes";
+import { computeBadges, yearsSince, type MaintlerStats } from "@/lib/maintlerScore";
+import { assetTypeOptions, assetTypeImg } from "@/lib/assetTypes";
 
-// The actual printable/shareable Maintler ID card — Facu's mockup had a
-// dark badge-style card (photo, name, verified pill, QR, a red "Maintler
-// ID" banner at the bottom) as the physical/shareable artifact, separate
-// from the public /maintler/[code] profile PAGE that QR resolves to. The
-// first cut of this feature only rendered a bare QR in Settings with no
-// photo/name/card design around it — Facu's follow-up: "no quedo tan
-// parecido a lo q te pase... ademas no se ve el QR y tampoco tengo forma
-// de imprimirla o mandarla." This component is that missing piece: one
-// composited PNG a Maintler can download, share (native share sheet on
-// mobile — actually reaches "mandarla"), or print.
+// Round 7 (July 9, 2026): Facu sent a fresh mockup — a real credit-card-
+// shaped, double-sided ID card (front: photo/name/status/QR; back: bio,
+// specialties, stats, badges, contact, a small share QR) — and asked
+// specifically for THIS component (not the /maintler/[code] report page)
+// to become that: "yo lo q busco es q el mecanico pueda imprimir esa
+// tarjeta y q sea una especie de tarjeta de credito." Two decisions from
+// that conversation shape everything below:
+//   1. Every figure on the back is real, computed data — same principle
+//      as maintlerScore.ts and the public card ("verified, tamper-proof",
+//      not self-reported). The mockup's "Reports Uploaded" became
+//      "Documents Uploaded" (a real count of Document Library uploads,
+//      passed in via `documentsCount`); a badge like "Top Rated" that has
+//      no real number behind it was dropped rather than faked.
+//   2. "Print" in Settings already prints the full public report page
+//      (round 5) — Facu chose to keep that and add a SEPARATE action here
+//      (`printCard`) that prints this physical card instead, front then
+//      back, one per page.
 //
-// Round 6: Facu sent a full desktop mockup of Settings ("algo asi te
-// muestro de ejemplo para la web") with a LANDSCAPE version of this same
-// card — photo/name/status/profession/location on the left, the QR on
-// the right, all in one wide horizontal card instead of the earlier
-// portrait/wallet-ID shape. Rebuilt around that orientation; the
-// download/share/print mechanics underneath are unchanged.
-//
-// Deliberately a single <canvas>, not an HTML/CSS layout exported via a
-// screenshot library — no new dependency needed (html2canvas and similar
-// have their own cross-origin/font-rendering quirks), and the QR portion
-// already has proven canvas-compositing logic in QrCodeCanvas.tsx
-// (frame artwork + print-resolution QR merged into one PNG) that this
-// reuses via the getBlob() handle method instead of duplicating it.
+// Badges are computed via the same computeBadges() thresholds the public
+// card and Settings' "Maintly Stats" panel already use (single source of
+// truth for what counts as "100+ Services" etc.) — but computeBadges()
+// returns a lucide *React component* per badge, which can't be drawn into
+// a 2D canvas context. styleFor() below maps each real label to a
+// canvas-drawable emoji + color instead of re-deriving the thresholds.
+export type MaintlerCardSpecialty = { asset_type: string; services_count: number };
+
 export type MaintlerCardCanvasHandle = {
-  download: (filename: string) => void;
-  // Web Share API with a file attachment where supported (Android Chrome,
-  // iOS Safari — opens the native "send to WhatsApp/Messages/Mail/AirDrop"
-  // sheet, which is what "mandarla" actually needs); falls back to a plain
-  // download on desktop browsers that don't support sharing files at all.
-  share: (filename: string) => Promise<void>;
-  // Opens the finished card in a new tab sized to just the image and
-  // triggers the browser's own print dialog — same "let the browser handle
-  // print layout" approach as the QR Codes page's Print Sheet.
-  print: () => void;
+  // Downloads BOTH sides as two separate PNG files (`${base}-front.png`,
+  // `${base}-back.png`) — a physical card is two-sided, so "download my
+  // card" should hand over both faces, not just the front.
+  download: (filenameBase: string) => Promise<void>;
+  // Web Share API, front image only (share sheets handle a single file far
+  // more reliably across browsers than two at once, and the front is the
+  // "identity" side someone would actually send).
+  share: (filenameBase: string) => Promise<void>;
+  // NEW: opens the browser print dialog with the front on one page and the
+  // back on the next — separate from Settings' existing "Print" button,
+  // which prints the full public report page instead.
+  printCard: () => Promise<void>;
+  // NEW: opens a built-in modal previewing both sides at a larger, legible
+  // size, so a Maintler can actually read the back before deciding to
+  // download/print/share it.
+  view: () => void;
 };
 
-const CARD_W = 1200;
-const CARD_H = 560;
+const CARD_W = 1050;
+const CARD_H = 660;
+const BANNER_H = 70;
 
 function loadImageEl(src: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
@@ -82,7 +94,88 @@ function truncateToWidth(ctx: CanvasRenderingContext2D, text: string, maxWidth: 
   return cut + "…";
 }
 
-const MaintlerCardCanvas = forwardRef<MaintlerCardCanvasHandle, {
+// Simple manual word-wrap — canvas has no native text-wrapping. Only used
+// for the auto-generated "About" blurb below, which is short and built
+// from a small set of real fields, so overflow beyond maxLines is not a
+// realistic case in practice.
+function wrapText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number, maxLines = 3): string[] {
+  const words = text.split(" ");
+  const lines: string[] = [];
+  let current = "";
+  for (const w of words) {
+    const test = current ? `${current} ${w}` : w;
+    if (current && ctx.measureText(test).width > maxWidth) {
+      lines.push(current);
+      current = w;
+      if (lines.length === maxLines) break;
+    } else {
+      current = test;
+    }
+  }
+  if (current && lines.length < maxLines) lines.push(current);
+  return lines.slice(0, maxLines);
+}
+
+// A small concentric-arc "scan/signal" glyph for the front banner — canvas
+// has no icon font available, so this is drawn directly rather than
+// pulling in an image asset for one small detail.
+function drawSignalGlyph(ctx: CanvasRenderingContext2D, cx: number, cy: number, size: number) {
+  ctx.save();
+  ctx.strokeStyle = "#ffffff";
+  ctx.lineCap = "round";
+  for (let i = 0; i < 3; i++) {
+    const r = (size / 3) * (i + 1);
+    ctx.globalAlpha = 1 - i * 0.22;
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, -Math.PI * 0.75, -Math.PI * 0.25);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+// Subtle diagonal accent line, echoing the mockup's top-right cut —
+// intentionally understated (this is a detail, not a load-bearing part of
+// the design) rather than an attempt at a pixel-exact recreation.
+function drawAccent(ctx: CanvasRenderingContext2D, w: number, h: number) {
+  ctx.save();
+  ctx.strokeStyle = "rgba(220,38,38,0.35)";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(w - 210, 0);
+  ctx.lineTo(w, 130);
+  ctx.stroke();
+  ctx.restore();
+}
+
+function assetTypeLabel(type: string) {
+  return assetTypeOptions.find((o) => o.value === type)?.label ?? type;
+}
+
+// Maps each REAL badge label (from computeBadges()'s canonical thresholds —
+// same numbers the public card and Settings' Maintly Stats panel use) to a
+// canvas-drawable emoji + color. Doesn't re-derive the thresholds — just
+// styles whatever labels computeBadges() actually returned, so this can't
+// drift from the single source of truth for what counts as "100+ Services"
+// etc.
+function styleForBadge(label: string): { emoji: string; bg: string } {
+  if (label === "Verified") return { emoji: "✓", bg: "#059669" };
+  if (label.includes("Services")) return { emoji: "🔧", bg: "#2563eb" };
+  if (label.includes("Years Active")) return { emoji: "📅", bg: "#d97706" };
+  if (label === "Multi-Asset Specialist") return { emoji: "📦", bg: "#7c3aed" };
+  return { emoji: "⭐", bg: "#71717a" };
+}
+
+function triggerDownload(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+type Props = {
   code: string;
   name: string;
   workshopName?: string | null;
@@ -90,35 +183,55 @@ const MaintlerCardCanvas = forwardRef<MaintlerCardCanvasHandle, {
   verified?: boolean | null;
   profession?: string | null;
   location?: string | null;
+  createdAt?: string | null;
+  stats?: MaintlerStats | null;
+  documentsCount?: number;
+  specialties?: MaintlerCardSpecialty[];
+  contactEmail?: string | null;
+  contactPhone?: string | null;
+  websiteUrl?: string | null;
   previewWidth?: number;
-}>(function MaintlerCardCanvas({ code, name, workshopName, photoUrl, verified, profession, location, previewWidth = 320 }, ref) {
-  const previewCanvasRef = useRef<HTMLCanvasElement>(null);
-  const qrHandleRef = useRef<QrCodeCanvasHandle>(null);
+};
 
-  // isStale lets a caller abort a slow, superseded draw mid-flight — without
-  // it, two overlapping drawCard() calls (e.g. photoUrl/name changing twice
-  // quickly, each triggering the preview effect below) race on the same
-  // canvas, and whichever finishes LAST wins regardless of which one
-  // started last, so a stale photo/name can visibly paint over a newer one.
-  // Checked after the two slow network-bound awaits (photo load, QR blob).
-  async function drawCard(ctx: CanvasRenderingContext2D, isStale: () => boolean = () => false) {
+const EMPTY_STATS: MaintlerStats = { services_count: 0, assets_count: 0, customers_count: 0, repeat_customers_count: 0 };
+
+const MaintlerCardCanvas = forwardRef<MaintlerCardCanvasHandle, Props>(function MaintlerCardCanvas(
+  {
+    code, name, workshopName, photoUrl, verified, profession, location, createdAt,
+    stats, documentsCount = 0, specialties = [], contactEmail, contactPhone, websiteUrl,
+    previewWidth = 320,
+  },
+  ref
+) {
+  const previewCanvasRef = useRef<HTMLCanvasElement>(null);
+  const qrFrontHandleRef = useRef<QrCodeCanvasHandle>(null);
+  const qrBackHandleRef = useRef<QrCodeCanvasHandle>(null);
+
+  const [viewOpen, setViewOpen] = useState(false);
+  const viewFrontCanvasRef = useRef<HTMLCanvasElement>(null);
+  const viewBackCanvasRef = useRef<HTMLCanvasElement>(null);
+
+  const effStats = stats ?? EMPTY_STATS;
+  const years = createdAt ? yearsSince(createdAt) : 0;
+  const activeSpecialties = specialties.filter((s) => s.services_count > 0).sort((a, b) => b.services_count - a.services_count);
+  const domBadges = computeBadges(!!verified, effStats, activeSpecialties.length, years);
+
+  // ── FRONT ──
+  async function drawFront(ctx: CanvasRenderingContext2D, isStale: () => boolean = () => false) {
     const W = CARD_W, H = CARD_H;
     ctx.clearRect(0, 0, W, H);
-
-    const bannerH = 64;
-    const contentH = H - bannerH;
+    const contentH = H - BANNER_H;
 
     const bg = ctx.createLinearGradient(0, 0, W, contentH);
     bg.addColorStop(0, "#27272a");
     bg.addColorStop(1, "#09090b");
     ctx.fillStyle = bg;
     ctx.fillRect(0, 0, W, contentH);
+    drawAccent(ctx, W, contentH);
 
-    // Brand mark, top-left this time (landscape leaves room for it beside
-    // the content instead of needing its own dedicated row up top).
-    const brandIconSize = 44;
-    const brandX = 40;
-    const brandY = 28;
+    // Brand mark, top-left.
+    const brandIconSize = 46;
+    const brandX = 40, brandY = 30;
     ctx.textAlign = "left";
     try {
       const gearIcon = await loadImageEl("/images/qr-frames/qr-gear-ring.png");
@@ -126,20 +239,18 @@ const MaintlerCardCanvas = forwardRef<MaintlerCardCanvasHandle, {
     } catch {
       // Icon failed to load — the wordmark alone still identifies the card.
     }
-    ctx.font = "bold 24px Arial, sans-serif";
+    ctx.font = "bold 22px Arial, sans-serif";
     ctx.fillStyle = "#e4e4e7";
     ctx.fillText("MAINTLYQR", brandX + brandIconSize + 12, brandY + brandIconSize / 2 - 2);
-    ctx.font = "bold 10px Arial, sans-serif";
+    ctx.font = "bold 9px Arial, sans-serif";
     ctx.fillStyle = "#71717a";
-    ctx.fillText("MAINTENANCE  ·  TRACKED", brandX + brandIconSize + 12, brandY + brandIconSize / 2 + 14);
+    ctx.fillText("MAINTENANCE  ·  TRACKED", brandX + brandIconSize + 12, brandY + brandIconSize / 2 + 13);
 
-    // ── LEFT: photo + identity block, vertically centered in the content
-    //    band below the brand mark ──
-    const bandTop = brandY + brandIconSize + 24;
-    const bandBottom = contentH;
-    const bandCy = bandTop + (bandBottom - bandTop) / 2;
+    // Photo + identity block, vertically centered below the brand mark.
+    const bandTop = brandY + brandIconSize + 26;
+    const bandCy = bandTop + (contentH - bandTop) / 2;
 
-    const photoSize = 176;
+    const photoSize = 168;
     const photoCx = 40 + photoSize / 2;
     const photoCy = bandCy;
     let photoDrawn = false;
@@ -168,7 +279,7 @@ const MaintlerCardCanvas = forwardRef<MaintlerCardCanvasHandle, {
       ctx.fillStyle = "#3f3f46";
       ctx.fill();
       ctx.fillStyle = "#ffffff";
-      ctx.font = "bold 60px Arial, sans-serif";
+      ctx.font = "bold 56px Arial, sans-serif";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
       ctx.fillText(initialsOf(name), photoCx, photoCy + 4);
@@ -181,64 +292,68 @@ const MaintlerCardCanvas = forwardRef<MaintlerCardCanvasHandle, {
     ctx.strokeStyle = "#dc2626";
     ctx.stroke();
 
-    // Text column to the right of the photo.
-    const textX = photoCx + photoSize / 2 + 36;
-    const textMaxWidth = 480;
-    let y = bandTop + 20;
+    const textX = photoCx + photoSize / 2 + 32;
+    const textMaxWidth = 420;
+    let y = bandTop + 16;
 
-    ctx.font = "bold 34px Arial, sans-serif";
+    ctx.font = "bold 30px Arial, sans-serif";
     ctx.fillStyle = "#ffffff";
     ctx.fillText(truncateToWidth(ctx, name, textMaxWidth), textX, y);
 
     if (workshopName && workshopName !== name) {
-      y += 30;
-      ctx.font = "20px Arial, sans-serif";
+      y += 26;
+      ctx.font = "18px Arial, sans-serif";
       ctx.fillStyle = "#a1a1aa";
       ctx.fillText(truncateToWidth(ctx, workshopName, textMaxWidth), textX, y);
     }
 
     if (verified) {
-      y += 38;
+      y += 34;
       const label = "✓ VERIFIED MAINTLER";
-      ctx.font = "bold 15px Arial, sans-serif";
+      ctx.font = "bold 13px Arial, sans-serif";
       const textWidth = ctx.measureText(label).width;
-      const pillH = 30, padX = 14;
+      const pillH = 27, padX = 12;
       const pillW = textWidth + padX * 2;
-      roundRect(ctx, textX, y - pillH + 8, pillW, pillH, pillH / 2);
+      roundRect(ctx, textX, y - pillH + 7, pillW, pillH, pillH / 2);
       ctx.fillStyle = "rgba(16,185,129,0.16)";
       ctx.fill();
       ctx.fillStyle = "#34d399";
       ctx.textBaseline = "middle";
-      ctx.fillText(label, textX + padX, y - pillH / 2 + 8 + 1);
+      ctx.fillText(label, textX + padX, y - pillH / 2 + 7 + 1);
       ctx.textBaseline = "alphabetic";
     }
 
     if (profession) {
-      y += 34;
-      ctx.font = "16px Arial, sans-serif";
+      y += 30;
+      ctx.font = "15px Arial, sans-serif";
       ctx.fillStyle = "#d4d4d8";
-      ctx.fillText(`🔧 ${truncateToWidth(ctx, profession, textMaxWidth - 24)}`, textX, y);
+      ctx.fillText(`🔧 ${truncateToWidth(ctx, profession, textMaxWidth - 22)}`, textX, y);
     }
 
     if (location) {
-      y += 26;
-      ctx.font = "16px Arial, sans-serif";
+      y += 24;
+      ctx.font = "15px Arial, sans-serif";
       ctx.fillStyle = "#a1a1aa";
-      ctx.fillText(`📍 ${truncateToWidth(ctx, location, textMaxWidth - 24)}`, textX, y);
+      ctx.fillText(`📍 ${truncateToWidth(ctx, location, textMaxWidth - 22)}`, textX, y);
     }
 
-    // ── RIGHT: QR block, reusing the exact composited frame+QR image
-    //    QrCodeCanvas already knows how to build. No background panel
-    //    behind it — the Gear Ring frame artwork already has its own
-    //    transparent margin, so it sits directly on the dark card
-    //    background (same fix as the portrait version, round 4: "ese
-    //    fondo blanco cuadrado queda re feo en la q hiciste"). ──
-    const qrBoxOuter = 320;
-    const qrCx = W - 200;
+    if (createdAt) {
+      y += 24;
+      ctx.font = "14px Arial, sans-serif";
+      ctx.fillStyle = "#71717a";
+      const memberSince = new Date(createdAt).toLocaleDateString("en-US", { day: "2-digit", month: "2-digit", year: "numeric" });
+      ctx.fillText(`📅 Member since ${memberSince}`, textX, y);
+    }
+
+    // QR block, framed by the Gear Ring artwork — no background panel
+    // behind it, since that artwork already has its own transparent
+    // margin (round 4 fix carried over unchanged).
+    const qrBoxOuter = 296;
+    const qrCx = W - 195;
     const qrCy = bandCy;
     let qrBlob: Blob | null = null;
     try {
-      qrBlob = (await qrHandleRef.current?.getBlob()) ?? null;
+      qrBlob = (await qrFrontHandleRef.current?.getBlob()) ?? null;
     } catch {
       qrBlob = null;
     }
@@ -250,38 +365,282 @@ const MaintlerCardCanvas = forwardRef<MaintlerCardCanvasHandle, {
         const dw = qrImg.width * scale, dh = qrImg.height * scale;
         ctx.drawImage(qrImg, qrCx - dw / 2, qrCy - dh / 2, dw, dh);
       } catch {
-        // Drawing the QR image failed — the rest of the card (photo, name,
-        // banner) still renders fine without it.
+        // Drawing the QR image failed — the rest of the card still
+        // renders fine without it.
       }
     }
-    ctx.textAlign = "center";
-    ctx.font = "bold 14px Arial, sans-serif";
-    ctx.fillStyle = "#e4e4e7";
-    ctx.fillText("SCAN TO VIEW MY PROFILE", qrCx, qrCy + qrBoxOuter / 2 + 30);
-    ctx.textAlign = "left";
 
-    // Bottom banner, full width.
-    ctx.textAlign = "center";
+    // Bottom banner: Maintler ID on the left, "scan to view" + a small
+    // signal glyph on the right — matching the mockup's layout (moved out
+    // of the main content area, where earlier rounds of this card used to
+    // put the "scan to view" caption directly under the QR).
     ctx.fillStyle = "#dc2626";
-    ctx.fillRect(0, H - bannerH, W, bannerH);
+    ctx.fillRect(0, H - BANNER_H, W, BANNER_H);
+    ctx.textAlign = "left";
+    ctx.fillStyle = "rgba(255,255,255,0.75)";
+    ctx.font = "10px Arial, sans-serif";
+    ctx.fillText("MAINTLER ID", 40, H - BANNER_H + 27);
     ctx.fillStyle = "#ffffff";
-    ctx.font = "12px Arial, sans-serif";
-    ctx.fillText("MAINTLER ID", W / 2, H - bannerH + 24);
-    ctx.font = "bold 22px Arial, sans-serif";
-    ctx.fillText(code.slice(0, 8).toUpperCase(), W / 2, H - bannerH + 48);
+    ctx.font = "bold 20px Arial, sans-serif";
+    ctx.fillText(code.slice(0, 8).toUpperCase(), 40, H - BANNER_H + 50);
+
+    ctx.textAlign = "right";
+    ctx.fillStyle = "#ffffff";
+    ctx.font = "bold 12px Arial, sans-serif";
+    ctx.fillText("SCAN TO VIEW MY PROFILE", W - 70, H - BANNER_H / 2 + 4);
+    drawSignalGlyph(ctx, W - 40, H - BANNER_H / 2, 20);
     ctx.textAlign = "left";
   }
 
-  async function buildCardBlob(): Promise<Blob | null> {
+  // ── BACK ──
+  async function drawBack(ctx: CanvasRenderingContext2D, isStale: () => boolean = () => false) {
+    const W = CARD_W, H = CARD_H;
+    ctx.clearRect(0, 0, W, H);
+    const contentH = H - BANNER_H;
+
+    const bg = ctx.createLinearGradient(0, 0, W, contentH);
+    bg.addColorStop(0, "#27272a");
+    bg.addColorStop(1, "#09090b");
+    ctx.fillStyle = bg;
+    ctx.fillRect(0, 0, W, contentH);
+    drawAccent(ctx, W, contentH);
+
+    const pad = 36;
+    const colLeftX = pad, colLeftW = 430;
+    const colMidX = colLeftX + colLeftW + 26, colMidW = 200;
+    const colRightX = colMidX + colMidW + 26, colRightW = W - pad - colRightX;
+
+    ctx.textAlign = "left";
+
+    // ── ABOUT ME (left column, top) ──
+    let leftY = 50;
+    ctx.font = "bold 12px Arial, sans-serif";
+    ctx.fillStyle = "#dc2626";
+    ctx.fillText("ABOUT ME", colLeftX, leftY);
+    leftY += 20;
+
+    const topSpecialty = activeSpecialties[0] ? assetTypeLabel(activeSpecialties[0].asset_type) : null;
+    const aboutParts: string[] = [];
+    aboutParts.push(
+      profession && verified
+        ? `Verified ${profession} on MaintlyQR${years > 0 ? ` for ${years} year${years === 1 ? "" : "s"}` : ""}.`
+        : `Active Maintler on MaintlyQR${years > 0 ? ` for ${years} year${years === 1 ? "" : "s"}` : ""}.`
+    );
+    if (topSpecialty) aboutParts.push(`Specialized in ${topSpecialty.toLowerCase()} maintenance.`);
+    ctx.font = "14px Arial, sans-serif";
+    ctx.fillStyle = "#d4d4d8";
+    const aboutLines = wrapText(ctx, aboutParts.join(" "), colLeftW, 3);
+    for (const line of aboutLines) {
+      ctx.fillText(line, colLeftX, leftY);
+      leftY += 20;
+    }
+    leftY += 18;
+
+    // ── SPECIALTIES (left column, below About) — only real, logged
+    // categories; hidden entirely if none yet, same call already made on
+    // the public card for a brand-new Maintler with zero services. ──
+    if (activeSpecialties.length > 0) {
+      ctx.font = "bold 12px Arial, sans-serif";
+      ctx.fillStyle = "#dc2626";
+      ctx.fillText("SPECIALTIES", colLeftX, leftY);
+      leftY += 22;
+
+      const iconSize = 30;
+      const perRow = 3;
+      const cellW = colLeftW / perRow;
+      const shown = activeSpecialties.slice(0, 6);
+      for (let i = 0; i < shown.length; i++) {
+        const row = Math.floor(i / perRow), col = i % perRow;
+        const cx = colLeftX + col * cellW + iconSize / 2;
+        const cy = leftY + row * 58 + iconSize / 2;
+        const imgSrc = assetTypeImg[shown[i].asset_type];
+        if (imgSrc) {
+          try {
+            const img = await loadImageEl(imgSrc);
+            if (isStale()) return;
+            ctx.drawImage(img, cx - iconSize / 2, cy - iconSize / 2, iconSize, iconSize);
+          } catch {
+            // Icon failed to load — the label below still identifies it.
+          }
+        }
+        ctx.font = "10px Arial, sans-serif";
+        ctx.fillStyle = "#a1a1aa";
+        ctx.textAlign = "center";
+        const label = truncateToWidth(ctx, assetTypeLabel(shown[i].asset_type), cellW - 6);
+        ctx.fillText(label, cx, cy + iconSize / 2 + 14);
+        ctx.textAlign = "left";
+      }
+      leftY += Math.ceil(shown.length / perRow) * 58 + 4;
+    }
+
+    // ── STATS (middle column) — real numbers only, same figures Settings'
+    // own "Maintly Stats" panel and the public card show. ──
+    let midY = 50;
+    ctx.font = "bold 12px Arial, sans-serif";
+    ctx.fillStyle = "#dc2626";
+    ctx.fillText("STATS", colMidX, midY);
+    midY += 26;
+
+    const statRows: [string, number][] = [
+      ["Services Logged", effStats.services_count],
+      ["Assets Maintained", effStats.assets_count],
+      ["Documents Uploaded", documentsCount],
+      ["Repeat Customers", effStats.repeat_customers_count],
+      ["Years Active", years],
+    ];
+    for (const [label, value] of statRows) {
+      ctx.font = "11px Arial, sans-serif";
+      ctx.fillStyle = "#a1a1aa";
+      ctx.fillText(truncateToWidth(ctx, label, colMidW - 46), colMidX, midY);
+      ctx.font = "bold 16px Arial, sans-serif";
+      ctx.fillStyle = "#ffffff";
+      ctx.textAlign = "right";
+      ctx.fillText(String(value), colMidX + colMidW, midY);
+      ctx.textAlign = "left";
+      midY += 32;
+    }
+
+    // ── BADGES (right column) — every label here comes straight from
+    // computeBadges()'s real thresholds (see styleForBadge() above); a
+    // profession badge is appended only when it's an actually-verified,
+    // declared profession, not a decorative filler. ──
+    let rightY = 50;
+    ctx.font = "bold 12px Arial, sans-serif";
+    ctx.fillStyle = "#dc2626";
+    ctx.fillText("BADGES", colRightX, rightY);
+    rightY += 24;
+
+    const cardBadges = [...domBadges.map((b) => ({ label: b.label, ...styleForBadge(b.label) }))];
+    if (verified && profession) cardBadges.push({ label: profession, emoji: "🛠", bg: "#dc2626" });
+
+    if (cardBadges.length === 0) {
+      ctx.font = "11px Arial, sans-serif";
+      ctx.fillStyle = "#71717a";
+      ctx.fillText("Keep logging services", colRightX, rightY);
+      ctx.fillText("to unlock badges.", colRightX, rightY + 16);
+    } else {
+      const perRow = 2;
+      const cellW = colRightW / perRow;
+      const iconR = 20;
+      const shown = cardBadges.slice(0, 6);
+      for (let i = 0; i < shown.length; i++) {
+        const row = Math.floor(i / perRow), col = i % perRow;
+        const cx = colRightX + col * cellW + iconR;
+        const cy = rightY + row * 62 + iconR;
+        ctx.beginPath();
+        ctx.arc(cx, cy, iconR, 0, Math.PI * 2);
+        ctx.fillStyle = shown[i].bg;
+        ctx.fill();
+        ctx.font = `${iconR}px Arial, sans-serif`;
+        ctx.fillStyle = "#ffffff";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(shown[i].emoji, cx, cy + 1);
+        ctx.textBaseline = "alphabetic";
+        ctx.font = "9.5px Arial, sans-serif";
+        ctx.fillStyle = "#d4d4d8";
+        ctx.fillText(truncateToWidth(ctx, shown[i].label, cellW - 4), cx, cy + iconR + 14);
+        ctx.textAlign = "left";
+      }
+    }
+
+    // ── CONTACT + SHARE MY CARD, bottom row above the banner ──
+    const bottomRowY = Math.max(leftY, midY, rightY + Math.ceil(cardBadges.length / 2) * 62 + 10, contentH - 150);
+    const dividerY = Math.min(bottomRowY - 14, contentH - 150);
+    ctx.strokeStyle = "rgba(255,255,255,0.08)";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(pad, dividerY);
+    ctx.lineTo(W - pad, dividerY);
+    ctx.stroke();
+
+    let contactY = dividerY + 26;
+    ctx.font = "bold 12px Arial, sans-serif";
+    ctx.fillStyle = "#dc2626";
+    ctx.fillText("CONTACT", colLeftX, contactY);
+    contactY += 20;
+
+    const contactRows: string[] = [];
+    if (contactEmail) contactRows.push(`✉ ${contactEmail}`);
+    if (contactPhone) contactRows.push(`📞 ${contactPhone}`);
+    if (websiteUrl) contactRows.push(`🌐 ${websiteUrl.replace(/^https?:\/\//, "")}`);
+    if (contactRows.length === 0) {
+      ctx.font = "11px Arial, sans-serif";
+      ctx.fillStyle = "#71717a";
+      ctx.fillText("No public contact info added yet.", colLeftX, contactY);
+    } else {
+      ctx.font = "12px Arial, sans-serif";
+      ctx.fillStyle = "#d4d4d8";
+      for (const row of contactRows) {
+        ctx.fillText(truncateToWidth(ctx, row, colMidX + colMidW - colLeftX - 20), colLeftX, contactY);
+        contactY += 20;
+      }
+    }
+
+    // Small "share my card" QR, bottom-right of the content area.
+    const shareBoxSize = 92;
+    const shareCx = W - pad - shareBoxSize / 2;
+    const shareCy = dividerY + 26 + shareBoxSize / 2 - 10;
+    roundRect(ctx, shareCx - shareBoxSize / 2, shareCy - shareBoxSize / 2, shareBoxSize, shareBoxSize, 10);
+    ctx.fillStyle = "#ffffff";
+    ctx.fill();
+    let shareBlob: Blob | null = null;
+    try {
+      shareBlob = (await qrBackHandleRef.current?.getBlob()) ?? null;
+    } catch {
+      shareBlob = null;
+    }
+    if (isStale()) return;
+    if (shareBlob) {
+      try {
+        const shareImg = await blobToImage(shareBlob);
+        const inner = shareBoxSize - 14;
+        ctx.drawImage(shareImg, shareCx - inner / 2, shareCy - inner / 2, inner, inner);
+      } catch {
+        // Falls back to the blank white box — the physical card is still
+        // usable via the front's main QR.
+      }
+    }
+    ctx.textAlign = "right";
+    ctx.font = "bold 11px Arial, sans-serif";
+    ctx.fillStyle = "#e4e4e7";
+    ctx.fillText("SHARE MY CARD", W - pad, shareCy - shareBoxSize / 2 - 10);
+    ctx.font = "9.5px Arial, sans-serif";
+    ctx.fillStyle = "#71717a";
+    ctx.fillText("Scan or share with anyone.", W - pad, shareCy + shareBoxSize / 2 + 16);
+    ctx.textAlign = "left";
+
+    // Bottom banner — same brand + Maintler ID pairing as the front, so
+    // either side alone still identifies the card if separated.
+    ctx.fillStyle = "#dc2626";
+    ctx.fillRect(0, H - BANNER_H, W, BANNER_H);
+    ctx.textAlign = "left";
+    ctx.fillStyle = "#ffffff";
+    ctx.font = "bold 15px Arial, sans-serif";
+    ctx.fillText("MAINTLYQR", pad, H - BANNER_H / 2 + 5);
+    ctx.font = "10px Arial, sans-serif";
+    ctx.fillStyle = "rgba(255,255,255,0.75)";
+    ctx.fillText("MAINTENANCE · TRACKED", pad, H - BANNER_H / 2 + 20);
+    ctx.textAlign = "right";
+    ctx.font = "bold 13px Arial, sans-serif";
+    ctx.fillStyle = "#ffffff";
+    ctx.fillText(`MAINTLER ID: ${code.slice(0, 8).toUpperCase()}`, W - pad, H - BANNER_H / 2 + 5);
+    ctx.textAlign = "left";
+  }
+
+  async function buildBlob(drawFn: (ctx: CanvasRenderingContext2D, isStale?: () => boolean) => Promise<void>): Promise<Blob | null> {
     const canvas = document.createElement("canvas");
     canvas.width = CARD_W;
     canvas.height = CARD_H;
     const ctx = canvas.getContext("2d");
     if (!ctx) return null;
-    await drawCard(ctx);
+    await drawFn(ctx);
     return await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/png"));
   }
 
+  // Live inline preview — front only (same visual slot this component has
+  // always occupied in Settings); the back is drawn on demand (download/
+  // share/print/view) rather than kept permanently mounted.
   useEffect(() => {
     const canvas = previewCanvasRef.current;
     if (!canvas) return;
@@ -290,28 +649,45 @@ const MaintlerCardCanvas = forwardRef<MaintlerCardCanvasHandle, {
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
     let cancelled = false;
+    (async () => { await drawFront(ctx, () => cancelled); })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [code, name, workshopName, photoUrl, verified, profession, location, createdAt]);
+
+  // View-modal preview — draws both sides into the modal's own canvases
+  // once it opens.
+  useEffect(() => {
+    if (!viewOpen) return;
+    let cancelled = false;
+    const fCanvas = viewFrontCanvasRef.current;
+    const bCanvas = viewBackCanvasRef.current;
+    if (fCanvas) { fCanvas.width = CARD_W; fCanvas.height = CARD_H; }
+    if (bCanvas) { bCanvas.width = CARD_W; bCanvas.height = CARD_H; }
     (async () => {
-      await drawCard(ctx, () => cancelled);
+      if (fCanvas) {
+        const fctx = fCanvas.getContext("2d");
+        if (fctx) await drawFront(fctx, () => cancelled);
+      }
+      if (cancelled) return;
+      if (bCanvas) {
+        const bctx = bCanvas.getContext("2d");
+        if (bctx) await drawBack(bctx, () => cancelled);
+      }
     })();
     return () => { cancelled = true; };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [code, name, workshopName, photoUrl, verified, profession, location]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [viewOpen, code, name, workshopName, photoUrl, verified, profession, location, createdAt, documentsCount, contactEmail, contactPhone, websiteUrl]);
 
   useImperativeHandle(ref, () => ({
-    download: async (filename: string) => {
-      const blob = await buildCardBlob();
-      if (!blob) return;
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `${filename}.png`;
-      a.click();
-      URL.revokeObjectURL(url);
+    download: async (filenameBase: string) => {
+      const [frontBlob, backBlob] = await Promise.all([buildBlob(drawFront), buildBlob(drawBack)]);
+      if (frontBlob) triggerDownload(frontBlob, `${filenameBase}-front.png`);
+      if (backBlob) triggerDownload(backBlob, `${filenameBase}-back.png`);
     },
-    share: async (filename: string) => {
-      const blob = await buildCardBlob();
+    share: async (filenameBase: string) => {
+      const blob = await buildBlob(drawFront);
       if (!blob) return;
-      const file = new File([blob], `${filename}.png`, { type: "image/png" });
+      const file = new File([blob], `${filenameBase}-front.png`, { type: "image/png" });
       const nav = navigator as Navigator & { canShare?: (data?: ShareData) => boolean };
       if (nav.canShare && nav.canShare({ files: [file] })) {
         try {
@@ -322,49 +698,141 @@ const MaintlerCardCanvas = forwardRef<MaintlerCardCanvasHandle, {
           // — fall through to a plain download rather than doing nothing.
         }
       }
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `${filename}.png`;
-      a.click();
-      URL.revokeObjectURL(url);
+      triggerDownload(blob, `${filenameBase}-front.png`);
     },
-    print: async () => {
-      const blob = await buildCardBlob();
-      if (!blob) return;
-      const url = URL.createObjectURL(blob);
+    printCard: async () => {
+      const [frontBlob, backBlob] = await Promise.all([buildBlob(drawFront), buildBlob(drawBack)]);
+      if (!frontBlob && !backBlob) return;
+      const frontUrl = frontBlob ? URL.createObjectURL(frontBlob) : "";
+      const backUrl = backBlob ? URL.createObjectURL(backBlob) : "";
       const printWindow = window.open("", "_blank");
-      if (!printWindow) { URL.revokeObjectURL(url); return; }
+      if (!printWindow) return;
       printWindow.document.write(
-        `<html><head><title>Maintler Card</title></head><body style="margin:0;display:flex;align-items:center;justify-content:center;min-height:100vh;background:#fff;">` +
-        `<img src="${url}" style="max-width:100%;max-height:100vh;" onload="window.focus();window.print();" />` +
+        `<html><head><title>Maintler Card</title><style>` +
+        `body{margin:0;background:#fff;}` +
+        `.page{display:flex;align-items:center;justify-content:center;min-height:100vh;}` +
+        `.page img{max-width:92%;max-height:92vh;}` +
+        `@media print{.page{page-break-after:always;}.page:last-child{page-break-after:auto;}}` +
+        `</style></head><body>` +
+        (frontUrl ? `<div class="page"><img src="${frontUrl}" /></div>` : "") +
+        (backUrl ? `<div class="page"><img src="${backUrl}" /></div>` : "") +
+        `<script>window.onload=function(){window.focus();window.print();};</script>` +
         `</body></html>`
       );
       printWindow.document.close();
     },
+    view: () => setViewOpen(true),
   }));
 
-  // Responsive up to previewWidth, not a fixed pixel box — a fixed width
-  // (e.g. 420px for the wide landscape card in Settings) would overflow
-  // the card's container on narrow phone screens. The canvas's actual
-  // drawing surface stays at the full CARD_W x CARD_H resolution
-  // regardless (set below in drawCard()); only the on-screen CSS size
-  // scales down here.
+  // These three thin wrappers just reuse the same buildBlob/download logic
+  // the imperative handle exposes, so the view modal's own action buttons
+  // don't need Settings to pass in separate callbacks — the modal is fully
+  // self-contained.
+  async function downloadFromModal() {
+    const [frontBlob, backBlob] = await Promise.all([buildBlob(drawFront), buildBlob(drawBack)]);
+    if (frontBlob) triggerDownload(frontBlob, "maintlyqr-card-front.png");
+    if (backBlob) triggerDownload(backBlob, "maintlyqr-card-back.png");
+  }
+  async function shareFromModal() {
+    const blob = await buildBlob(drawFront);
+    if (!blob) return;
+    const file = new File([blob], "maintlyqr-card-front.png", { type: "image/png" });
+    const nav = navigator as Navigator & { canShare?: (data?: ShareData) => boolean };
+    if (nav.canShare && nav.canShare({ files: [file] })) {
+      try {
+        await navigator.share({ files: [file], title: "My Maintler Card", text: "Scan my MaintlyQR Maintler card" });
+        return;
+      } catch {
+        // Falls through to a plain download below.
+      }
+    }
+    triggerDownload(blob, "maintlyqr-card-front.png");
+  }
+  async function printFromModal() {
+    const [frontBlob, backBlob] = await Promise.all([buildBlob(drawFront), buildBlob(drawBack)]);
+    if (!frontBlob && !backBlob) return;
+    const frontUrl = frontBlob ? URL.createObjectURL(frontBlob) : "";
+    const backUrl = backBlob ? URL.createObjectURL(backBlob) : "";
+    const printWindow = window.open("", "_blank");
+    if (!printWindow) return;
+    printWindow.document.write(
+      `<html><head><title>Maintler Card</title><style>` +
+      `body{margin:0;background:#fff;}` +
+      `.page{display:flex;align-items:center;justify-content:center;min-height:100vh;}` +
+      `.page img{max-width:92%;max-height:92vh;}` +
+      `@media print{.page{page-break-after:always;}.page:last-child{page-break-after:auto;}}` +
+      `</style></head><body>` +
+      (frontUrl ? `<div class="page"><img src="${frontUrl}" /></div>` : "") +
+      (backUrl ? `<div class="page"><img src="${backUrl}" /></div>` : "") +
+      `<script>window.onload=function(){window.focus();window.print();};</script>` +
+      `</body></html>`
+    );
+    printWindow.document.close();
+  }
+
   return (
-    <div
-      style={{ width: "100%", maxWidth: previewWidth, aspectRatio: `${CARD_W} / ${CARD_H}` }}
-      className="shrink-0 rounded-2xl overflow-hidden shadow-sm border border-zinc-200"
-    >
-      <canvas ref={previewCanvasRef} style={{ width: "100%", height: "100%", display: "block" }} />
-      {/* Off-screen — only exists to produce the composited frame+QR PNG
-          via getBlob(). Rendered, not display:none, since the underlying
-          qr-code-styling library needs a real mounted element to draw
-          into; visually hidden with an inline absolute position + zero
-          size + opacity instead. */}
-      <div style={{ position: "absolute", width: 0, height: 0, overflow: "hidden", opacity: 0 }} aria-hidden="true">
-        <QrCodeCanvas ref={qrHandleRef} code={code} theme={DEFAULT_QR_THEME} linkPath="maintler" size={240} />
+    <>
+      <div
+        style={{ width: "100%", maxWidth: previewWidth, aspectRatio: `${CARD_W} / ${CARD_H}` }}
+        className="shrink-0 rounded-2xl overflow-hidden shadow-sm border border-zinc-200"
+      >
+        <canvas ref={previewCanvasRef} style={{ width: "100%", height: "100%", display: "block" }} />
+        {/* Off-screen — only exist to produce composited QR PNGs via
+            getBlob(). Rendered, not display:none, since qr-code-styling
+            needs a real mounted element to draw into. */}
+        <div style={{ position: "absolute", width: 0, height: 0, overflow: "hidden", opacity: 0 }} aria-hidden="true">
+          <QrCodeCanvas ref={qrFrontHandleRef} code={code} theme={DEFAULT_QR_THEME} linkPath="maintler" size={240} />
+          <QrCodeCanvas ref={qrBackHandleRef} code={code} theme="classic" linkPath="maintler" size={220} />
+        </div>
       </div>
-    </div>
+
+      {viewOpen && (
+        <div className="fixed inset-0 z-[100] bg-zinc-900/70 flex items-center justify-center p-4" onClick={() => setViewOpen(false)}>
+          <div className="bg-white rounded-2xl p-6 max-w-4xl w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-[15px] font-black text-zinc-900">My Maintler Card</h3>
+              <button onClick={() => setViewOpen(false)} className="text-zinc-400 hover:text-zinc-700">
+                <X size={20} />
+              </button>
+            </div>
+            <div className="flex flex-col md:flex-row gap-6 items-center justify-center">
+              <div className="w-full md:w-1/2">
+                <div style={{ width: "100%", aspectRatio: `${CARD_W} / ${CARD_H}` }} className="rounded-2xl overflow-hidden border border-zinc-200 shadow-sm">
+                  <canvas ref={viewFrontCanvasRef} style={{ width: "100%", height: "100%", display: "block" }} />
+                </div>
+                <p className="text-center text-[11px] font-bold text-zinc-400 mt-2 uppercase tracking-wide">Front</p>
+              </div>
+              <div className="w-full md:w-1/2">
+                <div style={{ width: "100%", aspectRatio: `${CARD_W} / ${CARD_H}` }} className="rounded-2xl overflow-hidden border border-zinc-200 shadow-sm">
+                  <canvas ref={viewBackCanvasRef} style={{ width: "100%", height: "100%", display: "block" }} />
+                </div>
+                <p className="text-center text-[11px] font-bold text-zinc-400 mt-2 uppercase tracking-wide">Back</p>
+              </div>
+            </div>
+            <div className="flex items-center justify-center gap-2 mt-6">
+              <button
+                onClick={() => downloadFromModal()}
+                className="flex items-center gap-1.5 text-[12px] font-bold text-white bg-zinc-900 hover:bg-zinc-800 px-4 py-2.5 rounded-xl transition-colors"
+              >
+                <Download size={13} /> Download Both
+              </button>
+              <button
+                onClick={() => printFromModal()}
+                className="flex items-center gap-1.5 text-[12px] font-bold text-zinc-600 hover:text-red-600 border border-zinc-200 hover:bg-zinc-50 px-4 py-2.5 rounded-xl transition-colors"
+              >
+                <Printer size={13} /> Print Card
+              </button>
+              <button
+                onClick={() => shareFromModal()}
+                className="flex items-center gap-1.5 text-[12px] font-bold text-zinc-600 hover:text-red-600 border border-zinc-200 hover:bg-zinc-50 px-4 py-2.5 rounded-xl transition-colors"
+              >
+                <Share2 size={13} /> Share
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 });
 

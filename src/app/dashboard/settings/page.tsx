@@ -10,6 +10,7 @@ import {
   ShieldCheck, CalendarDays, KeyRound, AlertCircle, CheckCircle2, Camera,
   Image as ImageIcon,
   MessageCircle, Download, Copy, Check, Share2, Printer, Phone, Globe, MapPin,
+  Eye, CreditCard,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import NotificationBell from "@/components/NotificationBell";
@@ -95,6 +96,14 @@ export default function SettingsPage() {
   const [cardLinkCopied, setCardLinkCopied] = useState(false);
   const cardCanvasRef = useRef<MaintlerCardCanvasHandle>(null);
 
+  // Round 7 — the physical credit-card-style Maintler card's back side
+  // shows a "Documents Uploaded" stat. This is a real, owner-scoped count
+  // (RLS already lets a mechanic read their own documents rows directly,
+  // same as the Document Library page itself), so it's fetched here as a
+  // plain query rather than needing a new public RPC — this card is only
+  // ever rendered for the logged-in mechanic viewing their own Settings.
+  const [documentsCount, setDocumentsCount] = useState(0);
+
   // Synchronous in-flight guards for the three forms below — `disabled`
   // on the submit button is a React state update, so it doesn't take
   // effect until the next render; a fast double-click/double-Enter before
@@ -146,14 +155,16 @@ export default function SettingsPage() {
         setFacebookUrl(mechanic.facebook_url ?? "");
         setWebsiteUrl(mechanic.website_url ?? "");
 
-        const [statsRes, specialtiesRes] = await Promise.all([
+        const [statsRes, specialtiesRes, documentsRes] = await Promise.all([
           supabase.rpc("get_maintler_stats", { target_mechanic_id: session.user.id }),
           supabase.rpc("get_maintler_specialty_breakdown", { target_mechanic_id: session.user.id }),
+          supabase.from("documents").select("*", { count: "exact", head: true }).eq("mechanic_id", session.user.id),
         ]);
         if (active) {
           const statsRow = Array.isArray(statsRes.data) ? statsRes.data[0] : statsRes.data;
           if (statsRow) setStats(statsRow as MaintlerStats);
           if (Array.isArray(specialtiesRes.data)) setSpecialties(specialtiesRes.data as SpecialtyRow[]);
+          setDocumentsCount(documentsRes.count ?? 0);
         }
       }
 
@@ -204,6 +215,20 @@ export default function SettingsPage() {
     // alone read as empty compared to what he expected Print to produce.
     if (!maintlerCode) return;
     window.open(`/maintler/${maintlerCode}?print=1`, "_blank");
+  }
+
+  // Round 7 — the new credit-card-style physical card gets its OWN print
+  // action, separate from "Print" above (which still prints the full
+  // report page). Facu's own call: keep both, add a dedicated button
+  // rather than repurpose the existing one.
+  function handlePrintPhysicalCard() {
+    if (!maintlerCode) return;
+    cardCanvasRef.current?.printCard();
+  }
+
+  function handleViewCard() {
+    if (!maintlerCode) return;
+    cardCanvasRef.current?.view();
   }
 
   function handleFileSelected(e: React.ChangeEvent<HTMLInputElement>) {
@@ -471,6 +496,13 @@ export default function SettingsPage() {
                     verified={verified}
                     profession={verified ? profession : null}
                     location={location || null}
+                    createdAt={createdAt || null}
+                    stats={stats}
+                    documentsCount={documentsCount}
+                    specialties={specialties}
+                    contactEmail={contactEmail || null}
+                    contactPhone={contactPhone || null}
+                    websiteUrl={isSafeHref(websiteUrl) ? websiteUrl : null}
                     previewWidth={420}
                   />
                 </div>
@@ -502,6 +534,19 @@ export default function SettingsPage() {
                       className="flex items-center gap-1.5 text-[11.5px] font-bold text-zinc-600 hover:text-red-600 border border-zinc-200 hover:bg-zinc-50 px-3.5 py-2.5 rounded-xl transition-colors"
                     >
                       <Printer size={13} /> Print
+                    </button>
+                    <button
+                      onClick={handleViewCard}
+                      className="flex items-center gap-1.5 text-[11.5px] font-bold text-zinc-600 hover:text-red-600 border border-zinc-200 hover:bg-zinc-50 px-3.5 py-2.5 rounded-xl transition-colors"
+                    >
+                      <Eye size={13} /> View
+                    </button>
+                    <button
+                      onClick={handlePrintPhysicalCard}
+                      className="flex items-center gap-1.5 text-[11.5px] font-bold text-zinc-600 hover:text-red-600 border border-zinc-200 hover:bg-zinc-50 px-3.5 py-2.5 rounded-xl transition-colors"
+                      title="Print the physical front/back card (separate from the full report Print above)"
+                    >
+                      <CreditCard size={13} /> Print Card
                     </button>
                   </div>
 
