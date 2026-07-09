@@ -6,6 +6,7 @@ import { useParams, useRouter } from "next/navigation";
 import {
   ShieldCheck, CalendarDays, AlertCircle, LogIn, UserPlus,
   Star, Send, UserCircle2, Share2, Check, Wrench, Box, Users, Download,
+  Phone, Mail, Globe,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { formatDateDMY } from "@/lib/date";
@@ -63,6 +64,11 @@ type PublicProfile = {
   profession: string | null;
   created_at: string;
   maintler_code: string;
+  phone: string | null;
+  contact_email: string | null;
+  instagram_url: string | null;
+  facebook_url: string | null;
+  website_url: string | null;
 };
 
 type MaintlerStats = {
@@ -146,7 +152,7 @@ export default function MaintlerPublicPage() {
 
       const { data: row } = await supabase
         .from("mechanic_public_profile")
-        .select("id, name, workshop_name, photo_url, verified, profession, created_at, maintler_code")
+        .select("id, name, workshop_name, photo_url, verified, profession, created_at, maintler_code, phone, contact_email, instagram_url, facebook_url, website_url")
         .eq("maintler_code", code)
         .single();
 
@@ -437,6 +443,47 @@ export default function MaintlerPublicPage() {
                   </div>
                 );
               })}
+            </div>
+          </div>
+        )}
+
+        {/* ── CONTACT ──
+            Facu's feedback: "no veo datos de contacto." Answered via a
+            clarifying question — he wants email/phone/socials shown,
+            always visible once a mechanic fills them in (no per-field
+            privacy toggle). All optional; the section just doesn't
+            render anything for fields left blank. This is separate from
+            the Save/Message flow below, which still requires the
+            visitor to be a logged-in Maintler — this is for anyone. */}
+        {(profile.phone || profile.contact_email || profile.instagram_url || profile.facebook_url || profile.website_url) && (
+          <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm px-5 py-4">
+            <p className="text-[11px] font-bold text-zinc-400 uppercase tracking-wide mb-3">Contact</p>
+            <div className="space-y-2.5">
+              {profile.phone && (
+                <a href={`tel:${profile.phone}`} className="flex items-center gap-2.5 text-[12.5px] font-semibold text-zinc-700 hover:text-red-600 transition-colors">
+                  <Phone size={14} className="text-zinc-400 shrink-0" /> {profile.phone}
+                </a>
+              )}
+              {profile.contact_email && (
+                <a href={`mailto:${profile.contact_email}`} className="flex items-center gap-2.5 text-[12.5px] font-semibold text-zinc-700 hover:text-red-600 transition-colors break-all">
+                  <Mail size={14} className="text-zinc-400 shrink-0" /> {profile.contact_email}
+                </a>
+              )}
+              {profile.instagram_url && (
+                <a href={profile.instagram_url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2.5 text-[12.5px] font-semibold text-zinc-700 hover:text-red-600 transition-colors break-all">
+                  <Globe size={14} className="text-zinc-400 shrink-0" /> Instagram
+                </a>
+              )}
+              {profile.facebook_url && (
+                <a href={profile.facebook_url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2.5 text-[12.5px] font-semibold text-zinc-700 hover:text-red-600 transition-colors break-all">
+                  <Globe size={14} className="text-zinc-400 shrink-0" /> Facebook
+                </a>
+              )}
+              {profile.website_url && (
+                <a href={profile.website_url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2.5 text-[12.5px] font-semibold text-zinc-700 hover:text-red-600 transition-colors break-all">
+                  <Globe size={14} className="text-zinc-400 shrink-0" /> {profile.website_url.replace(/^https?:\/\//, "")}
+                </a>
+              )}
             </div>
           </div>
         )}

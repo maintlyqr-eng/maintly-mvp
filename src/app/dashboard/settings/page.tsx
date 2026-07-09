@@ -62,6 +62,22 @@ export default function SettingsPage() {
   const [profileSaving, setProfileSaving] = useState(false);
   const [profileMsg, setProfileMsg] = useState<{ text: string; ok: boolean } | null>(null);
 
+  // Public contact info (migration 026) — shown on the public Maintler
+  // card. Facu's feedback: "no veo datos de contacto." Answered via a
+  // clarifying question: he wants email/phone/socials always visible,
+  // no per-field privacy toggle — so these are separate, optional fields
+  // a mechanic fills in here and that then show up for anyone who visits
+  // /maintler/<code>. contact_email is intentionally its own column, not
+  // the account login email, since a mechanic may want to publish a
+  // different (e.g. shop) address.
+  const [contactPhone, setContactPhone] = useState("");
+  const [contactEmail, setContactEmail] = useState("");
+  const [instagramUrl, setInstagramUrl] = useState("");
+  const [facebookUrl, setFacebookUrl] = useState("");
+  const [websiteUrl, setWebsiteUrl] = useState("");
+  const [contactSaving, setContactSaving] = useState(false);
+  const [contactMsg, setContactMsg] = useState<{ text: string; ok: boolean } | null>(null);
+
   // Profile photo
   const [photoUrl, setPhotoUrl] = useState("");
   const [photoUploading, setPhotoUploading] = useState(false);
@@ -98,7 +114,7 @@ export default function SettingsPage() {
 
       const { data: mechanic } = await supabase
         .from("mechanics")
-        .select("name, workshop_name, created_at, is_mechanic, verified, photo_url, profession, verification_status, verification_note, maintler_code")
+        .select("name, workshop_name, created_at, is_mechanic, verified, photo_url, profession, verification_status, verification_note, maintler_code, phone, contact_email, instagram_url, facebook_url, website_url")
         .eq("id", session.user.id)
         .single();
 
@@ -113,6 +129,11 @@ export default function SettingsPage() {
         setVerificationStatus((mechanic.verification_status as "none" | "pending" | "verified" | "rejected") ?? "none");
         setVerificationNote(mechanic.verification_note ?? null);
         setMaintlerCode(mechanic.maintler_code ?? "");
+        setContactPhone(mechanic.phone ?? "");
+        setContactEmail(mechanic.contact_email ?? "");
+        setInstagramUrl(mechanic.instagram_url ?? "");
+        setFacebookUrl(mechanic.facebook_url ?? "");
+        setWebsiteUrl(mechanic.website_url ?? "");
       }
 
       if (active) setCheckingAuth(false);
@@ -238,6 +259,30 @@ export default function SettingsPage() {
     if (!data || data.length === 0) { setProfileMsg({ text: "Couldn't save — please try again.", ok: false }); return; }
 
     setProfileMsg({ text: "Profile updated.", ok: true });
+  }
+
+  async function handleSaveContactInfo(e: React.FormEvent) {
+    e.preventDefault();
+    setContactMsg(null);
+    setContactSaving(true);
+
+    const { data, error } = await supabase
+      .from("mechanics")
+      .update({
+        phone: contactPhone.trim() || null,
+        contact_email: contactEmail.trim() || null,
+        instagram_url: instagramUrl.trim() || null,
+        facebook_url: facebookUrl.trim() || null,
+        website_url: websiteUrl.trim() || null,
+      })
+      .eq("id", mechanicId)
+      .select("id");
+    setContactSaving(false);
+
+    if (error) { setContactMsg({ text: error.message, ok: false }); return; }
+    if (!data || data.length === 0) { setContactMsg({ text: "Couldn't save — please try again.", ok: false }); return; }
+
+    setContactMsg({ text: "Contact info updated.", ok: true });
   }
 
   async function handleChangePassword(e: React.FormEvent) {
@@ -385,27 +430,13 @@ export default function SettingsPage() {
 
         <div className="flex-1 overflow-y-auto p-4 md:p-7 max-w-2xl">
 
-          {/* ── ACCOUNT STATUS ── */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
-            <div className="bg-white rounded-2xl border border-zinc-200 p-4 shadow-sm flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl bg-zinc-50 flex items-center justify-center shrink-0"><CalendarDays size={16} className="text-zinc-500" /></div>
-              <div>
-                <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-wide">Member since</p>
-                <p className="text-[13px] font-bold text-zinc-800">{createdAt ? formatDateDMY(createdAt) : "—"}</p>
-              </div>
-            </div>
-            <div className="bg-white rounded-2xl border border-zinc-200 p-4 shadow-sm flex items-center gap-3">
-              <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${verified ? "bg-emerald-50" : "bg-zinc-50"}`}>
-                <ShieldCheck size={16} className={verified ? "text-emerald-500" : "text-zinc-400"} />
-              </div>
-              <div>
-                <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-wide">Status</p>
-                <p className="text-[13px] font-bold text-zinc-800">{verified && profession ? `${profession} Maintler` : verified ? "Verified Maintler" : "Maintler"}</p>
-              </div>
-            </div>
-          </div>
-
-          {/* ── MY MAINTLER CARD ── */}
+          {/* ── MY MAINTLER CARD ──
+              Moved above Account Status — Facu's feedback: "no me gusta
+              tener q escrolear para ver la tarjeta." This is arguably the
+              single thing a Maintler opens Settings for most often (grab
+              the card to send someone), so it's the first thing on the
+              page now instead of being buried below the account-status
+              tiles. */}
           <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm p-6 mb-6">
             <h2 className="text-[14px] font-black text-zinc-900 mb-1">My Maintler Card</h2>
             <p className="text-[12px] text-zinc-400 mb-5">
@@ -486,6 +517,26 @@ export default function SettingsPage() {
             ) : (
               <p className="text-[12px] text-zinc-300">Loading your card…</p>
             )}
+          </div>
+
+          {/* ── ACCOUNT STATUS ── */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+            <div className="bg-white rounded-2xl border border-zinc-200 p-4 shadow-sm flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-zinc-50 flex items-center justify-center shrink-0"><CalendarDays size={16} className="text-zinc-500" /></div>
+              <div>
+                <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-wide">Member since</p>
+                <p className="text-[13px] font-bold text-zinc-800">{createdAt ? formatDateDMY(createdAt) : "—"}</p>
+              </div>
+            </div>
+            <div className="bg-white rounded-2xl border border-zinc-200 p-4 shadow-sm flex items-center gap-3">
+              <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${verified ? "bg-emerald-50" : "bg-zinc-50"}`}>
+                <ShieldCheck size={16} className={verified ? "text-emerald-500" : "text-zinc-400"} />
+              </div>
+              <div>
+                <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-wide">Status</p>
+                <p className="text-[13px] font-bold text-zinc-800">{verified && profession ? `${profession} Maintler` : verified ? "Verified Maintler" : "Maintler"}</p>
+              </div>
+            </div>
           </div>
 
           {/* ── PROFESSION & VERIFICATION ── */}
@@ -635,6 +686,70 @@ export default function SettingsPage() {
               <button type="submit" disabled={profileSaving}
                 className="bg-red-600 hover:bg-red-500 disabled:opacity-60 transition-all text-white font-bold py-[11px] px-6 rounded-xl text-[13px]">
                 {profileSaving ? "Saving..." : "Save changes"}
+              </button>
+            </form>
+          </div>
+
+          {/* ── CONTACT INFO ──
+              Facu's feedback on the public card: "no veo datos de
+              contacto." All optional, and — per his answer when asked —
+              always shown publicly once filled in, no per-field toggle.
+              contact_email is separate from the account login email on
+              purpose (a mechanic may want to publish a shop email
+              instead of their personal one). */}
+          <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm p-6 mb-6">
+            <h2 className="text-[14px] font-black text-zinc-900 mb-1">Contact Info</h2>
+            <p className="text-[12px] text-zinc-400 mb-5">
+              Optional. Anything you fill in here shows up on your public Maintler card so people can reach you directly.
+            </p>
+
+            <form onSubmit={handleSaveContactInfo} className="space-y-4">
+              <div>
+                <label className="text-[12px] font-bold text-zinc-700">Phone / WhatsApp</label>
+                <input
+                  value={contactPhone} onChange={(e) => setContactPhone(e.target.value)} placeholder="+54 9 11 1234 5678"
+                  className="w-full mt-1 rounded-xl border border-zinc-200 px-3 py-[10px] text-[13px] outline-none focus:border-red-500"
+                />
+              </div>
+              <div>
+                <label className="text-[12px] font-bold text-zinc-700">Public email <span className="text-zinc-300 font-normal">(can differ from your account email)</span></label>
+                <input
+                  value={contactEmail} onChange={(e) => setContactEmail(e.target.value)} placeholder="taller@example.com"
+                  className="w-full mt-1 rounded-xl border border-zinc-200 px-3 py-[10px] text-[13px] outline-none focus:border-red-500"
+                />
+              </div>
+              <div>
+                <label className="text-[12px] font-bold text-zinc-700">Instagram</label>
+                <input
+                  value={instagramUrl} onChange={(e) => setInstagramUrl(e.target.value)} placeholder="https://instagram.com/tutaller"
+                  className="w-full mt-1 rounded-xl border border-zinc-200 px-3 py-[10px] text-[13px] outline-none focus:border-red-500"
+                />
+              </div>
+              <div>
+                <label className="text-[12px] font-bold text-zinc-700">Facebook</label>
+                <input
+                  value={facebookUrl} onChange={(e) => setFacebookUrl(e.target.value)} placeholder="https://facebook.com/tutaller"
+                  className="w-full mt-1 rounded-xl border border-zinc-200 px-3 py-[10px] text-[13px] outline-none focus:border-red-500"
+                />
+              </div>
+              <div>
+                <label className="text-[12px] font-bold text-zinc-700">Website</label>
+                <input
+                  value={websiteUrl} onChange={(e) => setWebsiteUrl(e.target.value)} placeholder="https://tutaller.com"
+                  className="w-full mt-1 rounded-xl border border-zinc-200 px-3 py-[10px] text-[13px] outline-none focus:border-red-500"
+                />
+              </div>
+
+              {contactMsg && (
+                <div className={`flex items-center gap-2 rounded-lg px-3 py-2 text-[12px] ${contactMsg.ok ? "bg-emerald-50 border border-emerald-200 text-emerald-700" : "bg-red-50 border border-red-200 text-red-700"}`}>
+                  {contactMsg.ok ? <CheckCircle2 size={13} /> : <AlertCircle size={13} />}
+                  {contactMsg.text}
+                </div>
+              )}
+
+              <button type="submit" disabled={contactSaving}
+                className="bg-red-600 hover:bg-red-500 disabled:opacity-60 transition-all text-white font-bold py-[11px] px-6 rounded-xl text-[13px]">
+                {contactSaving ? "Saving..." : "Save changes"}
               </button>
             </form>
           </div>
