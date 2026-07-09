@@ -71,6 +71,43 @@ function blobToImage(blob: Blob): Promise<HTMLImageElement> {
   return loadImageEl(url).finally(() => URL.revokeObjectURL(url));
 }
 
+// Round 8 take 3 (Facu: "no entiendo por qué no usás el logo con el
+// MaintlyQR que tenés para el home") — the real wordmark asset
+// (maintly-logo-full.png, the same file the landing page and dashboard
+// sidebar use) has BLACK "MAINTLY" lettering and a dark-gray subtitle,
+// because it was made for light backgrounds. Drawn as-is on this card's
+// near-black background, "MAINTLY" would be almost invisible (its RGB is
+// close to the card's own background color) — that's the actual reason a
+// hand-drawn substitute was used instead of the real file. This recolors
+// just a cropped region of the source image (the wordmark half, not the
+// metallic gear icon half, which already reads fine on dark and would be
+// damaged by naive brightness recoloring) so it's legible on a dark card:
+// solid dark lettering -> white, the mid-gray subtitle -> light gray, the
+// red "QR"/accent pixels are left untouched.
+function recolorWordmarkForDark(img: HTMLImageElement, srcX: number, srcW: number): HTMLCanvasElement {
+  const off = document.createElement("canvas");
+  off.width = srcW;
+  off.height = img.height;
+  const octx = off.getContext("2d")!;
+  octx.drawImage(img, srcX, 0, srcW, img.height, 0, 0, srcW, img.height);
+  const frame = octx.getImageData(0, 0, srcW, img.height);
+  const px = frame.data;
+  for (let i = 0; i < px.length; i += 4) {
+    const a = px[i + 3];
+    if (a === 0) continue;
+    const r = px[i], g = px[i + 1], b = px[i + 2];
+    if (r > g + 30 && r > b + 30) continue; // red "QR" lettering — leave as-is
+    const brightness = (r + g + b) / 3;
+    if (brightness < 60) {
+      px[i] = 255; px[i + 1] = 255; px[i + 2] = 255; // bold "MAINTLY" -> white
+    } else if (brightness < 170) {
+      px[i] = 195; px[i + 1] = 195; px[i + 2] = 200; // subtitle -> light gray
+    }
+  }
+  octx.putImageData(frame, 0, 0);
+  return off;
+}
+
 function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
   ctx.beginPath();
   ctx.moveTo(x + r, y);
@@ -242,22 +279,35 @@ const MaintlerCardCanvas = forwardRef<MaintlerCardCanvasHandle, Props>(function 
       ctx.fillRect(0, 0, W, H);
     }
 
-    // Brand mark, top-left, over the artwork's subtle hexagon pattern.
+    // Brand mark, top-left, over the artwork's subtle hexagon pattern — the
+    // REAL logo asset (maintly-logo-full.png, same file the landing page
+    // and dashboard sidebar use), not hand-drawn text. The gear-icon half
+    // is drawn straight from the source (it already reads fine on dark);
+    // the wordmark half is recolored for a dark background (see
+    // recolorWordmarkForDark above — the source file is black-on-white).
     const brandIconSize = 46;
     const brandX = 40, brandY = 30;
     ctx.textAlign = "left";
     try {
-      const gearIcon = await loadImageEl("/images/qr-frames/qr-gear-ring.png");
-      ctx.drawImage(gearIcon, brandX, brandY, brandIconSize, brandIconSize);
+      const logo = await loadImageEl("/images/maintly-logo-full.png");
+      if (isStale()) return;
+      const iconSrcW = 475; // gear-icon half of the 1619×477 source
+      ctx.drawImage(logo, 0, 0, iconSrcW, logo.height, brandX, brandY, brandIconSize, brandIconSize);
+      const wmSrcX = 490, wmSrcW = logo.width - wmSrcX;
+      const wordmark = recolorWordmarkForDark(logo, wmSrcX, wmSrcW);
+      const wmH = 40;
+      const wmW = wmH * (wordmark.width / wordmark.height);
+      ctx.drawImage(wordmark, brandX + brandIconSize + 12, brandY + brandIconSize / 2 - wmH / 2, wmW, wmH);
     } catch {
-      // Icon failed to load — the wordmark alone still identifies the card.
+      // Logo failed to load — fall back to plain text so the card still
+      // identifies itself.
+      ctx.font = "bold 22px Arial, sans-serif";
+      ctx.fillStyle = "#e4e4e7";
+      ctx.fillText("MAINTLYQR", brandX + brandIconSize + 12, brandY + brandIconSize / 2 - 2);
+      ctx.font = "bold 9px Arial, sans-serif";
+      ctx.fillStyle = "#71717a";
+      ctx.fillText("MAINTENANCE  ·  TRACKED", brandX + brandIconSize + 12, brandY + brandIconSize / 2 + 13);
     }
-    ctx.font = "bold 22px Arial, sans-serif";
-    ctx.fillStyle = "#e4e4e7";
-    ctx.fillText("MAINTLYQR", brandX + brandIconSize + 12, brandY + brandIconSize / 2 - 2);
-    ctx.font = "bold 9px Arial, sans-serif";
-    ctx.fillStyle = "#71717a";
-    ctx.fillText("MAINTENANCE  ·  TRACKED", brandX + brandIconSize + 12, brandY + brandIconSize / 2 + 13);
 
     // Photo + identity block. contentH stops where the artwork's left-side
     // red bar begins (measured off frontcard1.png), so the block centers
@@ -680,14 +730,25 @@ const MaintlerCardCanvas = forwardRef<MaintlerCardCanvasHandle, Props>(function 
     // — same pairing as the front, so either side alone still identifies
     // the card if separated. Both sit clear of the banner's center notch
     // (native x 882–1067, scaled ~603–729): the wordmark ends well before
-    // it, "MAINTLER ID" is right-aligned and starts well after it.
+    // it, "MAINTLER ID" is right-aligned and starts well after it. The
+    // wordmark is the real logo asset (see recolorWordmarkForDark above),
+    // not hand-drawn text.
     ctx.textAlign = "left";
-    ctx.fillStyle = "#ffffff";
-    ctx.font = "bold 15px Arial, sans-serif";
-    ctx.fillText("MAINTLYQR", pad, BACK_CONTENT_H + 45);
-    ctx.font = "10px Arial, sans-serif";
-    ctx.fillStyle = "rgba(255,255,255,0.75)";
-    ctx.fillText("MAINTENANCE · TRACKED", pad, BACK_CONTENT_H + 63);
+    try {
+      const logo = await loadImageEl("/images/maintly-logo-full.png");
+      if (isStale()) return;
+      const wordmark = recolorWordmarkForDark(logo, 490, logo.width - 490);
+      const wmH = 34;
+      const wmW = wmH * (wordmark.width / wordmark.height);
+      ctx.drawImage(wordmark, pad, BACK_CONTENT_H + 32, wmW, wmH);
+    } catch {
+      ctx.fillStyle = "#ffffff";
+      ctx.font = "bold 15px Arial, sans-serif";
+      ctx.fillText("MAINTLYQR", pad, BACK_CONTENT_H + 45);
+      ctx.font = "10px Arial, sans-serif";
+      ctx.fillStyle = "rgba(255,255,255,0.75)";
+      ctx.fillText("MAINTENANCE · TRACKED", pad, BACK_CONTENT_H + 63);
+    }
     ctx.textAlign = "right";
     ctx.font = "bold 13px Arial, sans-serif";
     ctx.fillStyle = "#ffffff";
