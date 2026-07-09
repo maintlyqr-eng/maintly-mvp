@@ -6,11 +6,12 @@ import { useParams, useRouter, useSearchParams } from "next/navigation";
 import {
   ShieldCheck, CalendarDays, AlertCircle, LogIn, UserPlus,
   Star, Send, UserCircle2, Share2, Check, Wrench, Box, Users, Download,
-  Phone, Mail, Globe, Printer,
+  Phone, Mail, Globe, Printer, MapPin,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { formatDateDMY } from "@/lib/date";
 import MaintlerCardCanvas, { type MaintlerCardCanvasHandle } from "@/components/MaintlerCardCanvas";
+import { yearsSince, computeScore, computeBadges, type MaintlerStats } from "@/lib/maintlerScore";
 
 // Maintler QR business card — Item 4 of the feature backlog. Every
 // mechanic gets a permanent code (see migration 024) that resolves here,
@@ -79,13 +80,7 @@ type PublicProfile = {
   instagram_url: string | null;
   facebook_url: string | null;
   website_url: string | null;
-};
-
-type MaintlerStats = {
-  services_count: number;
-  assets_count: number;
-  customers_count: number;
-  repeat_customers_count: number;
+  location: string | null;
 };
 
 type SpecialtyRow = { asset_type: string; services_count: number };
@@ -96,36 +91,6 @@ function displayName(p: PublicProfile) {
 
 function initialsOf(name: string) {
   return name.split(" ").filter(Boolean).map((p) => p[0]).join("").slice(0, 2).toUpperCase() || "M";
-}
-
-function yearsSince(iso: string) {
-  const ms = Date.now() - new Date(iso).getTime();
-  return Math.max(0, Math.floor(ms / (365.25 * 24 * 3600 * 1000)));
-}
-
-// A transparent, formula-driven score instead of an unexplained star
-// rating — every input is a number already shown elsewhere on this same
-// page, so nothing here is a hidden or "trust me" figure. Capped at 5.
-function computeScore(profile: PublicProfile, stats: MaintlerStats, specialtyCount: number, years: number) {
-  let score = 1;
-  if (profile.verified) score += 1;
-  if (stats.services_count >= 25) score += 1;
-  if (stats.services_count >= 100) score += 1;
-  if (years >= 2) score += 1;
-  if (specialtyCount >= 2) score += 1;
-  return Math.min(5, score);
-}
-
-type Badge = { label: string; icon: typeof ShieldCheck; className: string };
-
-function computeBadges(profile: PublicProfile, stats: MaintlerStats, specialtyCount: number, years: number): Badge[] {
-  const badges: Badge[] = [];
-  if (profile.verified) badges.push({ label: "Verified", icon: ShieldCheck, className: "bg-emerald-50 text-emerald-700 border-emerald-200" });
-  if (stats.services_count >= 100) badges.push({ label: "100+ Services", icon: Wrench, className: "bg-blue-50 text-blue-700 border-blue-200" });
-  else if (stats.services_count >= 25) badges.push({ label: "25+ Services", icon: Wrench, className: "bg-blue-50 text-blue-700 border-blue-200" });
-  if (years >= 5) badges.push({ label: `${years}+ Years Active`, icon: CalendarDays, className: "bg-amber-50 text-amber-700 border-amber-200" });
-  if (specialtyCount >= 3) badges.push({ label: "Multi-Asset Specialist", icon: Box, className: "bg-purple-50 text-purple-700 border-purple-200" });
-  return badges;
 }
 
 function MaintlerPublicPageContent() {
@@ -165,7 +130,7 @@ function MaintlerPublicPageContent() {
 
       const { data: row } = await supabase
         .from("mechanic_public_profile")
-        .select("id, name, workshop_name, photo_url, verified, profession, created_at, maintler_code, phone, contact_email, instagram_url, facebook_url, website_url")
+        .select("id, name, workshop_name, photo_url, verified, profession, created_at, maintler_code, phone, contact_email, instagram_url, facebook_url, website_url, location")
         .eq("maintler_code", code)
         .single();
 
@@ -315,8 +280,8 @@ function MaintlerPublicPageContent() {
   const name = displayName(profile);
   const years = yearsSince(profile.created_at);
   const totalSpecialtyServices = specialties.reduce((sum, s) => sum + s.services_count, 0);
-  const score = stats ? computeScore(profile, stats, specialties.length, years) : null;
-  const badges = stats ? computeBadges(profile, stats, specialties.length, years) : [];
+  const score = stats ? computeScore(profile.verified, stats, specialties.length, years) : null;
+  const badges = stats ? computeBadges(profile.verified, stats, specialties.length, years) : [];
   const hasContact = !!(profile.phone || profile.contact_email || profile.instagram_url || profile.facebook_url || profile.website_url);
 
   return (
@@ -365,215 +330,245 @@ function MaintlerPublicPageContent() {
         </div>
       </div>
 
-      <div className="maintler-doc max-w-lg mx-auto px-4 py-6">
+      <div className="maintler-doc max-w-lg lg:max-w-6xl mx-auto px-4 py-6">
 
         {/* ── ONE DOCUMENT, THIN DIVIDERS INSTEAD OF ~9 SEPARATE BOXED
                CARDS ── report-style density, same idea as the asset's
                printable service report: one bounded card, sections
                separated by a hairline instead of their own
-               padding+border+shadow apiece. This is what shrinks the page
-               enough to need little or no scrolling, and it's exactly
-               what Print now outputs. */}
+               padding+border+shadow apiece. On mobile this stacks top to
+               bottom exactly like before; at the `lg:` breakpoint it
+               splits into a fixed identity sidebar + a wider content
+               column, per Facu looking at this on a desktop screen: "ves
+               q no entra en la pagina?... tenes toda la pagina para
+               armar una buena tarjeta... esto es la compu asi q podemos
+               usar todo el espacio." Mobile layout is untouched —
+               revisiting that is a separate pass by his own call
+               ("despues vemos el diseño en el celu"). */}
         <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm overflow-hidden">
+          <div className="lg:grid lg:grid-cols-[320px_1fr] lg:divide-x lg:divide-zinc-100">
 
-          {/* Header strip: photo, name, workshop */}
-          <div className="bg-gradient-to-br from-zinc-900 to-zinc-800 px-5 py-5 flex items-center gap-4">
-            {profile.photo_url ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={profile.photo_url} alt={name} className="w-16 h-16 rounded-2xl object-cover shrink-0 border border-white/20" />
-            ) : (
-              <div className="w-16 h-16 rounded-2xl bg-white/10 border border-white/20 flex items-center justify-center shrink-0 text-white font-black text-[20px]">
-                {initialsOf(name)}
+            {/* ── LEFT (identity): photo, status, score, badges — a fixed
+                   sidebar on desktop, the normal top block on mobile ── */}
+            <div className="divide-y divide-zinc-100 border-b border-zinc-100 lg:border-b-0">
+              <div className="bg-gradient-to-br from-zinc-900 to-zinc-800 px-5 py-5 flex items-center gap-4 lg:flex-col lg:text-center lg:py-9 lg:px-6">
+                {profile.photo_url ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={profile.photo_url} alt={name} className="w-16 h-16 lg:w-24 lg:h-24 rounded-2xl object-cover shrink-0 border border-white/20" />
+                ) : (
+                  <div className="w-16 h-16 lg:w-24 lg:h-24 rounded-2xl bg-white/10 border border-white/20 flex items-center justify-center shrink-0 text-white font-black text-[20px] lg:text-[28px]">
+                    {initialsOf(name)}
+                  </div>
+                )}
+                <div className="min-w-0 lg:mt-4 lg:w-full">
+                  <p className="text-[11px] font-bold text-zinc-400 tracking-[0.15em] uppercase mb-0.5">Maintler</p>
+                  <h1 className="text-[20px] font-black text-white leading-tight truncate">{name}</h1>
+                  {profile.workshop_name && profile.name !== profile.workshop_name && (
+                    <p className="text-[12px] text-zinc-400 mt-0.5 truncate">{profile.name}</p>
+                  )}
+                </div>
               </div>
-            )}
-            <div className="min-w-0">
-              <p className="text-[11px] font-bold text-zinc-400 tracking-[0.15em] uppercase mb-0.5">Maintler</p>
-              <h1 className="text-[20px] font-black text-white leading-tight truncate">{name}</h1>
-              {profile.workshop_name && profile.name !== profile.workshop_name && (
-                <p className="text-[12px] text-zinc-400 mt-0.5 truncate">{profile.name}</p>
-              )}
-            </div>
-          </div>
 
-          {/* Status + member since — one thin row, no boxed tiles */}
-          <div className="px-5 py-3 border-b border-zinc-100 flex items-center gap-5 text-[12px]">
-            <div className="flex items-center gap-1.5">
-              <ShieldCheck size={14} className={profile.verified ? "text-emerald-500" : "text-zinc-400"} />
-              <span className="font-semibold text-zinc-700">
-                {profile.verified && profile.profession ? `${profile.profession} Maintler` : profile.verified ? "Verified Maintler" : "Maintler"}
-              </span>
-            </div>
-            <div className="flex items-center gap-1.5 text-zinc-400">
-              <CalendarDays size={14} />
-              <span>Since {formatDateDMY(profile.created_at)}</span>
-            </div>
-          </div>
+              {/* Status + member since */}
+              <div className="px-5 py-3 flex items-center gap-5 text-[12px] lg:flex-col lg:items-start lg:gap-2 lg:py-4">
+                <div className="flex items-center gap-1.5">
+                  <ShieldCheck size={14} className={profile.verified ? "text-emerald-500" : "text-zinc-400"} />
+                  <span className="font-semibold text-zinc-700">
+                    {profile.verified && profile.profession ? `${profile.profession} Maintler` : profile.verified ? "Verified Maintler" : "Maintler"}
+                  </span>
+                </div>
+                <div className="flex items-center gap-1.5 text-zinc-400">
+                  <CalendarDays size={14} />
+                  <span>Since {formatDateDMY(profile.created_at)}</span>
+                </div>
+                {profile.location && (
+                  <div className="flex items-center gap-1.5 text-zinc-400">
+                    <MapPin size={14} />
+                    <span>{profile.location}</span>
+                  </div>
+                )}
+              </div>
 
-          {/* Maintly Score + a horizontal stat strip (report style)
-              instead of a 2x2 grid of individually-boxed tiles */}
-          {stats && (
-            <div className="px-5 py-4 border-b border-zinc-100">
-              <div className="flex items-center justify-between mb-3">
-                <div>
+              {/* Maintly Score */}
+              {stats && (
+                <div className="px-5 py-4">
                   <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-wide mb-1">Maintly Score</p>
-                  <div className="flex items-center gap-0.5">
+                  <div className="flex items-center gap-0.5 lg:justify-start">
                     {Array.from({ length: 5 }, (_, i) => (
                       <Star key={i} size={14} className={i < (score ?? 0) ? "text-amber-400 fill-amber-400" : "text-zinc-200"} />
                     ))}
                   </div>
+                  <p className="text-[9.5px] text-zinc-400 leading-tight mt-1.5">
+                    Based on verification, activity, and logged experience — not reviews.
+                  </p>
                 </div>
-                <p className="text-[9.5px] text-zinc-400 text-right max-w-[130px] leading-tight">
-                  Based on verification, activity, and logged experience — not reviews.
+              )}
+
+              {/* Badges */}
+              {badges.length > 0 && (
+                <div className="px-5 py-3 flex flex-wrap gap-1.5 lg:justify-start">
+                  {badges.map((b) => (
+                    <span key={b.label} className={`flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-full border ${b.className}`}>
+                      <b.icon size={11} /> {b.label}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* ── RIGHT (details): activity stats, specialties, contact,
+                   own-card actions — the wide column that actually uses
+                   the extra room on desktop ── */}
+            <div className="divide-y divide-zinc-100">
+
+              {/* Activity — a real stat strip now that there's room for
+                  it, instead of squeezing 4 tiles into a narrow column */}
+              {stats && (
+                <div className="px-5 py-4 lg:px-7 lg:py-5">
+                  <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-wide mb-3">Activity</p>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 lg:gap-4">
+                    {[
+                      { value: stats.services_count, label: "Services Logged", icon: Wrench, color: "text-blue-500", bg: "bg-blue-50" },
+                      { value: stats.assets_count, label: "Assets Maintained", icon: Box, color: "text-red-500", bg: "bg-red-50" },
+                      { value: stats.customers_count, label: "Customers Served", icon: Users, color: "text-purple-500", bg: "bg-purple-50" },
+                      { value: stats.repeat_customers_count, label: "Repeat Customers", icon: Star, color: "text-emerald-500", bg: "bg-emerald-50" },
+                    ].map(({ value, label, icon: Icon, color, bg }) => (
+                      <div key={label} className="flex items-center gap-3 bg-zinc-50 lg:bg-transparent lg:border lg:border-zinc-100 rounded-xl px-3 py-3">
+                        <div className={`w-9 h-9 rounded-lg ${bg} flex items-center justify-center shrink-0`}><Icon size={16} className={color} /></div>
+                        <div className="min-w-0">
+                          <p className="text-[17px] font-black text-zinc-900 leading-tight">{value}</p>
+                          <p className="text-[9.5px] text-zinc-400 font-bold uppercase tracking-wide leading-tight truncate">{label}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Specialties + Experience & Skills */}
+              {specialties.length > 0 && (
+                <div className="px-5 py-4 lg:px-7 lg:py-5">
+                  <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-wide mb-2.5">Specialties & Experience</p>
+                  <div className="lg:grid lg:grid-cols-2 lg:gap-8">
+                    <div className="flex flex-wrap gap-2 mb-3 lg:mb-0 lg:content-start">
+                      {specialties.map((s) => (
+                        <div key={s.asset_type} className="flex items-center gap-1.5 bg-zinc-50 border border-zinc-100 rounded-lg pl-1.5 pr-2.5 py-1">
+                          <div className="w-6 h-6 rounded-md bg-white flex items-center justify-center overflow-hidden shrink-0">
+                            <Image src={assetTypeImg[s.asset_type] ?? "/images/car.png"} alt={s.asset_type} width={16} height={16} className="object-contain" />
+                          </div>
+                          <span className="text-[10.5px] font-semibold text-zinc-600">{assetTypeLabel[s.asset_type] ?? s.asset_type}</span>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="space-y-2">
+                      {specialties.map((s) => {
+                        const pct = totalSpecialtyServices > 0 ? Math.round((s.services_count / totalSpecialtyServices) * 100) : 0;
+                        return (
+                          <div key={s.asset_type}>
+                            <div className="flex items-center justify-between mb-0.5">
+                              <span className="text-[11px] font-semibold text-zinc-700">{assetTypeLabel[s.asset_type] ?? s.asset_type}</span>
+                              <span className="text-[10px] text-zinc-400">{pct}%</span>
+                            </div>
+                            <div className="h-1 rounded-full bg-zinc-100 overflow-hidden">
+                              <div className="h-full bg-red-600 rounded-full" style={{ width: `${pct}%` }} />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Contact */}
+              {hasContact && (
+                <div className="px-5 py-3 lg:px-7 lg:py-4">
+                  <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-wide mb-2">Contact</p>
+                  <div className="grid grid-cols-2 lg:grid-cols-3 gap-x-3 gap-y-1.5">
+                    {profile.phone && (
+                      <a href={`tel:${profile.phone}`} className="flex items-center gap-1.5 text-[11.5px] font-semibold text-zinc-700 hover:text-red-600 transition-colors truncate">
+                        <Phone size={12} className="text-zinc-400 shrink-0" /> <span className="truncate">{profile.phone}</span>
+                      </a>
+                    )}
+                    {profile.contact_email && (
+                      <a href={`mailto:${profile.contact_email}`} className="flex items-center gap-1.5 text-[11.5px] font-semibold text-zinc-700 hover:text-red-600 transition-colors truncate">
+                        <Mail size={12} className="text-zinc-400 shrink-0" /> <span className="truncate">{profile.contact_email}</span>
+                      </a>
+                    )}
+                    {profile.instagram_url && (
+                      <a href={profile.instagram_url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-[11.5px] font-semibold text-zinc-700 hover:text-red-600 transition-colors truncate">
+                        <Globe size={12} className="text-zinc-400 shrink-0" /> Instagram
+                      </a>
+                    )}
+                    {profile.facebook_url && (
+                      <a href={profile.facebook_url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-[11.5px] font-semibold text-zinc-700 hover:text-red-600 transition-colors truncate">
+                        <Globe size={12} className="text-zinc-400 shrink-0" /> Facebook
+                      </a>
+                    )}
+                    {profile.website_url && (
+                      <a href={profile.website_url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-[11.5px] font-semibold text-zinc-700 hover:text-red-600 transition-colors truncate col-span-2 lg:col-span-1">
+                        <Globe size={12} className="text-zinc-400 shrink-0" /> <span className="truncate">{profile.website_url.replace(/^https?:\/\//, "")}</span>
+                      </a>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {isSelf && (
+                <div className="maintler-noprint px-5 py-4 lg:px-7 lg:py-5">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="w-9 h-9 rounded-xl bg-red-50 flex items-center justify-center shrink-0">
+                      <UserCircle2 size={16} className="text-red-500" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-[12px] font-bold text-zinc-800">This is your own Maintler card.</p>
+                      <p className="text-[11px] text-zinc-400">Download or send the printable ID card below — the full editable version also lives in Settings.</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-4">
+                    <MaintlerCardCanvas
+                      ref={ownCardRef}
+                      code={code}
+                      name={name}
+                      workshopName={profile.workshop_name}
+                      photoUrl={profile.photo_url}
+                      verified={profile.verified}
+                      profession={profile.verified ? profile.profession : null}
+                      previewWidth={110}
+                    />
+                    <div className="flex flex-col gap-2">
+                      <button
+                        onClick={() => ownCardRef.current?.download(`maintlyqr-${name}`)}
+                        className="flex items-center gap-1.5 text-[11.5px] font-bold text-white bg-zinc-900 hover:bg-zinc-800 px-3.5 py-2.5 rounded-xl transition-colors"
+                      >
+                        <Download size={13} /> Download
+                      </button>
+                      <button
+                        onClick={() => ownCardRef.current?.share(`maintlyqr-${name}`)}
+                        className="flex items-center gap-1.5 text-[11.5px] font-bold text-zinc-600 hover:text-red-600 border border-zinc-200 hover:bg-zinc-50 px-3.5 py-2.5 rounded-xl transition-colors"
+                      >
+                        <Share2 size={13} /> Send
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {saveError && (
+                <div className="maintler-noprint mx-5 my-3 flex items-center gap-2 bg-red-50 border border-red-200 rounded-xl px-3 py-2.5">
+                  <AlertCircle size={14} className="text-red-500 shrink-0" />
+                  <p className="text-[12px] text-red-600">{saveError}</p>
+                </div>
+              )}
+
+              {/* Footer strip */}
+              <div className="px-5 py-3 lg:px-7 bg-zinc-50 flex items-center gap-2.5">
+                <ShieldCheck size={15} className="text-red-500 shrink-0" />
+                <p className="text-[10.5px] text-zinc-500">
+                  <span className="font-bold text-zinc-700">Verified by Maintly</span> · Part of the MaintlyQR World.
                 </p>
               </div>
-              <div className="flex divide-x divide-zinc-100 -mx-5 px-5 pt-3 border-t border-zinc-100">
-                {[
-                  { value: stats.services_count, label: "Services", icon: Wrench, color: "text-blue-500" },
-                  { value: stats.assets_count, label: "Assets", icon: Box, color: "text-red-500" },
-                  { value: stats.customers_count, label: "Customers", icon: Users, color: "text-purple-500" },
-                  { value: stats.repeat_customers_count, label: "Repeat", icon: Star, color: "text-emerald-500" },
-                ].map(({ value, label, icon: Icon, color }) => (
-                  <div key={label} className="flex-1 flex flex-col items-center text-center px-1">
-                    <Icon size={14} className={`${color} mb-1`} />
-                    <p className="text-[15px] font-black text-zinc-900 leading-tight">{value}</p>
-                    <p className="text-[9px] text-zinc-400 font-bold uppercase tracking-wide leading-tight">{label}</p>
-                  </div>
-                ))}
-              </div>
             </div>
-          )}
-
-          {/* Badges — compact chip row, no separate card */}
-          {badges.length > 0 && (
-            <div className="px-5 py-3 border-b border-zinc-100 flex flex-wrap gap-1.5">
-              {badges.map((b) => (
-                <span key={b.label} className={`flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-full border ${b.className}`}>
-                  <b.icon size={11} /> {b.label}
-                </span>
-              ))}
-            </div>
-          )}
-
-          {/* Specialties + Experience & Skills merged into one block */}
-          {specialties.length > 0 && (
-            <div className="px-5 py-4 border-b border-zinc-100">
-              <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-wide mb-2.5">Specialties & Experience</p>
-              <div className="flex flex-wrap gap-2 mb-3">
-                {specialties.map((s) => (
-                  <div key={s.asset_type} className="flex items-center gap-1.5 bg-zinc-50 border border-zinc-100 rounded-lg pl-1.5 pr-2.5 py-1">
-                    <div className="w-6 h-6 rounded-md bg-white flex items-center justify-center overflow-hidden shrink-0">
-                      <Image src={assetTypeImg[s.asset_type] ?? "/images/car.png"} alt={s.asset_type} width={16} height={16} className="object-contain" />
-                    </div>
-                    <span className="text-[10.5px] font-semibold text-zinc-600">{assetTypeLabel[s.asset_type] ?? s.asset_type}</span>
-                  </div>
-                ))}
-              </div>
-              <div className="space-y-2">
-                {specialties.map((s) => {
-                  const pct = totalSpecialtyServices > 0 ? Math.round((s.services_count / totalSpecialtyServices) * 100) : 0;
-                  return (
-                    <div key={s.asset_type}>
-                      <div className="flex items-center justify-between mb-0.5">
-                        <span className="text-[11px] font-semibold text-zinc-700">{assetTypeLabel[s.asset_type] ?? s.asset_type}</span>
-                        <span className="text-[10px] text-zinc-400">{pct}%</span>
-                      </div>
-                      <div className="h-1 rounded-full bg-zinc-100 overflow-hidden">
-                        <div className="h-full bg-red-600 rounded-full" style={{ width: `${pct}%` }} />
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          {/* Contact — 2-column grid instead of one-per-line */}
-          {hasContact && (
-            <div className="px-5 py-3 border-b border-zinc-100">
-              <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-wide mb-2">Contact</p>
-              <div className="grid grid-cols-2 gap-x-3 gap-y-1.5">
-                {profile.phone && (
-                  <a href={`tel:${profile.phone}`} className="flex items-center gap-1.5 text-[11.5px] font-semibold text-zinc-700 hover:text-red-600 transition-colors truncate">
-                    <Phone size={12} className="text-zinc-400 shrink-0" /> <span className="truncate">{profile.phone}</span>
-                  </a>
-                )}
-                {profile.contact_email && (
-                  <a href={`mailto:${profile.contact_email}`} className="flex items-center gap-1.5 text-[11.5px] font-semibold text-zinc-700 hover:text-red-600 transition-colors truncate">
-                    <Mail size={12} className="text-zinc-400 shrink-0" /> <span className="truncate">{profile.contact_email}</span>
-                  </a>
-                )}
-                {profile.instagram_url && (
-                  <a href={profile.instagram_url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-[11.5px] font-semibold text-zinc-700 hover:text-red-600 transition-colors truncate">
-                    <Globe size={12} className="text-zinc-400 shrink-0" /> Instagram
-                  </a>
-                )}
-                {profile.facebook_url && (
-                  <a href={profile.facebook_url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-[11.5px] font-semibold text-zinc-700 hover:text-red-600 transition-colors truncate">
-                    <Globe size={12} className="text-zinc-400 shrink-0" /> Facebook
-                  </a>
-                )}
-                {profile.website_url && (
-                  <a href={profile.website_url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-[11.5px] font-semibold text-zinc-700 hover:text-red-600 transition-colors truncate col-span-2">
-                    <Globe size={12} className="text-zinc-400 shrink-0" /> <span className="truncate">{profile.website_url.replace(/^https?:\/\//, "")}</span>
-                  </a>
-                )}
-              </div>
-            </div>
-          )}
-
-          {isSelf && (
-            <div className="maintler-noprint px-5 py-4 border-b border-zinc-100">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-9 h-9 rounded-xl bg-red-50 flex items-center justify-center shrink-0">
-                  <UserCircle2 size={16} className="text-red-500" />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-[12px] font-bold text-zinc-800">This is your own Maintler card.</p>
-                  <p className="text-[11px] text-zinc-400">Download or send the printable ID card below — the full editable version also lives in Settings.</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-4">
-                <MaintlerCardCanvas
-                  ref={ownCardRef}
-                  code={code}
-                  name={name}
-                  workshopName={profile.workshop_name}
-                  photoUrl={profile.photo_url}
-                  verified={profile.verified}
-                  profession={profile.verified ? profile.profession : null}
-                  previewWidth={110}
-                />
-                <div className="flex flex-col gap-2">
-                  <button
-                    onClick={() => ownCardRef.current?.download(`maintlyqr-${name}`)}
-                    className="flex items-center gap-1.5 text-[11.5px] font-bold text-white bg-zinc-900 hover:bg-zinc-800 px-3.5 py-2.5 rounded-xl transition-colors"
-                  >
-                    <Download size={13} /> Download
-                  </button>
-                  <button
-                    onClick={() => ownCardRef.current?.share(`maintlyqr-${name}`)}
-                    className="flex items-center gap-1.5 text-[11.5px] font-bold text-zinc-600 hover:text-red-600 border border-zinc-200 hover:bg-zinc-50 px-3.5 py-2.5 rounded-xl transition-colors"
-                  >
-                    <Share2 size={13} /> Send
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {saveError && (
-            <div className="maintler-noprint mx-5 my-3 flex items-center gap-2 bg-red-50 border border-red-200 rounded-xl px-3 py-2.5">
-              <AlertCircle size={14} className="text-red-500 shrink-0" />
-              <p className="text-[12px] text-red-600">{saveError}</p>
-            </div>
-          )}
-
-          {/* Footer strip */}
-          <div className="px-5 py-3 bg-zinc-50 flex items-center gap-2.5">
-            <ShieldCheck size={15} className="text-red-500 shrink-0" />
-            <p className="text-[10.5px] text-zinc-500">
-              <span className="font-bold text-zinc-700">Verified by Maintly</span> · Part of the MaintlyQR World.
-            </p>
           </div>
         </div>
 

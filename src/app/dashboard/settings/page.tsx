@@ -9,7 +9,7 @@ import {
   Mail, FolderOpen, Settings as SettingsIcon, Bell, X, LogOut, Crown, Menu,
   ShieldCheck, CalendarDays, KeyRound, AlertCircle, CheckCircle2, Camera,
   Image as ImageIcon,
-  MessageCircle, Download, Copy, Check, Share2, Printer,
+  MessageCircle, Download, Copy, Check, Share2, Printer, Phone, Globe, MapPin,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import NotificationBell from "@/components/NotificationBell";
@@ -22,6 +22,9 @@ import ContactSupportWidget from "@/components/ContactSupportWidget";
 import ProfessionVerificationForm, { VerificationStatusCard } from "@/components/ProfessionVerificationForm";
 import { validateImageFile } from "@/lib/imageValidation";
 import MaintlerCardCanvas, { type MaintlerCardCanvasHandle } from "@/components/MaintlerCardCanvas";
+import { yearsSince, computeScore, type MaintlerStats } from "@/lib/maintlerScore";
+
+type SpecialtyRow = { asset_type: string; services_count: number };
 
 const navItems = [
   { icon: LayoutGrid, label: "Dashboard", href: "/dashboard" },
@@ -59,8 +62,16 @@ export default function SettingsPage() {
   // Profile form
   const [name, setName] = useState("");
   const [workshopName, setWorkshopName] = useState("");
+  const [location, setLocation] = useState("");
   const [profileSaving, setProfileSaving] = useState(false);
   const [profileMsg, setProfileMsg] = useState<{ text: string; ok: boolean } | null>(null);
+
+  // Maintly Stats (round 6) — same real, computed figures as the public
+  // card (get_maintler_stats/get_maintler_specialty_breakdown RPCs,
+  // migration 025), shown again here so a Maintler can see their own
+  // stats without leaving Settings. Never self-reported.
+  const [stats, setStats] = useState<MaintlerStats | null>(null);
+  const [specialties, setSpecialties] = useState<SpecialtyRow[]>([]);
 
   // Public contact info (migration 026) — shown on the public Maintler
   // card. Facu's feedback: "no veo datos de contacto." Answered via a
@@ -114,13 +125,14 @@ export default function SettingsPage() {
 
       const { data: mechanic } = await supabase
         .from("mechanics")
-        .select("name, workshop_name, created_at, is_mechanic, verified, photo_url, profession, verification_status, verification_note, maintler_code, phone, contact_email, instagram_url, facebook_url, website_url")
+        .select("name, workshop_name, location, created_at, is_mechanic, verified, photo_url, profession, verification_status, verification_note, maintler_code, phone, contact_email, instagram_url, facebook_url, website_url")
         .eq("id", session.user.id)
         .single();
 
       if (active && mechanic) {
         setName(mechanic.name ?? "");
         setWorkshopName(mechanic.workshop_name ?? "");
+        setLocation(mechanic.location ?? "");
         setCreatedAt(mechanic.created_at ?? "");
         setIsMechanic(!!mechanic.is_mechanic);
         setVerified(!!mechanic.verified);
@@ -134,6 +146,16 @@ export default function SettingsPage() {
         setInstagramUrl(mechanic.instagram_url ?? "");
         setFacebookUrl(mechanic.facebook_url ?? "");
         setWebsiteUrl(mechanic.website_url ?? "");
+
+        const [statsRes, specialtiesRes] = await Promise.all([
+          supabase.rpc("get_maintler_stats", { target_mechanic_id: session.user.id }),
+          supabase.rpc("get_maintler_specialty_breakdown", { target_mechanic_id: session.user.id }),
+        ]);
+        if (active) {
+          const statsRow = Array.isArray(statsRes.data) ? statsRes.data[0] : statsRes.data;
+          if (statsRow) setStats(statsRow as MaintlerStats);
+          if (Array.isArray(specialtiesRes.data)) setSpecialties(specialtiesRes.data as SpecialtyRow[]);
+        }
       }
 
       if (active) setCheckingAuth(false);
@@ -255,7 +277,7 @@ export default function SettingsPage() {
     setProfileSaving(true);
     const { data, error } = await supabase
       .from("mechanics")
-      .update({ name: name.trim(), workshop_name: workshopName.trim() || null })
+      .update({ name: name.trim(), workshop_name: workshopName.trim() || null, location: location.trim() || null })
       .eq("id", mechanicId)
       .select("id");
     setProfileSaving(false);
@@ -323,6 +345,8 @@ export default function SettingsPage() {
   }
 
   const initials = name.split(" ").filter(Boolean).map(p => p[0]).join("").slice(0, 2).toUpperCase() || "ME";
+  const yearsActive = createdAt ? yearsSince(createdAt) : 0;
+  const maintlyScore = stats ? computeScore(verified, stats, specialties.length, yearsActive) : null;
 
   return (
     <div className="min-h-screen bg-zinc-50 flex relative">
@@ -433,96 +457,7 @@ export default function SettingsPage() {
           </div>
         </header>
 
-        <div className="flex-1 overflow-y-auto p-4 md:p-7 max-w-2xl">
-
-          {/* ── MY MAINTLER CARD ──
-              Moved above Account Status — Facu's feedback: "no me gusta
-              tener q escrolear para ver la tarjeta." This is arguably the
-              single thing a Maintler opens Settings for most often (grab
-              the card to send someone), so it's the first thing on the
-              page now instead of being buried below the account-status
-              tiles. */}
-          <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm p-6 mb-6">
-            <h2 className="text-[14px] font-black text-zinc-900 mb-1">My Maintler Card</h2>
-            <p className="text-[12px] text-zinc-400 mb-5">
-              Your own permanent QR — a business card other Maintlers can scan to find, save, and message you directly.
-              Print it, share the link, or add it to your workshop&apos;s signage.
-            </p>
-
-            {maintlerCode ? (
-              <div className="flex flex-col sm:flex-row gap-5 items-start">
-                {/* The actual printable/shareable ID card — photo, name,
-                    verified pill, and the QR composited into one image, not
-                    just a bare QR code. Facu's follow-up after the first cut
-                    only showed a plain QR with no card design around it:
-                    "no quedo tan parecido a lo q te pase... ademas no se ve
-                    el QR y tampoco tengo forma de imprimirla o mandarla." */}
-                <MaintlerCardCanvas
-                  ref={cardCanvasRef}
-                  code={maintlerCode}
-                  name={name || email}
-                  workshopName={workshopName}
-                  photoUrl={photoUrl}
-                  verified={verified}
-                  profession={verified ? profession : null}
-                  previewWidth={180}
-                />
-                <div className="flex-1 min-w-0 w-full space-y-3">
-                  <div>
-                    <label className="text-[11px] font-bold text-zinc-500 uppercase tracking-widest mb-1.5 block">Public link</label>
-                    <div className="flex items-center gap-2">
-                      <input
-                        readOnly
-                        value={`maintlyqr.com/maintler/${maintlerCode}`}
-                        className="flex-1 min-w-0 bg-zinc-50 border border-zinc-200 rounded-xl px-3 py-2.5 text-[12.5px] text-zinc-600 font-mono truncate"
-                      />
-                      <button
-                        onClick={handleCopyCardLink}
-                        className="shrink-0 flex items-center gap-1.5 text-[11.5px] font-bold text-zinc-600 hover:text-zinc-900 border border-zinc-200 hover:bg-zinc-50 px-3 py-2.5 rounded-xl transition-colors"
-                      >
-                        {cardLinkCopied ? <><Check size={13} className="text-emerald-500" /> Copied</> : <><Copy size={13} /> Copy</>}
-                      </button>
-                    </div>
-                  </div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <button
-                      onClick={handleDownloadCard}
-                      className="flex items-center gap-1.5 text-[11.5px] font-bold text-white bg-zinc-900 hover:bg-zinc-800 px-3.5 py-2.5 rounded-xl transition-colors"
-                    >
-                      <Download size={13} /> Download Card
-                    </button>
-                    <button
-                      onClick={handleShareCard}
-                      className="flex items-center gap-1.5 text-[11.5px] font-bold text-zinc-600 hover:text-red-600 border border-zinc-200 hover:bg-zinc-50 px-3.5 py-2.5 rounded-xl transition-colors"
-                    >
-                      <Share2 size={13} /> Send
-                    </button>
-                    <button
-                      onClick={handlePrintCard}
-                      className="flex items-center gap-1.5 text-[11.5px] font-bold text-zinc-600 hover:text-red-600 border border-zinc-200 hover:bg-zinc-50 px-3.5 py-2.5 rounded-xl transition-colors"
-                    >
-                      <Printer size={13} /> Print
-                    </button>
-                    <Link
-                      href={`/maintler/${maintlerCode}`}
-                      target="_blank"
-                      className="flex items-center gap-1.5 text-[11.5px] font-bold text-zinc-600 hover:text-red-600 border border-zinc-200 hover:bg-zinc-50 px-3.5 py-2.5 rounded-xl transition-colors"
-                    >
-                      View my public card
-                    </Link>
-                  </div>
-                  <p className="text-[11px] text-zinc-400">
-                    Send uses your phone or browser&apos;s own share sheet (WhatsApp, Messages, AirDrop, etc.) where available —
-                    on desktop it just downloads the card instead. Anyone who scans it or visits the link sees your name,
-                    workshop, verified status, and real activity stats — and, if they&apos;re a Maintler themselves,
-                    a Save and Message button straight to you.
-                  </p>
-                </div>
-              </div>
-            ) : (
-              <p className="text-[12px] text-zinc-300">Loading your card…</p>
-            )}
-          </div>
+        <div className="flex-1 overflow-y-auto p-4 md:p-7 max-w-2xl lg:max-w-5xl">
 
           {/* ── ACCOUNT STATUS ── */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
@@ -544,8 +479,128 @@ export default function SettingsPage() {
             </div>
           </div>
 
-          {/* ── PROFESSION & VERIFICATION ── */}
+          {/* ── MY MAINTLER CARD ──
+              Round 6 — Facu sent a full desktop mockup of this exact
+              section ("algo asi te muestro de ejemplo para la web"): a
+              wide landscape card on the left with the card's own
+              download/share actions plus a row of quick contact-method
+              icons to the right, instead of the previous narrow
+              portrait-card + stacked-buttons layout. Rebuilt around
+              that — on desktop the card and the action panel now sit
+              side by side using the extra width, same as his mockup;
+              they still stack on mobile. */}
           <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm p-6 mb-6">
+            <h2 className="text-[14px] font-black text-zinc-900 mb-1">My Maintler Card</h2>
+            <p className="text-[12px] text-zinc-400 mb-5">
+              Your digital identity as a Maintler. Share, scan, or save your card.
+            </p>
+
+            {maintlerCode ? (
+              <div className="lg:flex lg:items-stretch lg:gap-6">
+                <div className="lg:w-[420px] lg:shrink-0">
+                  <MaintlerCardCanvas
+                    ref={cardCanvasRef}
+                    code={maintlerCode}
+                    name={name || email}
+                    workshopName={workshopName}
+                    photoUrl={photoUrl}
+                    verified={verified}
+                    profession={verified ? profession : null}
+                    location={location || null}
+                    previewWidth={420}
+                  />
+                </div>
+                <div className="mt-4 lg:mt-0 lg:flex-1 lg:min-w-0 space-y-4 flex flex-col lg:justify-center">
+                  <div>
+                    <Link
+                      href={`/maintler/${maintlerCode}`}
+                      target="_blank"
+                      className="text-[13px] font-bold text-zinc-800 hover:text-red-600 transition-colors"
+                    >
+                      Scan to view my <span className="text-red-600">Maintler Profile</span>
+                    </Link>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      onClick={handleDownloadCard}
+                      className="flex items-center gap-1.5 text-[11.5px] font-bold text-white bg-zinc-900 hover:bg-zinc-800 px-3.5 py-2.5 rounded-xl transition-colors"
+                    >
+                      <Download size={13} /> Download PNG
+                    </button>
+                    <button
+                      onClick={handleShareCard}
+                      className="flex items-center gap-1.5 text-[11.5px] font-bold text-zinc-600 hover:text-red-600 border border-zinc-200 hover:bg-zinc-50 px-3.5 py-2.5 rounded-xl transition-colors"
+                    >
+                      <Share2 size={13} /> Share Card
+                    </button>
+                    <button
+                      onClick={handlePrintCard}
+                      className="flex items-center gap-1.5 text-[11.5px] font-bold text-zinc-600 hover:text-red-600 border border-zinc-200 hover:bg-zinc-50 px-3.5 py-2.5 rounded-xl transition-colors"
+                    >
+                      <Printer size={13} /> Print
+                    </button>
+                  </div>
+
+                  {/* Quick contact-method icons — only the ones actually
+                      filled in below show up, same real fields as the
+                      public card's Contact section (migration 026), not
+                      a fixed WhatsApp/LinkedIn set that may not apply to
+                      every Maintler. */}
+                  {(contactEmail || contactPhone || instagramUrl || facebookUrl || websiteUrl) && (
+                    <div className="flex items-center gap-2">
+                      {contactEmail && (
+                        <a href={`mailto:${contactEmail}`} title={contactEmail} className="w-9 h-9 rounded-full border border-zinc-200 flex items-center justify-center text-zinc-500 hover:text-red-600 hover:border-red-200 transition-colors">
+                          <Mail size={15} />
+                        </a>
+                      )}
+                      {contactPhone && (
+                        <a href={`tel:${contactPhone}`} title={contactPhone} className="w-9 h-9 rounded-full border border-zinc-200 flex items-center justify-center text-zinc-500 hover:text-red-600 hover:border-red-200 transition-colors">
+                          <Phone size={15} />
+                        </a>
+                      )}
+                      {instagramUrl && (
+                        <a href={instagramUrl} target="_blank" rel="noopener noreferrer" title="Instagram" className="w-9 h-9 rounded-full border border-zinc-200 flex items-center justify-center text-zinc-500 hover:text-red-600 hover:border-red-200 transition-colors">
+                          <Globe size={15} />
+                        </a>
+                      )}
+                      {facebookUrl && (
+                        <a href={facebookUrl} target="_blank" rel="noopener noreferrer" title="Facebook" className="w-9 h-9 rounded-full border border-zinc-200 flex items-center justify-center text-zinc-500 hover:text-red-600 hover:border-red-200 transition-colors">
+                          <Globe size={15} />
+                        </a>
+                      )}
+                      {websiteUrl && (
+                        <a href={websiteUrl} target="_blank" rel="noopener noreferrer" title={websiteUrl} className="w-9 h-9 rounded-full border border-zinc-200 flex items-center justify-center text-zinc-500 hover:text-red-600 hover:border-red-200 transition-colors">
+                          <Globe size={15} />
+                        </a>
+                      )}
+                    </div>
+                  )}
+
+                  <div className="flex items-center gap-2">
+                    <input
+                      readOnly
+                      value={`maintlyqr.com/maintler/${maintlerCode}`}
+                      className="flex-1 min-w-0 bg-zinc-50 border border-zinc-200 rounded-xl px-3 py-2.5 text-[12.5px] text-zinc-600 font-mono truncate"
+                    />
+                    <button
+                      onClick={handleCopyCardLink}
+                      className="shrink-0 flex items-center gap-1.5 text-[11.5px] font-bold text-zinc-600 hover:text-zinc-900 border border-zinc-200 hover:bg-zinc-50 px-3 py-2.5 rounded-xl transition-colors"
+                    >
+                      {cardLinkCopied ? <><Check size={13} className="text-emerald-500" /> Copied</> : <><Copy size={13} /> Copy</>}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <p className="text-[12px] text-zinc-300">Loading your card…</p>
+            )}
+          </div>
+
+          {/* ── PROFESSION & VERIFICATION + MAINTLY STATS ──
+              Side by side on desktop (round 6 mockup), stacked on
+              mobile. */}
+          <div className="lg:grid lg:grid-cols-2 lg:gap-6 lg:items-start mb-6">
+          <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm p-6 mb-6 lg:mb-0">
             <h2 className="text-[14px] font-black text-zinc-900 mb-1">Profession & Verification</h2>
             <p className="text-[12px] text-zinc-400 mb-5">
               Optional. Declare your profession and upload a certificate to earn a verified badge on every service you log.
@@ -577,6 +632,47 @@ export default function SettingsPage() {
                 }}
               />
             )}
+          </div>
+
+          {/* ── MAINTLY STATS ──
+              Real numbers only — the same get_maintler_stats() RPC and
+              formula-driven Maintly Score the public card already uses
+              (migration 025, src/lib/maintlerScore.ts), not a
+              self-reported "average rating" or a metric (like "reports
+              uploaded") this app doesn't actually track. Facu's mockup
+              had 6 tiles; these are the 6 real ones available. */}
+          <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm p-6 mb-6 lg:mb-0">
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="text-[14px] font-black text-zinc-900">Maintly Stats</h2>
+              {maintlerCode && (
+                <Link href={`/maintler/${maintlerCode}`} target="_blank" className="text-[11.5px] font-bold text-zinc-500 hover:text-red-600 transition-colors">
+                  View all
+                </Link>
+              )}
+            </div>
+            {stats ? (
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                {[
+                  { value: stats.services_count, label: "Services logged", icon: FileText, color: "text-blue-500", bg: "bg-blue-50" },
+                  { value: stats.assets_count, label: "Assets maintained", icon: Box, color: "text-red-500", bg: "bg-red-50" },
+                  { value: stats.customers_count, label: "Customers served", icon: Users, color: "text-purple-500", bg: "bg-purple-50" },
+                  { value: stats.repeat_customers_count, label: "Repeat customers", icon: Users, color: "text-amber-500", bg: "bg-amber-50" },
+                  { value: yearsActive, label: "Years active", icon: CalendarDays, color: "text-emerald-500", bg: "bg-emerald-50" },
+                  { value: `${maintlyScore ?? "—"}/5`, label: "Maintly Score", icon: ShieldCheck, color: "text-zinc-700", bg: "bg-zinc-100" },
+                ].map(({ value, label, icon: Icon, color, bg }) => (
+                  <div key={label} className="flex items-center gap-2.5">
+                    <div className={`w-9 h-9 rounded-lg ${bg} flex items-center justify-center shrink-0`}><Icon size={15} className={color} /></div>
+                    <div className="min-w-0">
+                      <p className="text-[15px] font-black text-zinc-900 leading-tight">{value}</p>
+                      <p className="text-[9.5px] text-zinc-400 font-bold uppercase tracking-wide leading-tight">{label}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-[12px] text-zinc-300">Loading stats…</p>
+            )}
+          </div>
           </div>
 
           {/* ── PROFILE ── */}
@@ -671,6 +767,14 @@ export default function SettingsPage() {
                   value={workshopName} onChange={(e) => setWorkshopName(e.target.value)} placeholder="e.g. Ledesma Motors"
                   className="w-full mt-1 rounded-xl border border-zinc-200 px-3 py-[10px] text-[13px] outline-none focus:border-red-500"
                 />
+              </div>
+              <div>
+                <label className="text-[12px] font-bold text-zinc-700">Location <span className="text-zinc-300 font-normal">(optional)</span></label>
+                <input
+                  value={location} onChange={(e) => setLocation(e.target.value)} placeholder="e.g. Emerald, QLD, Australia"
+                  className="w-full mt-1 rounded-xl border border-zinc-200 px-3 py-[10px] text-[13px] outline-none focus:border-red-500"
+                />
+                <p className="text-[11px] text-zinc-400 mt-1">Shown on your public Maintler card, under your profession.</p>
               </div>
               <div>
                 <label className="text-[12px] font-bold text-zinc-700">Email</label>
