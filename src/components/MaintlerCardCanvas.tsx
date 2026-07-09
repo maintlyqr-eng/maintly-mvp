@@ -294,17 +294,36 @@ const MaintlerCardCanvas = forwardRef<MaintlerCardCanvasHandle, Props>(function 
 
     const textX = photoCx + photoSize / 2 + 32;
     const textMaxWidth = 420;
-    let y = bandTop + 16;
+
+    // Two-pass layout: first work out how tall this text column will be
+    // (it varies — not every Maintler has a workshop/profession/location
+    // set), THEN center that whole block against the photo's true center
+    // (bandCy), instead of always starting at a fixed offset below the
+    // brand mark. Growing downward from a fixed top (the old approach) left
+    // a large, visible gap between the photo and the text once CARD_H grew
+    // to 660 and a "Member since" line was added — exactly what Facu's
+    // screenshot showed.
+    const showWorkshop = !!(workshopName && workshopName !== name);
+    let textSpan = 0; // baseline-to-baseline distance, first line to last
+    if (showWorkshop) textSpan += 26;
+    if (verified) textSpan += 34;
+    if (profession) textSpan += 30;
+    if (location) textSpan += 24;
+    if (createdAt) textSpan += 24;
+    const topPad = 22; // ~cap-height of the 30px bold name line
+    const bottomPad = 8; // descender allowance for the last line's font
+    const blockH = textSpan + topPad + bottomPad;
+    let y = bandCy - blockH / 2 + topPad;
 
     ctx.font = "bold 30px Arial, sans-serif";
     ctx.fillStyle = "#ffffff";
     ctx.fillText(truncateToWidth(ctx, name, textMaxWidth), textX, y);
 
-    if (workshopName && workshopName !== name) {
+    if (showWorkshop) {
       y += 26;
       ctx.font = "18px Arial, sans-serif";
       ctx.fillStyle = "#a1a1aa";
-      ctx.fillText(truncateToWidth(ctx, workshopName, textMaxWidth), textX, y);
+      ctx.fillText(truncateToWidth(ctx, workshopName!, textMaxWidth), textX, y);
     }
 
     if (verified) {
@@ -513,20 +532,35 @@ const MaintlerCardCanvas = forwardRef<MaintlerCardCanvasHandle, Props>(function 
     const cardBadges = [...domBadges.map((b) => ({ label: b.label, ...styleForBadge(b.label) }))];
     if (verified && profession) cardBadges.push({ label: profession, emoji: "🛠", bg: "#dc2626" });
 
+    let badgesBottomY = rightY;
     if (cardBadges.length === 0) {
       ctx.font = "11px Arial, sans-serif";
       ctx.fillStyle = "#71717a";
       ctx.fillText("Keep logging services", colRightX, rightY);
       ctx.fillText("to unlock badges.", colRightX, rightY + 16);
+      badgesBottomY = rightY + 16;
     } else {
+      // Vertically center the badge grid within the same content height the
+      // ABOUT ME/SPECIALTIES and STATS columns actually use (leftY/midY) —
+      // otherwise, with only 2-3 real badges, this column reads as sparse
+      // and cut-off next to the two fuller columns beside it (Facu's
+      // feedback on the badges looking cramped near the accent line).
+      // Bigger circles when there are few badges also helps the column
+      // feel intentional rather than empty.
       const perRow = 2;
       const cellW = colRightW / perRow;
-      const iconR = 20;
       const shown = cardBadges.slice(0, 6);
+      const rows = Math.ceil(shown.length / perRow);
+      const rowH = 68;
+      const iconR = shown.length <= 2 ? 27 : 21;
+      const gridH = rows * rowH;
+      const availableH = Math.max(leftY, midY) - rightY;
+      const startOffset = Math.max(0, (availableH - gridH) / 2);
+      const gridStartY = rightY + startOffset;
       for (let i = 0; i < shown.length; i++) {
         const row = Math.floor(i / perRow), col = i % perRow;
-        const cx = colRightX + col * cellW + iconR;
-        const cy = rightY + row * 62 + iconR;
+        const cx = colRightX + col * cellW + cellW / 2;
+        const cy = gridStartY + row * rowH + iconR;
         ctx.beginPath();
         ctx.arc(cx, cy, iconR, 0, Math.PI * 2);
         ctx.fillStyle = shown[i].bg;
@@ -542,11 +576,20 @@ const MaintlerCardCanvas = forwardRef<MaintlerCardCanvasHandle, Props>(function 
         ctx.fillText(truncateToWidth(ctx, shown[i].label, cellW - 4), cx, cy + iconR + 14);
         ctx.textAlign = "left";
       }
+      badgesBottomY = gridStartY + gridH;
     }
 
     // ── CONTACT + SHARE MY CARD, bottom row above the banner ──
-    const bottomRowY = Math.max(leftY, midY, rightY + Math.ceil(cardBadges.length / 2) * 62 + 10, contentH - 150);
-    const dividerY = Math.min(bottomRowY - 14, contentH - 150);
+    // Pull CONTACT/SHARE up close to wherever the real content actually
+    // ends, instead of always pinning them to a fixed distance from the
+    // banner — that fixed pin left a large dead gap in the middle for any
+    // Maintler whose content (specialties/stats/badges) doesn't fill the
+    // card, which read as "sparse" for the same reason the badges column
+    // originally did. contentH-150 remains a CEILING only, so CONTACT/SHARE
+    // never lose their guaranteed room above the bottom banner when content
+    // is unusually tall.
+    const contentBottom = Math.max(leftY, midY, badgesBottomY + 10);
+    const dividerY = Math.min(contentBottom + 20, contentH - 150);
     ctx.strokeStyle = "rgba(255,255,255,0.08)";
     ctx.lineWidth = 1;
     ctx.beginPath();
