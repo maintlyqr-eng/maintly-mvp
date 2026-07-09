@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { X, QrCode, ScanLine, AlertCircle, CheckCircle2, Camera } from "lucide-react";
 import { supabase } from "@/lib/supabase";
@@ -31,6 +31,12 @@ export default function LinkExistingAssetModal({
   const [searchLoading, setSearchLoading] = useState(false);
   const [addSuccess, setAddSuccess] = useState(false);
   const [showScanner, setShowScanner] = useState(false);
+  // Guards against the manual-search and camera-scan paths racing each
+  // other: whichever one's async lookup resolves LAST should win, not
+  // whichever one was started last. Incremented at the start of every
+  // search attempt from either path; a resolving call only commits its
+  // result to state if it's still the most recent attempt.
+  const searchRequestIdRef = useRef(0);
 
   useEffect(() => {
     if (!open) return;
@@ -47,6 +53,7 @@ export default function LinkExistingAssetModal({
   async function handleSearch(codeOverride?: string) {
     const code = (codeOverride ?? qrInput).trim();
     if (!code) return;
+    const requestId = ++searchRequestIdRef.current;
     setSearchError("");
     setFoundAsset(null);
     setSearchLoading(true);
@@ -65,6 +72,7 @@ export default function LinkExistingAssetModal({
         .eq("id", qrData.asset_id)
         .single();
 
+      if (requestId !== searchRequestIdRef.current) return;
       setSearchLoading(false);
 
       if (assetErr || !asset) {
@@ -88,6 +96,7 @@ export default function LinkExistingAssetModal({
       .eq("id", code)
       .maybeSingle();
 
+    if (requestId !== searchRequestIdRef.current) return;
     setSearchLoading(false);
 
     if (!directAsset) {

@@ -1,6 +1,14 @@
 import { SupabaseClient } from "@supabase/supabase-js";
 import { validateImageFile } from "@/lib/imageValidation";
 
+// Same whitelist approach as ProfessionVerificationForm's sanitizeFileName —
+// browser-reported file names/extensions are attacker-controlled, so only
+// safe characters are allowed to reach the storage key.
+function sanitizeExt(ext: string): string {
+  const cleaned = ext.toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 10);
+  return cleaned || "jpg";
+}
+
 // Shared by every place that uploads a photo for an asset (new-asset form,
 // edit-asset form) so the validation + storage path logic lives in one spot
 // instead of being copy-pasted per form.
@@ -12,7 +20,7 @@ export async function uploadAssetPhoto(
   const validationError = validateImageFile(file);
   if (validationError) return { url: null, error: validationError };
 
-  const ext = file.name.split(".").pop() ?? "jpg";
+  const ext = sanitizeExt(file.name.split(".").pop() ?? "jpg");
   const path = `${assetId}.${ext}`;
   const { error: uploadError } = await supabase.storage
     .from("asset-photos")

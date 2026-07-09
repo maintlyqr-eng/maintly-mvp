@@ -5,42 +5,25 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
-  LayoutGrid, FileText, Box, QrCode, Users, BarChart3, Calendar as CalendarIcon,
-  Mail, FolderOpen, Settings, Search, Bell, Plus, MoreVertical,
-  CheckCircle2, Clock, TrendingUp, TrendingDown, Crown, ChevronLeft, ChevronRight, LogOut,
-  Wrench, Menu, X,
-  MessageCircle,
+  Box, QrCode, Search, Plus, MoreVertical,
+  CheckCircle2, Clock, TrendingUp, TrendingDown, ChevronLeft, ChevronRight,
+  Wrench, FileText, Calendar as CalendarIcon,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
-import NotificationBell from "@/components/NotificationBell";
 import { useUnreadMessagesCount } from "@/lib/useUnreadMessages";
 import { useUnreadMechanicMessages } from "@/lib/useUnreadMechanicMessages";
 import { formatDateDMY } from "@/lib/date";
 import { computeReminderStatus, REMINDER_STATUS_LABEL, REMINDER_STATUS_COLOR, type ReminderStatus } from "@/lib/reminders";
 import { getUnitLabel, getUnitShort, formatUnitValue } from "@/lib/units";
-import HoverAvatar from "@/components/HoverAvatar";
 import ContactSupportWidget from "@/components/ContactSupportWidget";
+import DashboardSidebar from "@/components/DashboardSidebar";
+import DashboardHeader from "@/components/DashboardHeader";
 import CalendarDayCell, { type DayInfo } from "@/components/CalendarDayCell";
 import { buildMonthGridMondayFirst } from "@/lib/calendarGrid";
 import AddAssetChooser from "@/components/AddAssetChooser";
 import NewAssetModal from "@/components/NewAssetModal";
 import LinkExistingAssetModal from "@/components/LinkExistingAssetModal";
 import { assetTypeImg } from "@/lib/assetTypes";
-
-const navItems = [
-  { icon: LayoutGrid,   label: "Dashboard",        href: "/dashboard",          active: true  },
-  { icon: FileText,     label: "My Services",      href: "/dashboard/services", active: false },
-  { icon: Bell,         label: "Scheduled Services", href: "/dashboard/scheduled", active: false },
-  { icon: Box,          label: "Assets",           href: "/dashboard/assets",   active: false },
-  { icon: QrCode,       label: "QR Codes",         href: "/dashboard/qr-codes", active: false },
-  { icon: Users,        label: "Customers",        href: "/dashboard/customers",                   active: false },
-  { icon: BarChart3,    label: "Reports",          href: "/dashboard/reports",  active: false },
-  { icon: CalendarIcon, label: "Calendar",         href: "/dashboard/calendar", active: false },
-  { icon: Mail,         label: "Messages",         href: "/dashboard/messages", active: false },
-  { icon: MessageCircle, label: "Team Chat",     href: "/dashboard/team-chat", active: false },
-  { icon: FolderOpen,   label: "Document Library", href: "/dashboard/documents",                   active: false },
-  { icon: Settings,     label: "Settings",         href: "/dashboard/settings", active: false },
-];
 
 const typeColors: Record<string, string> = {
   "Oil Change":    "bg-amber-100 text-amber-700",
@@ -348,7 +331,6 @@ export default function DashboardPage() {
   }
 
   const displayName = mechanicName || mechanicEmail;
-  const initials = displayName.split(" ").filter(Boolean).map((p: string) => p[0]).join("").toUpperCase().slice(0, 2) || "ME";
 
   // ── Top search bar: matching assets (client-side, from the full workshop list) ──
   const searchQ = searchQuery.trim().toLowerCase();
@@ -416,185 +398,119 @@ export default function DashboardPage() {
     { label: "PENDING",   value: "0",                   color: "#ea580c" },
   ];
 
+  // ── Top search bar, rendered inside DashboardHeader's extraHeaderContent
+  // slot — this is the one bit of header markup unique to this page (no
+  // other dashboard page has a live search box), which is why Dashboard
+  // stayed on its own hand-rolled header/sidebar until this slot existed. ──
+  const dashboardSearchBar = (
+    <div className="hidden lg:block relative">
+      <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
+      <input
+        type="text"
+        value={searchQuery}
+        onChange={(e) => { setSearchQuery(e.target.value); setSearchOpen(true); }}
+        onFocus={() => { if (searchQuery.trim()) setSearchOpen(true); }}
+        onBlur={() => setTimeout(() => setSearchOpen(false), 150)}
+        onKeyDown={(e) => { if (e.key === "Enter") handleSearchSubmit(); if (e.key === "Escape") setSearchOpen(false); }}
+        placeholder="Search assets, QR codes, services..."
+        className="w-[280px] rounded-xl border border-zinc-200 bg-zinc-50 pl-9 pr-3 py-[9px] text-[12px] outline-none focus:border-red-400 transition-colors"
+      />
+
+      {searchOpen && searchQuery.trim().length > 0 && (
+        <div className="absolute top-[calc(100%+6px)] left-0 w-[340px] bg-white rounded-xl border border-zinc-200 shadow-lg py-2 z-50 max-h-[360px] overflow-y-auto">
+          {matchedAssets.length > 0 && (
+            <div className="px-2">
+              <p className="px-2 pb-1 text-[10px] font-bold text-zinc-400 uppercase tracking-wide">Assets</p>
+              {matchedAssets.map((a) => (
+                <button
+                  key={a.id}
+                  onMouseDown={() => goToAsset(a)}
+                  className="w-full flex items-center gap-2.5 px-2 py-2 rounded-lg hover:bg-zinc-50 text-left"
+                >
+                  <div className="w-7 h-7 rounded-lg bg-red-50 flex items-center justify-center shrink-0">
+                    <Box size={13} className="text-red-500" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-[12px] font-bold text-zinc-800 truncate">{a.name}</p>
+                    <p className="text-[10px] text-zinc-400 truncate">{a.qrCode || a.vin || a.type}</p>
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+
+          {searchServiceResults.length > 0 && (
+            <div className="px-2 mt-1">
+              <p className="px-2 pb-1 text-[10px] font-bold text-zinc-400 uppercase tracking-wide">Services</p>
+              {searchServiceResults.map((s) => (
+                <button
+                  key={s.id}
+                  onMouseDown={() => goToService(s)}
+                  className="w-full flex items-center gap-2.5 px-2 py-2 rounded-lg hover:bg-zinc-50 text-left"
+                >
+                  <div className="w-7 h-7 rounded-lg bg-blue-50 flex items-center justify-center shrink-0">
+                    <Wrench size={13} className="text-blue-500" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-[12px] font-bold text-zinc-800 truncate">{s.service_type} · {s.assetName}</p>
+                    <p className="text-[10px] text-zinc-400 truncate">{formatDateDMY(s.service_date)}</p>
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+
+          {!hasSearchResults && (
+            <p className="px-4 py-3 text-[12px] text-zinc-400">
+              {searchingServices ? "Searching…" : `No results for "${searchQuery.trim()}"`}
+            </p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+
   return (
     <div className="min-h-screen bg-zinc-50 flex relative">
 
-      {sidebarOpen && (
-        <div className="md:hidden fixed inset-0 bg-black/40 z-30" onClick={() => setSidebarOpen(false)} />
-      )}
-
-      {/* ════ SIDEBAR ════ */}
-      <aside className={`fixed md:static inset-y-0 left-0 z-40 w-[230px] bg-white border-r border-zinc-200 flex flex-col shrink-0 transform transition-transform duration-200 md:translate-x-0 ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}`}>
-
-        <div className="flex items-center justify-between px-4 py-2">
-          <Link href="/" className="flex items-center">
-            <Image src="/images/maintly-logo-full.png" alt="MaintlyQR" width={244} height={72} priority style={{ objectFit: "contain" }} />
-          </Link>
-          <button onClick={() => setSidebarOpen(false)} className="md:hidden text-zinc-400 hover:text-zinc-700 mr-2">
-            <X size={20} />
-          </button>
-        </div>
-
-        <nav className="flex-1 px-3 overflow-y-auto">
-          {navItems.map((item) => (
-            <Link
-              key={item.label}
-              href={item.href}
-              onClick={() => setSidebarOpen(false)}
-              className={`flex items-center gap-3 px-3 py-[9px] rounded-lg mb-1 text-[13px] font-medium transition-colors ${
-                item.active
-                  ? "bg-red-50 text-red-600 border-l-[3px] border-red-600 -ml-[1px]"
-                  : "text-zinc-600 hover:bg-zinc-50"
-              }`}
-            >
-              <item.icon size={16} />
-              {item.label}
-              {item.label === "Messages" && unreadMessages > 0 && (
-                <span className="ml-auto bg-red-600 text-white text-[9px] font-bold rounded-full min-w-[16px] h-4 flex items-center justify-center px-1">{unreadMessages}</span>
-              )}
-              {item.label === "Team Chat" && unreadMechanicMessages > 0 && (
-                <span className="ml-auto bg-red-600 text-white text-[9px] font-bold rounded-full min-w-[16px] h-4 flex items-center justify-center px-1">{unreadMechanicMessages}</span>
-              )}
-            </Link>
-          ))}
-        </nav>
-
-        <div className="mx-3 mb-3 p-4 rounded-xl bg-gradient-to-br from-zinc-50 to-zinc-100 border border-zinc-200">
-          <div className="flex items-center gap-1.5 text-amber-500 mb-1">
-            <Crown size={14} />
-            <span className="text-[12px] font-bold text-zinc-800">Go Premium</span>
-          </div>
-          <p className="text-[10px] text-zinc-500 leading-relaxed mb-3">Unlock advanced reports, custom branding and more.</p>
-          <button className="w-full bg-zinc-900 hover:bg-zinc-800 text-white text-[11px] font-bold py-2 rounded-lg transition-colors">Upgrade Now</button>
-        </div>
-
-        <div className="flex items-center gap-2.5 px-4 py-3 border-t border-zinc-200">
-          <Link href="/dashboard/settings" className="shrink-0">
-            {mechanicPhoto ? (
-              <HoverAvatar src={mechanicPhoto} size={32} />
-            ) : (
-              <div className="w-8 h-8 rounded-full bg-red-100 flex items-center justify-center text-red-600 font-bold text-[12px]">{initials}</div>
-            )}
-          </Link>
-          <div className="flex-1 min-w-0">
-            <p className="text-[12px] font-bold text-zinc-800 leading-tight truncate">{displayName}</p>
-            <p className="text-[10px] text-zinc-400 leading-tight">Maintly Maintler</p>
-          </div>
-        </div>
-      </aside>
+      {/* hideSupportWidget: this page renders ContactSupportWidget itself,
+          inline in the main content area below (variant="inline"), not in
+          the sidebar — same placement Facu specifically likes here, kept
+          unchanged by this migration. name/email are passed as `displayName`
+          twice (not name+email separately, like every other dashboard page)
+          so the shared component's initials-fallback math matches exactly
+          what this page computed before the migration (a mechanic with no
+          name set still got an initial derived from their email). */}
+      <DashboardSidebar
+        activeLabel="Dashboard"
+        sidebarOpen={sidebarOpen}
+        onCloseSidebar={() => setSidebarOpen(false)}
+        mechanicId={mechanicId}
+        unreadMessages={unreadMessages}
+        unreadMechanicMessages={unreadMechanicMessages}
+        photoUrl={mechanicPhoto}
+        name={displayName}
+        email={displayName}
+        hideSupportWidget
+      />
 
       {/* ════ MAIN CONTENT ════ */}
       <div className="flex-1 flex flex-col min-w-0">
 
-        <header className="flex items-center justify-between gap-3 px-4 md:px-7 py-4 bg-white border-b border-zinc-200">
-          <div className="flex items-center gap-3 min-w-0">
-            <button onClick={() => setSidebarOpen(true)} className="md:hidden shrink-0 text-zinc-600 hover:text-zinc-900">
-              <Menu size={22} />
-            </button>
-            <div className="min-w-0">
-              <h1 className="text-[17px] md:text-[20px] font-black text-zinc-900 truncate">Dashboard</h1>
-              <p className="hidden sm:block text-[12px] text-zinc-400 truncate">Welcome back, {mechanicName || "Maintler"}! Here&apos;s what&apos;s happening with your maintenance work.</p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2 md:gap-4 shrink-0">
-            <div className="hidden lg:block relative">
-              <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => { setSearchQuery(e.target.value); setSearchOpen(true); }}
-                onFocus={() => { if (searchQuery.trim()) setSearchOpen(true); }}
-                onBlur={() => setTimeout(() => setSearchOpen(false), 150)}
-                onKeyDown={(e) => { if (e.key === "Enter") handleSearchSubmit(); if (e.key === "Escape") setSearchOpen(false); }}
-                placeholder="Search assets, QR codes, services..."
-                className="w-[280px] rounded-xl border border-zinc-200 bg-zinc-50 pl-9 pr-3 py-[9px] text-[12px] outline-none focus:border-red-400 transition-colors"
-              />
-
-              {searchOpen && searchQuery.trim().length > 0 && (
-                <div className="absolute top-[calc(100%+6px)] left-0 w-[340px] bg-white rounded-xl border border-zinc-200 shadow-lg py-2 z-50 max-h-[360px] overflow-y-auto">
-                  {matchedAssets.length > 0 && (
-                    <div className="px-2">
-                      <p className="px-2 pb-1 text-[10px] font-bold text-zinc-400 uppercase tracking-wide">Assets</p>
-                      {matchedAssets.map((a) => (
-                        <button
-                          key={a.id}
-                          onMouseDown={() => goToAsset(a)}
-                          className="w-full flex items-center gap-2.5 px-2 py-2 rounded-lg hover:bg-zinc-50 text-left"
-                        >
-                          <div className="w-7 h-7 rounded-lg bg-red-50 flex items-center justify-center shrink-0">
-                            <Box size={13} className="text-red-500" />
-                          </div>
-                          <div className="min-w-0">
-                            <p className="text-[12px] font-bold text-zinc-800 truncate">{a.name}</p>
-                            <p className="text-[10px] text-zinc-400 truncate">{a.qrCode || a.vin || a.type}</p>
-                          </div>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-
-                  {searchServiceResults.length > 0 && (
-                    <div className="px-2 mt-1">
-                      <p className="px-2 pb-1 text-[10px] font-bold text-zinc-400 uppercase tracking-wide">Services</p>
-                      {searchServiceResults.map((s) => (
-                        <button
-                          key={s.id}
-                          onMouseDown={() => goToService(s)}
-                          className="w-full flex items-center gap-2.5 px-2 py-2 rounded-lg hover:bg-zinc-50 text-left"
-                        >
-                          <div className="w-7 h-7 rounded-lg bg-blue-50 flex items-center justify-center shrink-0">
-                            <Wrench size={13} className="text-blue-500" />
-                          </div>
-                          <div className="min-w-0">
-                            <p className="text-[12px] font-bold text-zinc-800 truncate">{s.service_type} · {s.assetName}</p>
-                            <p className="text-[10px] text-zinc-400 truncate">{formatDateDMY(s.service_date)}</p>
-                          </div>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-
-                  {!hasSearchResults && (
-                    <p className="px-4 py-3 text-[12px] text-zinc-400">
-                      {searchingServices ? "Searching…" : `No results for "${searchQuery.trim()}"`}
-                    </p>
-                  )}
-                </div>
-              )}
-            </div>
-
-            <NotificationBell mechanicId={mechanicId} unreadMessagesCount={unreadMessages} unreadMechanicCount={unreadMechanicMessages} />
-
-            <div className="flex items-center gap-3 md:pl-3 md:border-l border-zinc-200">
-              {/* Links to this Maintler's own public card (/maintler/<code>)
-                  instead of Settings — Facu's own ask: Settings is already
-                  one click away via the sidebar nav, so this top-right
-                  identity spot is freed up to jump straight to "how the
-                  world sees me" instead of duplicating that sidebar link.
-                  Falls back to Settings if maintlerCode hasn't loaded yet
-                  (e.g. migration 024 not run yet on this database). */}
-              <Link href={maintlerCode ? `/maintler/${maintlerCode}` : "/dashboard/settings"} className="flex items-center gap-2.5 group">
-                {mechanicPhoto ? (
-                  <HoverAvatar src={mechanicPhoto} size={36} />
-                ) : (
-                  <div className="w-9 h-9 rounded-full bg-red-100 flex items-center justify-center text-red-600 font-bold text-[13px]">{initials}</div>
-                )}
-                <div className="hidden sm:block text-left">
-                  <p className="text-[12px] font-bold text-zinc-800 leading-tight group-hover:text-red-600 transition-colors">{displayName}</p>
-                  <p className="text-[10px] text-zinc-400 leading-tight">Maintler</p>
-                </div>
-              </Link>
-              <button
-                onClick={handleLogout}
-                className="flex items-center gap-1.5 text-[12px] font-semibold text-zinc-500 hover:text-red-600 hover:bg-red-50 border border-zinc-200 hover:border-red-200 px-3 py-2 rounded-xl transition-all"
-              >
-                <LogOut size={13} />
-                <span className="hidden md:inline">Log out</span>
-              </button>
-            </div>
-          </div>
-        </header>
+        <DashboardHeader
+          title="Dashboard"
+          subtitle={`Welcome back, ${mechanicName || "Maintler"}! Here's what's happening with your maintenance work.`}
+          onOpenSidebar={() => setSidebarOpen(true)}
+          mechanicId={mechanicId}
+          unreadMessages={unreadMessages}
+          unreadMechanicMessages={unreadMechanicMessages}
+          photoUrl={mechanicPhoto}
+          name={displayName}
+          email={displayName}
+          maintlerCode={maintlerCode}
+          onLogout={handleLogout}
+          extraHeaderContent={dashboardSearchBar}
+        />
 
         <div className="flex-1 overflow-y-auto p-4 md:p-7">
 

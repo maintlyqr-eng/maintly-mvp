@@ -617,8 +617,9 @@ export default function AdminPage() {
     setConfirmClearThread(false);
     const hasUnread = supportMessages.some((m) => m.mechanic_id === mechanicId && !m.from_admin && !m.read);
     if (hasUnread) {
+      const result = await adminFetch("/api/admin/support-messages", "PATCH", { mechanicId });
+      if (!result.ok) { flash(result.error || "Couldn't mark messages as read.", "error"); return; }
       setSupportMessages((prev) => prev.map((x) => (x.mechanic_id === mechanicId && !x.from_admin ? { ...x, read: true } : x)));
-      await adminFetch("/api/admin/support-messages", "PATCH", { mechanicId });
     }
   }
 
@@ -646,11 +647,11 @@ export default function AdminPage() {
   }
 
   async function handleClearThread(mechanicId: string) {
+    const result = await adminFetch("/api/admin/support-messages", "DELETE", { mechanicId });
+    if (!result.ok) { flash(result.error || "Couldn't clear the conversation.", "error"); return; }
     setSupportMessages((prev) => prev.filter((m) => m.mechanic_id !== mechanicId));
     setSelectedThreadMechanic(null);
     setConfirmClearThread(false);
-    const result = await adminFetch("/api/admin/support-messages", "DELETE", { mechanicId });
-    if (!result.ok) flash(result.error || "Couldn't clear the conversation.", "error");
   }
 
   async function handleSendThreadReply() {

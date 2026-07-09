@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { LifeBuoy, X, Send, Trash2 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
@@ -43,6 +43,10 @@ export default function ContactSupportWidget({ mechanicId, variant = "sidebar" }
   const [error, setError] = useState("");
   const [confirmClear, setConfirmClear] = useState(false);
   const [mounted, setMounted] = useState(false);
+  // Synchronous double-send guard: the `saving` state alone can't stop a
+  // fast double-Enter (or Enter + a click on Send) from both firing
+  // handleSend before the disabled-button re-render lands.
+  const sendBusyRef = useRef(false);
 
   useEffect(() => {
     setMounted(true);
@@ -87,21 +91,27 @@ export default function ContactSupportWidget({ mechanicId, variant = "sidebar" }
   }
 
   async function handleSend() {
+    if (sendBusyRef.current) return;
     if (!body.trim()) return;
+    sendBusyRef.current = true;
     const text = body.trim();
     setSaving(true);
     setError("");
-    const { data, error: err } = await supabase
-      .from("support_messages")
-      .insert({ mechanic_id: mechanicId, body: text, from_admin: false })
-      .select("id, body, from_admin, read, created_at");
-    setSaving(false);
-    if (err || !data || data.length === 0) {
-      setError("Couldn't send your message. Try again.");
-      return;
+    try {
+      const { data, error: err } = await supabase
+        .from("support_messages")
+        .insert({ mechanic_id: mechanicId, body: text, from_admin: false })
+        .select("id, body, from_admin, read, created_at");
+      if (err || !data || data.length === 0) {
+        setError("Couldn't send your message. Try again.");
+        return;
+      }
+      setThread((prev) => [...prev, data[0] as SupportMsgRow]);
+      setBody("");
+    } finally {
+      setSaving(false);
+      sendBusyRef.current = false;
     }
-    setThread((prev) => [...prev, data[0] as SupportMsgRow]);
-    setBody("");
   }
 
   async function handleClear() {

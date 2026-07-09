@@ -29,11 +29,13 @@ export default function QRScannerModal({
   const streamRef = useRef<MediaStream | null>(null);
   const rafRef = useRef<number | null>(null);
   const activeRef = useRef(false);
+  const detectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   function stopCamera() {
     activeRef.current = false;
     if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current = null; }
     if (streamRef.current) { streamRef.current.getTracks().forEach((t) => t.stop()); streamRef.current = null; }
+    if (detectTimeoutRef.current) { clearTimeout(detectTimeoutRef.current); detectTimeoutRef.current = null; }
   }
 
   async function requestScan() {
@@ -70,7 +72,7 @@ export default function QRScannerModal({
       }
       setDetected(qrValue);
       stopCamera();
-      setTimeout(() => onDetect(qrValue), 500);
+      detectTimeoutRef.current = setTimeout(() => onDetect(qrValue), 500);
       return;
     }
 

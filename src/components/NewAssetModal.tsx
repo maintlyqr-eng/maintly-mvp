@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { X, Camera } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { authedFetch } from "@/lib/apiAuth";
@@ -49,10 +49,19 @@ export default function NewAssetModal({
   const [photoPreview, setPhotoPreview] = useState("");
   const [customerId, setCustomerId] = useState("");
   const [customers, setCustomers] = useState<CustomerOption[]>([]);
+  // Synchronous double-submit guard: `saving` state alone isn't enough
+  // because a fast double-click/double-Enter can fire handleSubmit twice
+  // before React re-renders the disabled button.
+  const submitBusyRef = useRef(false);
+  // Tracks the currently-live object URL created for the photo preview so
+  // it can be revoked before creating a new one (or on unmount), instead
+  // of leaking it.
+  const photoPreviewUrlRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (!open) return;
     // Fresh form every time it's opened.
+    submitBusyRef.current = false;
     setSaving(false);
     setFormError("");
     setAssetType("automotive");
@@ -65,6 +74,10 @@ export default function NewAssetModal({
     setFuelType("");
     setLocation("");
     setPhotoFile(null);
+    if (photoPreviewUrlRef.current) {
+      URL.revokeObjectURL(photoPreviewUrlRef.current);
+      photoPreviewUrlRef.current = null;
+    }
     setPhotoPreview("");
     setCustomerId("");
 
@@ -76,10 +89,31 @@ export default function NewAssetModal({
       .then(({ data }) => setCustomers((data as CustomerOption[]) ?? []));
   }, [open, mechanicId]);
 
+  // Release the last photo-preview object URL when the component unmounts,
+  // so it doesn't leak for the lifetime of the page.
+  useEffect(() => {
+    return () => {
+      if (photoPreviewUrlRef.current) {
+        URL.revokeObjectURL(photoPreviewUrlRef.current);
+        photoPreviewUrlRef.current = null;
+      }
+    };
+  }, []);
+
   if (!open) return null;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (submitBusyRef.current) return;
+    submitBusyRef.current = true;
+    try {
+      await doSubmit();
+    } finally {
+      submitBusyRef.current = false;
+    }
+  }
+
+  async function doSubmit() {
     setFormError("");
 
     if (!brand.trim() || !model.trim()) {
@@ -270,8 +304,17 @@ export default function NewAssetModal({
                     }
                     setFormError("");
                     setPhotoFile(f);
-                    if (f) setPhotoPreview(URL.createObjectURL(f));
-                    else setPhotoPreview("");
+                    if (photoPreviewUrlRef.current) {
+                      URL.revokeObjectURL(photoPreviewUrlRef.current);
+                      photoPreviewUrlRef.current = null;
+                    }
+                    if (f) {
+                      const url = URL.createObjectURL(f);
+                      photoPreviewUrlRef.current = url;
+                      setPhotoPreview(url);
+                    } else {
+                      setPhotoPreview("");
+                    }
                   }}
                 />
               </label>
@@ -281,7 +324,14 @@ export default function NewAssetModal({
                   <img src={photoPreview} alt="Preview" className="w-full h-full object-cover" />
                   <button
                     type="button"
-                    onClick={() => { setPhotoFile(null); setPhotoPreview(""); }}
+                    onClick={() => {
+                      if (photoPreviewUrlRef.current) {
+                        URL.revokeObjectURL(photoPreviewUrlRef.current);
+                        photoPreviewUrlRef.current = null;
+                      }
+                      setPhotoFile(null);
+                      setPhotoPreview("");
+                    }}
                     className="absolute top-0.5 right-0.5 w-4 h-4 bg-zinc-900/60 rounded-full flex items-center justify-center text-white"
                   >
                     <X size={9} />

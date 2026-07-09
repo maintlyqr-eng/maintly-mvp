@@ -82,7 +82,7 @@ export default function HomePage() {
 
       {/* ── BACKGROUND ── */}
       <div className="absolute inset-0 z-0">
-        <Image src="/images/fondo.png" alt="Maintly background" fill priority className="object-cover object-center" />
+        <Image src="/images/fondo.jpg" alt="Maintly background" fill priority sizes="100vw" quality={90} className="object-cover object-center" />
       </div>
       <div className="absolute inset-0 z-0 bg-white/15 pointer-events-none" />
 

@@ -23,23 +23,12 @@ import ProfessionVerificationForm, { VerificationStatusCard } from "@/components
 import { validateImageFile } from "@/lib/imageValidation";
 import MaintlerCardCanvas, { type MaintlerCardCanvasHandle } from "@/components/MaintlerCardCanvas";
 import { yearsSince, computeScore, type MaintlerStats } from "@/lib/maintlerScore";
+import { normalizeContactUrl, isValidPhone, isValidEmail, isSafeHref } from "@/lib/contactValidation";
+import DashboardSidebar from "@/components/DashboardSidebar";
+import DashboardHeader from "@/components/DashboardHeader";
+import { getInitials } from "@/lib/initials";
 
 type SpecialtyRow = { asset_type: string; services_count: number };
-
-const navItems = [
-  { icon: LayoutGrid, label: "Dashboard", href: "/dashboard" },
-  { icon: FileText, label: "My Services", href: "/dashboard/services" },
-  { icon: Bell, label: "Scheduled Services", href: "/dashboard/scheduled" },
-  { icon: Box, label: "Assets", href: "/dashboard/assets" },
-  { icon: QrCode, label: "QR Codes", href: "/dashboard/qr-codes" },
-  { icon: Users, label: "Customers", href: "/dashboard/customers" },
-  { icon: BarChart3, label: "Reports", href: "/dashboard/reports" },
-  { icon: CalendarIcon, label: "Calendar", href: "/dashboard/calendar" },
-  { icon: Mail, label: "Messages", href: "/dashboard/messages" },
-  { icon: MessageCircle, label: "Team Chat", href: "/dashboard/team-chat" },
-  { icon: FolderOpen, label: "Document Library", href: "/dashboard/documents" },
-  { icon: SettingsIcon, label: "Settings", href: "/dashboard/settings" },
-];
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -105,6 +94,16 @@ export default function SettingsPage() {
   const [maintlerCode, setMaintlerCode] = useState("");
   const [cardLinkCopied, setCardLinkCopied] = useState(false);
   const cardCanvasRef = useRef<MaintlerCardCanvasHandle>(null);
+
+  // Synchronous in-flight guards for the three forms below — `disabled`
+  // on the submit button is a React state update, so it doesn't take
+  // effect until the next render; a fast double-click/double-Enter before
+  // that re-render can still fire the handler twice (e.g. two "Profile
+  // updated" writes, or two password-change requests back to back).
+  // These refs are checked synchronously at the very top of each handler.
+  const profileBusyRef = useRef(false);
+  const contactBusyRef = useRef(false);
+  const passwordBusyRef = useRef(false);
 
   // Password form
   const [newPassword, setNewPassword] = useState("");
@@ -267,9 +266,12 @@ export default function SettingsPage() {
 
   async function handleSaveProfile(e: React.FormEvent) {
     e.preventDefault();
+    if (profileBusyRef.current) return;
+    profileBusyRef.current = true;
     setProfileMsg(null);
 
     if (!name.trim()) {
+      profileBusyRef.current = false;
       setProfileMsg({ text: "Name can't be empty.", ok: false });
       return;
     }
@@ -281,6 +283,7 @@ export default function SettingsPage() {
       .eq("id", mechanicId)
       .select("id");
     setProfileSaving(false);
+    profileBusyRef.current = false;
 
     if (error) { setProfileMsg({ text: error.message, ok: false }); return; }
     if (!data || data.length === 0) { setProfileMsg({ text: "Couldn't save — please try again.", ok: false }); return; }
@@ -290,37 +293,74 @@ export default function SettingsPage() {
 
   async function handleSaveContactInfo(e: React.FormEvent) {
     e.preventDefault();
+    if (contactBusyRef.current) return;
+    contactBusyRef.current = true;
     setContactMsg(null);
-    setContactSaving(true);
 
+    // Validate + normalize every field before this ever reaches the
+    // database — these values get rendered as clickable links on the
+    // public /maintler/[code] card (and again as quick-contact icons in
+    // this same page), so nothing that isn't a real http(s) link, a
+    // phone-shaped string, or an email-shaped string is allowed through.
+    // See src/lib/contactValidation.ts for the rationale.
+    const errors: string[] = [];
+
+    if (!isValidPhone(contactPhone)) errors.push("El teléfono no parece válido.");
+    if (!isValidEmail(contactEmail)) errors.push("El email público no parece válido.");
+
+    const instagram = normalizeContactUrl(instagramUrl);
+    if (instagram.error) errors.push(`Instagram: ${instagram.error}.`);
+    const facebook = normalizeContactUrl(facebookUrl);
+    if (facebook.error) errors.push(`Facebook: ${facebook.error}.`);
+    const website = normalizeContactUrl(websiteUrl);
+    if (website.error) errors.push(`Website: ${website.error}.`);
+
+    if (errors.length > 0) {
+      contactBusyRef.current = false;
+      setContactMsg({ text: errors.join(" "), ok: false });
+      return;
+    }
+
+    setContactSaving(true);
     const { data, error } = await supabase
       .from("mechanics")
       .update({
         phone: contactPhone.trim() || null,
         contact_email: contactEmail.trim() || null,
-        instagram_url: instagramUrl.trim() || null,
-        facebook_url: facebookUrl.trim() || null,
-        website_url: websiteUrl.trim() || null,
+        instagram_url: instagram.value,
+        facebook_url: facebook.value,
+        website_url: website.value,
       })
       .eq("id", mechanicId)
       .select("id");
     setContactSaving(false);
+    contactBusyRef.current = false;
 
     if (error) { setContactMsg({ text: error.message, ok: false }); return; }
     if (!data || data.length === 0) { setContactMsg({ text: "Couldn't save — please try again.", ok: false }); return; }
+
+    // Reflect the normalized (scheme-added) values back into the form so
+    // what's shown matches exactly what's now stored/live on the public card.
+    setInstagramUrl(instagram.value ?? "");
+    setFacebookUrl(facebook.value ?? "");
+    setWebsiteUrl(website.value ?? "");
 
     setContactMsg({ text: "Contact info updated.", ok: true });
   }
 
   async function handleChangePassword(e: React.FormEvent) {
     e.preventDefault();
+    if (passwordBusyRef.current) return;
+    passwordBusyRef.current = true;
     setPasswordMsg(null);
 
     if (newPassword.length < 6) {
+      passwordBusyRef.current = false;
       setPasswordMsg({ text: "Password must be at least 6 characters.", ok: false });
       return;
     }
     if (newPassword !== confirmPassword) {
+      passwordBusyRef.current = false;
       setPasswordMsg({ text: "Passwords do not match.", ok: false });
       return;
     }
@@ -328,6 +368,7 @@ export default function SettingsPage() {
     setPasswordSaving(true);
     const { error } = await supabase.auth.updateUser({ password: newPassword });
     setPasswordSaving(false);
+    passwordBusyRef.current = false;
 
     if (error) { setPasswordMsg({ text: error.message, ok: false }); return; }
 
@@ -344,118 +385,41 @@ export default function SettingsPage() {
     );
   }
 
-  const initials = name.split(" ").filter(Boolean).map(p => p[0]).join("").slice(0, 2).toUpperCase() || "ME";
+  const initials = getInitials(name);
   const yearsActive = createdAt ? yearsSince(createdAt) : 0;
   const maintlyScore = stats ? computeScore(verified, stats, specialties.length, yearsActive) : null;
 
   return (
     <div className="min-h-screen bg-zinc-50 flex relative">
 
-      {sidebarOpen && (
-        <div className="md:hidden fixed inset-0 bg-black/40 z-30" onClick={() => setSidebarOpen(false)} />
-      )}
-
-      {/* ════ SIDEBAR ════ */}
-      <aside className={`fixed md:static inset-y-0 left-0 z-40 w-[230px] bg-white border-r border-zinc-200 flex flex-col shrink-0 transform transition-transform duration-200 md:translate-x-0 ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}`}>
-        <div className="flex items-center justify-between px-4 py-2">
-          <Link href="/" className="flex items-center">
-            <Image src="/images/maintly-logo-full.png" alt="MaintlyQR" width={244} height={72} priority style={{ objectFit: "contain" }} />
-          </Link>
-          <button onClick={() => setSidebarOpen(false)} className="md:hidden text-zinc-400 hover:text-zinc-700 mr-2">
-            <X size={20} />
-          </button>
-        </div>
-
-        <nav className="flex-1 px-3 overflow-y-auto">
-          {navItems.map((item) => (
-            <Link
-              key={item.label}
-              href={item.href}
-              onClick={() => setSidebarOpen(false)}
-              className={`flex items-center gap-3 px-3 py-[9px] rounded-lg mb-1 text-[13px] font-medium transition-colors ${
-                item.label === "Settings"
-                  ? "bg-red-50 text-red-600 border-l-[3px] border-red-600 -ml-[1px]"
-                  : "text-zinc-600 hover:bg-zinc-50"
-              }`}
-            >
-              <item.icon size={16} />
-              {item.label}
-              {item.label === "Messages" && unreadMessages > 0 && (
-                <span className="ml-auto bg-red-600 text-white text-[9px] font-bold rounded-full min-w-[16px] h-4 flex items-center justify-center px-1">{unreadMessages}</span>
-              )}
-              {item.label === "Team Chat" && unreadMechanicMessages > 0 && (
-                <span className="ml-auto bg-red-600 text-white text-[9px] font-bold rounded-full min-w-[16px] h-4 flex items-center justify-center px-1">{unreadMechanicMessages}</span>
-              )}
-            </Link>
-          ))}
-        </nav>
-
-        <ContactSupportWidget mechanicId={mechanicId} />
-
-        <div className="mx-3 mb-3 p-4 rounded-xl bg-gradient-to-br from-zinc-50 to-zinc-100 border border-zinc-200">
-          <div className="flex items-center gap-1.5 text-amber-500 mb-1">
-            <Crown size={14} />
-            <span className="text-[12px] font-bold text-zinc-800">Go Premium</span>
-          </div>
-          <p className="text-[10px] text-zinc-500 leading-relaxed mb-3">Unlock advanced reports, custom branding and more.</p>
-          <button className="w-full bg-zinc-900 hover:bg-zinc-800 text-white text-[11px] font-bold py-2 rounded-lg transition-colors">Upgrade Now</button>
-        </div>
-
-        <div className="flex items-center gap-2.5 px-4 py-3 border-t border-zinc-200">
-          {photoUrl ? (
-            <HoverAvatar src={photoUrl} size={32} className="shrink-0" />
-          ) : (
-            <div className="w-8 h-8 rounded-full bg-red-100 flex items-center justify-center text-red-600 font-bold text-[12px] shrink-0">{initials}</div>
-          )}
-          <div className="flex-1 min-w-0">
-            <p className="text-[12px] font-bold text-zinc-800 leading-tight truncate">{name || email}</p>
-            <p className="text-[10px] text-zinc-400 leading-tight">Maintly Maintler</p>
-          </div>
-        </div>
-      </aside>
+      <DashboardSidebar
+        activeLabel="Settings"
+        sidebarOpen={sidebarOpen}
+        onCloseSidebar={() => setSidebarOpen(false)}
+        mechanicId={mechanicId}
+        unreadMessages={unreadMessages}
+        unreadMechanicMessages={unreadMechanicMessages}
+        photoUrl={photoUrl}
+        name={name}
+        email={email}
+      />
 
       {/* ════ MAIN ════ */}
       <div className="flex-1 flex flex-col min-w-0">
 
-        <header className="flex items-center justify-between gap-3 px-4 md:px-7 py-4 bg-white border-b border-zinc-200">
-          <div className="flex items-center gap-3 min-w-0">
-            <button onClick={() => setSidebarOpen(true)} className="md:hidden shrink-0 text-zinc-600 hover:text-zinc-900">
-              <Menu size={22} />
-            </button>
-            <div className="min-w-0">
-              <h1 className="text-[17px] md:text-[20px] font-black text-zinc-900 truncate">Settings</h1>
-              <p className="hidden sm:block text-[12px] text-zinc-400 truncate">Manage your account and profile.</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2 md:gap-4 shrink-0">
-            <NotificationBell mechanicId={mechanicId} unreadMessagesCount={unreadMessages} unreadMechanicCount={unreadMechanicMessages} />
-            <div className="flex items-center gap-3 md:pl-3 md:border-l border-zinc-200">
-              {/* Links to this Maintler's own public card, same as every
-                  other dashboard page's header — see the matching comment
-                  there. Already on Settings here, so this is purely a
-                  shortcut to preview the public card (the "My Maintler
-                  Card" section further down also links to it). */}
-              <Link href={maintlerCode ? `/maintler/${maintlerCode}` : "/dashboard/settings"} className="flex items-center gap-2.5 group">
-                {photoUrl ? (
-                  <HoverAvatar src={photoUrl} size={36} className="shrink-0" />
-                ) : (
-                  <div className="w-9 h-9 rounded-full bg-red-100 flex items-center justify-center text-red-600 font-bold text-[13px] shrink-0">{initials}</div>
-                )}
-                <div className="hidden sm:block text-left">
-                  <p className="text-[12px] font-bold text-zinc-800 leading-tight group-hover:text-red-600 transition-colors">{name || email}</p>
-                  <p className="text-[10px] text-zinc-400 leading-tight">Maintler</p>
-                </div>
-              </Link>
-              <button
-                onClick={handleLogout}
-                className="flex items-center gap-1.5 text-[12px] font-semibold text-zinc-500 hover:text-red-600 hover:bg-red-50 border border-zinc-200 hover:border-red-200 px-3 py-2 rounded-xl transition-all"
-              >
-                <LogOut size={13} />
-                <span className="hidden md:inline">Log out</span>
-              </button>
-            </div>
-          </div>
-        </header>
+        <DashboardHeader
+          title="Settings"
+          subtitle="Manage your account and profile."
+          onOpenSidebar={() => setSidebarOpen(true)}
+          mechanicId={mechanicId}
+          unreadMessages={unreadMessages}
+          unreadMechanicMessages={unreadMechanicMessages}
+          photoUrl={photoUrl}
+          name={name}
+          email={email}
+          maintlerCode={maintlerCode}
+          onLogout={handleLogout}
+        />
 
         <div className="flex-1 overflow-y-auto p-4 md:p-7 max-w-2xl lg:max-w-5xl">
 
@@ -558,17 +522,17 @@ export default function SettingsPage() {
                           <Phone size={15} />
                         </a>
                       )}
-                      {instagramUrl && (
+                      {isSafeHref(instagramUrl) && (
                         <a href={instagramUrl} target="_blank" rel="noopener noreferrer" title="Instagram" className="w-9 h-9 rounded-full border border-zinc-200 flex items-center justify-center text-zinc-500 hover:text-red-600 hover:border-red-200 transition-colors">
                           <Globe size={15} />
                         </a>
                       )}
-                      {facebookUrl && (
+                      {isSafeHref(facebookUrl) && (
                         <a href={facebookUrl} target="_blank" rel="noopener noreferrer" title="Facebook" className="w-9 h-9 rounded-full border border-zinc-200 flex items-center justify-center text-zinc-500 hover:text-red-600 hover:border-red-200 transition-colors">
                           <Globe size={15} />
                         </a>
                       )}
-                      {websiteUrl && (
+                      {isSafeHref(websiteUrl) && (
                         <a href={websiteUrl} target="_blank" rel="noopener noreferrer" title={websiteUrl} className="w-9 h-9 rounded-full border border-zinc-200 flex items-center justify-center text-zinc-500 hover:text-red-600 hover:border-red-200 transition-colors">
                           <Globe size={15} />
                         </a>
@@ -757,21 +721,21 @@ export default function SettingsPage() {
               <div>
                 <label className="text-[12px] font-bold text-zinc-700">Full name</label>
                 <input
-                  value={name} onChange={(e) => setName(e.target.value)}
+                  value={name} onChange={(e) => { setName(e.target.value); if (profileMsg) setProfileMsg(null); }}
                   className="w-full mt-1 rounded-xl border border-zinc-200 px-3 py-[10px] text-[13px] outline-none focus:border-red-500"
                 />
               </div>
               <div>
                 <label className="text-[12px] font-bold text-zinc-700">Workshop name <span className="text-zinc-300 font-normal">(optional)</span></label>
                 <input
-                  value={workshopName} onChange={(e) => setWorkshopName(e.target.value)} placeholder="e.g. Ledesma Motors"
+                  value={workshopName} onChange={(e) => { setWorkshopName(e.target.value); if (profileMsg) setProfileMsg(null); }} placeholder="e.g. Ledesma Motors"
                   className="w-full mt-1 rounded-xl border border-zinc-200 px-3 py-[10px] text-[13px] outline-none focus:border-red-500"
                 />
               </div>
               <div>
                 <label className="text-[12px] font-bold text-zinc-700">Location <span className="text-zinc-300 font-normal">(optional)</span></label>
                 <input
-                  value={location} onChange={(e) => setLocation(e.target.value)} placeholder="e.g. Emerald, QLD, Australia"
+                  value={location} onChange={(e) => { setLocation(e.target.value); if (profileMsg) setProfileMsg(null); }} placeholder="e.g. Emerald, QLD, Australia"
                   className="w-full mt-1 rounded-xl border border-zinc-200 px-3 py-[10px] text-[13px] outline-none focus:border-red-500"
                 />
                 <p className="text-[11px] text-zinc-400 mt-1">Shown on your public Maintler card, under your profession.</p>
@@ -816,35 +780,35 @@ export default function SettingsPage() {
               <div>
                 <label className="text-[12px] font-bold text-zinc-700">Phone / WhatsApp</label>
                 <input
-                  value={contactPhone} onChange={(e) => setContactPhone(e.target.value)} placeholder="+54 9 11 1234 5678"
+                  value={contactPhone} onChange={(e) => { setContactPhone(e.target.value); if (contactMsg) setContactMsg(null); }} placeholder="+54 9 11 1234 5678"
                   className="w-full mt-1 rounded-xl border border-zinc-200 px-3 py-[10px] text-[13px] outline-none focus:border-red-500"
                 />
               </div>
               <div>
                 <label className="text-[12px] font-bold text-zinc-700">Public email <span className="text-zinc-300 font-normal">(can differ from your account email)</span></label>
                 <input
-                  value={contactEmail} onChange={(e) => setContactEmail(e.target.value)} placeholder="taller@example.com"
+                  value={contactEmail} onChange={(e) => { setContactEmail(e.target.value); if (contactMsg) setContactMsg(null); }} placeholder="taller@example.com"
                   className="w-full mt-1 rounded-xl border border-zinc-200 px-3 py-[10px] text-[13px] outline-none focus:border-red-500"
                 />
               </div>
               <div>
                 <label className="text-[12px] font-bold text-zinc-700">Instagram</label>
                 <input
-                  value={instagramUrl} onChange={(e) => setInstagramUrl(e.target.value)} placeholder="https://instagram.com/tutaller"
+                  value={instagramUrl} onChange={(e) => { setInstagramUrl(e.target.value); if (contactMsg) setContactMsg(null); }} placeholder="https://instagram.com/tutaller"
                   className="w-full mt-1 rounded-xl border border-zinc-200 px-3 py-[10px] text-[13px] outline-none focus:border-red-500"
                 />
               </div>
               <div>
                 <label className="text-[12px] font-bold text-zinc-700">Facebook</label>
                 <input
-                  value={facebookUrl} onChange={(e) => setFacebookUrl(e.target.value)} placeholder="https://facebook.com/tutaller"
+                  value={facebookUrl} onChange={(e) => { setFacebookUrl(e.target.value); if (contactMsg) setContactMsg(null); }} placeholder="https://facebook.com/tutaller"
                   className="w-full mt-1 rounded-xl border border-zinc-200 px-3 py-[10px] text-[13px] outline-none focus:border-red-500"
                 />
               </div>
               <div>
                 <label className="text-[12px] font-bold text-zinc-700">Website</label>
                 <input
-                  value={websiteUrl} onChange={(e) => setWebsiteUrl(e.target.value)} placeholder="https://tutaller.com"
+                  value={websiteUrl} onChange={(e) => { setWebsiteUrl(e.target.value); if (contactMsg) setContactMsg(null); }} placeholder="https://tutaller.com"
                   className="w-full mt-1 rounded-xl border border-zinc-200 px-3 py-[10px] text-[13px] outline-none focus:border-red-500"
                 />
               </div>
@@ -872,14 +836,14 @@ export default function SettingsPage() {
               <div>
                 <label className="text-[12px] font-bold text-zinc-700">New password</label>
                 <input
-                  type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="At least 6 characters"
+                  type="password" value={newPassword} onChange={(e) => { setNewPassword(e.target.value); if (passwordMsg) setPasswordMsg(null); }} placeholder="At least 6 characters"
                   className="w-full mt-1 rounded-xl border border-zinc-200 px-3 py-[10px] text-[13px] outline-none focus:border-red-500"
                 />
               </div>
               <div>
                 <label className="text-[12px] font-bold text-zinc-700">Confirm new password</label>
                 <input
-                  type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)}
+                  type="password" value={confirmPassword} onChange={(e) => { setConfirmPassword(e.target.value); if (passwordMsg) setPasswordMsg(null); }}
                   className="w-full mt-1 rounded-xl border border-zinc-200 px-3 py-[10px] text-[13px] outline-none focus:border-red-500"
                 />
               </div>

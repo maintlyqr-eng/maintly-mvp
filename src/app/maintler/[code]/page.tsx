@@ -12,6 +12,7 @@ import { supabase } from "@/lib/supabase";
 import { formatDateDMY } from "@/lib/date";
 import MaintlerCardCanvas, { type MaintlerCardCanvasHandle } from "@/components/MaintlerCardCanvas";
 import { yearsSince, computeScore, computeBadges, type MaintlerStats } from "@/lib/maintlerScore";
+import { isSafeHref } from "@/lib/contactValidation";
 
 // Maintler QR business card — Item 4 of the feature backlog. Every
 // mechanic gets a permanent code (see migration 024) that resolves here,
@@ -183,9 +184,15 @@ function MaintlerPublicPageContent() {
     setSaveBusy(true);
 
     if (saved) {
-      if (savedRowId) await supabase.from("maintler_saved_contacts").delete().eq("id", savedRowId);
-      setSaved(false);
-      setSavedRowId(null);
+      const { error: err } = savedRowId
+        ? await supabase.from("maintler_saved_contacts").delete().eq("id", savedRowId)
+        : { error: null };
+      if (err) {
+        setSaveError("Couldn't remove this Maintler. Try again.");
+      } else {
+        setSaved(false);
+        setSavedRowId(null);
+      }
     } else {
       const { data, error: err } = await supabase
         .from("maintler_saved_contacts")
@@ -495,17 +502,17 @@ function MaintlerPublicPageContent() {
                         <Mail size={12} className="text-zinc-400 shrink-0" /> <span className="truncate">{profile.contact_email}</span>
                       </a>
                     )}
-                    {profile.instagram_url && (
+                    {isSafeHref(profile.instagram_url) && (
                       <a href={profile.instagram_url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-[11.5px] font-semibold text-zinc-700 hover:text-red-600 transition-colors truncate">
                         <Globe size={12} className="text-zinc-400 shrink-0" /> Instagram
                       </a>
                     )}
-                    {profile.facebook_url && (
+                    {isSafeHref(profile.facebook_url) && (
                       <a href={profile.facebook_url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-[11.5px] font-semibold text-zinc-700 hover:text-red-600 transition-colors truncate">
                         <Globe size={12} className="text-zinc-400 shrink-0" /> Facebook
                       </a>
                     )}
-                    {profile.website_url && (
+                    {isSafeHref(profile.website_url) && (
                       <a href={profile.website_url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-[11.5px] font-semibold text-zinc-700 hover:text-red-600 transition-colors truncate col-span-2 lg:col-span-1">
                         <Globe size={12} className="text-zinc-400 shrink-0" /> <span className="truncate">{profile.website_url.replace(/^https?:\/\//, "")}</span>
                       </a>

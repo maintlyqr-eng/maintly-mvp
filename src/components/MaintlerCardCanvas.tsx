@@ -95,7 +95,13 @@ const MaintlerCardCanvas = forwardRef<MaintlerCardCanvasHandle, {
   const previewCanvasRef = useRef<HTMLCanvasElement>(null);
   const qrHandleRef = useRef<QrCodeCanvasHandle>(null);
 
-  async function drawCard(ctx: CanvasRenderingContext2D) {
+  // isStale lets a caller abort a slow, superseded draw mid-flight — without
+  // it, two overlapping drawCard() calls (e.g. photoUrl/name changing twice
+  // quickly, each triggering the preview effect below) race on the same
+  // canvas, and whichever finishes LAST wins regardless of which one
+  // started last, so a stale photo/name can visibly paint over a newer one.
+  // Checked after the two slow network-bound awaits (photo load, QR blob).
+  async function drawCard(ctx: CanvasRenderingContext2D, isStale: () => boolean = () => false) {
     const W = CARD_W, H = CARD_H;
     ctx.clearRect(0, 0, W, H);
 
@@ -140,6 +146,7 @@ const MaintlerCardCanvas = forwardRef<MaintlerCardCanvasHandle, {
     if (photoUrl) {
       try {
         const img = await loadImageEl(photoUrl);
+        if (isStale()) return;
         ctx.save();
         ctx.beginPath();
         ctx.arc(photoCx, photoCy, photoSize / 2, 0, Math.PI * 2);
@@ -235,6 +242,7 @@ const MaintlerCardCanvas = forwardRef<MaintlerCardCanvasHandle, {
     } catch {
       qrBlob = null;
     }
+    if (isStale()) return;
     if (qrBlob) {
       try {
         const qrImg = await blobToImage(qrBlob);
@@ -283,8 +291,7 @@ const MaintlerCardCanvas = forwardRef<MaintlerCardCanvasHandle, {
     if (!ctx) return;
     let cancelled = false;
     (async () => {
-      await drawCard(ctx);
-      if (cancelled) return;
+      await drawCard(ctx, () => cancelled);
     })();
     return () => { cancelled = true; };
   // eslint-disable-next-line react-hooks/exhaustive-deps

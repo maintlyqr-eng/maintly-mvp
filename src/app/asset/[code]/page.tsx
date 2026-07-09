@@ -130,7 +130,9 @@ export default function AssetPublicPage() {
       if (!qrRow.asset_id) {
         // Valid code, part of the MaintlyQR World, just not assigned yet.
         setIsBlank(true);
-        supabase.from("qr_scans").insert({ code, asset_id: null }).then(() => {});
+        supabase.from("qr_scans").insert({ code, asset_id: null }).then(({ error }) => {
+          if (error) console.error("qr_scans insert failed", error);
+        });
         setLoading(false);
         return;
       }
@@ -144,7 +146,9 @@ export default function AssetPublicPage() {
       setAsset(assetData as AssetData);
 
       // Log the scan for the admin Dashboard (fire-and-forget, never blocks the page).
-      supabase.from("qr_scans").insert({ code, asset_id: qrRow.asset_id }).then(() => {});
+      supabase.from("qr_scans").insert({ code, asset_id: qrRow.asset_id }).then(({ error }) => {
+        if (error) console.error("qr_scans insert failed", error);
+      });
 
       // Load services
       await loadServices(qrRow.asset_id);

@@ -1,42 +1,22 @@
 "use client";
 
-import Link from "next/link";
-import Image from "next/image";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
-  LayoutGrid, FileText, Box, QrCode, Users, BarChart3, Calendar as CalendarIcon,
-  Mail, FolderOpen, Settings, Bell, Plus, X, LogOut, Crown, Menu,
+  QrCode, Plus, X,
   Search, Download, Printer, Sparkles, ScanLine, Tag, Wrench,
-  MessageCircle,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
-import NotificationBell from "@/components/NotificationBell";
 import { authedFetch } from "@/lib/apiAuth";
 import { useUnreadMessagesCount } from "@/lib/useUnreadMessages";
 import { useUnreadMechanicMessages } from "@/lib/useUnreadMechanicMessages";
-import HoverAvatar from "@/components/HoverAvatar";
-import ContactSupportWidget from "@/components/ContactSupportWidget";
+import DashboardSidebar from "@/components/DashboardSidebar";
+import DashboardHeader from "@/components/DashboardHeader";
 import QrCodeCanvas, { type QrCodeCanvasHandle } from "@/components/QrCodeCanvas";
 import QrThemePicker from "@/components/QrThemePicker";
 import NewAssetModal from "@/components/NewAssetModal";
 import { DEFAULT_QR_THEME } from "@/lib/qrThemes";
 import { formatDateDMY } from "@/lib/date";
-
-const navItems = [
-  { icon: LayoutGrid, label: "Dashboard", href: "/dashboard" },
-  { icon: FileText, label: "My Services", href: "/dashboard/services" },
-  { icon: Bell, label: "Scheduled Services", href: "/dashboard/scheduled" },
-  { icon: Box, label: "Assets", href: "/dashboard/assets" },
-  { icon: QrCode, label: "QR Codes", href: "/dashboard/qr-codes" },
-  { icon: Users, label: "Customers", href: "/dashboard/customers" },
-  { icon: BarChart3, label: "Reports", href: "/dashboard/reports" },
-  { icon: CalendarIcon, label: "Calendar", href: "/dashboard/calendar" },
-  { icon: Mail, label: "Messages", href: "/dashboard/messages" },
-  { icon: MessageCircle, label: "Team Chat", href: "/dashboard/team-chat" },
-  { icon: FolderOpen, label: "Document Library", href: "/dashboard/documents" },
-  { icon: Settings, label: "Settings", href: "/dashboard/settings" },
-];
 
 type QrAsset = { id: string; asset_type: string; brand: string | null; model: string | null; nickname: string | null };
 type QrCodeRow = {
@@ -266,121 +246,40 @@ export default function QrCodesPage() {
     );
   }
 
-  const initials = mechanicName.split(" ").filter(Boolean).map((p) => p[0]).join("").slice(0, 2).toUpperCase() || "ME";
   const printRows = printCodes ? codes.filter((c) => printCodes.includes(c.code)) : [];
 
   return (
     <div className="min-h-screen bg-zinc-50 flex relative">
 
-      {sidebarOpen && (
-        <div className="md:hidden fixed inset-0 bg-black/40 z-30" onClick={() => setSidebarOpen(false)} />
-      )}
-
-      {/* ════ SIDEBAR ════ */}
-      <aside className={`no-print fixed md:static inset-y-0 left-0 z-40 w-[230px] bg-white border-r border-zinc-200 flex flex-col shrink-0 transform transition-transform duration-200 md:translate-x-0 ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}`}>
-        <div className="flex items-center justify-between px-4 py-2">
-          <Link href="/" className="flex items-center">
-            <Image src="/images/maintly-logo-full.png" alt="MaintlyQR" width={244} height={72} priority style={{ objectFit: "contain" }} />
-          </Link>
-          <button onClick={() => setSidebarOpen(false)} className="md:hidden text-zinc-400 hover:text-zinc-700 mr-2">
-            <X size={20} />
-          </button>
-        </div>
-
-        <nav className="flex-1 px-3 overflow-y-auto">
-          {navItems.map((item) => (
-            <Link
-              key={item.label}
-              href={item.href}
-              onClick={() => setSidebarOpen(false)}
-              className={`flex items-center gap-3 px-3 py-[9px] rounded-lg mb-1 text-[13px] font-medium transition-colors ${
-                item.label === "QR Codes"
-                  ? "bg-red-50 text-red-600 border-l-[3px] border-red-600 -ml-[1px]"
-                  : "text-zinc-600 hover:bg-zinc-50"
-              }`}
-            >
-              <item.icon size={16} />
-              {item.label}
-              {item.label === "Messages" && unreadMessages > 0 && (
-                <span className="ml-auto bg-red-600 text-white text-[9px] font-bold rounded-full min-w-[16px] h-4 flex items-center justify-center px-1">{unreadMessages}</span>
-              )}
-              {item.label === "Team Chat" && unreadMechanicMessages > 0 && (
-                <span className="ml-auto bg-red-600 text-white text-[9px] font-bold rounded-full min-w-[16px] h-4 flex items-center justify-center px-1">{unreadMechanicMessages}</span>
-              )}
-            </Link>
-          ))}
-        </nav>
-
-        <ContactSupportWidget mechanicId={mechanicId} />
-
-        <div className="mx-3 mb-3 p-4 rounded-xl bg-gradient-to-br from-zinc-50 to-zinc-100 border border-zinc-200">
-          <div className="flex items-center gap-1.5 text-amber-500 mb-1">
-            <Crown size={14} />
-            <span className="text-[12px] font-bold text-zinc-800">Go Premium</span>
-          </div>
-          <p className="text-[10px] text-zinc-500 leading-relaxed mb-3">Unlock advanced reports, custom branding and more.</p>
-          <button className="w-full bg-zinc-900 hover:bg-zinc-800 text-white text-[11px] font-bold py-2 rounded-lg transition-colors">Upgrade Now</button>
-        </div>
-
-        <div className="flex items-center gap-2.5 px-4 py-3 border-t border-zinc-200">
-          <Link href="/dashboard/settings" className="shrink-0">
-            {mechanicPhoto ? (
-              <HoverAvatar src={mechanicPhoto} size={32} />
-            ) : (
-              <div className="w-8 h-8 rounded-full bg-red-100 flex items-center justify-center text-red-600 font-bold text-[12px]">{initials}</div>
-            )}
-          </Link>
-          <div className="flex-1 min-w-0">
-            <p className="text-[12px] font-bold text-zinc-800 leading-tight truncate">{mechanicName || mechanicEmail}</p>
-            <p className="text-[10px] text-zinc-400 leading-tight">Maintly Maintler</p>
-          </div>
-        </div>
-      </aside>
+      <DashboardSidebar
+        activeLabel="QR Codes"
+        sidebarOpen={sidebarOpen}
+        onCloseSidebar={() => setSidebarOpen(false)}
+        mechanicId={mechanicId}
+        unreadMessages={unreadMessages}
+        unreadMechanicMessages={unreadMechanicMessages}
+        photoUrl={mechanicPhoto}
+        name={mechanicName}
+        email={mechanicEmail}
+        className="no-print"
+      />
 
       {/* ════ MAIN ════ */}
       <div className="flex-1 flex flex-col min-w-0">
-
-        <header className="no-print flex items-center justify-between gap-3 px-4 md:px-7 py-4 bg-white border-b border-zinc-200">
-          <div className="flex items-center gap-3 min-w-0">
-            <button onClick={() => setSidebarOpen(true)} className="md:hidden shrink-0 text-zinc-600 hover:text-zinc-900">
-              <Menu size={22} />
-            </button>
-            <div className="min-w-0">
-              <h1 className="text-[17px] md:text-[20px] font-black text-zinc-900 truncate">QR Codes</h1>
-              <p className="hidden sm:block text-[12px] text-zinc-400 truncate">Generate blank codes to print, personalize their look, and track every scan.</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2 md:gap-4 shrink-0">
-            <NotificationBell mechanicId={mechanicId} unreadMessagesCount={unreadMessages} unreadMechanicCount={unreadMechanicMessages} />
-            <div className="flex items-center gap-3 md:pl-3 md:border-l border-zinc-200">
-              {/* Links to this Maintler's own public card (/maintler/<code>)
-                  instead of Settings — Facu's own ask: Settings is already
-                  one click away via the sidebar nav, so this top-right
-                  identity spot is freed up to jump straight to "how the
-                  world sees me" instead of duplicating that sidebar link.
-                  Falls back to Settings if maintlerCode hasn't loaded yet
-                  (e.g. migration 024 not run yet on this database). */}
-              <Link href={maintlerCode ? `/maintler/${maintlerCode}` : "/dashboard/settings"} className="flex items-center gap-2.5 group">
-                {mechanicPhoto ? (
-                  <HoverAvatar src={mechanicPhoto} size={36} />
-                ) : (
-                  <div className="w-9 h-9 rounded-full bg-red-100 flex items-center justify-center text-red-600 font-bold text-[13px]">{initials}</div>
-                )}
-                <div className="hidden sm:block text-left">
-                  <p className="text-[12px] font-bold text-zinc-800 leading-tight group-hover:text-red-600 transition-colors">{mechanicName || mechanicEmail}</p>
-                  <p className="text-[10px] text-zinc-400 leading-tight">Maintler</p>
-                </div>
-              </Link>
-              <button
-                onClick={handleLogout}
-                className="flex items-center gap-1.5 text-[12px] font-semibold text-zinc-500 hover:text-red-600 hover:bg-red-50 border border-zinc-200 hover:border-red-200 px-3 py-2 rounded-xl transition-all"
-              >
-                <LogOut size={13} />
-                <span className="hidden md:inline">Log out</span>
-              </button>
-            </div>
-          </div>
-        </header>
+        <DashboardHeader
+          title="QR Codes"
+          subtitle="Generate blank codes to print, personalize their look, and track every scan."
+          onOpenSidebar={() => setSidebarOpen(true)}
+          mechanicId={mechanicId}
+          unreadMessages={unreadMessages}
+          unreadMechanicMessages={unreadMechanicMessages}
+          photoUrl={mechanicPhoto}
+          name={mechanicName}
+          email={mechanicEmail}
+          maintlerCode={maintlerCode}
+          onLogout={handleLogout}
+          className="no-print"
+        />
 
         <div className="no-print flex-1 overflow-y-auto p-4 md:p-7">
 

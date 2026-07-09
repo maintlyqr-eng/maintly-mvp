@@ -16,6 +16,9 @@ import HoverAvatar from "@/components/HoverAvatar";
 import ContactSupportWidget from "@/components/ContactSupportWidget";
 import { useUnreadMessagesCount } from "@/lib/useUnreadMessages";
 import { formatDateDMY } from "@/lib/date";
+import DashboardSidebar from "@/components/DashboardSidebar";
+import DashboardHeader from "@/components/DashboardHeader";
+import { getInitials } from "@/lib/initials";
 
 // Mechanic-to-mechanic direct messaging — a second, independent inbox from
 // the customer-facing "Messages" page. Mirrors ContactSupportWidget.tsx's
@@ -36,21 +39,6 @@ import { formatDateDMY } from "@/lib/date";
 // don't want messages from this person" is Block (enforced for real at
 // the database level, see the mechanic_messages insert policy in the same
 // migration) and Report (flows into the Admin Control Center).
-
-const navItems = [
-  { icon: LayoutGrid, label: "Dashboard", href: "/dashboard" },
-  { icon: FileText, label: "My Services", href: "/dashboard/services" },
-  { icon: Bell, label: "Scheduled Services", href: "/dashboard/scheduled" },
-  { icon: Box, label: "Assets", href: "/dashboard/assets" },
-  { icon: QrCode, label: "QR Codes", href: "/dashboard/qr-codes" },
-  { icon: Users, label: "Customers", href: "/dashboard/customers" },
-  { icon: BarChart3, label: "Reports", href: "/dashboard/reports" },
-  { icon: CalendarIcon, label: "Calendar", href: "/dashboard/calendar" },
-  { icon: Mail, label: "Messages", href: "/dashboard/messages" },
-  { icon: MessageCircle, label: "Team Chat", href: "/dashboard/team-chat" },
-  { icon: FolderOpen, label: "Document Library", href: "/dashboard/documents" },
-  { icon: Settings, label: "Settings", href: "/dashboard/settings" },
-];
 
 type MechanicInfo = {
   id: string;
@@ -731,6 +719,13 @@ function TeamChatPageInner() {
   }
 
   async function openConversation(info: MechanicInfo) {
+    // Set synchronously (not via the selectedId-driven effect above, which
+    // only commits after React re-renders) so a stale-result check further
+    // down can rely on it the instant this call starts — otherwise clicking
+    // conversation A then quickly clicking B before A's fetch resolves could
+    // still see selectedIdRef pointing at A when A's fetch lands, since the
+    // effect mirroring selectedId into this ref hadn't fired yet.
+    selectedIdRef.current = info.id;
     setSelectedInfo(info);
     setSelectedId(info.id);
     setThreadLoading(true);
@@ -749,6 +744,13 @@ function TeamChatPageInner() {
         `and(sender_id.eq.${info.id},recipient_id.eq.${mechanicId},hidden_for_recipient.eq.false)`
       )
       .order("created_at", { ascending: true });
+
+    // A newer call to openConversation() may have started (and already
+    // pointed selectedIdRef at a different conversation) while this fetch
+    // was in flight. If so, this result is stale — painting it now would
+    // show this conversation's messages under whatever conversation's
+    // header is actually on screen. Discard it and leave state alone.
+    if (selectedIdRef.current !== info.id) return;
 
     const rows = (data as MsgRow[]) ?? [];
     setThread(rows);
@@ -835,7 +837,6 @@ function TeamChatPageInner() {
     );
   }
 
-  const initials = initialsOf(mechanicName, mechanicEmail) || "ME";
   const totalUnread = conversations.reduce((sum, c) => sum + c.unread, 0);
   const selectedIsBlocked = !!(selectedId && blockedIds.has(selectedId));
 
@@ -863,137 +864,50 @@ function TeamChatPageInner() {
     // bar is fully visible immediately, no nudge needed.
     <div className="h-dvh bg-zinc-50 flex relative overflow-hidden">
 
-      {sidebarOpen && (
-        <div className="md:hidden fixed inset-0 bg-black/40 z-30" onClick={() => setSidebarOpen(false)} />
-      )}
-
-      {/* ════ SIDEBAR ════ */}
-      <aside className={`fixed md:static inset-y-0 left-0 z-40 w-[230px] bg-white border-r border-zinc-200 flex flex-col shrink-0 transform transition-transform duration-200 md:translate-x-0 ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}`}>
-        <div className="flex items-center justify-between px-4 py-2">
-          <Link href="/" className="flex items-center">
-            <Image src="/images/maintly-logo-full.png" alt="MaintlyQR" width={244} height={72} priority style={{ objectFit: "contain" }} />
-          </Link>
-          <button onClick={() => setSidebarOpen(false)} className="md:hidden text-zinc-400 hover:text-zinc-700 mr-2">
-            <X size={20} />
-          </button>
-        </div>
-
-        <nav className="flex-1 min-h-0 px-3 overflow-y-auto">
-          {navItems.map((item) => (
-            <Link
-              key={item.label}
-              href={item.href}
-              onClick={() => setSidebarOpen(false)}
-              className={`flex items-center gap-3 px-3 py-[9px] rounded-lg mb-1 text-[13px] font-medium transition-colors ${
-                item.label === "Team Chat"
-                  ? "bg-red-50 text-red-600 border-l-[3px] border-red-600 -ml-[1px]"
-                  : "text-zinc-600 hover:bg-zinc-50"
-              }`}
-            >
-              <item.icon size={16} />
-              {item.label}
-              {item.label === "Messages" && unreadMessages > 0 && (
-                <span className="ml-auto bg-red-600 text-white text-[9px] font-bold rounded-full min-w-[16px] h-4 flex items-center justify-center px-1">{unreadMessages}</span>
-              )}
-              {/* Uses totalUnread (derived from this page's own `conversations`
-                  state), not the useUnreadMechanicMessages() hook every
-                  other dashboard page uses for this badge — Facu's report:
-                  sitting inside a conversation and getting a
-                  new message from that same person still briefly flashed
-                  "1" here (and on the bell) even though the message was
-                  visibly right there on screen. The hook increments
-                  optimistically the instant the INSERT event arrives and
-                  only corrects itself once a separate follow-up UPDATE
-                  (marking the message read) round-trips back — a real gap
-                  where the count is momentarily wrong. `totalUnread` has no
-                  such gap: the realtime handler that builds `conversations`
-                  already knows synchronously, in the same event, whether
-                  the message's thread is the one currently open, and never
-                  counts it as unread in the first place. Only this page has
-                  that context, so this substitution is local to Team Chat —
-                  the other 11 pages keep using the hook, which is correct
-                  there (no open conversation to exclude). */}
-              {item.label === "Team Chat" && totalUnread > 0 && (
-                <span className="ml-auto bg-red-600 text-white text-[9px] font-bold rounded-full min-w-[16px] h-4 flex items-center justify-center px-1">{totalUnread}</span>
-              )}
-            </Link>
-          ))}
-        </nav>
-
-        <ContactSupportWidget mechanicId={mechanicId} />
-
-        <div className="mx-3 mb-3 p-4 rounded-xl bg-gradient-to-br from-zinc-50 to-zinc-100 border border-zinc-200">
-          <div className="flex items-center gap-1.5 text-amber-500 mb-1">
-            <Crown size={14} />
-            <span className="text-[12px] font-bold text-zinc-800">Go Premium</span>
-          </div>
-          <p className="text-[10px] text-zinc-500 leading-relaxed mb-3">Unlock advanced reports, custom branding and more.</p>
-          <button className="w-full bg-zinc-900 hover:bg-zinc-800 text-white text-[11px] font-bold py-2 rounded-lg transition-colors">Upgrade Now</button>
-        </div>
-
-        <div className="flex items-center gap-2.5 px-4 py-3 border-t border-zinc-200">
-          <Link href="/dashboard/settings" className="shrink-0">
-            {mechanicPhoto ? (
-              <HoverAvatar src={mechanicPhoto} size={32} />
-            ) : (
-              <div className="w-8 h-8 rounded-full bg-red-100 flex items-center justify-center text-red-600 font-bold text-[12px]">{initials}</div>
-            )}
-          </Link>
-          <div className="flex-1 min-w-0">
-            <p className="text-[12px] font-bold text-zinc-800 leading-tight truncate">{mechanicName || mechanicEmail}</p>
-            <p className="text-[10px] text-zinc-400 leading-tight">Maintly Maintler</p>
-          </div>
-        </div>
-      </aside>
+      {/* unreadMechanicMessages={totalUnread}, not the useUnreadMechanicMessages()
+          hook every other dashboard page passes here — Facu's report: sitting
+          inside a conversation and getting a new message from that same person
+          still briefly flashed "1" on this badge (and on the header's bell)
+          even though the message was visibly right there on screen. The hook
+          increments optimistically the instant the INSERT event arrives and
+          only corrects itself once a separate follow-up UPDATE (marking the
+          message read) round-trips back — a real gap where the count is
+          momentarily wrong. `totalUnread` (derived from this page's own
+          `conversations` state, declared above) has no such gap: the realtime
+          handler that builds `conversations` already knows synchronously, in
+          the same event, whether the message's thread is the one currently
+          open, and never counts it as unread in the first place. Only this
+          page has that context, so this substitution is local to Team Chat —
+          the other 11 pages keep using the hook, which is correct there (no
+          open conversation to exclude). */}
+      <DashboardSidebar
+        activeLabel="Team Chat"
+        sidebarOpen={sidebarOpen}
+        onCloseSidebar={() => setSidebarOpen(false)}
+        mechanicId={mechanicId}
+        unreadMessages={unreadMessages}
+        unreadMechanicMessages={totalUnread}
+        photoUrl={mechanicPhoto}
+        name={mechanicName}
+        email={mechanicEmail}
+      />
 
       {/* ════ MAIN ════ */}
       <div className="flex-1 flex flex-col min-w-0 min-h-0">
 
-        <header className="flex items-center justify-between gap-3 px-4 md:px-7 py-4 bg-white border-b border-zinc-200">
-          <div className="flex items-center gap-3 min-w-0">
-            <button onClick={() => setSidebarOpen(true)} className="md:hidden shrink-0 text-zinc-600 hover:text-zinc-900">
-              <Menu size={22} />
-            </button>
-            <div className="min-w-0">
-              <h1 className="text-[17px] md:text-[20px] font-black text-zinc-900 truncate">Team Chat</h1>
-              <p className="hidden sm:block text-[12px] text-zinc-400 truncate">Message other Maintlers on MaintlyQR directly.</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2 md:gap-4 shrink-0">
-            {/* unreadMechanicCount uses totalUnread here too, same reasoning
-                as the sidebar badge above — avoids the bell flashing "1"
-                for a message that just arrived in the conversation you're
-                already looking at. */}
-            <NotificationBell mechanicId={mechanicId} unreadMessagesCount={unreadMessages} unreadMechanicCount={totalUnread} />
-            <div className="flex items-center gap-3 md:pl-3 md:border-l border-zinc-200">
-              {/* Links to this Maintler's own public card (/maintler/<code>)
-                  instead of Settings — Facu's own ask: Settings is already
-                  one click away via the sidebar nav, so this top-right
-                  identity spot is freed up to jump straight to "how the
-                  world sees me" instead of duplicating that sidebar link.
-                  Falls back to Settings if maintlerCode hasn't loaded yet
-                  (e.g. migration 024 not run yet on this database). */}
-              <Link href={maintlerCode ? `/maintler/${maintlerCode}` : "/dashboard/settings"} className="flex items-center gap-2.5 group">
-                {mechanicPhoto ? (
-                  <HoverAvatar src={mechanicPhoto} size={36} />
-                ) : (
-                  <div className="w-9 h-9 rounded-full bg-red-100 flex items-center justify-center text-red-600 font-bold text-[13px]">{initials}</div>
-                )}
-                <div className="hidden sm:block text-left">
-                  <p className="text-[12px] font-bold text-zinc-800 leading-tight group-hover:text-red-600 transition-colors">{mechanicName || mechanicEmail}</p>
-                  <p className="text-[10px] text-zinc-400 leading-tight">Maintler</p>
-                </div>
-              </Link>
-              <button
-                onClick={handleLogout}
-                className="flex items-center gap-1.5 text-[12px] font-semibold text-zinc-500 hover:text-red-600 hover:bg-red-50 border border-zinc-200 hover:border-red-200 px-3 py-2 rounded-xl transition-all"
-              >
-                <LogOut size={13} />
-                <span className="hidden md:inline">Log out</span>
-              </button>
-            </div>
-          </div>
-        </header>
+        <DashboardHeader
+          title="Team Chat"
+          subtitle="Message other Maintlers on MaintlyQR directly."
+          onOpenSidebar={() => setSidebarOpen(true)}
+          mechanicId={mechanicId}
+          unreadMessages={unreadMessages}
+          unreadMechanicMessages={totalUnread}
+          photoUrl={mechanicPhoto}
+          name={mechanicName}
+          email={mechanicEmail}
+          maintlerCode={maintlerCode}
+          onLogout={handleLogout}
+        />
 
         <div className="flex-1 flex min-h-0 p-4 md:p-7 gap-4">
 

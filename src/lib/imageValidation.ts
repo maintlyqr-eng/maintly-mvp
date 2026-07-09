@@ -9,6 +9,9 @@ export function validateImageFile(file: File): string | null {
   if (!file.type.startsWith("image/")) {
     return "Please choose an image file (JPG, PNG, WEBP...).";
   }
+  if (file.type === "image/svg+xml") {
+    return "SVG files aren't supported. Please choose a JPG, PNG, or WEBP image.";
+  }
   if (file.size > MAX_PHOTO_BYTES) {
     return `Image is too large (${(file.size / (1024 * 1024)).toFixed(1)}MB). Max size is 8MB.`;
   }
