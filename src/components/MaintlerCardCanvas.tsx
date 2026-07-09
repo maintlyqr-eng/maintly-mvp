@@ -1,6 +1,7 @@
 "use client";
 
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
+import type { KeyboardEvent } from "react";
 import { X, Download, Share2, Printer } from "lucide-react";
 import QrCodeCanvas, { type QrCodeCanvasHandle } from "@/components/QrCodeCanvas";
 import { DEFAULT_QR_THEME } from "@/lib/qrThemes";
@@ -191,6 +192,15 @@ type Props = {
   contactPhone?: string | null;
   websiteUrl?: string | null;
   previewWidth?: number;
+  // Round 8 (Facu: "no me gustan tantos botones... que la tarjeta sea un
+  // boton, si uno toca la tarjeta deberia mostrar la tarjeta de ambos lados
+  // y ahi dar la posibilidad de imprimirla") — when true, the live preview
+  // itself becomes the entry point into the view modal, instead of Settings
+  // needing a separate "View" button calling the imperative handle. Default
+  // false so the /maintler/[code] self-view banner (a small 110px preview
+  // in a very different layout context) is completely unaffected unless a
+  // caller opts in.
+  clickToView?: boolean;
 };
 
 const EMPTY_STATS: MaintlerStats = { services_count: 0, assets_count: 0, customers_count: 0, repeat_customers_count: 0 };
@@ -200,6 +210,7 @@ const MaintlerCardCanvas = forwardRef<MaintlerCardCanvasHandle, Props>(function 
     code, name, workshopName, photoUrl, verified, profession, location, createdAt,
     stats, documentsCount = 0, specialties = [], contactEmail, contactPhone, websiteUrl,
     previewWidth = 320,
+    clickToView = false,
   },
   ref
 ) {
@@ -817,7 +828,18 @@ const MaintlerCardCanvas = forwardRef<MaintlerCardCanvasHandle, Props>(function 
     <>
       <div
         style={{ width: "100%", maxWidth: previewWidth, aspectRatio: `${CARD_W} / ${CARD_H}` }}
-        className="shrink-0 rounded-2xl overflow-hidden shadow-sm border border-zinc-200"
+        className={`shrink-0 rounded-2xl overflow-hidden shadow-sm border border-zinc-200 ${clickToView ? "cursor-pointer hover:border-red-300 hover:shadow-md transition-all" : ""}`}
+        {...(clickToView
+          ? {
+              onClick: () => setViewOpen(true),
+              role: "button" as const,
+              tabIndex: 0,
+              "aria-label": "View both sides of your Maintler card",
+              onKeyDown: (e: KeyboardEvent<HTMLDivElement>) => {
+                if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setViewOpen(true); }
+              },
+            }
+          : {})}
       >
         <canvas ref={previewCanvasRef} style={{ width: "100%", height: "100%", display: "block" }} />
         {/* Off-screen — only exist to produce composited QR PNGs via
@@ -828,6 +850,11 @@ const MaintlerCardCanvas = forwardRef<MaintlerCardCanvasHandle, Props>(function 
           <QrCodeCanvas ref={qrBackHandleRef} code={code} theme="classic" linkPath="maintler" size={220} />
         </div>
       </div>
+      {clickToView && (
+        <p className="text-center text-[11px] text-zinc-400 mt-2">
+          Tap the card to view both sides &amp; print
+        </p>
+      )}
 
       {viewOpen && (
         <div className="fixed inset-0 z-[100] bg-zinc-900/70 flex items-center justify-center p-4" onClick={() => setViewOpen(false)}>

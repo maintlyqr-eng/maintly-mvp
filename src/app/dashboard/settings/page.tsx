@@ -9,8 +9,7 @@ import {
   Mail, FolderOpen, Settings as SettingsIcon, Bell, X, LogOut, Crown, Menu,
   ShieldCheck, CalendarDays, KeyRound, AlertCircle, CheckCircle2, Camera,
   Image as ImageIcon,
-  MessageCircle, Download, Copy, Check, Share2, Printer, Phone, Globe, MapPin,
-  Eye, CreditCard,
+  MessageCircle, Copy, Check, Printer, Phone, Globe, MapPin,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import NotificationBell from "@/components/NotificationBell";
@@ -197,38 +196,18 @@ export default function SettingsPage() {
     }
   }
 
-  function handleDownloadCard() {
-    if (!maintlerCode) return;
-    cardCanvasRef.current?.download(`maintlyqr-${workshopName || name || "maintler-card"}`);
-  }
-
-  function handleShareCard() {
-    if (!maintlerCode) return;
-    cardCanvasRef.current?.share(`maintlyqr-${workshopName || name || "maintler-card"}`);
-  }
-
   function handlePrintCard() {
-    // Print now opens the real public profile (stats, badges, specialties,
+    // Print opens the real public profile (stats, badges, specialties,
     // contact — not just the small photo+QR ID card) and auto-triggers the
     // browser's print dialog there via ?print=1. Facu: "cuando toco print
     // me muestra esto pero no tiene datos de nada" — the small ID card
     // alone read as empty compared to what he expected Print to produce.
+    // This is intentionally the ONLY standalone button left in this panel
+    // (round 8, "no me gustan tantos botones") — every physical-card action
+    // (download/share/print the card itself) now lives behind tapping the
+    // card, which opens MaintlerCardCanvas's own view modal.
     if (!maintlerCode) return;
     window.open(`/maintler/${maintlerCode}?print=1`, "_blank");
-  }
-
-  // Round 7 — the new credit-card-style physical card gets its OWN print
-  // action, separate from "Print" above (which still prints the full
-  // report page). Facu's own call: keep both, add a dedicated button
-  // rather than repurpose the existing one.
-  function handlePrintPhysicalCard() {
-    if (!maintlerCode) return;
-    cardCanvasRef.current?.printCard();
-  }
-
-  function handleViewCard() {
-    if (!maintlerCode) return;
-    cardCanvasRef.current?.view();
   }
 
   function handleFileSelected(e: React.ChangeEvent<HTMLInputElement>) {
@@ -504,6 +483,7 @@ export default function SettingsPage() {
                     contactPhone={contactPhone || null}
                     websiteUrl={isSafeHref(websiteUrl) ? websiteUrl : null}
                     previewWidth={420}
+                    clickToView
                   />
                 </div>
                 <div className="mt-4 lg:mt-0 lg:flex-1 lg:min-w-0 space-y-4 flex flex-col lg:justify-center">
@@ -516,37 +496,19 @@ export default function SettingsPage() {
                       Scan to view my <span className="text-red-600">Maintler Profile</span>
                     </Link>
                   </div>
+                  {/* Round 8 ("no me gustan tantos botones"): download, share,
+                      view, and print-the-physical-card all collapsed into a
+                      single interaction — tap the card itself, which opens
+                      MaintlerCardCanvas's own modal (both sides, plus its own
+                      Download/Print Card/Share actions). "Print" here is a
+                      genuinely separate feature (the full public report page,
+                      not this card), so it keeps its own button. */}
                   <div className="flex flex-wrap items-center gap-2">
-                    <button
-                      onClick={handleDownloadCard}
-                      className="flex items-center gap-1.5 text-[11.5px] font-bold text-white bg-zinc-900 hover:bg-zinc-800 px-3.5 py-2.5 rounded-xl transition-colors"
-                    >
-                      <Download size={13} /> Download PNG
-                    </button>
-                    <button
-                      onClick={handleShareCard}
-                      className="flex items-center gap-1.5 text-[11.5px] font-bold text-zinc-600 hover:text-red-600 border border-zinc-200 hover:bg-zinc-50 px-3.5 py-2.5 rounded-xl transition-colors"
-                    >
-                      <Share2 size={13} /> Share Card
-                    </button>
                     <button
                       onClick={handlePrintCard}
                       className="flex items-center gap-1.5 text-[11.5px] font-bold text-zinc-600 hover:text-red-600 border border-zinc-200 hover:bg-zinc-50 px-3.5 py-2.5 rounded-xl transition-colors"
                     >
                       <Printer size={13} /> Print
-                    </button>
-                    <button
-                      onClick={handleViewCard}
-                      className="flex items-center gap-1.5 text-[11.5px] font-bold text-zinc-600 hover:text-red-600 border border-zinc-200 hover:bg-zinc-50 px-3.5 py-2.5 rounded-xl transition-colors"
-                    >
-                      <Eye size={13} /> View
-                    </button>
-                    <button
-                      onClick={handlePrintPhysicalCard}
-                      className="flex items-center gap-1.5 text-[11.5px] font-bold text-zinc-600 hover:text-red-600 border border-zinc-200 hover:bg-zinc-50 px-3.5 py-2.5 rounded-xl transition-colors"
-                      title="Print the physical front/back card (separate from the full report Print above)"
-                    >
-                      <CreditCard size={13} /> Print Card
                     </button>
                   </div>
 
