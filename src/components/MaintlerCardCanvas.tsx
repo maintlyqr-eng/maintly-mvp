@@ -285,7 +285,18 @@ const MaintlerCardCanvas = forwardRef<MaintlerCardCanvasHandle, Props>(function 
     // is drawn straight from the source (it already reads fine on dark);
     // the wordmark half is recolored for a dark background (see
     // recolorWordmarkForDark above — the source file is black-on-white).
-    const brandIconSize = 46;
+    //
+    // Sizing note (round 9, Facu: "quedo todo peor... se ven mal y chico"):
+    // this canvas is CARD_W×CARD_H=1050×660 for print/download quality, but
+    // on screen it's always displayed shrunk to ~40-50% of that (the
+    // Settings preview and the view-modal both cap it well under 1050px
+    // wide) — sizes tuned to look right at full canvas resolution read as
+    // illegible mush once scaled down for actual on-screen viewing. Every
+    // font/icon size on both faces was bumped up from this round on with
+    // that real display scale in mind, verified by rendering the canvas
+    // AND then shrinking it in the browser the same way the app does (see
+    // /tmp/card_test/*_scaled.html) rather than just eyeballing it at 1:1.
+    const brandIconSize = 66;
     const brandX = 40, brandY = 30;
     ctx.textAlign = "left";
     try {
@@ -295,18 +306,18 @@ const MaintlerCardCanvas = forwardRef<MaintlerCardCanvasHandle, Props>(function 
       ctx.drawImage(logo, 0, 0, iconSrcW, logo.height, brandX, brandY, brandIconSize, brandIconSize);
       const wmSrcX = 490, wmSrcW = logo.width - wmSrcX;
       const wordmark = recolorWordmarkForDark(logo, wmSrcX, wmSrcW);
-      const wmH = 40;
+      const wmH = 56;
       const wmW = wmH * (wordmark.width / wordmark.height);
-      ctx.drawImage(wordmark, brandX + brandIconSize + 12, brandY + brandIconSize / 2 - wmH / 2, wmW, wmH);
+      ctx.drawImage(wordmark, brandX + brandIconSize + 14, brandY + brandIconSize / 2 - wmH / 2, wmW, wmH);
     } catch {
       // Logo failed to load — fall back to plain text so the card still
       // identifies itself.
-      ctx.font = "bold 22px Arial, sans-serif";
+      ctx.font = "bold 30px Arial, sans-serif";
       ctx.fillStyle = "#e4e4e7";
-      ctx.fillText("MAINTLYQR", brandX + brandIconSize + 12, brandY + brandIconSize / 2 - 2);
-      ctx.font = "bold 9px Arial, sans-serif";
+      ctx.fillText("MAINTLYQR", brandX + brandIconSize + 14, brandY + brandIconSize / 2 - 2);
+      ctx.font = "bold 12px Arial, sans-serif";
       ctx.fillStyle = "#71717a";
-      ctx.fillText("MAINTENANCE  ·  TRACKED", brandX + brandIconSize + 12, brandY + brandIconSize / 2 + 13);
+      ctx.fillText("MAINTENANCE  ·  TRACKED", brandX + brandIconSize + 14, brandY + brandIconSize / 2 + 17);
     }
 
     // Photo + identity block. contentH stops where the artwork's left-side
@@ -316,7 +327,7 @@ const MaintlerCardCanvas = forwardRef<MaintlerCardCanvasHandle, Props>(function 
     const bandTop = brandY + brandIconSize + 26;
     const bandCy = bandTop + (contentH - bandTop) / 2;
 
-    const photoSize = 168;
+    const photoSize = 200;
     const photoCx = 40 + photoSize / 2;
     const photoCy = bandCy;
     let photoDrawn = false;
@@ -358,8 +369,8 @@ const MaintlerCardCanvas = forwardRef<MaintlerCardCanvasHandle, Props>(function 
     ctx.strokeStyle = "#dc2626";
     ctx.stroke();
 
-    const textX = photoCx + photoSize / 2 + 32;
-    const textMaxWidth = 380; // clear of the circular gear watermark on the right
+    const textX = photoCx + photoSize / 2 + 36;
+    const textMaxWidth = 340; // clear of the circular gear watermark on the right
 
     // Two-pass layout: work out how tall this text column will be (it
     // varies — not every Maintler has a workshop/profession/location set),
@@ -367,60 +378,60 @@ const MaintlerCardCanvas = forwardRef<MaintlerCardCanvasHandle, Props>(function 
     // (bandCy) — same fix from the previous round, carried over.
     const showWorkshop = !!(workshopName && workshopName !== name);
     let textSpan = 0;
-    if (showWorkshop) textSpan += 26;
-    if (verified) textSpan += 34;
-    if (profession) textSpan += 30;
-    if (location) textSpan += 24;
-    if (createdAt) textSpan += 24;
-    const topPad = 22;
-    const bottomPad = 8;
+    if (showWorkshop) textSpan += 32;
+    if (verified) textSpan += 40;
+    if (profession) textSpan += 36;
+    if (location) textSpan += 30;
+    if (createdAt) textSpan += 30;
+    const topPad = 26;
+    const bottomPad = 10;
     const blockH = textSpan + topPad + bottomPad;
     let y = bandCy - blockH / 2 + topPad;
 
-    ctx.font = "bold 30px Arial, sans-serif";
+    ctx.font = "bold 36px Arial, sans-serif";
     ctx.fillStyle = "#ffffff";
     ctx.fillText(truncateToWidth(ctx, name, textMaxWidth), textX, y);
 
     if (showWorkshop) {
-      y += 26;
-      ctx.font = "18px Arial, sans-serif";
+      y += 32;
+      ctx.font = "22px Arial, sans-serif";
       ctx.fillStyle = "#a1a1aa";
       ctx.fillText(truncateToWidth(ctx, workshopName!, textMaxWidth), textX, y);
     }
 
     if (verified) {
-      y += 34;
+      y += 40;
       const label = "✓ VERIFIED MAINTLER";
-      ctx.font = "bold 13px Arial, sans-serif";
+      ctx.font = "bold 16px Arial, sans-serif";
       const textWidth = ctx.measureText(label).width;
-      const pillH = 27, padX = 12;
+      const pillH = 32, padX = 14;
       const pillW = textWidth + padX * 2;
-      roundRect(ctx, textX, y - pillH + 7, pillW, pillH, pillH / 2);
+      roundRect(ctx, textX, y - pillH + 8, pillW, pillH, pillH / 2);
       ctx.fillStyle = "rgba(16,185,129,0.16)";
       ctx.fill();
       ctx.fillStyle = "#34d399";
       ctx.textBaseline = "middle";
-      ctx.fillText(label, textX + padX, y - pillH / 2 + 7 + 1);
+      ctx.fillText(label, textX + padX, y - pillH / 2 + 8 + 1);
       ctx.textBaseline = "alphabetic";
     }
 
     if (profession) {
-      y += 30;
-      ctx.font = "15px Arial, sans-serif";
+      y += 36;
+      ctx.font = "19px Arial, sans-serif";
       ctx.fillStyle = "#d4d4d8";
-      ctx.fillText(`🔧 ${truncateToWidth(ctx, profession, textMaxWidth - 22)}`, textX, y);
+      ctx.fillText(`🔧 ${truncateToWidth(ctx, profession, textMaxWidth - 26)}`, textX, y);
     }
 
     if (location) {
-      y += 24;
-      ctx.font = "15px Arial, sans-serif";
+      y += 30;
+      ctx.font = "19px Arial, sans-serif";
       ctx.fillStyle = "#a1a1aa";
-      ctx.fillText(`📍 ${truncateToWidth(ctx, location, textMaxWidth - 22)}`, textX, y);
+      ctx.fillText(`📍 ${truncateToWidth(ctx, location, textMaxWidth - 26)}`, textX, y);
     }
 
     if (createdAt) {
-      y += 24;
-      ctx.font = "14px Arial, sans-serif";
+      y += 30;
+      ctx.font = "17px Arial, sans-serif";
       ctx.fillStyle = "#71717a";
       const memberSince = new Date(createdAt).toLocaleDateString("en-US", { day: "2-digit", month: "2-digit", year: "numeric" });
       ctx.fillText(`📅 Member since ${memberSince}`, textX, y);
@@ -428,7 +439,7 @@ const MaintlerCardCanvas = forwardRef<MaintlerCardCanvasHandle, Props>(function 
 
     // QR, centered inside the artwork's circular gear watermark on the
     // right (measured off frontcard1.png — see /tmp/card_test/).
-    const qrOuter = 160;
+    const qrOuter = 180;
     const qrCx = 786, qrCy = 258;
     let qrBlob: Blob | null = null;
     try {
@@ -453,20 +464,20 @@ const MaintlerCardCanvas = forwardRef<MaintlerCardCanvasHandle, Props>(function 
     // template's bottom edge that's actually red — it stops at roughly
     // 57% of the card's width, unlike frontcard.png's full-width banner).
     ctx.textAlign = "left";
-    ctx.fillStyle = "rgba(255,255,255,0.75)";
-    ctx.font = "10px Arial, sans-serif";
-    ctx.fillText("MAINTLER ID", 40, 552);
+    ctx.fillStyle = "rgba(255,255,255,0.8)";
+    ctx.font = "bold 13px Arial, sans-serif";
+    ctx.fillText("MAINTLER ID", 40, 555);
     ctx.fillStyle = "#ffffff";
-    ctx.font = "bold 20px Arial, sans-serif";
-    ctx.fillText(code.slice(0, 8).toUpperCase(), 40, 578);
+    ctx.font = "bold 26px Arial, sans-serif";
+    ctx.fillText(code.slice(0, 8).toUpperCase(), 40, 585);
 
     // "Scan to view" + signal glyph sit on the plain card-black area to the
     // right of the red bar (this template has no red there to match).
     ctx.textAlign = "right";
     ctx.fillStyle = "#e4e4e7";
-    ctx.font = "bold 12px Arial, sans-serif";
-    ctx.fillText("SCAN TO VIEW MY PROFILE", W - 70, 568);
-    drawSignalGlyph(ctx, W - 40, 561, 20);
+    ctx.font = "bold 15px Arial, sans-serif";
+    ctx.fillText("SCAN TO VIEW MY PROFILE", W - 80, 572);
+    drawSignalGlyph(ctx, W - 42, 563, 26);
     ctx.textAlign = "left";
   }
 
@@ -497,19 +508,26 @@ const MaintlerCardCanvas = forwardRef<MaintlerCardCanvasHandle, Props>(function 
       ctx.fillRect(0, 0, W, H);
     }
 
+    // Sizing note (round 9, Facu: "quedo todo peor... se ven mal y chico"):
+    // same reason as the front — this canvas is always shown shrunk to
+    // ~40-50% on screen, so every font/icon size below was bumped up from
+    // this round on and re-verified by rendering the canvas AND then
+    // shrinking it in the browser the same way the app does (see
+    // /tmp/card_test/*_scaled.html), not just checked at full 1050px
+    // resolution.
     const pad = 36;
     const colLeftX = pad, colLeftW = 430;
-    const colMidX = colLeftX + colLeftW + 26, colMidW = 200;
+    const colMidX = colLeftX + colLeftW + 26, colMidW = 220;
     const colRightX = colMidX + colMidW + 26, colRightW = W - pad - colRightX;
 
     ctx.textAlign = "left";
 
     // ── ABOUT ME (left column, top) ──
-    let leftY = 50;
-    ctx.font = "bold 12px Arial, sans-serif";
+    let leftY = 54;
+    ctx.font = "bold 15px Arial, sans-serif";
     ctx.fillStyle = "#dc2626";
     ctx.fillText("ABOUT ME", colLeftX, leftY);
-    leftY += 20;
+    leftY += 26;
 
     const topSpecialty = activeSpecialties[0] ? assetTypeLabel(activeSpecialties[0].asset_type) : null;
     const aboutParts: string[] = [];
@@ -519,32 +537,32 @@ const MaintlerCardCanvas = forwardRef<MaintlerCardCanvasHandle, Props>(function 
         : `Active Maintler on MaintlyQR${years > 0 ? ` for ${years} year${years === 1 ? "" : "s"}` : ""}.`
     );
     if (topSpecialty) aboutParts.push(`Specialized in ${topSpecialty.toLowerCase()} maintenance.`);
-    ctx.font = "14px Arial, sans-serif";
+    ctx.font = "17px Arial, sans-serif";
     ctx.fillStyle = "#d4d4d8";
     const aboutLines = wrapText(ctx, aboutParts.join(" "), colLeftW, 3);
     for (const line of aboutLines) {
       ctx.fillText(line, colLeftX, leftY);
-      leftY += 20;
+      leftY += 24;
     }
-    leftY += 18;
+    leftY += 20;
 
     // ── SPECIALTIES (left column, below About) — only real, logged
     // categories; hidden entirely if none yet, same call already made on
     // the public card for a brand-new Maintler with zero services. ──
     if (activeSpecialties.length > 0) {
-      ctx.font = "bold 12px Arial, sans-serif";
+      ctx.font = "bold 15px Arial, sans-serif";
       ctx.fillStyle = "#dc2626";
       ctx.fillText("SPECIALTIES", colLeftX, leftY);
-      leftY += 22;
+      leftY += 26;
 
-      const iconSize = 30;
+      const iconSize = 38;
       const perRow = 3;
       const cellW = colLeftW / perRow;
       const shown = activeSpecialties.slice(0, 6);
       for (let i = 0; i < shown.length; i++) {
         const row = Math.floor(i / perRow), col = i % perRow;
         const cx = colLeftX + col * cellW + iconSize / 2;
-        const cy = leftY + row * 58 + iconSize / 2;
+        const cy = leftY + row * 70 + iconSize / 2;
         const imgSrc = assetTypeImg[shown[i].asset_type];
         if (imgSrc) {
           try {
@@ -555,23 +573,23 @@ const MaintlerCardCanvas = forwardRef<MaintlerCardCanvasHandle, Props>(function 
             // Icon failed to load — the label below still identifies it.
           }
         }
-        ctx.font = "10px Arial, sans-serif";
+        ctx.font = "13px Arial, sans-serif";
         ctx.fillStyle = "#a1a1aa";
         ctx.textAlign = "center";
         const label = truncateToWidth(ctx, assetTypeLabel(shown[i].asset_type), cellW - 6);
-        ctx.fillText(label, cx, cy + iconSize / 2 + 14);
+        ctx.fillText(label, cx, cy + iconSize / 2 + 18);
         ctx.textAlign = "left";
       }
-      leftY += Math.ceil(shown.length / perRow) * 58 + 4;
+      leftY += Math.ceil(shown.length / perRow) * 70 + 4;
     }
 
     // ── STATS (middle column) — real numbers only, same figures Settings'
     // own "Maintly Stats" panel and the public card show. ──
-    let midY = 50;
-    ctx.font = "bold 12px Arial, sans-serif";
+    let midY = 54;
+    ctx.font = "bold 15px Arial, sans-serif";
     ctx.fillStyle = "#dc2626";
     ctx.fillText("STATS", colMidX, midY);
-    midY += 26;
+    midY += 32;
 
     const statRows: [string, number][] = [
       ["Services Logged", effStats.services_count],
@@ -581,37 +599,37 @@ const MaintlerCardCanvas = forwardRef<MaintlerCardCanvasHandle, Props>(function 
       ["Years Active", years],
     ];
     for (const [label, value] of statRows) {
-      ctx.font = "11px Arial, sans-serif";
+      ctx.font = "14px Arial, sans-serif";
       ctx.fillStyle = "#a1a1aa";
-      ctx.fillText(truncateToWidth(ctx, label, colMidW - 46), colMidX, midY);
-      ctx.font = "bold 16px Arial, sans-serif";
+      ctx.fillText(truncateToWidth(ctx, label, colMidW - 50), colMidX, midY);
+      ctx.font = "bold 20px Arial, sans-serif";
       ctx.fillStyle = "#ffffff";
       ctx.textAlign = "right";
       ctx.fillText(String(value), colMidX + colMidW, midY);
       ctx.textAlign = "left";
-      midY += 32;
+      midY += 38;
     }
 
     // ── BADGES (right column) — every label here comes straight from
     // computeBadges()'s real thresholds (see styleForBadge() above); a
     // profession badge is appended only when it's an actually-verified,
     // declared profession, not a decorative filler. ──
-    let rightY = 50;
-    ctx.font = "bold 12px Arial, sans-serif";
+    let rightY = 54;
+    ctx.font = "bold 15px Arial, sans-serif";
     ctx.fillStyle = "#dc2626";
     ctx.fillText("BADGES", colRightX, rightY);
-    rightY += 24;
+    rightY += 28;
 
     const cardBadges = [...domBadges.map((b) => ({ label: b.label, ...styleForBadge(b.label) }))];
     if (verified && profession) cardBadges.push({ label: profession, emoji: "🛠", bg: "#dc2626" });
 
     let badgesBottomY = rightY;
     if (cardBadges.length === 0) {
-      ctx.font = "11px Arial, sans-serif";
+      ctx.font = "14px Arial, sans-serif";
       ctx.fillStyle = "#71717a";
       ctx.fillText("Keep logging services", colRightX, rightY);
-      ctx.fillText("to unlock badges.", colRightX, rightY + 16);
-      badgesBottomY = rightY + 16;
+      ctx.fillText("to unlock badges.", colRightX, rightY + 20);
+      badgesBottomY = rightY + 20;
     } else {
       // Vertically center the badge grid within the same content height the
       // ABOUT ME/SPECIALTIES and STATS columns actually use (leftY/midY) —
@@ -624,8 +642,8 @@ const MaintlerCardCanvas = forwardRef<MaintlerCardCanvasHandle, Props>(function 
       const cellW = colRightW / perRow;
       const shown = cardBadges.slice(0, 6);
       const rows = Math.ceil(shown.length / perRow);
-      const rowH = 68;
-      const iconR = shown.length <= 2 ? 27 : 21;
+      const rowH = 84;
+      const iconR = shown.length <= 2 ? 34 : 27;
       const gridH = rows * rowH;
       const availableH = Math.max(leftY, midY) - rightY;
       const startOffset = Math.max(0, (availableH - gridH) / 2);
@@ -644,9 +662,9 @@ const MaintlerCardCanvas = forwardRef<MaintlerCardCanvasHandle, Props>(function 
         ctx.textBaseline = "middle";
         ctx.fillText(shown[i].emoji, cx, cy + 1);
         ctx.textBaseline = "alphabetic";
-        ctx.font = "9.5px Arial, sans-serif";
+        ctx.font = "12.5px Arial, sans-serif";
         ctx.fillStyle = "#d4d4d8";
-        ctx.fillText(truncateToWidth(ctx, shown[i].label, cellW - 4), cx, cy + iconR + 14);
+        ctx.fillText(truncateToWidth(ctx, shown[i].label, cellW - 4), cx, cy + iconR + 18);
         ctx.textAlign = "left";
       }
       badgesBottomY = gridStartY + gridH;
@@ -670,34 +688,34 @@ const MaintlerCardCanvas = forwardRef<MaintlerCardCanvasHandle, Props>(function 
     ctx.lineTo(W - pad, dividerY);
     ctx.stroke();
 
-    let contactY = dividerY + 26;
-    ctx.font = "bold 12px Arial, sans-serif";
+    let contactY = dividerY + 32;
+    ctx.font = "bold 15px Arial, sans-serif";
     ctx.fillStyle = "#dc2626";
     ctx.fillText("CONTACT", colLeftX, contactY);
-    contactY += 20;
+    contactY += 26;
 
     const contactRows: string[] = [];
     if (contactEmail) contactRows.push(`✉ ${contactEmail}`);
     if (contactPhone) contactRows.push(`📞 ${contactPhone}`);
     if (websiteUrl) contactRows.push(`🌐 ${websiteUrl.replace(/^https?:\/\//, "")}`);
     if (contactRows.length === 0) {
-      ctx.font = "11px Arial, sans-serif";
+      ctx.font = "14px Arial, sans-serif";
       ctx.fillStyle = "#71717a";
       ctx.fillText("No public contact info added yet.", colLeftX, contactY);
     } else {
-      ctx.font = "12px Arial, sans-serif";
+      ctx.font = "15px Arial, sans-serif";
       ctx.fillStyle = "#d4d4d8";
       for (const row of contactRows) {
         ctx.fillText(truncateToWidth(ctx, row, colMidX + colMidW - colLeftX - 20), colLeftX, contactY);
-        contactY += 20;
+        contactY += 25;
       }
     }
 
     // Small "share my card" QR, bottom-right of the content area.
-    const shareBoxSize = 92;
+    const shareBoxSize = 110;
     const shareCx = W - pad - shareBoxSize / 2;
-    const shareCy = dividerY + 26 + shareBoxSize / 2 - 10;
-    roundRect(ctx, shareCx - shareBoxSize / 2, shareCy - shareBoxSize / 2, shareBoxSize, shareBoxSize, 10);
+    const shareCy = dividerY + 32 + shareBoxSize / 2 - 10;
+    roundRect(ctx, shareCx - shareBoxSize / 2, shareCy - shareBoxSize / 2, shareBoxSize, shareBoxSize, 12);
     ctx.fillStyle = "#ffffff";
     ctx.fill();
     let shareBlob: Blob | null = null;
@@ -710,7 +728,7 @@ const MaintlerCardCanvas = forwardRef<MaintlerCardCanvasHandle, Props>(function 
     if (shareBlob) {
       try {
         const shareImg = await blobToImage(shareBlob);
-        const inner = shareBoxSize - 14;
+        const inner = shareBoxSize - 16;
         ctx.drawImage(shareImg, shareCx - inner / 2, shareCy - inner / 2, inner, inner);
       } catch {
         // Falls back to the blank white box — the physical card is still
@@ -718,12 +736,12 @@ const MaintlerCardCanvas = forwardRef<MaintlerCardCanvasHandle, Props>(function 
       }
     }
     ctx.textAlign = "right";
-    ctx.font = "bold 11px Arial, sans-serif";
+    ctx.font = "bold 14px Arial, sans-serif";
     ctx.fillStyle = "#e4e4e7";
-    ctx.fillText("SHARE MY CARD", W - pad, shareCy - shareBoxSize / 2 - 10);
-    ctx.font = "9.5px Arial, sans-serif";
+    ctx.fillText("SHARE MY CARD", W - pad, shareCy - shareBoxSize / 2 - 12);
+    ctx.font = "12px Arial, sans-serif";
     ctx.fillStyle = "#71717a";
-    ctx.fillText("Scan or share with anyone.", W - pad, shareCy + shareBoxSize / 2 + 16);
+    ctx.fillText("Scan or share with anyone.", W - pad, shareCy + shareBoxSize / 2 + 20);
     ctx.textAlign = "left";
 
     // Brand + Maintler ID, over the artwork's (otherwise blank) red banner
@@ -738,21 +756,21 @@ const MaintlerCardCanvas = forwardRef<MaintlerCardCanvasHandle, Props>(function 
       const logo = await loadImageEl("/images/maintly-logo-full.png");
       if (isStale()) return;
       const wordmark = recolorWordmarkForDark(logo, 490, logo.width - 490);
-      const wmH = 34;
+      const wmH = 44;
       const wmW = wmH * (wordmark.width / wordmark.height);
-      ctx.drawImage(wordmark, pad, BACK_CONTENT_H + 32, wmW, wmH);
+      ctx.drawImage(wordmark, pad, BACK_CONTENT_H + 27, wmW, wmH);
     } catch {
       ctx.fillStyle = "#ffffff";
-      ctx.font = "bold 15px Arial, sans-serif";
-      ctx.fillText("MAINTLYQR", pad, BACK_CONTENT_H + 45);
-      ctx.font = "10px Arial, sans-serif";
+      ctx.font = "bold 19px Arial, sans-serif";
+      ctx.fillText("MAINTLYQR", pad, BACK_CONTENT_H + 48);
+      ctx.font = "13px Arial, sans-serif";
       ctx.fillStyle = "rgba(255,255,255,0.75)";
-      ctx.fillText("MAINTENANCE · TRACKED", pad, BACK_CONTENT_H + 63);
+      ctx.fillText("MAINTENANCE · TRACKED", pad, BACK_CONTENT_H + 68);
     }
     ctx.textAlign = "right";
-    ctx.font = "bold 13px Arial, sans-serif";
+    ctx.font = "bold 16px Arial, sans-serif";
     ctx.fillStyle = "#ffffff";
-    ctx.fillText(`MAINTLER ID: ${code.slice(0, 8).toUpperCase()}`, W - pad, BACK_CONTENT_H + 45);
+    ctx.fillText(`MAINTLER ID: ${code.slice(0, 8).toUpperCase()}`, W - pad, BACK_CONTENT_H + 48);
     ctx.textAlign = "left";
   }
 
@@ -932,7 +950,7 @@ const MaintlerCardCanvas = forwardRef<MaintlerCardCanvasHandle, Props>(function 
 
       {viewOpen && (
         <div className="fixed inset-0 z-[100] bg-zinc-900/70 flex items-center justify-center p-4" onClick={() => setViewOpen(false)}>
-          <div className="bg-white rounded-2xl p-6 max-w-4xl w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-white rounded-2xl p-6 max-w-7xl w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-[15px] font-black text-zinc-900">My Maintler Card</h3>
               <button onClick={() => setViewOpen(false)} className="text-zinc-400 hover:text-zinc-700">

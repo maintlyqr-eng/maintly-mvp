@@ -465,7 +465,7 @@ export default function SettingsPage() {
 
             {maintlerCode ? (
               <div className="lg:flex lg:items-stretch lg:gap-6">
-                <div className="lg:w-[420px] lg:shrink-0">
+                <div className="lg:w-[520px] lg:shrink-0">
                   <MaintlerCardCanvas
                     ref={cardCanvasRef}
                     code={maintlerCode}
@@ -482,7 +482,7 @@ export default function SettingsPage() {
                     contactEmail={contactEmail || null}
                     contactPhone={contactPhone || null}
                     websiteUrl={isSafeHref(websiteUrl) ? websiteUrl : null}
-                    previewWidth={420}
+                    previewWidth={520}
                     clickToView
                   />
                 </div>
