@@ -75,38 +75,20 @@ function blobToImage(blob: Blob): Promise<HTMLImageElement> {
 // MaintlyQR que tenés para el home") — the real wordmark asset
 // (maintly-logo-full.png, the same file the landing page and dashboard
 // sidebar use) has BLACK "MAINTLY" lettering and a dark-gray subtitle,
-// because it was made for light backgrounds. Drawn as-is on this card's
-// near-black background, "MAINTLY" would be almost invisible (its RGB is
-// close to the card's own background color) — that's the actual reason a
-// hand-drawn substitute was used instead of the real file. This recolors
-// just a cropped region of the source image (the wordmark half, not the
-// metallic gear icon half, which already reads fine on dark and would be
-// damaged by naive brightness recoloring) so it's legible on a dark card:
-// solid dark lettering -> white, the mid-gray subtitle -> light gray, the
-// red "QR"/accent pixels are left untouched.
-function recolorWordmarkForDark(img: HTMLImageElement, srcX: number, srcW: number): HTMLCanvasElement {
-  const off = document.createElement("canvas");
-  off.width = srcW;
-  off.height = img.height;
-  const octx = off.getContext("2d")!;
-  octx.drawImage(img, srcX, 0, srcW, img.height, 0, 0, srcW, img.height);
-  const frame = octx.getImageData(0, 0, srcW, img.height);
-  const px = frame.data;
-  for (let i = 0; i < px.length; i += 4) {
-    const a = px[i + 3];
-    if (a === 0) continue;
-    const r = px[i], g = px[i + 1], b = px[i + 2];
-    if (r > g + 30 && r > b + 30) continue; // red "QR" lettering — leave as-is
-    const brightness = (r + g + b) / 3;
-    if (brightness < 60) {
-      px[i] = 255; px[i + 1] = 255; px[i + 2] = 255; // bold "MAINTLY" -> white
-    } else if (brightness < 170) {
-      px[i] = 195; px[i + 1] = 195; px[i + 2] = 200; // subtitle -> light gray
-    }
-  }
-  octx.putImageData(frame, 0, 0);
-  return off;
-}
+// because it was made for light backgrounds — unreadable as-is on this
+// card's near-black background. Round 10: this used to be handled by
+// algorithmically recoloring the dark wordmark pixel-by-pixel at draw time
+// (brightness thresholds -> white/gray), but that kept degrading at the
+// card's real on-screen size (Facu, twice: "se ve horrible" / "quedo
+// feo") — some combination of the recolor's hard brightness cutoffs and
+// browser downscaling that never fully reproduced in this sandbox's
+// headless renders. Facu supplied a proper light-colored wordmark PNG
+// instead (maintly-wordmark-light.png, transparent background, isolated
+// from the black-plate mockup he sent by un-premultiplying its RGB against
+// black — see /tmp/card_test/wordmark_clean.png for the extraction), so
+// this is now just loaded and drawn directly, same as the gear icon always
+// was. The gear icon half is unaffected — still cropped straight from
+// maintly-logo-full.png, it already read fine on dark.
 
 function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
   ctx.beginPath();
@@ -280,11 +262,12 @@ const MaintlerCardCanvas = forwardRef<MaintlerCardCanvasHandle, Props>(function 
     }
 
     // Brand mark, top-left, over the artwork's subtle hexagon pattern — the
-    // REAL logo asset (maintly-logo-full.png, same file the landing page
-    // and dashboard sidebar use), not hand-drawn text. The gear-icon half
-    // is drawn straight from the source (it already reads fine on dark);
-    // the wordmark half is recolored for a dark background (see
-    // recolorWordmarkForDark above — the source file is black-on-white).
+    // REAL logo assets, not hand-drawn text: the gear-icon half comes
+    // straight from maintly-logo-full.png (same file the landing page and
+    // dashboard sidebar use — it already reads fine on dark); the wordmark
+    // is maintly-wordmark-light.png, a separate light-colored asset for
+    // dark backgrounds (see the file header comment near the top for how
+    // it was extracted from what Facu supplied).
     //
     // Sizing note (round 9, Facu: "quedo todo peor... se ven mal y chico"):
     // this canvas is CARD_W×CARD_H=1050×660 for print/download quality, but
@@ -304,8 +287,8 @@ const MaintlerCardCanvas = forwardRef<MaintlerCardCanvasHandle, Props>(function 
       if (isStale()) return;
       const iconSrcW = 475; // gear-icon half of the 1619×477 source
       ctx.drawImage(logo, 0, 0, iconSrcW, logo.height, brandX, brandY, brandIconSize, brandIconSize);
-      const wmSrcX = 490, wmSrcW = logo.width - wmSrcX;
-      const wordmark = recolorWordmarkForDark(logo, wmSrcX, wmSrcW);
+      const wordmark = await loadImageEl("/images/maintly-wordmark-light.png");
+      if (isStale()) return;
       const wmH = 56;
       const wmW = wmH * (wordmark.width / wordmark.height);
       ctx.drawImage(wordmark, brandX + brandIconSize + 14, brandY + brandIconSize / 2 - wmH / 2, wmW, wmH);
@@ -437,26 +420,19 @@ const MaintlerCardCanvas = forwardRef<MaintlerCardCanvasHandle, Props>(function 
       ctx.fillText(`📅 Member since ${memberSince}`, textX, y);
     }
 
-    // QR, on its own white rounded-square badge with a red ring border —
-    // same visual language as the photo circle on the left (red accent
-    // ring), so it reads as a deliberate, matching design element instead
-    // of a bare image floating over the artwork. Previously this just sat
-    // loose on top of the background's decorative gear-ring texture with
-    // no frame of its own, which is what actually looked "wrong" (round
-    // 10, Facu: "el q esta mal es el q estas montando vos con el qr") —
-    // not the background art itself. Vertically centered on bandCy, the
-    // same value the photo uses, so the two sides balance instead of the
-    // QR sitting noticeably higher than the photo.
-    const qrOuter = 190;
-    const qrPad = 16;
-    const qrPlateSize = qrOuter + qrPad * 2;
+    // QR — the "gear-ring" theme's composited blob (QrCodeCanvas.tsx,
+    // qrThemes.ts) is already a complete, self-contained illustrated sticker
+    // (real gear-ring artwork with the code inset, transparent outside the
+    // ring), meant to sit directly on any background. Round 10, take 1
+    // wrapped this in a white rounded-square + red ring, which just boxed a
+    // circular sticker inside a visible square — that's what actually
+    // looked wrong (Facu: "no tiene q ir en rectangulo blanco... tiene q ir
+    // sin fondo"). Draw it straight onto the card, no frame of our own.
+    // Bigger than before and vertically centered on bandCy (same value the
+    // photo uses) so the two sides balance instead of the QR sitting
+    // noticeably higher than the photo.
+    const qrOuter = 230;
     const qrCx = 786, qrCy = bandCy;
-    roundRect(ctx, qrCx - qrPlateSize / 2, qrCy - qrPlateSize / 2, qrPlateSize, qrPlateSize, 20);
-    ctx.fillStyle = "#ffffff";
-    ctx.fill();
-    ctx.lineWidth = 5;
-    ctx.strokeStyle = "#dc2626";
-    ctx.stroke();
     let qrBlob: Blob | null = null;
     try {
       qrBlob = (await qrFrontHandleRef.current?.getBlob()) ?? null;
@@ -765,13 +741,12 @@ const MaintlerCardCanvas = forwardRef<MaintlerCardCanvasHandle, Props>(function 
     // the card if separated. Both sit clear of the banner's center notch
     // (native x 882–1067, scaled ~603–729): the wordmark ends well before
     // it, "MAINTLER ID" is right-aligned and starts well after it. The
-    // wordmark is the real logo asset (see recolorWordmarkForDark above),
-    // not hand-drawn text.
+    // wordmark is maintly-wordmark-light.png, the real light-colored asset
+    // (see the file header comment near the top), not hand-drawn text.
     ctx.textAlign = "left";
     try {
-      const logo = await loadImageEl("/images/maintly-logo-full.png");
+      const wordmark = await loadImageEl("/images/maintly-wordmark-light.png");
       if (isStale()) return;
-      const wordmark = recolorWordmarkForDark(logo, 490, logo.width - 490);
       const wmH = 44;
       const wmW = wmH * (wordmark.width / wordmark.height);
       ctx.drawImage(wordmark, pad, BACK_CONTENT_H + 27, wmW, wmH);
