@@ -437,10 +437,26 @@ const MaintlerCardCanvas = forwardRef<MaintlerCardCanvasHandle, Props>(function 
       ctx.fillText(`📅 Member since ${memberSince}`, textX, y);
     }
 
-    // QR, centered inside the artwork's circular gear watermark on the
-    // right (measured off frontcard1.png — see /tmp/card_test/).
-    const qrOuter = 180;
-    const qrCx = 786, qrCy = 258;
+    // QR, on its own white rounded-square badge with a red ring border —
+    // same visual language as the photo circle on the left (red accent
+    // ring), so it reads as a deliberate, matching design element instead
+    // of a bare image floating over the artwork. Previously this just sat
+    // loose on top of the background's decorative gear-ring texture with
+    // no frame of its own, which is what actually looked "wrong" (round
+    // 10, Facu: "el q esta mal es el q estas montando vos con el qr") —
+    // not the background art itself. Vertically centered on bandCy, the
+    // same value the photo uses, so the two sides balance instead of the
+    // QR sitting noticeably higher than the photo.
+    const qrOuter = 190;
+    const qrPad = 16;
+    const qrPlateSize = qrOuter + qrPad * 2;
+    const qrCx = 786, qrCy = bandCy;
+    roundRect(ctx, qrCx - qrPlateSize / 2, qrCy - qrPlateSize / 2, qrPlateSize, qrPlateSize, 20);
+    ctx.fillStyle = "#ffffff";
+    ctx.fill();
+    ctx.lineWidth = 5;
+    ctx.strokeStyle = "#dc2626";
+    ctx.stroke();
     let qrBlob: Blob | null = null;
     try {
       qrBlob = (await qrFrontHandleRef.current?.getBlob()) ?? null;
@@ -476,8 +492,8 @@ const MaintlerCardCanvas = forwardRef<MaintlerCardCanvasHandle, Props>(function 
     ctx.textAlign = "right";
     ctx.fillStyle = "#e4e4e7";
     ctx.font = "bold 15px Arial, sans-serif";
-    ctx.fillText("SCAN TO VIEW MY PROFILE", W - 80, 572);
-    drawSignalGlyph(ctx, W - 42, 563, 26);
+    ctx.fillText("SCAN TO VIEW MY PROFILE", W - 80, 590);
+    drawSignalGlyph(ctx, W - 42, 580, 26);
     ctx.textAlign = "left";
   }
 
