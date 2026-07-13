@@ -1,4 +1,20 @@
-import Link from "next/link";
+import { Link } from "@/i18n/navigation";
+import { useTranslations } from "next-intl";
+
+// Like MarketingLayout.tsx, this is only used by the 4 legal pages
+// (legal hub, terms, privacy, cookies) — all migrated together in this
+// same rollout pass, so it's safe to use next-intl directly here.
+//
+// Facu's explicit call on scope (see MAINTLYQR_FEATURE_BACKLOG.md, Item 5):
+// "Absolutamente todo, incluido Legal" — translate these on-platform HTML
+// pages fully. The linked "Download PDF" documents (the official,
+// generated Legal Package v1.1 PDFs) are a separate, much larger project
+// (10 documents, reportlab-generated) and are OUT of scope here — they
+// stay English-only regardless of locale, same PDF path in all 3
+// languages. Worth flagging to Facu explicitly: a translated on-platform
+// summary is not a substitute for professional legal review if these
+// translations are ever relied on for actual legal effect in another
+// language — same caveat given when this scope was first agreed.
 
 interface LegalLayoutProps {
   children: React.ReactNode;
@@ -9,6 +25,8 @@ interface LegalLayoutProps {
 }
 
 export default function LegalLayout({ children, title, subtitle, docNumber, effectiveDate }: LegalLayoutProps) {
+  const t = useTranslations("LegalLayout");
+
   return (
     <div className="min-h-screen bg-white text-zinc-900 flex flex-col">
 
@@ -20,10 +38,10 @@ export default function LegalLayout({ children, title, subtitle, docNumber, effe
             <img src="/images/maintly-logo-full.png" alt="MaintlyQR" style={{ height: 52, width: "auto", objectFit: "contain" }} />
           </Link>
           <div className="flex items-center gap-6 text-xs font-medium text-zinc-500 tracking-wide uppercase">
-            <Link href="/legal" className="hover:text-red-600 transition-colors">Legal Hub</Link>
-            <Link href="/terms" className="hover:text-red-600 transition-colors">Terms</Link>
-            <Link href="/privacy" className="hover:text-red-600 transition-colors">Privacy</Link>
-            <Link href="/cookies" className="hover:text-red-600 transition-colors">Cookies</Link>
+            <Link href="/legal" className="hover:text-red-600 transition-colors">{t("legalHub")}</Link>
+            <Link href="/terms" className="hover:text-red-600 transition-colors">{t("terms")}</Link>
+            <Link href="/privacy" className="hover:text-red-600 transition-colors">{t("privacy")}</Link>
+            <Link href="/cookies" className="hover:text-red-600 transition-colors">{t("cookies")}</Link>
           </div>
         </div>
       </nav>
@@ -33,14 +51,14 @@ export default function LegalLayout({ children, title, subtitle, docNumber, effe
         <div className="max-w-5xl mx-auto">
           {docNumber && (
             <p className="text-xs font-semibold tracking-[0.2em] uppercase text-red-500 mb-3">
-              Document {docNumber} of 10  ·  MaintlyQR Legal Package v1.1
+              {t("documentXOf10", { num: docNumber })}
             </p>
           )}
           <h1 className="text-3xl md:text-4xl font-black tracking-tight text-white mb-2">{title}</h1>
           {subtitle && <p className="text-zinc-400 text-sm mt-2 max-w-xl">{subtitle}</p>}
           {effectiveDate && (
             <p className="text-zinc-500 text-xs mt-4 font-medium tracking-wide uppercase">
-              Effective {effectiveDate}  ·  Revised July 2, 2026
+              {t("effectiveRevised", { date: effectiveDate })}
             </p>
           )}
         </div>
@@ -62,12 +80,12 @@ export default function LegalLayout({ children, title, subtitle, docNumber, effe
             <span className="text-xs font-semibold tracking-widest text-zinc-400 uppercase">MaintlyQR™</span>
           </div>
           <div className="flex flex-wrap justify-center gap-x-6 gap-y-1 text-xs text-zinc-400">
-            <Link href="/legal" className="hover:text-red-600 transition-colors">Legal Hub</Link>
-            <Link href="/terms" className="hover:text-red-600 transition-colors">Terms of Service</Link>
-            <Link href="/privacy" className="hover:text-red-600 transition-colors">Privacy Policy</Link>
-            <Link href="/cookies" className="hover:text-red-600 transition-colors">Cookie Policy</Link>
+            <Link href="/legal" className="hover:text-red-600 transition-colors">{t("legalHub")}</Link>
+            <Link href="/terms" className="hover:text-red-600 transition-colors">{t("termsFull")}</Link>
+            <Link href="/privacy" className="hover:text-red-600 transition-colors">{t("privacyFull")}</Link>
+            <Link href="/cookies" className="hover:text-red-600 transition-colors">{t("cookiesFull")}</Link>
           </div>
-          <p className="text-xs text-zinc-400">© 2026 MaintlyQR™ · Queensland, Australia</p>
+          <p className="text-xs text-zinc-400">{t("copyrightLine")}</p>
         </div>
       </footer>
 

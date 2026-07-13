@@ -1,8 +1,22 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
+import { Link } from "@/i18n/navigation";
+import { useTranslations } from "next-intl";
 import { Menu, X } from "lucide-react";
+
+// This component is only ever used by the 7 marketing pages under
+// src/app/[locale]/ (product, how-it-works, industries, pricing,
+// resources, about, api) — all 7 were migrated together in the same
+// rollout pass, so unlike NewAssetModal.tsx (still shared with
+// not-yet-migrated dashboard pages) it's safe to use next-intl directly
+// here instead of keeping a separate localized copy.
+//
+// Nav item labels reuse the existing "Nav" namespace (already defined for
+// the Home page's own navbar — product/howItWorks/industries/pricing/
+// resources/api/about/login all match 1:1). Legal is now migrated too
+// (last group in the rollout order), so the footer's Terms/Privacy/
+// Cookies links use next-intl's locale-aware <Link>.
 
 interface MarketingLayoutProps {
   children: React.ReactNode;
@@ -11,18 +25,22 @@ interface MarketingLayoutProps {
   subtitle?: string;
 }
 
-const NAV_ITEMS: { label: string; href: string }[] = [
-  { label: "Product", href: "/product" },
-  { label: "How It Works", href: "/how-it-works" },
-  { label: "Industries", href: "/industries" },
-  { label: "Pricing", href: "/pricing" },
-  { label: "Resources", href: "/resources" },
-  { label: "API", href: "/api" },
-  { label: "About", href: "/about" },
+const NAV_ITEMS: { key: string; href: string }[] = [
+  { key: "product", href: "/product" },
+  { key: "howItWorks", href: "/how-it-works" },
+  { key: "industries", href: "/industries" },
+  { key: "pricing", href: "/pricing" },
+  { key: "resources", href: "/resources" },
+  { key: "api", href: "/api" },
+  { key: "about", href: "/about" },
 ];
 
 export default function MarketingLayout({ children, eyebrow, title, subtitle }: MarketingLayoutProps) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const tNav = useTranslations("Nav");
+  // Reusing the Home page's own footer link labels (already translated in
+  // all 3 locales) instead of adding duplicate keys here.
+  const tHome = useTranslations("HomePage");
 
   return (
     <div className="min-h-screen bg-white text-zinc-900 flex flex-col">
@@ -36,13 +54,13 @@ export default function MarketingLayout({ children, eyebrow, title, subtitle }: 
           </Link>
           <div className="hidden md:flex items-center gap-7">
             {NAV_ITEMS.map((item) => (
-              <Link
-                key={item.label}
+              <a
+                key={item.key}
                 href={item.href}
                 className="text-zinc-600 hover:text-red-600 font-medium text-[13px] transition-colors"
               >
-                {item.label}
-              </Link>
+                {tNav(item.key)}
+              </a>
             ))}
           </div>
           <div className="hidden md:block">
@@ -50,7 +68,7 @@ export default function MarketingLayout({ children, eyebrow, title, subtitle }: 
               href="/login"
               className="flex items-center gap-2 text-zinc-700 hover:text-zinc-900 font-black tracking-wide rounded-xl transition-all border border-zinc-300 hover:border-zinc-400 uppercase px-4 py-2 text-[11px] shrink-0"
             >
-              Login
+              {tNav("login")}
             </Link>
           </div>
           <button
@@ -65,21 +83,21 @@ export default function MarketingLayout({ children, eyebrow, title, subtitle }: 
         {menuOpen && (
           <div className="md:hidden bg-white border-t border-zinc-200 shadow-lg flex flex-col px-5 py-4 gap-1">
             {NAV_ITEMS.map((item) => (
-              <Link
-                key={item.label}
+              <a
+                key={item.key}
                 href={item.href}
                 onClick={() => setMenuOpen(false)}
                 className="text-zinc-700 hover:text-zinc-900 font-medium py-2 border-b border-zinc-100 last:border-0"
               >
-                {item.label}
-              </Link>
+                {tNav(item.key)}
+              </a>
             ))}
             <Link
               href="/login"
               onClick={() => setMenuOpen(false)}
               className="flex items-center justify-center gap-2 text-zinc-700 font-black tracking-wide rounded-xl transition-all border border-zinc-300 uppercase px-5 py-3 text-[13px] mt-3"
             >
-              Login
+              {tNav("login")}
             </Link>
           </div>
         )}
@@ -112,9 +130,10 @@ export default function MarketingLayout({ children, eyebrow, title, subtitle }: 
             <span className="text-xs font-semibold tracking-widest text-zinc-400 uppercase">MaintlyQR™</span>
           </div>
           <div className="flex flex-wrap justify-center gap-x-6 gap-y-1 text-xs text-zinc-400">
-            <Link href="/terms" className="hover:text-red-600 transition-colors">Terms</Link>
-            <Link href="/privacy" className="hover:text-red-600 transition-colors">Privacy</Link>
-            <Link href="/cookies" className="hover:text-red-600 transition-colors">Cookies</Link>
+            {/* Legal is now migrated too — locale-aware Link. */}
+            <Link href="/terms" className="hover:text-red-600 transition-colors">{tHome("footerTerms")}</Link>
+            <Link href="/privacy" className="hover:text-red-600 transition-colors">{tHome("footerPrivacy")}</Link>
+            <Link href="/cookies" className="hover:text-red-600 transition-colors">{tHome("footerCookies")}</Link>
           </div>
           <p className="text-xs text-zinc-400">© 2026 MaintlyQR™</p>
         </div>

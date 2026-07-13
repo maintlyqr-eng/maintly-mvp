@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { Link } from "@/i18n/navigation";
 import { useTranslations } from "next-intl";
 import { ArrowRight, ShieldCheck, Camera, Keyboard, User, Globe, Clock, TrendingUp, LogOut, LayoutGrid, X, Menu, Wrench, FileText, ExternalLink } from "lucide-react";
 import { supabase } from "@/lib/supabase";
@@ -134,9 +135,9 @@ export default function HomePage() {
             </div>
           ) : (
             <div className="flex items-center gap-2.5">
-              <a href="/login" className="flex items-center gap-2 text-zinc-700 hover:text-zinc-900 font-black tracking-wide rounded-xl transition-all border border-zinc-300 hover:border-zinc-400 uppercase px-4 py-2" style={{fontSize:'clamp(10px,0.75vw,12px)'}}>
+              <Link href="/login" className="flex items-center gap-2 text-zinc-700 hover:text-zinc-900 font-black tracking-wide rounded-xl transition-all border border-zinc-300 hover:border-zinc-400 uppercase px-4 py-2" style={{fontSize:'clamp(10px,0.75vw,12px)'}}>
                 <User size={13} /> {tNav("login")}
-              </a>
+              </Link>
             </div>
           )}
         </div>
@@ -171,9 +172,9 @@ export default function HomePage() {
               </div>
             ) : (
               <div className="flex flex-col gap-2">
-                <a href="/login" onClick={() => setMobileMenuOpen(false)} className="flex items-center justify-center gap-2 text-zinc-700 font-black tracking-wide rounded-xl transition-all border border-zinc-300 uppercase px-5 py-3 text-[13px]">
+                <Link href="/login" onClick={() => setMobileMenuOpen(false)} className="flex items-center justify-center gap-2 text-zinc-700 font-black tracking-wide rounded-xl transition-all border border-zinc-300 uppercase px-5 py-3 text-[13px]">
                   <User size={14} /> {tNav("login")}
-                </a>
+                </Link>
               </div>
             )}
           </div>
@@ -346,11 +347,11 @@ export default function HomePage() {
           <span className="text-red-400" style={{fontSize:'clamp(6px,0.5vw,7px)'}}>•</span>
           <span className="tracking-[0.2em] text-zinc-400 font-semibold uppercase" style={{fontSize:'clamp(6.5px,0.55vw,8px)'}}>{t("footerTagline")}</span>
           <span className="text-red-400" style={{fontSize:'clamp(6px,0.5vw,7px)'}}>•</span>
-          <a href="/terms" className="tracking-[0.2em] text-zinc-400 hover:text-red-500 font-semibold uppercase transition-colors" style={{fontSize:'clamp(6.5px,0.55vw,8px)'}}>{t("footerTerms")}</a>
+          <Link href="/terms" className="tracking-[0.2em] text-zinc-400 hover:text-red-500 font-semibold uppercase transition-colors" style={{fontSize:'clamp(6.5px,0.55vw,8px)'}}>{t("footerTerms")}</Link>
           <span className="text-red-400" style={{fontSize:'clamp(6px,0.5vw,7px)'}}>•</span>
-          <a href="/privacy" className="tracking-[0.2em] text-zinc-400 hover:text-red-500 font-semibold uppercase transition-colors" style={{fontSize:'clamp(6.5px,0.55vw,8px)'}}>{t("footerPrivacy")}</a>
+          <Link href="/privacy" className="tracking-[0.2em] text-zinc-400 hover:text-red-500 font-semibold uppercase transition-colors" style={{fontSize:'clamp(6.5px,0.55vw,8px)'}}>{t("footerPrivacy")}</Link>
           <span className="text-red-400" style={{fontSize:'clamp(6px,0.5vw,7px)'}}>•</span>
-          <a href="/cookies" className="tracking-[0.2em] text-zinc-400 hover:text-red-500 font-semibold uppercase transition-colors" style={{fontSize:'clamp(6.5px,0.55vw,8px)'}}>{t("footerCookies")}</a>
+          <Link href="/cookies" className="tracking-[0.2em] text-zinc-400 hover:text-red-500 font-semibold uppercase transition-colors" style={{fontSize:'clamp(6.5px,0.55vw,8px)'}}>{t("footerCookies")}</Link>
           <span className="text-red-400" style={{fontSize:'clamp(6px,0.5vw,7px)'}}>•</span>
           <span className="tracking-[0.2em] text-zinc-400 font-semibold uppercase" style={{fontSize:'clamp(6.5px,0.55vw,8px)'}}>{t("footerRights")}</span>
         </div>

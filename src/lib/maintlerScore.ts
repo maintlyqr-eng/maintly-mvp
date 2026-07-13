@@ -40,17 +40,43 @@ export function computeScore(
 
 export type Badge = { label: string; icon: typeof ShieldCheck; className: string };
 
+// Optional translated labels — the badge text used to be hardcoded English
+// literals baked directly into this function, which is shared by the public
+// /maintler/[code] page (now localized under src/app/[locale]/) and the
+// still-English "My Maintler Card" section in Settings. Rather than fork the
+// scoring logic, this takes an optional `labels` override: pass translated
+// strings from a localized caller (see the [locale] maintler page for the
+// pattern), or omit it entirely and the English defaults below are used —
+// exactly the previous behavior, so the not-yet-migrated Settings call site
+// needs zero changes.
+export type BadgeLabels = {
+  verified: string;
+  services100: string;
+  services25: string;
+  yearsActive: (years: number) => string;
+  multiAssetSpecialist: string;
+};
+
+const DEFAULT_BADGE_LABELS: BadgeLabels = {
+  verified: "Verified",
+  services100: "100+ Services",
+  services25: "25+ Services",
+  yearsActive: (years) => `${years}+ Years Active`,
+  multiAssetSpecialist: "Multi-Asset Specialist",
+};
+
 export function computeBadges(
   verified: boolean | null,
   stats: MaintlerStats,
   specialtyCount: number,
-  years: number
+  years: number,
+  labels: BadgeLabels = DEFAULT_BADGE_LABELS
 ): Badge[] {
   const badges: Badge[] = [];
-  if (verified) badges.push({ label: "Verified", icon: ShieldCheck, className: "bg-emerald-50 text-emerald-700 border-emerald-200" });
-  if (stats.services_count >= 100) badges.push({ label: "100+ Services", icon: Wrench, className: "bg-blue-50 text-blue-700 border-blue-200" });
-  else if (stats.services_count >= 25) badges.push({ label: "25+ Services", icon: Wrench, className: "bg-blue-50 text-blue-700 border-blue-200" });
-  if (years >= 5) badges.push({ label: `${years}+ Years Active`, icon: CalendarDays, className: "bg-amber-50 text-amber-700 border-amber-200" });
-  if (specialtyCount >= 3) badges.push({ label: "Multi-Asset Specialist", icon: Box, className: "bg-purple-50 text-purple-700 border-purple-200" });
+  if (verified) badges.push({ label: labels.verified, icon: ShieldCheck, className: "bg-emerald-50 text-emerald-700 border-emerald-200" });
+  if (stats.services_count >= 100) badges.push({ label: labels.services100, icon: Wrench, className: "bg-blue-50 text-blue-700 border-blue-200" });
+  else if (stats.services_count >= 25) badges.push({ label: labels.services25, icon: Wrench, className: "bg-blue-50 text-blue-700 border-blue-200" });
+  if (years >= 5) badges.push({ label: labels.yearsActive(years), icon: CalendarDays, className: "bg-amber-50 text-amber-700 border-amber-200" });
+  if (specialtyCount >= 3) badges.push({ label: labels.multiAssetSpecialist, icon: Box, className: "bg-purple-50 text-purple-700 border-purple-200" });
   return badges;
 }
