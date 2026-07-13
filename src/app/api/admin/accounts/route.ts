@@ -66,7 +66,7 @@ export async function PATCH(req: NextRequest) {
       action: "account.update",
       entityType: "mechanic",
       entityId: id,
-      oldValue: beforeRow ? pick(beforeRow as Record<string, unknown>, Object.keys(updates)) : null,
+      oldValue: beforeRow ? pick(beforeRow as unknown as Record<string, unknown>, Object.keys(updates)) : null,
       newValue: updates,
       ipAddress: getRequestIp(req),
     });
