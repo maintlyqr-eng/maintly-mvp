@@ -45,13 +45,16 @@ export default function ShareAssetModal({
   const [loadingContacts, setLoadingContacts] = useState(true);
   const [search, setSearch] = useState("");
   const [sharingId, setSharingId] = useState<string | null>(null);
-  const [sharedWith, setSharedWith] = useState<SavedContactInfo | null>(null);
+  // alreadyHad = true means nothing was actually shared (the recipient
+  // already had this asset — from a previous share, their own scan,
+  // whatever) so no notification was sent. See handleShare.
+  const [shareResult, setShareResult] = useState<{ contact: SavedContactInfo; alreadyHad: boolean } | null>(null);
   const [error, setError] = useState("");
 
   useEffect(() => {
     if (!open) return;
     setSearch("");
-    setSharedWith(null);
+    setShareResult(null);
     setError("");
     void loadContacts();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -94,16 +97,37 @@ export default function ShareAssetModal({
     setSharingId(contact.id);
     setError("");
 
-    const { error: shareErr } = await supabase
+    // ignoreDuplicates makes this a silent no-op when contact.id already has
+    // this asset (from a previous share, their own scan, whoever shared it)
+    // — the unique(mechanic_id, asset_id) constraint just skips the insert
+    // instead of erroring. That used to look identical to a real share from
+    // here, so re-sharing the same equipment kept sending duplicate "shared
+    // with you" notifications even though nothing changed for the recipient
+    // (Facu: "le puedo mandar 10 veces el mismo equipo... le aparecen 10
+    // mensajes... no tiene sentido"). Asking for `.select("id")` back tells
+    // us whether a row was actually inserted: RLS lets the sharer see rows
+    // they just created (shared_by = auth.uid()), so a real insert always
+    // comes back with a row — an empty result means the conflict branch
+    // fired, i.e. the recipient already had it, and we skip the notification.
+    const { data: upsertData, error: shareErr } = await supabase
       .from("mechanic_assets")
       .upsert(
         { mechanic_id: contact.id, asset_id: asset.id, qr_code: asset.qrCode, shared_by: mechanicId },
         { onConflict: "mechanic_id,asset_id", ignoreDuplicates: true }
-      );
+      )
+      .select("id");
 
     if (shareErr) {
       setSharingId(null);
       setError("Couldn't share this equipment. Try again.");
+      return;
+    }
+
+    const alreadyHad = !upsertData || upsertData.length === 0;
+
+    if (alreadyHad) {
+      setSharingId(null);
+      setShareResult({ contact, alreadyHad: true });
       return;
     }
 
@@ -117,7 +141,7 @@ export default function ShareAssetModal({
     });
 
     setSharingId(null);
-    setSharedWith(contact);
+    setShareResult({ contact, alreadyHad: false });
     onShared(contact.name);
   }
 
@@ -129,16 +153,31 @@ export default function ShareAssetModal({
           <button onClick={onClose} className="text-zinc-400 hover:text-zinc-700"><X size={18} /></button>
         </div>
 
-        {sharedWith ? (
+        {shareResult ? (
           <div className="p-8 text-center">
-            <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-4">
-              <CheckCircle2 size={32} className="text-green-600" />
-            </div>
-            <h4 className="text-[18px] font-black text-zinc-900 mb-1">Shared!</h4>
-            <p className="text-[13px] text-zinc-500 mb-6">
-              <span className="font-semibold text-zinc-700">{asset.name}</span> is now in{" "}
-              <span className="font-semibold text-zinc-700">{sharedWith.name}</span>'s workshop too — they can view and log services on it right away.
-            </p>
+            {shareResult.alreadyHad ? (
+              <>
+                <div className="w-16 h-16 rounded-full bg-zinc-100 flex items-center justify-center mx-auto mb-4">
+                  <AlertCircle size={32} className="text-zinc-400" />
+                </div>
+                <h4 className="text-[18px] font-black text-zinc-900 mb-1">Already shared</h4>
+                <p className="text-[13px] text-zinc-500 mb-6">
+                  <span className="font-semibold text-zinc-700">{shareResult.contact.name}</span> already has{" "}
+                  <span className="font-semibold text-zinc-700">{asset.name}</span> in their workshop — no need to share it again.
+                </p>
+              </>
+            ) : (
+              <>
+                <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-4">
+                  <CheckCircle2 size={32} className="text-green-600" />
+                </div>
+                <h4 className="text-[18px] font-black text-zinc-900 mb-1">Shared!</h4>
+                <p className="text-[13px] text-zinc-500 mb-6">
+                  <span className="font-semibold text-zinc-700">{asset.name}</span> is now in{" "}
+                  <span className="font-semibold text-zinc-700">{shareResult.contact.name}</span>'s workshop too — they can view and log services on it right away.
+                </p>
+              </>
+            )}
             <button onClick={onClose} className="w-full bg-red-600 hover:bg-red-500 text-white font-bold py-3 rounded-xl text-[13px] transition-colors">
               Done
             </button>
