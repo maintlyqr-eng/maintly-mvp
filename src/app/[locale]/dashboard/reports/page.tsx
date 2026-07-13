@@ -84,7 +84,8 @@ export default function ReportsPage() {
         supabase
           .from("service_records")
           .select("asset_id, service_date")
-          .eq("mechanic_id", session.user.id),
+          .eq("mechanic_id", session.user.id)
+          .is("deleted_at", null),
       ]);
 
       const statsByAsset: Record<string, { count: number; lastDate: string | null }> = {};

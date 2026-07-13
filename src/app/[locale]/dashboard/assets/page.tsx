@@ -241,13 +241,18 @@ export default function AssetsPage() {
     // para cualquier fila que el mecánico agregó por su cuenta (escaneo propio).
     const { data } = await supabase
       .from("mechanic_assets")
-      .select("asset_id, shared_by, sharer:mechanics!mechanic_assets_shared_by_fkey(name), assets(id, asset_type, brand, model, nickname, vin_serial, year, plate, fuel_type, location, photo_url, created_at, customer_id, qr_codes(code))")
+      .select("asset_id, shared_by, sharer:mechanics!mechanic_assets_shared_by_fkey(name), assets(id, asset_type, brand, model, nickname, vin_serial, year, plate, fuel_type, location, photo_url, created_at, customer_id, deleted_at, qr_codes(code))")
       .eq("mechanic_id", uid)
       .order("added_at", { ascending: false });
     const assetList = (data ?? [])
       .map((row: any) => {
         const a = Array.isArray(row.assets) ? row.assets[0] : row.assets;
         if (!a) return null;
+        // Filtered here (not in the query) because `assets` is an embedded
+        // relation through mechanic_assets — see admin's soft-delete
+        // migration 031. An asset the admin soft-deleted disappears from
+        // the owner's own workshop too, same as it does from public view.
+        if (a.deleted_at) return null;
         const sharer = Array.isArray(row.sharer) ? row.sharer[0] : row.sharer;
         return { ...a, sharedByName: row.shared_by ? (sharer?.name ?? t("anotherMaintler")) : null };
       })
@@ -269,7 +274,8 @@ export default function AssetsPage() {
     const { data } = await supabase
       .from("service_records")
       .select("asset_id, service_date, km_hours, next_due_date, next_due_km_hours")
-      .eq("mechanic_id", uid);
+      .eq("mechanic_id", uid)
+      .is("deleted_at", null);
 
     type Bucket = {
       dates: string[];
@@ -374,6 +380,7 @@ export default function AssetsPage() {
       .from("service_records")
       .select("km_hours")
       .eq("asset_id", assetId)
+      .is("deleted_at", null)
       .not("km_hours", "is", null)
       .order("km_hours", { ascending: false })
       .limit(1)
@@ -395,6 +402,7 @@ export default function AssetsPage() {
       .from("service_records")
       .select("id, service_date, service_type, km_hours, notes, mechanic_id")
       .eq("asset_id", a.id)
+      .is("deleted_at", null)
       .order("service_date", { ascending: false });
     if (currentHistoryAssetIdRef.current !== a.id) return;
     const rows = (data as unknown as (ServiceRecord & { mechanic_id: string | null })[]) ?? [];

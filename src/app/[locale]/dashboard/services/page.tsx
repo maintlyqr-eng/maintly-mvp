@@ -166,6 +166,7 @@ export default function ServicesPage() {
       .from("service_records")
       .select("id, service_date, service_type, km_hours, notes, created_at, next_due_date, next_due_km_hours, assets(id, nickname, brand, model, vin_serial, asset_type)")
       .eq("mechanic_id", uid)
+      .is("deleted_at", null)
       .order("service_date", { ascending: false });
     setServices((data as unknown as ServiceRow[]) ?? []);
     setLoading(false);
@@ -176,6 +177,7 @@ export default function ServicesPage() {
       .from("assets")
       .select("id, nickname, brand, model, asset_type, customer_id")
       .eq("created_by", uid)
+      .is("deleted_at", null)
       .order("created_at", { ascending: false });
     const opts = (data as AssetOption[]) ?? [];
     setAssetOptions(opts);
@@ -249,6 +251,7 @@ export default function ServicesPage() {
       .from("service_records")
       .select("km_hours")
       .eq("asset_id", assetId)
+      .is("deleted_at", null)
       .not("km_hours", "is", null)
       .order("km_hours", { ascending: false })
       .limit(1)

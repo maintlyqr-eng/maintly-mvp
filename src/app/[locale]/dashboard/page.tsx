@@ -201,23 +201,27 @@ export default function DashboardPage() {
           .from("service_records")
           .select("id, service_date, service_type, km_hours, notes, asset_id, assets(brand, model, nickname, asset_type, vin_serial)")
           .eq("mechanic_id", session.user.id)
+          .is("deleted_at", null)
           .order("service_date", { ascending: false })
           .limit(6),
-        supabase.from("service_records").select("*", { count: "exact", head: true }).eq("mechanic_id", session.user.id),
+        supabase.from("service_records").select("*", { count: "exact", head: true }).eq("mechanic_id", session.user.id).is("deleted_at", null),
         supabase
           .from("service_records")
           .select("id, asset_id, service_type, next_due_date, next_due_km_hours, assets(nickname, brand, model, asset_type)")
           .eq("mechanic_id", session.user.id)
+          .is("deleted_at", null)
           .or("next_due_date.not.is.null,next_due_km_hours.not.is.null"),
         supabase
           .from("service_records")
           .select("asset_id, km_hours")
           .eq("mechanic_id", session.user.id)
+          .is("deleted_at", null)
           .not("km_hours", "is", null),
         supabase
           .from("service_records")
           .select("service_date, service_type, assets(nickname, brand, model)")
           .eq("mechanic_id", session.user.id)
+          .is("deleted_at", null)
           .order("service_date", { ascending: false })
           .limit(3000), // dashboard calendar dots only — bounds payload for very long-tenured accounts
         supabase
@@ -331,6 +335,7 @@ export default function DashboardPage() {
         .from("service_records")
         .select("id, asset_id, service_type, service_date, notes, assets(nickname, brand, model)")
         .eq("mechanic_id", session.user.id)
+        .is("deleted_at", null)
         .or(`service_type.ilike.%${safeQ}%,notes.ilike.%${safeQ}%`)
         .order("service_date", { ascending: false })
         .limit(5);

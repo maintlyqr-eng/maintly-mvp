@@ -99,7 +99,7 @@ export default function DocumentsPage() {
         .select("id, asset_id, service_record_id, customer_id, file_name, file_path, file_type, file_size, notes, created_at")
         .eq("mechanic_id", uid)
         .order("created_at", { ascending: false }),
-      supabase.from("assets").select("id, nickname, brand, model").eq("created_by", uid).order("created_at", { ascending: false }),
+      supabase.from("assets").select("id, nickname, brand, model").eq("created_by", uid).is("deleted_at", null).order("created_at", { ascending: false }),
       supabase.from("customers").select("id, name").eq("mechanic_id", uid).order("name", { ascending: true }),
     ]);
     setDocuments((docRows as DocumentRow[]) ?? []);

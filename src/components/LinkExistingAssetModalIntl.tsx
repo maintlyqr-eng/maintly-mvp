@@ -77,6 +77,7 @@ export default function LinkExistingAssetModalIntl({
         .from("assets")
         .select("id, brand, model, nickname, asset_type, vin_serial")
         .eq("id", qrData.asset_id)
+        .is("deleted_at", null)
         .single();
 
       if (requestId !== searchRequestIdRef.current) return;
@@ -101,6 +102,7 @@ export default function LinkExistingAssetModalIntl({
       .from("assets")
       .select("id, brand, model, nickname, asset_type, vin_serial")
       .eq("id", code)
+      .is("deleted_at", null)
       .maybeSingle();
 
     if (requestId !== searchRequestIdRef.current) return;

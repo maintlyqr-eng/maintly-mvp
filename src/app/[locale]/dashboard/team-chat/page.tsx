@@ -272,7 +272,8 @@ function TeamChatPageInner() {
     const { data: mechanicsData } = await supabase
       .from("mechanics")
       .select("id, name, email, workshop_name, photo_url")
-      .in("id", ids);
+      .in("id", ids)
+      .is("deleted_at", null);
 
     const infoById = new Map((mechanicsData as MechanicInfo[] ?? []).map((mm) => [mm.id, mm]));
 
@@ -324,7 +325,8 @@ function TeamChatPageInner() {
     const { data: mechanicsData } = await supabase
       .from("mechanics")
       .select("id, name, email, workshop_name, photo_url")
-      .in("id", ids);
+      .in("id", ids)
+      .is("deleted_at", null);
 
     const infoById = new Map((mechanicsData as MechanicInfo[] ?? []).map((mm) => [mm.id, mm]));
 
@@ -505,6 +507,7 @@ function TeamChatPageInner() {
         .from("mechanics")
         .select("id, name, email, workshop_name, photo_url")
         .eq("id", withId)
+        .is("deleted_at", null)
         .single();
       if (active && info) {
         openConversation(info as MechanicInfo);
@@ -550,6 +553,7 @@ function TeamChatPageInner() {
                 .from("mechanics")
                 .select("id, name, email, workshop_name, photo_url")
                 .eq("id", m.sender_id)
+                .is("deleted_at", null)
                 .single()
                 .then(({ data: info }) => {
                   if (!info) return;
@@ -700,6 +704,7 @@ function TeamChatPageInner() {
         .from("mechanics")
         .select("id, name, email, workshop_name, photo_url")
         .neq("id", mechanicId)
+        .is("deleted_at", null)
         .or(`name.ilike.*${term}*,email.ilike.*${term}*,workshop_name.ilike.*${term}*`)
         .limit(8);
 

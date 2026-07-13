@@ -98,6 +98,7 @@ export default function ShareAssetModal({
       .from("mechanics")
       .select("id, name, workshop_name, photo_url, profession")
       .in("id", ids)
+      .is("deleted_at", null)
       .order("name", { ascending: true });
 
     setContacts((mechanicsData as SavedContactInfo[]) ?? []);

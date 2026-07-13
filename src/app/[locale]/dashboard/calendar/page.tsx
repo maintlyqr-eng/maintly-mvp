@@ -149,13 +149,15 @@ export default function CalendarPage() {
     const { data: svc } = await supabase
       .from("service_records")
       .select("id, asset_id, service_date, service_type, next_due_date, next_due_km_hours, assets(id, nickname, brand, model, asset_type)")
-      .eq("mechanic_id", uid);
+      .eq("mechanic_id", uid)
+      .is("deleted_at", null);
     setServiceRows((svc as unknown as ServiceRow[]) ?? []);
 
     const { data: kmRows } = await supabase
       .from("service_records")
       .select("asset_id, km_hours")
       .eq("mechanic_id", uid)
+      .is("deleted_at", null)
       .not("km_hours", "is", null);
     const maxKm: Record<string, number> = {};
     for (const r of (kmRows ?? []) as any[]) {
@@ -169,6 +171,7 @@ export default function CalendarPage() {
       .from("assets")
       .select("id, nickname, brand, model")
       .eq("created_by", uid)
+      .is("deleted_at", null)
       .order("created_at", { ascending: false });
     setAssetOptions((assets as AssetOption[]) ?? []);
 

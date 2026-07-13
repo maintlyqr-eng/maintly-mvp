@@ -119,12 +119,14 @@ export default function ScheduledServicesPage() {
         .from("service_records")
         .select("id, asset_id, service_type, service_date, next_due_date, next_due_km_hours, assets(id, nickname, brand, model, vin_serial, asset_type)")
         .eq("mechanic_id", uid)
+        .is("deleted_at", null)
         .or("next_due_date.not.is.null,next_due_km_hours.not.is.null")
         .order("next_due_date", { ascending: true }),
       supabase
         .from("service_records")
         .select("asset_id, km_hours")
         .eq("mechanic_id", uid)
+        .is("deleted_at", null)
         .not("km_hours", "is", null),
     ]);
 

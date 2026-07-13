@@ -124,8 +124,8 @@ export default function CustomersPage() {
     setLoading(true);
     const [{ data: customerRows }, { data: assetRows }, { data: serviceRows }] = await Promise.all([
       supabase.from("customers").select("id, name, phone, email, notes, created_at").eq("mechanic_id", uid).order("name", { ascending: true }),
-      supabase.from("assets").select("id, nickname, brand, model, asset_type, customer_id").eq("created_by", uid),
-      supabase.from("service_records").select("id, service_type, service_date, customer_id, asset_id").eq("mechanic_id", uid).order("service_date", { ascending: false }),
+      supabase.from("assets").select("id, nickname, brand, model, asset_type, customer_id").eq("created_by", uid).is("deleted_at", null),
+      supabase.from("service_records").select("id, service_type, service_date, customer_id, asset_id").eq("mechanic_id", uid).is("deleted_at", null).order("service_date", { ascending: false }),
     ]);
     setCustomers((customerRows as CustomerRow[]) ?? []);
     setAssets((assetRows as AssetLite[]) ?? []);

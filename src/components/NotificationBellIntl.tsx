@@ -103,7 +103,8 @@ export default function NotificationBellIntl({
       const { data: senders } = await supabase
         .from("mechanics")
         .select("id, name, workshop_name, email")
-        .in("id", senderIds);
+        .in("id", senderIds)
+        .is("deleted_at", null);
       const nameById: Record<string, string> = {};
       (senders ?? []).forEach((s) => { nameById[s.id] = s.workshop_name || s.name || s.email; });
 
