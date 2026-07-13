@@ -7,13 +7,14 @@ import {
   ShieldCheck, Calendar, Gauge, Wrench, CheckCircle2, MapPin,
   Hash, Fuel, AlertCircle, ChevronDown, ChevronUp, UserCircle2,
   Plus, BookMarked, LogIn, X, ChevronRight, MessageCircle, Send,
-  QrCode, UserPlus
+  QrCode, UserPlus, Flag
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { formatDateDMY } from "@/lib/date";
 import { getUnitLabel, getUnitShort, formatUnitValue } from "@/lib/units";
 import { fetchMechanicPublicProfiles } from "@/lib/mechanicPublicProfile";
 import NewAssetModal from "@/components/NewAssetModal";
+import ReportIssueModal from "@/components/ReportIssueModal";
 
 const assetTypeImg: Record<string, string> = {
   automotive: "/images/car.png",
@@ -98,6 +99,11 @@ export default function AssetPublicPage() {
   const [contactSaving, setContactSaving] = useState(false);
   const [contactError, setContactError] = useState("");
   const [contactSent, setContactSent] = useState(false);
+
+  // Report an issue to Maintly (item 6 del pedido de Facu: "Reportes y
+  // moderación") — separate concern from the "contact the Maintler" form
+  // above: this goes to the admin panel's "Reportes y Moderación" section.
+  const [showReportModal, setShowReportModal] = useState(false);
 
   // Add Service form
   const [showServiceForm, setShowServiceForm] = useState(false);
@@ -553,9 +559,18 @@ export default function AssetPublicPage() {
           </div>
         </div>
 
-        <p className="text-center text-[10px] text-zinc-400 pb-4">
+        <p className="text-center text-[10px] text-zinc-400 pb-2">
           Powered by <span className="font-bold text-zinc-600">Maintly</span> · Maintenance. Tracked.
         </p>
+
+        {!isDemo && (
+          <button
+            onClick={() => setShowReportModal(true)}
+            className="mx-auto flex items-center gap-1 text-[10px] text-zinc-300 hover:text-red-500 transition-colors pb-4"
+          >
+            <Flag size={11} /> Report an issue
+          </button>
+        )}
       </div>
 
       {/* ══ STICKY ACTION BAR ══════════════════════════════════════════════════ */}
@@ -785,6 +800,14 @@ export default function AssetPublicPage() {
           </div>
         </div>
       )}
+
+      <ReportIssueModal
+        open={showReportModal}
+        onClose={() => setShowReportModal(false)}
+        assetId={asset?.id ?? null}
+        mechanicId={asset?.created_by ?? null}
+        qrCode={code}
+      />
     </div>
   );
 }

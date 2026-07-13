@@ -25,9 +25,10 @@ export type AdminAuditAction =
   | "service.delete_permanent"
   | "qr.generate_batch"
   | "qr.unlink"
-  | "support_thread.clear";
+  | "support_thread.clear"
+  | "report.update_status";
 
-export type AdminAuditEntityType = "mechanic" | "asset" | "service_record" | "qr_code" | "qr_batch" | "support_thread";
+export type AdminAuditEntityType = "mechanic" | "asset" | "service_record" | "qr_code" | "qr_batch" | "support_thread" | "content_report";
 
 export async function logAdminAction(params: {
   adminUsername: string;

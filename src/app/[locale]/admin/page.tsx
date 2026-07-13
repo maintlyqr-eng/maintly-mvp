@@ -130,7 +130,7 @@ type UsageMetrics = {
   checkedAt: string;
 };
 
-type Section = "dashboard" | "accounts" | "mechanics" | "verifications" | "assets" | "services" | "qr" | "support" | "team-chat" | "audit-log" | "trash";
+type Section = "dashboard" | "accounts" | "mechanics" | "verifications" | "assets" | "services" | "qr" | "support" | "team-chat" | "moderation" | "audit-log" | "trash";
 
 type SupportMessageRow = {
   id: string;
@@ -205,6 +205,31 @@ type AdminAuditLogRow = {
   new_value: unknown;
   reason: string | null;
   ip_address: string | null;
+};
+
+// Item 6 del pedido de Facu ("Reportes y moderación") — reportes públicos
+// sobre un asset/registro/QR o consultas generales, distintos de
+// mechanic_reports (Maintler reportando a otro Maintler, ver Team Chat).
+// Leído acá desde /api/admin/reports, que ya enriquece cada fila con un
+// resumen de su asset/mecánico relacionado (ver ese route.ts).
+type ContentReportRow = {
+  id: string;
+  created_at: string;
+  updated_at: string;
+  report_type: string;
+  status: string;
+  asset_id: string | null;
+  service_record_id: string | null;
+  mechanic_id: string | null;
+  qr_code: string | null;
+  reporter_name: string | null;
+  reporter_contact: string | null;
+  message: string;
+  internal_notes: string | null;
+  resolved_at: string | null;
+  resolved_by: string | null;
+  asset: { brand: string | null; model: string | null; nickname: string | null } | null;
+  mechanic: { name: string; email: string } | null;
 };
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -462,6 +487,23 @@ export default function AdminPage() {
   const [auditLogTo, setAuditLogTo] = useState("");
   const [expandedAuditLogId, setExpandedAuditLogId] = useState<string | null>(null);
 
+  // ── Reportes y Moderación (item 6 del pedido de Facu) ──
+  const REPORTS_PAGE_SIZE = 25;
+  const [reports, setReports] = useState<ContentReportRow[]>([]);
+  const [reportsLoading, setReportsLoading] = useState(true);
+  const [reportsTotal, setReportsTotal] = useState(0);
+  const [reportsNewCount, setReportsNewCount] = useState(0);
+  const [reportsPage, setReportsPage] = useState(1);
+  const [reportStatusFilter, setReportStatusFilter] = useState("all");
+  const [reportTypeFilter, setReportTypeFilter] = useState("all");
+  const [expandedReportId, setExpandedReportId] = useState<string | null>(null);
+  // Draft text for the internal-notes textarea, keyed by report id — kept
+  // separate from the loaded row so typing doesn't need a round-trip to
+  // show up, and "Guardar" only fires on demand rather than on every
+  // keystroke.
+  const [reportNotesDraft, setReportNotesDraft] = useState<Record<string, string>>({});
+  const [reportNotesSaving, setReportNotesSaving] = useState<string | null>(null);
+
   // ── Papelera (Trash — soft delete + restauración, item 14 del pedido) ──
   const [trashMechanics, setTrashMechanics] = useState<TrashMechanicRow[]>([]);
   const [trashAssets, setTrashAssets] = useState<TrashAssetRow[]>([]);
@@ -528,6 +570,15 @@ export default function AdminPage() {
     fetch("/api/admin/usage-check")
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => { if (data && !data.error) setUsageMetrics(data as UsageMetrics); })
+      .catch(() => {});
+
+    // Non-critical: just the "new reports" badge count for the sidebar, so
+    // it's visible without having to open the Moderación tab first (same
+    // lightweight, best-effort pattern as usage-check above). The full
+    // list itself still lazy-loads on open, same as every other tab.
+    fetch("/api/admin/reports?pageSize=1")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => { if (data && typeof data.newCount === "number") setReportsNewCount(data.newCount); })
       .catch(() => {});
 
     const mechRows = bulkRes.mechanics;
@@ -699,6 +750,48 @@ export default function AdminPage() {
     }
   }
 
+  // Reportes y Moderación: mismo patrón de paginación real server-side que
+  // el log de auditoría (esta tabla la alimenta un formulario público
+  // anónimo, así que puede crecer sin límite — ver /api/admin/reports).
+  async function loadReports() {
+    setReportsLoading(true);
+    try {
+      const params = new URLSearchParams();
+      params.set("page", String(reportsPage));
+      params.set("pageSize", String(REPORTS_PAGE_SIZE));
+      if (reportStatusFilter !== "all") params.set("status", reportStatusFilter);
+      if (reportTypeFilter !== "all") params.set("reportType", reportTypeFilter);
+
+      const res = await fetch(`/api/admin/reports?${params.toString()}`);
+      const data = await res.json().catch(() => ({}));
+      setReports((data.reports as ContentReportRow[]) ?? []);
+      setReportsTotal((data.total as number) ?? 0);
+      setReportsNewCount((data.newCount as number) ?? 0);
+    } finally {
+      setReportsLoading(false);
+    }
+  }
+
+  async function handleReportStatusChange(report: ContentReportRow, status: string) {
+    const res = await adminFetch("/api/admin/reports", "PATCH", { id: report.id, status });
+    if (!res.ok) { flash(res.error, "error"); return; }
+    setReports((prev) => prev.map((r) => (r.id === report.id
+      ? { ...r, status, resolved_at: status === "resolved" ? new Date().toISOString() : null }
+      : r)));
+    if (report.status === "new" && status !== "new") setReportsNewCount((n) => Math.max(0, n - 1));
+    flash(t("reportStatusUpdated"));
+  }
+
+  async function handleSaveReportNotes(report: ContentReportRow) {
+    const notes = reportNotesDraft[report.id] ?? report.internal_notes ?? "";
+    setReportNotesSaving(report.id);
+    const res = await adminFetch("/api/admin/reports", "PATCH", { id: report.id, internal_notes: notes });
+    setReportNotesSaving(null);
+    if (!res.ok) { flash(res.error, "error"); return; }
+    setReports((prev) => prev.map((r) => (r.id === report.id ? { ...r, internal_notes: notes } : r)));
+    flash(t("reportNotesSaved"));
+  }
+
   // Papelera: small capped lists (see /api/admin/trash's own comment on why
   // this doesn't need real pagination the way the audit log does), so a
   // simple lazy-refetch-on-open is enough — same pattern as Support/Team Chat.
@@ -858,6 +951,16 @@ export default function AdminPage() {
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [section, adminAuthed, auditLogsPage, auditLogActionFilter, auditLogEntityFilter, auditLogFrom, auditLogTo]);
+
+  // Reportes y Moderación: same reasoning as the audit log effect above —
+  // server-side filters/pagination, so filter changes need a real refetch,
+  // not just a client-side re-slice.
+  useEffect(() => {
+    if (section === "moderation" && adminAuthed) {
+      loadReports();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [section, adminAuthed, reportsPage, reportStatusFilter, reportTypeFilter]);
 
   // Papelera: refetch every time the tab opens, same lazy pattern as
   // Support/Team Chat — a restore or permanent delete elsewhere shouldn't
@@ -1283,13 +1386,33 @@ export default function AdminPage() {
     { id: "qr",        label: t("navQr"), icon: QrCode   },
     { id: "support",   label: t("navSupport"),   icon: LifeBuoy  },
     { id: "team-chat", label: t("navTeamChat"), icon: MessageCircle },
+    { id: "moderation", label: t("navModeration"), icon: Flag },
     { id: "audit-log", label: t("navAuditLog"), icon: History },
     { id: "trash",     label: t("navTrash"),     icon: Trash    },
   ];
   const sectionLabels: Record<Section, string> = {
     dashboard: t("navDashboard"), accounts: t("navAccounts"), mechanics: t("navMechanics"), verifications: t("navVerifications"),
     assets: t("navAssets"), services: t("navServices"), qr: t("navQr"), support: t("navSupport"), "team-chat": t("navTeamChat"),
-    "audit-log": t("navAuditLog"), trash: t("navTrash"),
+    moderation: t("navModeration"), "audit-log": t("navAuditLog"), trash: t("navTrash"),
+  };
+  const REPORT_TYPE_LABEL: Record<string, string> = {
+    incorrect_info: t("reportTypeIncorrectInfo"),
+    fake_record: t("reportTypeFakeRecord"),
+    inappropriate_content: t("reportTypeInappropriateContent"),
+    wrong_asset: t("reportTypeWrongAsset"),
+    qr_issue: t("reportTypeQrIssue"),
+    technical_issue: t("reportTypeTechnicalIssue"),
+    deletion_request: t("reportTypeDeletionRequest"),
+    general_inquiry: t("reportTypeGeneralInquiry"),
+  };
+  const REPORT_STATUS_LABEL: Record<string, string> = {
+    new: t("reportStatusNew"),
+    in_review: t("reportStatusInReview"),
+    resolved: t("reportStatusResolved"),
+    closed: t("reportStatusClosed"),
+  };
+  const REPORT_STATUS_TONE: Record<string, "amber" | "blue" | "emerald" | "zinc"> = {
+    new: "amber", in_review: "blue", resolved: "emerald", closed: "zinc",
   };
   const AUDIT_ACTION_LABEL: Record<string, string> = {
     "admin.login": t("auditActionAdminLogin"),
@@ -1317,6 +1440,7 @@ export default function AdminPage() {
     support_thread: t("auditEntitySupportThread"),
   };
   const auditLogTotalPages = Math.max(1, Math.ceil(auditLogsTotal / AUDIT_LOG_PAGE_SIZE));
+  const reportsTotalPages = Math.max(1, Math.ceil(reportsTotal / REPORTS_PAGE_SIZE));
   const unreadSupportCount = supportMessages.filter((m) => !m.from_admin && !m.read).length;
 
   return (
@@ -1373,6 +1497,13 @@ export default function AdminPage() {
                   section === id ? "bg-white text-red-600" : "bg-amber-500 text-white"
                 }`}>
                   {mechanicReports.length}
+                </span>
+              )}
+              {id === "moderation" && reportsNewCount > 0 && (
+                <span className={`ml-auto text-[10px] font-black px-1.5 py-0.5 rounded-full leading-none ${
+                  section === id ? "bg-white text-red-600" : "bg-amber-500 text-white"
+                }`}>
+                  {reportsNewCount}
                 </span>
               )}
             </button>
@@ -2401,6 +2532,184 @@ export default function AdminPage() {
                         <button
                           onClick={() => setAuditLogsPage((p) => Math.min(auditLogTotalPages, p + 1))}
                           disabled={auditLogsPage >= auditLogTotalPages}
+                          className="text-[11px] font-bold px-3 py-1.5 rounded-lg border border-zinc-200 text-zinc-600 hover:bg-zinc-50 transition-colors disabled:opacity-30"
+                        >
+                          {t("auditNextPage")}
+                        </button>
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* ── REPORTES Y MODERACIÓN (item 6 del pedido de Facu) ──────────── */}
+          {section === "moderation" && (
+            <div className="space-y-4">
+              <p className="text-[12px] text-zinc-400">{t("moderationIntro")}</p>
+
+              <div className="flex flex-wrap items-end gap-3">
+                <div>
+                  <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1">{t("moderationFilterStatus")}</label>
+                  <select
+                    value={reportStatusFilter}
+                    onChange={(e) => { setReportStatusFilter(e.target.value); setReportsPage(1); }}
+                    className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-[12px] outline-none focus:border-red-400"
+                  >
+                    <option value="all">{t("auditFilterAll")}</option>
+                    {Object.entries(REPORT_STATUS_LABEL).map(([key, label]) => (
+                      <option key={key} value={key}>{label}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1">{t("moderationFilterType")}</label>
+                  <select
+                    value={reportTypeFilter}
+                    onChange={(e) => { setReportTypeFilter(e.target.value); setReportsPage(1); }}
+                    className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-[12px] outline-none focus:border-red-400"
+                  >
+                    <option value="all">{t("auditFilterAll")}</option>
+                    {Object.entries(REPORT_TYPE_LABEL).map(([key, label]) => (
+                      <option key={key} value={key}>{label}</option>
+                    ))}
+                  </select>
+                </div>
+                {(reportStatusFilter !== "all" || reportTypeFilter !== "all") && (
+                  <button
+                    onClick={() => { setReportStatusFilter("all"); setReportTypeFilter("all"); setReportsPage(1); }}
+                    className="text-[11px] font-bold text-zinc-400 hover:text-red-600 transition-colors px-2 py-2"
+                  >
+                    {t("auditFilterClear")}
+                  </button>
+                )}
+              </div>
+
+              <div className="bg-white rounded-2xl border border-zinc-200/80 shadow-sm overflow-hidden">
+                {reportsLoading ? (
+                  <p className="text-[13px] text-zinc-400 text-center py-16">{t("loading")}</p>
+                ) : reports.length === 0 ? (
+                  <div className="text-center py-16">
+                    <Flag size={28} className="mx-auto text-zinc-200 mb-2" />
+                    <p className="text-[13px] text-zinc-300 font-medium">{t("moderationNoReports")}</p>
+                  </div>
+                ) : (
+                  <>
+                    <div className="overflow-x-auto">
+                      <table className="w-full min-w-[760px]">
+                        <thead>
+                          <tr className="bg-zinc-50 border-b border-zinc-100">
+                            {[t("moderationColWhen"), t("moderationColType"), t("moderationColStatus"), t("moderationColRelated"), ""].map((h) => (
+                              <th key={h} className="px-7 py-3 text-left text-[9px] font-bold text-zinc-400 uppercase tracking-widest">{h}</th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-zinc-50">
+                          {reports.map((report) => {
+                            const isExpanded = expandedReportId === report.id;
+                            const relatedLabel = report.asset
+                              ? assetLabel(report.asset)
+                              : (report.mechanic?.name ?? report.qr_code ?? "—");
+                            return (
+                              <Fragment key={report.id}>
+                                <tr
+                                  className="hover:bg-zinc-50/80 transition-colors cursor-pointer"
+                                  onClick={() => {
+                                    setExpandedReportId(isExpanded ? null : report.id);
+                                    setReportNotesDraft((prev) => (report.id in prev ? prev : { ...prev, [report.id]: report.internal_notes ?? "" }));
+                                  }}
+                                >
+                                  <td className="px-7 py-4 text-[12px] text-zinc-400 whitespace-nowrap">{formatDate(report.created_at)} · {formatTime(report.created_at, locale)}</td>
+                                  <td className="px-7 py-4 text-[12px] text-zinc-600 font-semibold">{REPORT_TYPE_LABEL[report.report_type] ?? report.report_type}</td>
+                                  <td className="px-7 py-4"><Pill tone={REPORT_STATUS_TONE[report.status] ?? "zinc"}>{REPORT_STATUS_LABEL[report.status] ?? report.status}</Pill></td>
+                                  <td className="px-7 py-4 text-[12px] text-zinc-500 truncate max-w-[220px]">{relatedLabel}</td>
+                                  <td className="px-7 py-4 text-right text-zinc-300">
+                                    {isExpanded ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
+                                  </td>
+                                </tr>
+                                {isExpanded && (
+                                  <tr key={`${report.id}-detail`} className="bg-zinc-50/60">
+                                    <td colSpan={5} className="px-7 py-5">
+                                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 text-[12px]">
+                                        <div className="sm:col-span-2">
+                                          <p className="font-bold text-zinc-500 uppercase tracking-wide text-[9.5px] mb-1">{t("moderationDetailMessage")}</p>
+                                          <p className="whitespace-pre-wrap break-words bg-white border border-zinc-200 rounded-lg p-3 text-zinc-700">{report.message}</p>
+                                        </div>
+                                        {(report.reporter_name || report.reporter_contact) && (
+                                          <div>
+                                            <p className="font-bold text-zinc-500 uppercase tracking-wide text-[9.5px] mb-1">{t("moderationDetailReporter")}</p>
+                                            <p className="text-zinc-600">{report.reporter_name || t("moderationAnonymous")}{report.reporter_contact ? ` · ${report.reporter_contact}` : ""}</p>
+                                          </div>
+                                        )}
+                                        {report.qr_code && (
+                                          <div>
+                                            <p className="font-bold text-zinc-500 uppercase tracking-wide text-[9.5px] mb-1">{t("moderationDetailQrCode")}</p>
+                                            <a href={`/asset/${report.qr_code}`} target="_blank" rel="noopener noreferrer" className="text-red-600 hover:text-red-700 font-mono font-bold">
+                                              {report.qr_code}
+                                            </a>
+                                          </div>
+                                        )}
+                                        <div>
+                                          <p className="font-bold text-zinc-500 uppercase tracking-wide text-[9.5px] mb-1">{t("moderationDetailStatus")}</p>
+                                          <select
+                                            value={report.status}
+                                            onChange={(e) => handleReportStatusChange(report, e.target.value)}
+                                            className="rounded-lg border border-zinc-200 bg-white px-2.5 py-1.5 text-[12px] outline-none focus:border-red-400"
+                                          >
+                                            {Object.entries(REPORT_STATUS_LABEL).map(([key, label]) => (
+                                              <option key={key} value={key}>{label}</option>
+                                            ))}
+                                          </select>
+                                        </div>
+                                        {report.resolved_at && (
+                                          <div>
+                                            <p className="font-bold text-zinc-500 uppercase tracking-wide text-[9.5px] mb-1">{t("moderationDetailResolvedBy")}</p>
+                                            <p className="text-zinc-600">{report.resolved_by ?? "—"} · {formatDate(report.resolved_at)}</p>
+                                          </div>
+                                        )}
+                                        <div className="sm:col-span-2">
+                                          <p className="font-bold text-zinc-500 uppercase tracking-wide text-[9.5px] mb-1">{t("moderationDetailNotes")}</p>
+                                          <textarea
+                                            value={reportNotesDraft[report.id] ?? report.internal_notes ?? ""}
+                                            onChange={(e) => setReportNotesDraft((prev) => ({ ...prev, [report.id]: e.target.value }))}
+                                            placeholder={t("moderationNotesPlaceholder")}
+                                            rows={2}
+                                            className="w-full bg-white border border-zinc-200 focus:border-red-400 rounded-lg px-3 py-2 text-[12px] text-zinc-700 outline-none transition-all resize-none"
+                                          />
+                                          <button
+                                            onClick={() => handleSaveReportNotes(report)}
+                                            disabled={reportNotesSaving === report.id}
+                                            className="mt-2 text-[11px] font-bold text-red-600 hover:text-red-700 disabled:opacity-50 transition-colors"
+                                          >
+                                            {reportNotesSaving === report.id ? t("saving") : t("moderationSaveNotes")}
+                                          </button>
+                                        </div>
+                                      </div>
+                                    </td>
+                                  </tr>
+                                )}
+                              </Fragment>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    <div className="flex items-center justify-between px-7 py-4 border-t border-zinc-100">
+                      <p className="text-[11px] text-zinc-400">{t("auditTotalCount", { count: reportsTotal })}</p>
+                      <div className="flex items-center gap-3">
+                        <button
+                          onClick={() => setReportsPage((p) => Math.max(1, p - 1))}
+                          disabled={reportsPage <= 1}
+                          className="text-[11px] font-bold px-3 py-1.5 rounded-lg border border-zinc-200 text-zinc-600 hover:bg-zinc-50 transition-colors disabled:opacity-30"
+                        >
+                          {t("auditPrevPage")}
+                        </button>
+                        <span className="text-[11px] text-zinc-400">{t("auditPageOf", { page: reportsPage, totalPages: reportsTotalPages })}</span>
+                        <button
+                          onClick={() => setReportsPage((p) => Math.min(reportsTotalPages, p + 1))}
+                          disabled={reportsPage >= reportsTotalPages}
                           className="text-[11px] font-bold px-3 py-1.5 rounded-lg border border-zinc-200 text-zinc-600 hover:bg-zinc-50 transition-colors disabled:opacity-30"
                         >
                           {t("auditNextPage")}
