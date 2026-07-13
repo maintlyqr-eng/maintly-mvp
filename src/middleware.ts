@@ -70,5 +70,16 @@ export const config = {
     "/(es|pt)/privacy",
     "/cookies",
     "/(es|pt)/cookies",
+    // Phase 2 (Dashboard/Admin i18n) — each dashboard route gets its pair
+    // here exactly when its [locale] page is built, same discipline as
+    // every route above. See DashboardSidebarIntl.tsx for why the shared
+    // sidebar/header/etc. exist as separate "*Intl" components during this
+    // transition instead of being edited in place.
+    "/dashboard/messages",
+    "/(es|pt)/dashboard/messages",
+    "/dashboard/reports",
+    "/(es|pt)/dashboard/reports",
+    "/dashboard/scheduled",
+    "/(es|pt)/dashboard/scheduled",
   ],
 };
