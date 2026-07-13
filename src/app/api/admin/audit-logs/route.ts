@@ -22,7 +22,13 @@ export type AdminAuditLogRow = {
 // table is meant to grow indefinitely, so that pattern wouldn't hold up.
 //
 // Query params (all optional): page (default 1), pageSize (default 50, max
-// 200), action, entityType, adminUsername, from (ISO date), to (ISO date).
+// 200), action, entityType, entityId, adminUsername, from (ISO date), to
+// (ISO date).
+//
+// entityId is an exact match on entity_id — feeds the "Ver historial" links
+// from Accounts/Assets (item 2/3 del pedido: "ver historial de acciones"),
+// so an admin can jump straight to every audit entry for one specific
+// Maintler or asset instead of scrolling the whole unfiltered log.
 export async function GET(req: NextRequest) {
   if (!isAdminRequest(req)) {
     return NextResponse.json({ error: "Not authorized." }, { status: 401 });
@@ -33,6 +39,7 @@ export async function GET(req: NextRequest) {
   const pageSize = Math.min(200, Math.max(1, Math.trunc(Number(url.searchParams.get("pageSize")) || 50)));
   const action = url.searchParams.get("action");
   const entityType = url.searchParams.get("entityType");
+  const entityId = url.searchParams.get("entityId");
   const adminUsername = url.searchParams.get("adminUsername");
   const from = url.searchParams.get("from");
   const to = url.searchParams.get("to");
@@ -45,6 +52,7 @@ export async function GET(req: NextRequest) {
 
   if (action) query = query.eq("action", action);
   if (entityType) query = query.eq("entity_type", entityType);
+  if (entityId) query = query.eq("entity_id", entityId);
   if (adminUsername) query = query.eq("admin_username", adminUsername);
   if (from) query = query.gte("created_at", from);
   if (to) query = query.lte("created_at", to);

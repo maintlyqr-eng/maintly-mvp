@@ -20,6 +20,7 @@ export type AdminAuditAction =
   | "asset.delete"
   | "asset.restore"
   | "asset.delete_permanent"
+  | "asset.update"
   | "service.delete"
   | "service.restore"
   | "service.delete_permanent"

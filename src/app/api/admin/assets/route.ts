@@ -4,53 +4,114 @@ import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 import { logAdminAction, getRequestIp } from "@/lib/auditLog";
 
 // Admin management for the "assets" table — previously read-only from the
-// Control Center (via /api/admin/bulk-data). This is the first write path:
-// soft-delete + restore, as part of the same Papelera system as accounts
-// and service records (see migration 031). Editing asset fields directly
-// from the admin isn't part of this increment — see the feature backlog.
+// Control Center (via /api/admin/bulk-data). Write paths: soft-delete +
+// restore (same Papelera system as accounts and service records, see
+// migration 031), plus general field editing (item 3 del pedido: "editar"),
+// added in the "Completar gestión existente" increment.
 
-// PATCH: restore a soft-deleted asset. Body: { id, restore: true }
+// Fields an admin is allowed to edit directly. Deliberately excludes
+// created_by (never reassign ownership from here — that's a much bigger,
+// separate decision) and anything QR/id-related (QR linkage has its own
+// dedicated management under item 5 del pedido).
+const EDITABLE_FIELDS = ["asset_type", "brand", "model", "nickname", "vin_serial", "plate"] as const;
+type EditableField = (typeof EDITABLE_FIELDS)[number];
+
+// PATCH: either restore a soft-deleted asset ({ id, restore: true }), or
+// edit one or more of EDITABLE_FIELDS ({ id, updates: { ... } }).
 export async function PATCH(req: NextRequest) {
   if (!isAdminRequest(req)) {
     return NextResponse.json({ error: "Not authorized." }, { status: 401 });
   }
 
   const body = await req.json().catch(() => ({}));
-  const { id, restore } = body ?? {};
+  const { id, restore, updates } = body ?? {};
   if (!id || typeof id !== "string") {
     return NextResponse.json({ error: "Missing asset id." }, { status: 400 });
   }
-  if (restore !== true) {
-    return NextResponse.json({ error: "Nothing to update." }, { status: 400 });
-  }
 
   const admin = getSupabaseAdmin();
-  const { data, error } = await admin
-    .from("assets")
-    .update({ deleted_at: null })
-    .eq("id", id)
-    .select("id")
-    .single();
 
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
-  }
-  if (!data) {
-    return NextResponse.json({ error: "Asset not found." }, { status: 404 });
+  if (restore === true) {
+    const { data, error } = await admin
+      .from("assets")
+      .update({ deleted_at: null })
+      .eq("id", id)
+      .select("id")
+      .single();
+
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+    if (!data) {
+      return NextResponse.json({ error: "Asset not found." }, { status: 404 });
+    }
+
+    const adminUsername = getAdminUsername(req);
+    if (adminUsername) {
+      await logAdminAction({
+        adminUsername,
+        action: "asset.restore",
+        entityType: "asset",
+        entityId: id,
+        ipAddress: getRequestIp(req),
+      });
+    }
+
+    return NextResponse.json({ ok: true });
   }
 
-  const adminUsername = getAdminUsername(req);
-  if (adminUsername) {
-    await logAdminAction({
-      adminUsername,
-      action: "asset.restore",
-      entityType: "asset",
-      entityId: id,
-      ipAddress: getRequestIp(req),
-    });
+  if (updates && typeof updates === "object" && !Array.isArray(updates)) {
+    const patch: Record<string, unknown> = {};
+    for (const key of EDITABLE_FIELDS) {
+      if (Object.prototype.hasOwnProperty.call(updates, key)) {
+        patch[key] = (updates as Record<EditableField, unknown>)[key];
+      }
+    }
+    if (Object.keys(patch).length === 0) {
+      return NextResponse.json({ error: "No editable fields in the request." }, { status: 400 });
+    }
+
+    const { data: beforeRow } = await admin
+      .from("assets")
+      .select(EDITABLE_FIELDS.join(", "))
+      .eq("id", id)
+      .single();
+
+    const { data, error } = await admin
+      .from("assets")
+      .update(patch)
+      .eq("id", id)
+      .select("id")
+      .single();
+
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+    if (!data) {
+      return NextResponse.json({ error: "Asset not found." }, { status: 404 });
+    }
+
+    const adminUsername = getAdminUsername(req);
+    if (adminUsername) {
+      await logAdminAction({
+        adminUsername,
+        action: "asset.update",
+        entityType: "asset",
+        entityId: id,
+        // beforeRow comes from a .select() built from a dynamic field list
+        // (EDITABLE_FIELDS.join(", ")), so it types as Supabase's generic
+        // error-row shape — pass through `unknown` first, same workaround
+        // documented in Item 6 / Logs de Auditoría for this exact pattern.
+        oldValue: (beforeRow as unknown as Record<string, unknown>) ?? null,
+        newValue: patch,
+        ipAddress: getRequestIp(req),
+      });
+    }
+
+    return NextResponse.json({ ok: true });
   }
 
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ error: "Nothing to update." }, { status: 400 });
 }
 
 // DELETE: soft-delete an asset by default (restorable from the Papelera).

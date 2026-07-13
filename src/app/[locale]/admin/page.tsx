@@ -11,7 +11,7 @@ import {
   Ban, ShieldCheck, ShieldOff, Trash2, KeyRound, UserCog,
   UserPlus, UserMinus, Plus, Link2Off, ScanLine, ClipboardList,
   LifeBuoy, Send, MessageCircle, Flag, History, ChevronDown, ChevronRight,
-  Trash, RotateCcw,
+  Trash, RotateCcw, TrendingUp, MapPin, Calendar, Pencil,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { formatDateDMY } from "@/lib/date";
@@ -43,6 +43,7 @@ type AccountRow = {
   verified: boolean;
   suspended: boolean;
   created_at: string;
+  last_active_at: string | null;
   photo_url: string | null;
   profession: string | null;
   certificate_path: string | null;
@@ -130,7 +131,7 @@ type UsageMetrics = {
   checkedAt: string;
 };
 
-type Section = "dashboard" | "accounts" | "mechanics" | "verifications" | "assets" | "services" | "qr" | "support" | "team-chat" | "moderation" | "audit-log" | "trash";
+type Section = "dashboard" | "accounts" | "mechanics" | "verifications" | "assets" | "services" | "qr" | "support" | "team-chat" | "moderation" | "analytics" | "audit-log" | "trash";
 
 type SupportMessageRow = {
   id: string;
@@ -232,6 +233,35 @@ type ContentReportRow = {
   mechanic: { name: string; email: string } | null;
 };
 
+// Item 8 del pedido de Facu ("Analytics avanzados") + la parte de item 9
+// ("Estado y calidad de la plataforma") derivable de datos existentes.
+// Leído acá desde /api/admin/analytics — ver ese route.ts para el detalle
+// de cómo se calcula cada campo.
+type AnalyticsAssetRef = { assetId: string; count: number; asset: { asset_type: string; brand: string | null; model: string | null; nickname: string | null } | null };
+type AnalyticsData = {
+  range: { from: string; to: string };
+  activeToday: number;
+  activeThisWeek: number;
+  activeThisMonth: number;
+  inactiveMechanics: number;
+  totalMechanics: number;
+  returningMechanics: number;
+  totalAssets: number;
+  totalServices: number;
+  totalQrCodes: number;
+  avgRecordsPerAsset: number;
+  avgDaysToFirstMaintenance: number | null;
+  scansInRange: number;
+  scansInRangeTruncated: boolean;
+  servicesInRange: number;
+  servicesInRangeTruncated: boolean;
+  topScannedAssets: AnalyticsAssetRef[];
+  topAssetsByRecords: AnalyticsAssetRef[];
+  topLocations: { location: string; count: number }[];
+  assetsWithoutRecords: number;
+  qrNeverScanned: number;
+};
+
 // ────────────────────────────────────────────────────────────────────────────
 // Constants
 // ────────────────────────────────────────────────────────────────────────────
@@ -261,6 +291,17 @@ const ASSET_COLORS: Record<string, string> = {
 
 function formatDate(iso: string) {
   return formatDateDMY(iso);
+}
+
+// "Sin actividad" threshold used both for the amber highlight on the
+// Accounts table's "Último acceso" column and for the Analytics section's
+// inactive-Maintlers count (item 8/9 del pedido de Facu) — kept as one
+// constant so both places agree on what "inactive" means.
+const INACTIVE_DAYS_THRESHOLD = 30;
+function isStaleActivity(iso: string) {
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return false;
+  return Date.now() - d.getTime() > INACTIVE_DAYS_THRESHOLD * 24 * 60 * 60 * 1000;
 }
 
 const DATE_LOCALE: Record<string, string> = { en: "en-US", es: "es-AR", pt: "pt-BR" };
@@ -483,9 +524,21 @@ export default function AdminPage() {
   const [auditLogsPage, setAuditLogsPage] = useState(1);
   const [auditLogActionFilter, setAuditLogActionFilter] = useState("all");
   const [auditLogEntityFilter, setAuditLogEntityFilter] = useState("all");
+  // Filtro por ID exacto de entidad — alimentado normalmente por los botones
+  // "Ver historial" de Cuentas/Assets (viewHistory()), pero también editable
+  // a mano por si el admin ya tiene un ID copiado de otro lado.
+  const [auditLogEntityIdFilter, setAuditLogEntityIdFilter] = useState("");
   const [auditLogFrom, setAuditLogFrom] = useState("");
   const [auditLogTo, setAuditLogTo] = useState("");
   const [expandedAuditLogId, setExpandedAuditLogId] = useState<string | null>(null);
+
+  // ── Analytics (item 8 del pedido de Facu) ──
+  // Rango con fecha por defecto de últimos 30 días, mismo criterio que el
+  // resto del panel usa para "sin actividad" (INACTIVE_DAYS_THRESHOLD).
+  const [analyticsData, setAnalyticsData] = useState<AnalyticsData | null>(null);
+  const [analyticsLoading, setAnalyticsLoading] = useState(true);
+  const [analyticsFrom, setAnalyticsFrom] = useState(() => new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10));
+  const [analyticsTo, setAnalyticsTo] = useState(() => new Date().toISOString().slice(0, 10));
 
   // ── Reportes y Moderación (item 6 del pedido de Facu) ──
   const REPORTS_PAGE_SIZE = 25;
@@ -510,9 +563,25 @@ export default function AdminPage() {
   const [trashServices, setTrashServices] = useState<TrashServiceRow[]>([]);
   const [trashLoading, setTrashLoading] = useState(true);
   const [trashTab, setTrashTab] = useState<"mechanics" | "assets" | "services">("mechanics");
+  // Filtro de fecha de la Papelera (por fecha de borrado, deleted_at) — se
+  // aplica en el cliente sobre los datos ya cargados, mismo criterio que el
+  // resto del panel (sin paginación server-side acá, ver /api/admin/trash).
+  const [trashFilterFrom, setTrashFilterFrom] = useState("");
+  const [trashFilterTo, setTrashFilterTo] = useState("");
 
   // ── Assets UI state ──
   const [assetSearch, setAssetSearch] = useState("");
+  // Edición de campos de asset desde el admin (item 3 del pedido: "editar") —
+  // el asset editado en el modal, y un draft local por campo hasta guardar.
+  const [editAssetRow, setEditAssetRow] = useState<AssetRow | null>(null);
+  const [editAssetType, setEditAssetType] = useState("");
+  const [editBrand, setEditBrand] = useState("");
+  const [editModel, setEditModel] = useState("");
+  const [editNickname, setEditNickname] = useState("");
+  const [editVin, setEditVin] = useState("");
+  const [editPlate, setEditPlate] = useState("");
+  const [editAssetSaving, setEditAssetSaving] = useState(false);
+  const [editAssetError, setEditAssetError] = useState("");
 
   // ── Services UI state ──
   const [svcMechanicFilter, setSvcMechanicFilter] = useState("all");
@@ -738,6 +807,7 @@ export default function AdminPage() {
       params.set("pageSize", String(AUDIT_LOG_PAGE_SIZE));
       if (auditLogActionFilter !== "all") params.set("action", auditLogActionFilter);
       if (auditLogEntityFilter !== "all") params.set("entityType", auditLogEntityFilter);
+      if (auditLogEntityIdFilter.trim()) params.set("entityId", auditLogEntityIdFilter.trim());
       if (auditLogFrom) params.set("from", new Date(auditLogFrom).toISOString());
       if (auditLogTo) params.set("to", new Date(new Date(auditLogTo).getTime() + 86400000).toISOString());
 
@@ -747,6 +817,20 @@ export default function AdminPage() {
       setAuditLogsTotal((data.total as number) ?? 0);
     } finally {
       setAuditLogsLoading(false);
+    }
+  }
+
+  async function loadAnalytics() {
+    setAnalyticsLoading(true);
+    try {
+      const params = new URLSearchParams();
+      params.set("from", new Date(analyticsFrom).toISOString());
+      params.set("to", new Date(new Date(analyticsTo).getTime() + 86400000).toISOString());
+      const res = await fetch(`/api/admin/analytics?${params.toString()}`);
+      const data = await res.json().catch(() => null);
+      if (data && !data.error) setAnalyticsData(data as AnalyticsData);
+    } finally {
+      setAnalyticsLoading(false);
     }
   }
 
@@ -950,7 +1034,7 @@ export default function AdminPage() {
       loadAuditLogs();
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [section, adminAuthed, auditLogsPage, auditLogActionFilter, auditLogEntityFilter, auditLogFrom, auditLogTo]);
+  }, [section, adminAuthed, auditLogsPage, auditLogActionFilter, auditLogEntityFilter, auditLogEntityIdFilter, auditLogFrom, auditLogTo]);
 
   // Reportes y Moderación: same reasoning as the audit log effect above —
   // server-side filters/pagination, so filter changes need a real refetch,
@@ -961,6 +1045,14 @@ export default function AdminPage() {
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [section, adminAuthed, reportsPage, reportStatusFilter, reportTypeFilter]);
+
+  // Analytics: refetch on open and whenever the date range changes.
+  useEffect(() => {
+    if (section === "analytics" && adminAuthed) {
+      loadAnalytics();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [section, adminAuthed, analyticsFrom, analyticsTo]);
 
   // Papelera: refetch every time the tab opens, same lazy pattern as
   // Support/Team Chat — a restore or permanent delete elsewhere shouldn't
@@ -1164,6 +1256,54 @@ export default function AdminPage() {
     });
   }
 
+  // Edición de campos de asset (item 3 del pedido: "editar") — el primer
+  // punto de escritura de campos generales sobre "assets" desde el admin;
+  // hasta este incremento solo existía soft-delete/restore/permanent-delete.
+  function openEditAsset(a: AssetRow) {
+    setEditAssetRow(a);
+    setEditAssetType(a.asset_type);
+    setEditBrand(a.brand ?? "");
+    setEditModel(a.model ?? "");
+    setEditNickname(a.nickname ?? "");
+    setEditVin(a.vin_serial ?? "");
+    setEditPlate(a.plate ?? "");
+    setEditAssetError("");
+  }
+
+  async function handleSaveAssetEdit() {
+    if (!editAssetRow) return;
+    setEditAssetSaving(true);
+    setEditAssetError("");
+    const updates = {
+      asset_type: editAssetType,
+      brand: editBrand.trim() || null,
+      model: editModel.trim() || null,
+      nickname: editNickname.trim() || null,
+      vin_serial: editVin.trim() || null,
+      plate: editPlate.trim() || null,
+    };
+    const res = await adminFetch("/api/admin/assets", "PATCH", { id: editAssetRow.id, updates });
+    setEditAssetSaving(false);
+    if (!res.ok) { setEditAssetError(res.error); return; }
+    setAssets((prev) => prev.map((x) => (x.id === editAssetRow.id ? { ...x, ...updates } : x)));
+    flash(t("assetUpdated"));
+    setEditAssetRow(null);
+  }
+
+  // "Ver historial de acciones" (item 2/3 del pedido) — salta a Logs de
+  // Auditoría filtrado por esta entidad exacta, en vez de tener que buscarla
+  // a mano entre todas las acciones de todos los admins.
+  function viewHistory(entityType: string, entityId: string) {
+    setAuditLogEntityFilter(entityType);
+    setAuditLogEntityIdFilter(entityId);
+    setAuditLogActionFilter("all");
+    setAuditLogFrom("");
+    setAuditLogTo("");
+    setAuditLogsPage(1);
+    setDetailAccount(null);
+    setSection("audit-log");
+  }
+
   // ── Service actions ──
   function confirmDeleteService(s: ServiceRow) {
     setConfirmAction({
@@ -1266,15 +1406,59 @@ export default function AdminPage() {
       .sort((a, b) => (a.verification_requested_at ?? "").localeCompare(b.verification_requested_at ?? ""));
   }, [accounts]);
 
+  // asset_id -> códigos de QR vinculados, para poder buscar un asset por su
+  // QR (item 3 del pedido: búsqueda por "QR/ID/serie/matrícula/marca/
+  // modelo/nombre/tipo/creador/fecha" — antes solo cubría marca/modelo/
+  // apodo/VIN/matrícula/dueño).
+  const qrCodesByAssetId = useMemo(() => {
+    const m: Record<string, string[]> = {};
+    for (const q of qrCodes) {
+      if (!q.asset_id) continue;
+      (m[q.asset_id] ??= []).push(q.code);
+    }
+    return m;
+  }, [qrCodes]);
+
   const visibleAssets = useMemo(() => {
     const q = assetSearch.trim().toLowerCase();
     if (!q) return assets;
     return assets.filter((a) => {
       const owner = a.created_by ? mechanicsById[a.created_by]?.name : "";
-      const hay = [a.brand, a.model, a.nickname, a.vin_serial, a.plate, owner].filter(Boolean).join(" ").toLowerCase();
+      const qrs = qrCodesByAssetId[a.id]?.join(" ") ?? "";
+      const hay = [
+        a.id, a.brand, a.model, a.nickname, a.vin_serial, a.plate, owner,
+        tAssetTypes(a.asset_type), qrs, formatDate(a.created_at),
+      ].filter(Boolean).join(" ").toLowerCase();
       return hay.includes(q);
     });
-  }, [assets, assetSearch, mechanicsById]);
+  }, [assets, assetSearch, mechanicsById, qrCodesByAssetId, tAssetTypes]);
+
+  // Filtro de fecha para la Papelera (por deleted_at) — pedido explícito
+  // pendiente desde el incremento 2 de Item 6 ("filtrar Papelera por
+  // fecha"). Se filtra en el cliente porque /api/admin/trash ya trae todo
+  // capado a 500 filas por tipo sin paginación real (ver ese archivo).
+  function withinTrashRange(deletedAt: string) {
+    if (!trashFilterFrom && !trashFilterTo) return true;
+    const d = new Date(deletedAt).getTime();
+    if (trashFilterFrom && d < new Date(trashFilterFrom).getTime()) return false;
+    if (trashFilterTo && d > new Date(trashFilterTo).getTime() + 86400000) return false;
+    return true;
+  }
+  const visibleTrashMechanics = useMemo(
+    () => trashMechanics.filter((r) => withinTrashRange(r.deleted_at)),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [trashMechanics, trashFilterFrom, trashFilterTo]
+  );
+  const visibleTrashAssets = useMemo(
+    () => trashAssets.filter((r) => withinTrashRange(r.deleted_at)),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [trashAssets, trashFilterFrom, trashFilterTo]
+  );
+  const visibleTrashServices = useMemo(
+    () => trashServices.filter((r) => withinTrashRange(r.deleted_at)),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [trashServices, trashFilterFrom, trashFilterTo]
+  );
 
   const serviceTypeOptions = useMemo(() => Array.from(new Set(services.map((s) => s.service_type))), [services]);
 
@@ -1387,13 +1571,14 @@ export default function AdminPage() {
     { id: "support",   label: t("navSupport"),   icon: LifeBuoy  },
     { id: "team-chat", label: t("navTeamChat"), icon: MessageCircle },
     { id: "moderation", label: t("navModeration"), icon: Flag },
+    { id: "analytics", label: t("navAnalytics"), icon: TrendingUp },
     { id: "audit-log", label: t("navAuditLog"), icon: History },
     { id: "trash",     label: t("navTrash"),     icon: Trash    },
   ];
   const sectionLabels: Record<Section, string> = {
     dashboard: t("navDashboard"), accounts: t("navAccounts"), mechanics: t("navMechanics"), verifications: t("navVerifications"),
     assets: t("navAssets"), services: t("navServices"), qr: t("navQr"), support: t("navSupport"), "team-chat": t("navTeamChat"),
-    moderation: t("navModeration"), "audit-log": t("navAuditLog"), trash: t("navTrash"),
+    moderation: t("navModeration"), analytics: t("navAnalytics"), "audit-log": t("navAuditLog"), trash: t("navTrash"),
   };
   const REPORT_TYPE_LABEL: Record<string, string> = {
     incorrect_info: t("reportTypeIncorrectInfo"),
@@ -1424,12 +1609,14 @@ export default function AdminPage() {
     "asset.delete": t("auditActionAssetDelete"),
     "asset.restore": t("auditActionAssetRestore"),
     "asset.delete_permanent": t("auditActionAssetDeletePermanent"),
+    "asset.update": t("auditActionAssetUpdate"),
     "service.delete": t("auditActionServiceDelete"),
     "service.restore": t("auditActionServiceRestore"),
     "service.delete_permanent": t("auditActionServiceDeletePermanent"),
     "qr.generate_batch": t("auditActionQrGenerateBatch"),
     "qr.unlink": t("auditActionQrUnlink"),
     "support_thread.clear": t("auditActionSupportThreadClear"),
+    "report.update_status": t("auditActionReportUpdateStatus"),
   };
   const AUDIT_ENTITY_LABEL: Record<string, string> = {
     mechanic: t("auditEntityMechanic"),
@@ -1438,6 +1625,7 @@ export default function AdminPage() {
     qr_code: t("auditEntityQrCode"),
     qr_batch: t("auditEntityQrBatch"),
     support_thread: t("auditEntitySupportThread"),
+    content_report: t("auditEntityContentReport"),
   };
   const auditLogTotalPages = Math.max(1, Math.ceil(auditLogsTotal / AUDIT_LOG_PAGE_SIZE));
   const reportsTotalPages = Math.max(1, Math.ceil(reportsTotal / REPORTS_PAGE_SIZE));
@@ -1676,10 +1864,10 @@ export default function AdminPage() {
                   <SectionTitle>{t("accountsCount", { count: visibleAccounts.length })}</SectionTitle>
                 </div>
                 <div className="overflow-x-auto">
-                  <table className="w-full min-w-[820px]">
+                  <table className="w-full min-w-[900px]">
                     <thead>
                       <tr className="bg-zinc-50 border-b border-zinc-100">
-                        {[t("colAccount"), t("colRoles"), t("colStatus"), t("colJoined"), ""].map((h) => (
+                        {[t("colAccount"), t("colRoles"), t("colStatus"), t("colLastActive"), t("colJoined"), ""].map((h) => (
                           <th key={h} className="px-7 py-3 text-left text-[9px] font-bold text-zinc-400 uppercase tracking-widest">{h}</th>
                         ))}
                       </tr>
@@ -1716,6 +1904,15 @@ export default function AdminPage() {
                                 ? <Pill tone="red">{t("suspendedPill")}</Pill>
                                 : <Pill tone="emerald">{t("activePill")}</Pill>}
                             </td>
+                            <td className="px-7 py-4 text-[12px]">
+                              {a.last_active_at ? (
+                                <span className={isStaleActivity(a.last_active_at) ? "text-amber-600 font-semibold" : "text-zinc-400"}>
+                                  {formatDate(a.last_active_at)}
+                                </span>
+                              ) : (
+                                <span className="text-zinc-300">{t("neverActive")}</span>
+                              )}
+                            </td>
                             <td className="px-7 py-4 text-[12px] text-zinc-400">{formatDate(a.created_at)}</td>
                             <td className="px-7 py-4 text-right">
                               <span className="text-[11px] font-bold text-zinc-400">{t("viewArrow")}</span>
@@ -1724,7 +1921,7 @@ export default function AdminPage() {
                         );
                       })}
                       {visibleAccounts.length === 0 && (
-                        <tr><td colSpan={5} className="px-7 py-16 text-center text-[13px] text-zinc-300">{t("noAccountsMatch")}</td></tr>
+                        <tr><td colSpan={6} className="px-7 py-16 text-center text-[13px] text-zinc-300">{t("noAccountsMatch")}</td></tr>
                       )}
                     </tbody>
                   </table>
@@ -1885,7 +2082,7 @@ export default function AdminPage() {
                   <SectionTitle>{t("assetsCount", { count: visibleAssets.length })}</SectionTitle>
                 </div>
                 <div className="overflow-x-auto">
-                  <table className="w-full min-w-[820px]">
+                  <table className="w-full min-w-[900px]">
                     <thead>
                       <tr className="bg-zinc-50 border-b border-zinc-100">
                         {[t("colAsset"), t("colType"), t("colVin"), t("colOwner"), t("colServices"), t("colRegistered"), ""].map((h) => (
@@ -1911,9 +2108,17 @@ export default function AdminPage() {
                             <td className="px-7 py-4 text-[12px] text-zinc-500">{servicesByAsset[a.id] ?? 0}</td>
                             <td className="px-7 py-4 text-[12px] text-zinc-400">{formatDate(a.created_at)}</td>
                             <td className="px-7 py-4 text-right">
-                              <button onClick={() => confirmDeleteAsset(a)} className="text-zinc-300 hover:text-red-600 transition-colors" title={t("deleteTitle")}>
-                                <Trash2 size={14} />
-                              </button>
+                              <div className="flex items-center justify-end gap-3">
+                                <button onClick={() => openEditAsset(a)} className="text-zinc-300 hover:text-zinc-700 transition-colors" title={t("editTitle")}>
+                                  <Pencil size={14} />
+                                </button>
+                                <button onClick={() => viewHistory("asset", a.id)} className="text-zinc-300 hover:text-blue-600 transition-colors" title={t("viewHistoryTitle")}>
+                                  <History size={14} />
+                                </button>
+                                <button onClick={() => confirmDeleteAsset(a)} className="text-zinc-300 hover:text-red-600 transition-colors" title={t("deleteTitle")}>
+                                  <Trash2 size={14} />
+                                </button>
+                              </div>
                             </td>
                           </tr>
                         );
@@ -2432,9 +2637,18 @@ export default function AdminPage() {
                     className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-[12px] outline-none focus:border-red-400"
                   />
                 </div>
-                {(auditLogActionFilter !== "all" || auditLogEntityFilter !== "all" || auditLogFrom || auditLogTo) && (
+                <div>
+                  <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1">{t("auditFilterEntityId")}</label>
+                  <input
+                    type="text" value={auditLogEntityIdFilter}
+                    onChange={(e) => { setAuditLogEntityIdFilter(e.target.value); setAuditLogsPage(1); }}
+                    placeholder={t("auditFilterEntityIdPlaceholder")}
+                    className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-[12px] font-mono outline-none focus:border-red-400 w-[220px]"
+                  />
+                </div>
+                {(auditLogActionFilter !== "all" || auditLogEntityFilter !== "all" || auditLogEntityIdFilter || auditLogFrom || auditLogTo) && (
                   <button
-                    onClick={() => { setAuditLogActionFilter("all"); setAuditLogEntityFilter("all"); setAuditLogFrom(""); setAuditLogTo(""); setAuditLogsPage(1); }}
+                    onClick={() => { setAuditLogActionFilter("all"); setAuditLogEntityFilter("all"); setAuditLogEntityIdFilter(""); setAuditLogFrom(""); setAuditLogTo(""); setAuditLogsPage(1); }}
                     className="text-[11px] font-bold text-zinc-400 hover:text-red-600 transition-colors px-2 py-2"
                   >
                     {t("auditFilterClear")}
@@ -2722,6 +2936,150 @@ export default function AdminPage() {
             </div>
           )}
 
+          {/* ── ANALYTICS (item 8 del pedido de Facu) ───────────────────────── */}
+          {section === "analytics" && (
+            <div className="space-y-5">
+              <div className="flex flex-wrap items-end justify-between gap-3">
+                <p className="text-[12px] text-zinc-400 max-w-lg">{t("analyticsIntro")}</p>
+                <div className="flex items-end gap-3">
+                  <div>
+                    <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1">{t("auditFilterFrom")}</label>
+                    <input
+                      type="date" value={analyticsFrom}
+                      onChange={(e) => setAnalyticsFrom(e.target.value)}
+                      className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-[12px] outline-none focus:border-red-400"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1">{t("auditFilterTo")}</label>
+                    <input
+                      type="date" value={analyticsTo}
+                      onChange={(e) => setAnalyticsTo(e.target.value)}
+                      className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-[12px] outline-none focus:border-red-400"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {analyticsLoading || !analyticsData ? (
+                <p className="text-[13px] text-zinc-400 text-center py-16">{t("loading")}</p>
+              ) : (
+                <>
+                  <div>
+                    <SectionTitle>{t("analyticsActiveUsersTitle")}</SectionTitle>
+                    <div className="grid grid-cols-2 xl:grid-cols-5 gap-4 mt-3">
+                      <StatCard label={t("analyticsActiveToday")} value={analyticsData.activeToday} icon={Users} accent="bg-blue-500" />
+                      <StatCard label={t("analyticsActiveWeek")} value={analyticsData.activeThisWeek} icon={Users} accent="bg-indigo-500" />
+                      <StatCard label={t("analyticsActiveMonth")} value={analyticsData.activeThisMonth} icon={Users} accent="bg-purple-500" />
+                      <StatCard label={t("analyticsReturning")} value={analyticsData.returningMechanics} icon={TrendingUp} accent="bg-emerald-500" sub={t("analyticsReturningSub")} />
+                      <StatCard label={t("analyticsInactive")} value={analyticsData.inactiveMechanics} icon={Users} accent="bg-amber-500" sub={t("analyticsInactiveSub", { days: INACTIVE_DAYS_THRESHOLD })} />
+                    </div>
+                  </div>
+
+                  <div>
+                    <SectionTitle>{t("analyticsHealthTitle")}</SectionTitle>
+                    <div className="grid grid-cols-2 xl:grid-cols-4 gap-4 mt-3">
+                      <StatCard label={t("analyticsAvgRecordsPerAsset")} value={analyticsData.avgRecordsPerAsset.toFixed(1)} icon={ClipboardList} accent="bg-cyan-500" />
+                      <StatCard
+                        label={t("analyticsAvgDaysToFirst")}
+                        value={analyticsData.avgDaysToFirstMaintenance != null ? analyticsData.avgDaysToFirstMaintenance.toFixed(0) : "—"}
+                        icon={Calendar}
+                        accent="bg-orange-500"
+                      />
+                      <StatCard label={t("analyticsAssetsWithoutRecords")} value={analyticsData.assetsWithoutRecords} icon={Box} accent="bg-red-500" sub={t("analyticsOfTotal", { total: analyticsData.totalAssets })} />
+                      <StatCard label={t("analyticsQrNeverScanned")} value={analyticsData.qrNeverScanned} icon={QrCode} accent="bg-zinc-500" sub={t("analyticsOfTotal", { total: analyticsData.totalQrCodes })} />
+                    </div>
+                  </div>
+
+                  <div>
+                    <SectionTitle>{t("analyticsRangeActivityTitle")}</SectionTitle>
+                    <div className="grid grid-cols-2 gap-4 mt-3">
+                      <StatCard
+                        label={t("analyticsScansInRange")}
+                        value={analyticsData.scansInRange.toLocaleString()}
+                        icon={ScanLine}
+                        accent="bg-pink-500"
+                        sub={analyticsData.scansInRangeTruncated ? t("analyticsSampleNote") : undefined}
+                      />
+                      <StatCard
+                        label={t("analyticsServicesInRange")}
+                        value={analyticsData.servicesInRange.toLocaleString()}
+                        icon={Wrench}
+                        accent="bg-teal-500"
+                        sub={analyticsData.servicesInRangeTruncated ? t("analyticsSampleNote") : undefined}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
+                    <div className="bg-white rounded-2xl border border-zinc-200/80 p-6 shadow-sm">
+                      <SectionTitle>{t("analyticsTopScannedTitle")}</SectionTitle>
+                      {analyticsData.topScannedAssets.length === 0 ? (
+                        <p className="text-[13px] text-zinc-300 mt-4">{t("analyticsNoData")}</p>
+                      ) : (
+                        <div className="space-y-2.5 mt-4">
+                          {analyticsData.topScannedAssets.map((r, i) => (
+                            <div key={r.assetId} className="flex items-center gap-3">
+                              <span className="text-[11px] font-black text-zinc-300 w-4 shrink-0">{i + 1}</span>
+                              <span className="text-[15px] shrink-0">{r.asset ? ASSET_ICONS[r.asset.asset_type] ?? "🔧" : "🔧"}</span>
+                              <span className="text-[12.5px] font-semibold text-zinc-700 truncate flex-1">{r.asset ? assetLabel(r.asset) : r.assetId}</span>
+                              <span className="text-[12px] font-black text-zinc-900 shrink-0">{r.count}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="bg-white rounded-2xl border border-zinc-200/80 p-6 shadow-sm">
+                      <SectionTitle>{t("analyticsTopRecordsTitle")}</SectionTitle>
+                      {analyticsData.topAssetsByRecords.length === 0 ? (
+                        <p className="text-[13px] text-zinc-300 mt-4">{t("analyticsNoData")}</p>
+                      ) : (
+                        <div className="space-y-2.5 mt-4">
+                          {analyticsData.topAssetsByRecords.map((r, i) => (
+                            <div key={r.assetId} className="flex items-center gap-3">
+                              <span className="text-[11px] font-black text-zinc-300 w-4 shrink-0">{i + 1}</span>
+                              <span className="text-[15px] shrink-0">{r.asset ? ASSET_ICONS[r.asset.asset_type] ?? "🔧" : "🔧"}</span>
+                              <span className="text-[12.5px] font-semibold text-zinc-700 truncate flex-1">{r.asset ? assetLabel(r.asset) : r.assetId}</span>
+                              <span className="text-[12px] font-black text-zinc-900 shrink-0">{r.count}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="bg-white rounded-2xl border border-zinc-200/80 p-6 shadow-sm">
+                    <div className="flex items-center gap-2 mb-1">
+                      <MapPin size={14} className="text-zinc-400" />
+                      <SectionTitle>{t("analyticsTopLocationsTitle")}</SectionTitle>
+                    </div>
+                    <p className="text-[10.5px] text-zinc-300 mb-4">{t("analyticsTopLocationsNote")}</p>
+                    {analyticsData.topLocations.length === 0 ? (
+                      <p className="text-[13px] text-zinc-300">{t("analyticsNoData")}</p>
+                    ) : (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-2.5">
+                        {analyticsData.topLocations.map((loc) => {
+                          const max = analyticsData.topLocations[0].count;
+                          const pct = Math.round((loc.count / max) * 100);
+                          return (
+                            <div key={loc.location} className="flex items-center gap-3">
+                              <span className="text-[12px] font-semibold text-zinc-700 truncate flex-1">{loc.location}</span>
+                              <div className="w-20 h-1.5 bg-zinc-100 rounded-full overflow-hidden shrink-0">
+                                <div className="h-full bg-red-500 rounded-full" style={{ width: `${pct}%` }} />
+                              </div>
+                              <span className="text-[11px] font-black text-zinc-900 w-6 text-right shrink-0">{loc.count}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+
           {/* ── PAPELERA ──────────────────────────────────────────────────── */}
           {section === "trash" && (
             <div className="space-y-4">
@@ -2742,11 +3100,40 @@ export default function AdminPage() {
                 ))}
               </div>
 
+              {/* Filtro por fecha de borrado (deleted_at) — pendiente desde
+                  el incremento 2 de Item 6, resuelto acá. */}
+              <div className="flex flex-wrap items-end gap-3">
+                <div>
+                  <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1">{t("auditFilterFrom")}</label>
+                  <input
+                    type="date" value={trashFilterFrom}
+                    onChange={(e) => setTrashFilterFrom(e.target.value)}
+                    className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-[12px] outline-none focus:border-red-400"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1">{t("auditFilterTo")}</label>
+                  <input
+                    type="date" value={trashFilterTo}
+                    onChange={(e) => setTrashFilterTo(e.target.value)}
+                    className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-[12px] outline-none focus:border-red-400"
+                  />
+                </div>
+                {(trashFilterFrom || trashFilterTo) && (
+                  <button
+                    onClick={() => { setTrashFilterFrom(""); setTrashFilterTo(""); }}
+                    className="text-[11px] font-bold text-zinc-400 hover:text-red-600 transition-colors px-2 py-2"
+                  >
+                    {t("auditFilterClear")}
+                  </button>
+                )}
+              </div>
+
               <div className="bg-white rounded-2xl border border-zinc-200/80 shadow-sm overflow-hidden">
                 {trashLoading ? (
                   <p className="text-[13px] text-zinc-400 text-center py-16">{t("loading")}</p>
                 ) : trashTab === "mechanics" ? (
-                  trashMechanics.length === 0 ? (
+                  visibleTrashMechanics.length === 0 ? (
                     <div className="text-center py-16">
                       <Trash size={28} className="mx-auto text-zinc-200 mb-2" />
                       <p className="text-[13px] text-zinc-300 font-medium">{t("trashEmptyMechanics")}</p>
@@ -2762,7 +3149,7 @@ export default function AdminPage() {
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-zinc-50">
-                          {trashMechanics.map((row) => (
+                          {visibleTrashMechanics.map((row) => (
                             <tr key={row.id} className="hover:bg-zinc-50/80 transition-colors">
                               <td className="px-7 py-4 text-[13px] font-bold text-zinc-900">{row.name}</td>
                               <td className="px-7 py-4 text-[12px] text-zinc-500">{row.email}</td>
@@ -2784,7 +3171,7 @@ export default function AdminPage() {
                     </div>
                   )
                 ) : trashTab === "assets" ? (
-                  trashAssets.length === 0 ? (
+                  visibleTrashAssets.length === 0 ? (
                     <div className="text-center py-16">
                       <Trash size={28} className="mx-auto text-zinc-200 mb-2" />
                       <p className="text-[13px] text-zinc-300 font-medium">{t("trashEmptyAssets")}</p>
@@ -2800,7 +3187,7 @@ export default function AdminPage() {
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-zinc-50">
-                          {trashAssets.map((row) => {
+                          {visibleTrashAssets.map((row) => {
                             const owner = row.created_by ? mechanicsById[row.created_by] : null;
                             return (
                               <tr key={row.id} className="hover:bg-zinc-50/80 transition-colors">
@@ -2830,7 +3217,7 @@ export default function AdminPage() {
                       </table>
                     </div>
                   )
-                ) : trashServices.length === 0 ? (
+                ) : visibleTrashServices.length === 0 ? (
                   <div className="text-center py-16">
                     <Trash size={28} className="mx-auto text-zinc-200 mb-2" />
                     <p className="text-[13px] text-zinc-300 font-medium">{t("trashEmptyServices")}</p>
@@ -2846,7 +3233,7 @@ export default function AdminPage() {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-zinc-50">
-                        {trashServices.map((row) => (
+                        {visibleTrashServices.map((row) => (
                           <tr key={row.id} className="hover:bg-zinc-50/80 transition-colors">
                             <td className="px-7 py-4 text-[13px] font-bold text-zinc-900">{row.assets ? assetLabel(row.assets) : "—"}</td>
                             <td className="px-7 py-4">
@@ -2919,7 +3306,10 @@ export default function AdminPage() {
                 </div>
               </div>
 
-              <p className="text-[11px] text-zinc-400">{t("joinedOn", { date: formatDate(detailAccount.created_at) })}</p>
+              <p className="text-[11px] text-zinc-400">
+                {t("joinedOn", { date: formatDate(detailAccount.created_at) })}
+                {detailAccount.last_active_at && ` · ${t("lastActiveOn", { date: formatDate(detailAccount.last_active_at) })}`}
+              </p>
 
               {/* Editable fields */}
               <div className="space-y-3">
@@ -3008,6 +3398,15 @@ export default function AdminPage() {
                 </button>
 
                 <button
+                  onClick={() => viewHistory("mechanic", detailAccount.id)}
+                  className="w-full flex items-center justify-between px-3 py-2.5 rounded-xl border border-zinc-200 hover:bg-zinc-50 transition-colors text-left"
+                >
+                  <span className="flex items-center gap-2 text-[12px] font-bold text-zinc-700">
+                    <History size={14} /> {t("viewHistoryTitle")}
+                  </span>
+                </button>
+
+                <button
                   onClick={() => confirmDeleteAccount(detailAccount)}
                   className="w-full flex items-center justify-between px-3 py-2.5 rounded-xl border border-red-200 hover:bg-red-50 transition-colors text-left"
                 >
@@ -3016,6 +3415,79 @@ export default function AdminPage() {
                   </span>
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ══ EDIT ASSET MODAL (item 3 del pedido: "editar") ══ */}
+      {editAssetRow && (
+        <div className="fixed inset-0 z-50 bg-zinc-900/40 flex items-center justify-center p-4" onClick={() => setEditAssetRow(null)}>
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 max-h-[88vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-[16px] font-black text-zinc-900 mb-1">{t("editAssetTitle")}</h3>
+            <p className="text-[12px] text-zinc-400 mb-4">{assetLabel(editAssetRow)}</p>
+
+            <div className="space-y-3">
+              <div>
+                <label className="text-[11px] font-bold text-zinc-600">{t("colType")}</label>
+                <select
+                  value={editAssetType} onChange={(e) => setEditAssetType(e.target.value)}
+                  className="w-full mt-1 rounded-xl border border-zinc-200 px-3 py-2 text-[13px] outline-none focus:border-red-400"
+                >
+                  {Object.keys(ASSET_ICONS).map((type) => (
+                    <option key={type} value={type}>{tAssetTypes(type)}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="text-[11px] font-bold text-zinc-600">{t("editAssetNickname")}</label>
+                <input
+                  type="text" value={editNickname} onChange={(e) => setEditNickname(e.target.value)}
+                  className="w-full mt-1 rounded-xl border border-zinc-200 px-3 py-2 text-[13px] outline-none focus:border-red-400"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[11px] font-bold text-zinc-600">{t("editAssetBrand")}</label>
+                  <input
+                    type="text" value={editBrand} onChange={(e) => setEditBrand(e.target.value)}
+                    className="w-full mt-1 rounded-xl border border-zinc-200 px-3 py-2 text-[13px] outline-none focus:border-red-400"
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] font-bold text-zinc-600">{t("editAssetModel")}</label>
+                  <input
+                    type="text" value={editModel} onChange={(e) => setEditModel(e.target.value)}
+                    className="w-full mt-1 rounded-xl border border-zinc-200 px-3 py-2 text-[13px] outline-none focus:border-red-400"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[11px] font-bold text-zinc-600">{t("editAssetVin")}</label>
+                  <input
+                    type="text" value={editVin} onChange={(e) => setEditVin(e.target.value)}
+                    className="w-full mt-1 rounded-xl border border-zinc-200 px-3 py-2 text-[13px] font-mono outline-none focus:border-red-400"
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] font-bold text-zinc-600">{t("editAssetPlate")}</label>
+                  <input
+                    type="text" value={editPlate} onChange={(e) => setEditPlate(e.target.value)}
+                    className="w-full mt-1 rounded-xl border border-zinc-200 px-3 py-2 text-[13px] font-mono outline-none focus:border-red-400"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {editAssetError && <p className="text-[12px] text-red-600 mt-3">{editAssetError}</p>}
+
+            <div className="flex gap-3 mt-5">
+              <button onClick={() => setEditAssetRow(null)} className="flex-1 border border-zinc-200 text-zinc-700 font-bold py-2.5 rounded-xl text-[13px] hover:bg-zinc-50">{t("cancel")}</button>
+              <button onClick={handleSaveAssetEdit} disabled={editAssetSaving}
+                className="flex-1 bg-red-600 hover:bg-red-500 disabled:opacity-60 text-white font-bold py-2.5 rounded-xl text-[13px] transition-all">
+                {editAssetSaving ? t("saving") : t("saveChanges")}
+              </button>
             </div>
           </div>
         </div>

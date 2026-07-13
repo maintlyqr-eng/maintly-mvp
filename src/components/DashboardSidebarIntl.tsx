@@ -2,12 +2,14 @@
 
 import { Link } from "@/i18n/navigation";
 import Image from "next/image";
+import { useEffect } from "react";
 import { X, Crown } from "lucide-react";
 import { useTranslations } from "next-intl";
 import HoverAvatar from "@/components/HoverAvatar";
 import ContactSupportWidgetIntl from "@/components/ContactSupportWidgetIntl";
 import { navItems } from "@/lib/dashboardNav";
 import { getInitials } from "@/lib/initials";
+import { supabase } from "@/lib/supabase";
 
 // The sidebar used by every dashboard page + admin now that the full
 // Phase 2 i18n rollout is complete (see MAINTLYQR_FEATURE_BACKLOG.md). It
@@ -57,6 +59,19 @@ export default function DashboardSidebarIntl({
   const t = useTranslations("DashboardSidebar");
   const tNav = useTranslations("DashboardNav");
   const initials = getInitials(name);
+
+  // Stamps mechanics.last_active_at (migration 033) on every Dashboard page
+  // load — this component renders on all 12 Dashboard pages, so it's the
+  // one place that can track "still actually using the app" without
+  // duplicating the same effect 12 times. Feeds "último acceso" in Gestión
+  // de Maintlers (item 2 del pedido) and the active-user metrics in
+  // Analytics (item 8). Fire-and-forget: a failed update here should never
+  // block or visibly affect the page the mechanic is trying to use.
+  useEffect(() => {
+    if (!mechanicId) return;
+    supabase.from("mechanics").update({ last_active_at: new Date().toISOString() }).eq("id", mechanicId)
+      .then(({ error }) => { if (error) console.error("last_active_at stamp failed", error.message); });
+  }, [mechanicId]);
 
   return (
     <>
