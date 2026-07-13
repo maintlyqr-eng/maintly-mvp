@@ -261,13 +261,15 @@ const MaintlerCardCanvas = forwardRef<MaintlerCardCanvasHandle, Props>(function 
       ctx.fillRect(0, 0, W, H);
     }
 
-    // Brand mark, top-left, over the artwork's subtle hexagon pattern — the
-    // REAL logo assets, not hand-drawn text: the gear-icon half comes
-    // straight from maintly-logo-full.png (same file the landing page and
-    // dashboard sidebar use — it already reads fine on dark); the wordmark
-    // is maintly-wordmark-light.png, a separate light-colored asset for
-    // dark backgrounds (see the file header comment near the top for how
-    // it was extracted from what Facu supplied).
+    // Brand mark, top-left, over the artwork's subtle hexagon pattern —
+    // wordmark only now, no gear icon. Round 11: with the wordmark now
+    // crisp (maintly-wordmark-light.png, see file header comment), the
+    // small unrecolored gear-icon crop from maintly-logo-full.png sitting
+    // right next to it started reading as a second, unrelated logo
+    // ("hay otro logo ahi dando vueltas") instead of one mark — dropped
+    // per Facu's call ("uno nuevo... sin el engranaje mejor"). If he
+    // supplies a fresh wordmark asset later, only the loadImageEl path
+    // below needs to change.
     //
     // Sizing note (round 9, Facu: "quedo todo peor... se ven mal y chico"):
     // this canvas is CARD_W×CARD_H=1050×660 for print/download quality, but
@@ -279,35 +281,32 @@ const MaintlerCardCanvas = forwardRef<MaintlerCardCanvasHandle, Props>(function 
     // that real display scale in mind, verified by rendering the canvas
     // AND then shrinking it in the browser the same way the app does (see
     // /tmp/card_test/*_scaled.html) rather than just eyeballing it at 1:1.
-    const brandIconSize = 66;
     const brandX = 40, brandY = 30;
+    let brandRowH = 56;
     ctx.textAlign = "left";
     try {
-      const logo = await loadImageEl("/images/maintly-logo-full.png");
-      if (isStale()) return;
-      const iconSrcW = 475; // gear-icon half of the 1619×477 source
-      ctx.drawImage(logo, 0, 0, iconSrcW, logo.height, brandX, brandY, brandIconSize, brandIconSize);
       const wordmark = await loadImageEl("/images/maintly-wordmark-light.png");
       if (isStale()) return;
       const wmH = 56;
+      brandRowH = wmH;
       const wmW = wmH * (wordmark.width / wordmark.height);
-      ctx.drawImage(wordmark, brandX + brandIconSize + 14, brandY + brandIconSize / 2 - wmH / 2, wmW, wmH);
+      ctx.drawImage(wordmark, brandX, brandY, wmW, wmH);
     } catch {
       // Logo failed to load — fall back to plain text so the card still
       // identifies itself.
       ctx.font = "bold 30px Arial, sans-serif";
       ctx.fillStyle = "#e4e4e7";
-      ctx.fillText("MAINTLYQR", brandX + brandIconSize + 14, brandY + brandIconSize / 2 - 2);
+      ctx.fillText("MAINTLYQR", brandX, brandY + 22);
       ctx.font = "bold 12px Arial, sans-serif";
       ctx.fillStyle = "#71717a";
-      ctx.fillText("MAINTENANCE  ·  TRACKED", brandX + brandIconSize + 14, brandY + brandIconSize / 2 + 17);
+      ctx.fillText("MAINTENANCE  ·  TRACKED", brandX, brandY + 41);
     }
 
     // Photo + identity block. contentH stops where the artwork's left-side
     // red bar begins (measured off frontcard1.png), so the block centers
     // against the space actually available above it, not the full card.
     const contentH = 522;
-    const bandTop = brandY + brandIconSize + 26;
+    const bandTop = brandY + brandRowH + 26;
     const bandCy = bandTop + (contentH - bandTop) / 2;
 
     const photoSize = 200;
@@ -431,7 +430,7 @@ const MaintlerCardCanvas = forwardRef<MaintlerCardCanvasHandle, Props>(function 
     // Bigger than before and vertically centered on bandCy (same value the
     // photo uses) so the two sides balance instead of the QR sitting
     // noticeably higher than the photo.
-    const qrOuter = 230;
+    const qrOuter = 260;
     const qrCx = 786, qrCy = bandCy;
     let qrBlob: Blob | null = null;
     try {
