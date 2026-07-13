@@ -15,12 +15,19 @@ export type AdminAuditAction =
   | "admin.logout"
   | "account.update"
   | "account.delete"
+  | "account.restore"
+  | "account.delete_permanent"
+  | "asset.delete"
+  | "asset.restore"
+  | "asset.delete_permanent"
   | "service.delete"
+  | "service.restore"
+  | "service.delete_permanent"
   | "qr.generate_batch"
   | "qr.unlink"
   | "support_thread.clear";
 
-export type AdminAuditEntityType = "mechanic" | "service_record" | "qr_code" | "qr_batch" | "support_thread";
+export type AdminAuditEntityType = "mechanic" | "asset" | "service_record" | "qr_code" | "qr_batch" | "support_thread";
 
 export async function logAdminAction(params: {
   adminUsername: string;

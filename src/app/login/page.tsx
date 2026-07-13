@@ -21,7 +21,12 @@ function LoginForm() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       if (!session) return;
 
-      const { data: m } = await supabase.from("mechanics").select("suspended").eq("id", session.user.id).single();
+      const { data: m } = await supabase.from("mechanics").select("suspended, deleted_at").eq("id", session.user.id).single();
+      if (m?.deleted_at) {
+        await supabase.auth.signOut();
+        setError("This account has been deleted. Contact support if you think this is a mistake.");
+        return;
+      }
       if (m?.suspended) {
         await supabase.auth.signOut();
         setError("This account has been suspended. Contact support if you think this is a mistake.");

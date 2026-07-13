@@ -42,17 +42,22 @@ export async function GET(req: NextRequest) {
     mechanicAssetsRes,
     mechanicAssetsCountRes,
   ] = await Promise.all([
+    // .is("deleted_at", null) on mechanics/assets/service_records excludes
+    // soft-deleted rows (see migration 031) — those show up in the Papelera
+    // section instead (/api/admin/trash), not in the regular admin lists.
     admin.from("mechanics")
       .select("id, name, email, workshop_name, is_mechanic, verified, suspended, created_at, photo_url, profession, certificate_path, verification_status, verification_requested_at, verification_reviewed_at, verification_note")
+      .is("deleted_at", null)
       .order("created_at", { ascending: false })
       .limit(MECHANICS_CAP),
-    admin.from("mechanics").select("*", { count: "exact", head: true }),
+    admin.from("mechanics").select("*", { count: "exact", head: true }).is("deleted_at", null),
 
     admin.from("assets")
       .select("id, asset_type, brand, model, nickname, vin_serial, plate, created_by, created_at")
+      .is("deleted_at", null)
       .order("created_at", { ascending: false })
       .limit(ASSETS_CAP),
-    admin.from("assets").select("*", { count: "exact", head: true }),
+    admin.from("assets").select("*", { count: "exact", head: true }).is("deleted_at", null),
 
     admin.from("qr_codes")
       .select("code, asset_id, created_by, created_at")
@@ -62,9 +67,10 @@ export async function GET(req: NextRequest) {
 
     admin.from("service_records")
       .select("id, service_date, service_type, mechanic_id, asset_id, customer_id, mechanics(name), assets(brand, model, nickname)")
+      .is("deleted_at", null)
       .order("service_date", { ascending: false })
       .limit(SERVICE_RECORDS_CAP),
-    admin.from("service_records").select("*", { count: "exact", head: true }),
+    admin.from("service_records").select("*", { count: "exact", head: true }).is("deleted_at", null),
 
     admin.from("mechanic_assets").select("mechanic_id").limit(MECHANIC_ASSETS_CAP),
     admin.from("mechanic_assets").select("*", { count: "exact", head: true }),

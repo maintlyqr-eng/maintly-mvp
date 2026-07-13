@@ -103,7 +103,7 @@ export default function AssetReportPage() {
       const { data: assetData } = await supabase
         .from("assets")
         .select("id, asset_type, brand, model, nickname, vin_serial, year, plate, fuel_type, location, photo_url")
-        .eq("id", qrRow.asset_id).single();
+        .eq("id", qrRow.asset_id).is("deleted_at", null).single();
       if (!assetData) { setNotFound(true); setLoading(false); return; }
 
       setAsset(assetData as AssetData);
@@ -113,6 +113,7 @@ export default function AssetReportPage() {
         .from("service_records")
         .select("id, service_date, service_type, km_hours, notes, mechanic_id")
         .eq("asset_id", qrRow.asset_id)
+        .is("deleted_at", null)
         .order("service_date", { ascending: false });
 
       const rows = (svcRows as (ServiceRecord & { mechanic_id: string | null })[]) ?? [];

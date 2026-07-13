@@ -11,6 +11,7 @@ import {
   Ban, ShieldCheck, ShieldOff, Trash2, KeyRound, UserCog,
   UserPlus, UserMinus, Plus, Link2Off, ScanLine, ClipboardList,
   LifeBuoy, Send, MessageCircle, Flag, History, ChevronDown, ChevronRight,
+  Trash, RotateCcw,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { formatDateDMY } from "@/lib/date";
@@ -81,6 +82,42 @@ type QrRow = {
   created_at: string;
 };
 
+// ── Papelera (soft delete + restauración — item 14 del pedido de Facu) ──
+// Fed by /api/admin/trash, not bulk-data — these are the rows bulk-data
+// deliberately excludes (deleted_at is not null).
+type TrashMechanicRow = {
+  id: string;
+  name: string;
+  email: string;
+  workshop_name: string | null;
+  is_mechanic: boolean;
+  deleted_at: string;
+};
+
+type TrashAssetRow = {
+  id: string;
+  asset_type: string;
+  brand: string | null;
+  model: string | null;
+  nickname: string | null;
+  vin_serial: string | null;
+  plate: string | null;
+  created_by: string | null;
+  deleted_at: string;
+};
+
+type TrashServiceRow = {
+  id: string;
+  service_date: string;
+  service_type: string;
+  mechanic_id: string | null;
+  asset_id: string | null;
+  customer_id: string | null;
+  deleted_at: string;
+  mechanics: { name: string } | null;
+  assets: { brand: string | null; model: string | null; nickname: string | null } | null;
+};
+
 type AssetTypeCount = { type: string; count: number };
 type DayBucket = { label: string; count: number };
 type UsageMetrics = {
@@ -93,7 +130,7 @@ type UsageMetrics = {
   checkedAt: string;
 };
 
-type Section = "dashboard" | "accounts" | "mechanics" | "verifications" | "assets" | "services" | "qr" | "support" | "team-chat" | "audit-log";
+type Section = "dashboard" | "accounts" | "mechanics" | "verifications" | "assets" | "services" | "qr" | "support" | "team-chat" | "audit-log" | "trash";
 
 type SupportMessageRow = {
   id: string;
@@ -425,6 +462,13 @@ export default function AdminPage() {
   const [auditLogTo, setAuditLogTo] = useState("");
   const [expandedAuditLogId, setExpandedAuditLogId] = useState<string | null>(null);
 
+  // ── Papelera (Trash — soft delete + restauración, item 14 del pedido) ──
+  const [trashMechanics, setTrashMechanics] = useState<TrashMechanicRow[]>([]);
+  const [trashAssets, setTrashAssets] = useState<TrashAssetRow[]>([]);
+  const [trashServices, setTrashServices] = useState<TrashServiceRow[]>([]);
+  const [trashLoading, setTrashLoading] = useState(true);
+  const [trashTab, setTrashTab] = useState<"mechanics" | "assets" | "services">("mechanics");
+
   // ── Assets UI state ──
   const [assetSearch, setAssetSearch] = useState("");
 
@@ -440,10 +484,15 @@ export default function AdminPage() {
   const [generating, setGenerating] = useState(false);
 
   // ── Confirm dialog (shared) ──
+  // `requireTypeToConfirm` gates the confirm button behind typing that exact
+  // word first — reserved for permanent-delete actions (item 13 del pedido
+  // de Facu: "acciones críticas no deben ejecutarse con un solo clic"). Soft
+  // deletes (restorable from the Papelera) use the plain one-click confirm.
   const [confirmAction, setConfirmAction] = useState<null | {
-    title: string; body: string; danger?: boolean; onConfirm: () => Promise<void>;
+    title: string; body: string; danger?: boolean; requireTypeToConfirm?: string; onConfirm: () => Promise<void>;
   }>(null);
   const [confirmBusy, setConfirmBusy] = useState(false);
+  const [confirmTypedText, setConfirmTypedText] = useState("");
 
   function flash(text: string, tone: "ok" | "error" = "ok") {
     setActionMsg({ text, tone });
@@ -650,6 +699,22 @@ export default function AdminPage() {
     }
   }
 
+  // Papelera: small capped lists (see /api/admin/trash's own comment on why
+  // this doesn't need real pagination the way the audit log does), so a
+  // simple lazy-refetch-on-open is enough — same pattern as Support/Team Chat.
+  async function loadTrash() {
+    setTrashLoading(true);
+    try {
+      const res = await fetch("/api/admin/trash");
+      const data = await res.json().catch(() => ({}));
+      setTrashMechanics((data.mechanics as TrashMechanicRow[]) ?? []);
+      setTrashAssets((data.assets as TrashAssetRow[]) ?? []);
+      setTrashServices((data.serviceRecords as TrashServiceRow[]) ?? []);
+    } finally {
+      setTrashLoading(false);
+    }
+  }
+
   // Grouped by unordered pair (sorted id pair joined into one key) rather
   // than by a single "mechanic_id" the way support conversations are,
   // since here BOTH sides are ordinary Maintlers — there's no fixed
@@ -794,6 +859,16 @@ export default function AdminPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [section, adminAuthed, auditLogsPage, auditLogActionFilter, auditLogEntityFilter, auditLogFrom, auditLogTo]);
 
+  // Papelera: refetch every time the tab opens, same lazy pattern as
+  // Support/Team Chat — a restore or permanent delete elsewhere shouldn't
+  // leave a stale trash list sitting around.
+  useEffect(() => {
+    if (section === "trash" && adminAuthed) {
+      loadTrash();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [section, adminAuthed]);
+
   async function handleAdminLogin(e: React.FormEvent) {
     e.preventDefault();
     setLoginError("");
@@ -888,6 +963,9 @@ export default function AdminPage() {
     else flash(t("passwordResetSent", { email }));
   }
 
+  // Soft delete by default — the account moves to the Papelera and stays
+  // fully restorable (see migration 031 + accounts/route.ts). Permanent
+  // deletion is a separate, extra-gated action from within the Papelera.
   function confirmDeleteAccount(a: AccountRow) {
     setConfirmAction({
       title: t("deleteAccountConfirmTitle"),
@@ -898,7 +976,87 @@ export default function AdminPage() {
         if (!res.ok) { flash(res.error, "error"); return; }
         setAccounts((prev) => prev.filter((x) => x.id !== a.id));
         setDetailAccount(null);
-        flash(t("accountDeleted"));
+        flash(t("accountMovedToTrash"));
+      },
+    });
+  }
+
+  function confirmRestoreAccount(row: TrashMechanicRow) {
+    setConfirmAction({
+      title: t("restoreAccountConfirmTitle"),
+      body: t("restoreAccountConfirmBody", { name: row.name, email: row.email }),
+      onConfirm: async () => {
+        const res = await adminFetch("/api/admin/accounts", "PATCH", { id: row.id, restore: true });
+        if (!res.ok) { flash(res.error, "error"); return; }
+        setTrashMechanics((prev) => prev.filter((x) => x.id !== row.id));
+        flash(t("accountRestored"));
+        loadData();
+      },
+    });
+  }
+
+  function confirmPermanentDeleteAccount(row: TrashMechanicRow) {
+    setConfirmAction({
+      title: t("permanentDeleteAccountConfirmTitle"),
+      body: t("permanentDeleteAccountConfirmBody", { name: row.name, email: row.email }),
+      danger: true,
+      requireTypeToConfirm: t("permanentDeleteConfirmWord"),
+      onConfirm: async () => {
+        const res = await adminFetch("/api/admin/accounts", "DELETE", { id: row.id, permanent: true });
+        if (!res.ok) { flash(res.error, "error"); return; }
+        setTrashMechanics((prev) => prev.filter((x) => x.id !== row.id));
+        flash(t("accountPermanentlyDeleted"));
+      },
+    });
+  }
+
+  // ── Asset actions ──
+  // Assets had no write path from the admin at all before this increment —
+  // only ever read (via bulk-data). Soft delete + restore + permanent
+  // delete follow the exact same three-state pattern as accounts/services.
+  function assetLabel(a: { nickname: string | null; brand: string | null; model: string | null }) {
+    return a.nickname || [a.brand, a.model].filter(Boolean).join(" ") || t("unnamedAsset");
+  }
+
+  function confirmDeleteAsset(a: AssetRow) {
+    setConfirmAction({
+      title: t("deleteAssetConfirmTitle"),
+      body: t("deleteAssetConfirmBody", { asset: assetLabel(a) }),
+      danger: true,
+      onConfirm: async () => {
+        const res = await adminFetch("/api/admin/assets", "DELETE", { id: a.id });
+        if (!res.ok) { flash(res.error, "error"); return; }
+        setAssets((prev) => prev.filter((x) => x.id !== a.id));
+        flash(t("assetMovedToTrash"));
+      },
+    });
+  }
+
+  function confirmRestoreAsset(row: TrashAssetRow) {
+    setConfirmAction({
+      title: t("restoreAssetConfirmTitle"),
+      body: t("restoreAssetConfirmBody", { asset: assetLabel(row) }),
+      onConfirm: async () => {
+        const res = await adminFetch("/api/admin/assets", "PATCH", { id: row.id, restore: true });
+        if (!res.ok) { flash(res.error, "error"); return; }
+        setTrashAssets((prev) => prev.filter((x) => x.id !== row.id));
+        flash(t("assetRestored"));
+        loadData();
+      },
+    });
+  }
+
+  function confirmPermanentDeleteAsset(row: TrashAssetRow) {
+    setConfirmAction({
+      title: t("permanentDeleteAssetConfirmTitle"),
+      body: t("permanentDeleteAssetConfirmBody", { asset: assetLabel(row) }),
+      danger: true,
+      requireTypeToConfirm: t("permanentDeleteConfirmWord"),
+      onConfirm: async () => {
+        const res = await adminFetch("/api/admin/assets", "DELETE", { id: row.id, permanent: true });
+        if (!res.ok) { flash(res.error, "error"); return; }
+        setTrashAssets((prev) => prev.filter((x) => x.id !== row.id));
+        flash(t("assetPermanentlyDeleted"));
       },
     });
   }
@@ -913,7 +1071,36 @@ export default function AdminPage() {
         const res = await adminFetch("/api/admin/services", "DELETE", { id: s.id });
         if (!res.ok) { flash(res.error, "error"); return; }
         setServices((prev) => prev.filter((x) => x.id !== s.id));
-        flash(t("serviceRecordDeleted"));
+        flash(t("serviceRecordMovedToTrash"));
+      },
+    });
+  }
+
+  function confirmRestoreService(row: TrashServiceRow) {
+    setConfirmAction({
+      title: t("restoreServiceConfirmTitle"),
+      body: t("restoreServiceConfirmBody", { type: row.service_type, date: formatDate(row.service_date) }),
+      onConfirm: async () => {
+        const res = await adminFetch("/api/admin/services", "PATCH", { id: row.id, restore: true });
+        if (!res.ok) { flash(res.error, "error"); return; }
+        setTrashServices((prev) => prev.filter((x) => x.id !== row.id));
+        flash(t("serviceRecordRestored"));
+        loadData();
+      },
+    });
+  }
+
+  function confirmPermanentDeleteService(row: TrashServiceRow) {
+    setConfirmAction({
+      title: t("permanentDeleteServiceConfirmTitle"),
+      body: t("permanentDeleteServiceConfirmBody", { type: row.service_type, date: formatDate(row.service_date) }),
+      danger: true,
+      requireTypeToConfirm: t("permanentDeleteConfirmWord"),
+      onConfirm: async () => {
+        const res = await adminFetch("/api/admin/services", "DELETE", { id: row.id, permanent: true });
+        if (!res.ok) { flash(res.error, "error"); return; }
+        setTrashServices((prev) => prev.filter((x) => x.id !== row.id));
+        flash(t("serviceRecordPermanentlyDeleted"));
       },
     });
   }
@@ -1097,24 +1284,33 @@ export default function AdminPage() {
     { id: "support",   label: t("navSupport"),   icon: LifeBuoy  },
     { id: "team-chat", label: t("navTeamChat"), icon: MessageCircle },
     { id: "audit-log", label: t("navAuditLog"), icon: History },
+    { id: "trash",     label: t("navTrash"),     icon: Trash    },
   ];
   const sectionLabels: Record<Section, string> = {
     dashboard: t("navDashboard"), accounts: t("navAccounts"), mechanics: t("navMechanics"), verifications: t("navVerifications"),
     assets: t("navAssets"), services: t("navServices"), qr: t("navQr"), support: t("navSupport"), "team-chat": t("navTeamChat"),
-    "audit-log": t("navAuditLog"),
+    "audit-log": t("navAuditLog"), trash: t("navTrash"),
   };
   const AUDIT_ACTION_LABEL: Record<string, string> = {
     "admin.login": t("auditActionAdminLogin"),
     "admin.logout": t("auditActionAdminLogout"),
     "account.update": t("auditActionAccountUpdate"),
     "account.delete": t("auditActionAccountDelete"),
+    "account.restore": t("auditActionAccountRestore"),
+    "account.delete_permanent": t("auditActionAccountDeletePermanent"),
+    "asset.delete": t("auditActionAssetDelete"),
+    "asset.restore": t("auditActionAssetRestore"),
+    "asset.delete_permanent": t("auditActionAssetDeletePermanent"),
     "service.delete": t("auditActionServiceDelete"),
+    "service.restore": t("auditActionServiceRestore"),
+    "service.delete_permanent": t("auditActionServiceDeletePermanent"),
     "qr.generate_batch": t("auditActionQrGenerateBatch"),
     "qr.unlink": t("auditActionQrUnlink"),
     "support_thread.clear": t("auditActionSupportThreadClear"),
   };
   const AUDIT_ENTITY_LABEL: Record<string, string> = {
     mechanic: t("auditEntityMechanic"),
+    asset: t("auditEntityAsset"),
     service_record: t("auditEntityServiceRecord"),
     qr_code: t("auditEntityQrCode"),
     qr_batch: t("auditEntityQrBatch"),
@@ -1561,14 +1757,14 @@ export default function AdminPage() {
                   <table className="w-full min-w-[820px]">
                     <thead>
                       <tr className="bg-zinc-50 border-b border-zinc-100">
-                        {[t("colAsset"), t("colType"), t("colVin"), t("colOwner"), t("colServices"), t("colRegistered")].map((h) => (
+                        {[t("colAsset"), t("colType"), t("colVin"), t("colOwner"), t("colServices"), t("colRegistered"), ""].map((h) => (
                           <th key={h} className="px-7 py-3 text-left text-[9px] font-bold text-zinc-400 uppercase tracking-widest">{h}</th>
                         ))}
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-zinc-50">
                       {visibleAssets.map((a) => {
-                        const label = a.nickname || [a.brand, a.model].filter(Boolean).join(" ") || t("unnamedAsset");
+                        const label = assetLabel(a);
                         const owner = a.created_by ? mechanicsById[a.created_by] : null;
                         return (
                           <tr key={a.id} className="hover:bg-zinc-50/80 transition-colors">
@@ -1583,11 +1779,16 @@ export default function AdminPage() {
                             <td className="px-7 py-4 text-[12px] text-zinc-500">{owner?.name ?? "—"}</td>
                             <td className="px-7 py-4 text-[12px] text-zinc-500">{servicesByAsset[a.id] ?? 0}</td>
                             <td className="px-7 py-4 text-[12px] text-zinc-400">{formatDate(a.created_at)}</td>
+                            <td className="px-7 py-4 text-right">
+                              <button onClick={() => confirmDeleteAsset(a)} className="text-zinc-300 hover:text-red-600 transition-colors" title={t("deleteTitle")}>
+                                <Trash2 size={14} />
+                              </button>
+                            </td>
                           </tr>
                         );
                       })}
                       {visibleAssets.length === 0 && (
-                        <tr><td colSpan={6} className="px-7 py-16 text-center text-[13px] text-zinc-300">{t("noAssetsMatch")}</td></tr>
+                        <tr><td colSpan={7} className="px-7 py-16 text-center text-[13px] text-zinc-300">{t("noAssetsMatch")}</td></tr>
                       )}
                     </tbody>
                   </table>
@@ -2212,6 +2413,161 @@ export default function AdminPage() {
             </div>
           )}
 
+          {/* ── PAPELERA ──────────────────────────────────────────────────── */}
+          {section === "trash" && (
+            <div className="space-y-4">
+              <p className="text-[12px] text-zinc-400">{t("trashIntro")}</p>
+
+              <div className="flex flex-wrap gap-2">
+                {([
+                  { id: "mechanics", label: t("trashTabMechanics"), count: trashMechanics.length },
+                  { id: "assets", label: t("trashTabAssets"), count: trashAssets.length },
+                  { id: "services", label: t("trashTabServices"), count: trashServices.length },
+                ] as const).map((tab) => (
+                  <button key={tab.id} onClick={() => setTrashTab(tab.id)}
+                    className={`px-3.5 py-[7px] rounded-full text-[12px] font-bold transition-colors ${
+                      trashTab === tab.id ? "bg-zinc-900 text-white" : "bg-white border border-zinc-200 text-zinc-500 hover:bg-zinc-50"
+                    }`}>
+                    {tab.label} {tab.count > 0 && <span className="opacity-60">· {tab.count}</span>}
+                  </button>
+                ))}
+              </div>
+
+              <div className="bg-white rounded-2xl border border-zinc-200/80 shadow-sm overflow-hidden">
+                {trashLoading ? (
+                  <p className="text-[13px] text-zinc-400 text-center py-16">{t("loading")}</p>
+                ) : trashTab === "mechanics" ? (
+                  trashMechanics.length === 0 ? (
+                    <div className="text-center py-16">
+                      <Trash size={28} className="mx-auto text-zinc-200 mb-2" />
+                      <p className="text-[13px] text-zinc-300 font-medium">{t("trashEmptyMechanics")}</p>
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full min-w-[640px]">
+                        <thead>
+                          <tr className="bg-zinc-50 border-b border-zinc-100">
+                            {[t("colAccount"), t("colEmail"), t("trashColDeletedAt"), ""].map((h) => (
+                              <th key={h} className="px-7 py-3 text-left text-[9px] font-bold text-zinc-400 uppercase tracking-widest">{h}</th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-zinc-50">
+                          {trashMechanics.map((row) => (
+                            <tr key={row.id} className="hover:bg-zinc-50/80 transition-colors">
+                              <td className="px-7 py-4 text-[13px] font-bold text-zinc-900">{row.name}</td>
+                              <td className="px-7 py-4 text-[12px] text-zinc-500">{row.email}</td>
+                              <td className="px-7 py-4 text-[12px] text-zinc-400 whitespace-nowrap">{formatDate(row.deleted_at)} · {formatTime(row.deleted_at, locale)}</td>
+                              <td className="px-7 py-4">
+                                <div className="flex items-center justify-end gap-3">
+                                  <button onClick={() => confirmRestoreAccount(row)} className="flex items-center gap-1.5 text-[11px] font-bold text-emerald-600 hover:text-emerald-700 transition-colors" title={t("restoreTitle")}>
+                                    <RotateCcw size={13} /> {t("restoreTitle")}
+                                  </button>
+                                  <button onClick={() => confirmPermanentDeleteAccount(row)} className="text-zinc-300 hover:text-red-600 transition-colors" title={t("permanentDeleteTitle")}>
+                                    <Trash2 size={14} />
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )
+                ) : trashTab === "assets" ? (
+                  trashAssets.length === 0 ? (
+                    <div className="text-center py-16">
+                      <Trash size={28} className="mx-auto text-zinc-200 mb-2" />
+                      <p className="text-[13px] text-zinc-300 font-medium">{t("trashEmptyAssets")}</p>
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full min-w-[640px]">
+                        <thead>
+                          <tr className="bg-zinc-50 border-b border-zinc-100">
+                            {[t("colAsset"), t("colType"), t("colOwner"), t("trashColDeletedAt"), ""].map((h) => (
+                              <th key={h} className="px-7 py-3 text-left text-[9px] font-bold text-zinc-400 uppercase tracking-widest">{h}</th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-zinc-50">
+                          {trashAssets.map((row) => {
+                            const owner = row.created_by ? mechanicsById[row.created_by] : null;
+                            return (
+                              <tr key={row.id} className="hover:bg-zinc-50/80 transition-colors">
+                                <td className="px-7 py-4">
+                                  <div className="flex items-center gap-2.5">
+                                    <span className="text-[16px]">{ASSET_ICONS[row.asset_type] ?? "🔧"}</span>
+                                    <span className="text-[13px] font-bold text-zinc-900">{assetLabel(row)}</span>
+                                  </div>
+                                </td>
+                                <td className="px-7 py-4 text-[12px] text-zinc-500">{tAssetTypes(row.asset_type)}</td>
+                                <td className="px-7 py-4 text-[12px] text-zinc-500">{owner?.name ?? "—"}</td>
+                                <td className="px-7 py-4 text-[12px] text-zinc-400 whitespace-nowrap">{formatDate(row.deleted_at)} · {formatTime(row.deleted_at, locale)}</td>
+                                <td className="px-7 py-4">
+                                  <div className="flex items-center justify-end gap-3">
+                                    <button onClick={() => confirmRestoreAsset(row)} className="flex items-center gap-1.5 text-[11px] font-bold text-emerald-600 hover:text-emerald-700 transition-colors" title={t("restoreTitle")}>
+                                      <RotateCcw size={13} /> {t("restoreTitle")}
+                                    </button>
+                                    <button onClick={() => confirmPermanentDeleteAsset(row)} className="text-zinc-300 hover:text-red-600 transition-colors" title={t("permanentDeleteTitle")}>
+                                      <Trash2 size={14} />
+                                    </button>
+                                  </div>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  )
+                ) : trashServices.length === 0 ? (
+                  <div className="text-center py-16">
+                    <Trash size={28} className="mx-auto text-zinc-200 mb-2" />
+                    <p className="text-[13px] text-zinc-300 font-medium">{t("trashEmptyServices")}</p>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full min-w-[640px]">
+                      <thead>
+                        <tr className="bg-zinc-50 border-b border-zinc-100">
+                          {[t("colAsset"), t("colServiceType"), t("colMechanic"), t("colDate"), t("trashColDeletedAt"), ""].map((h) => (
+                            <th key={h} className="px-7 py-3 text-left text-[9px] font-bold text-zinc-400 uppercase tracking-widest">{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-zinc-50">
+                        {trashServices.map((row) => (
+                          <tr key={row.id} className="hover:bg-zinc-50/80 transition-colors">
+                            <td className="px-7 py-4 text-[13px] font-bold text-zinc-900">{row.assets ? assetLabel(row.assets) : "—"}</td>
+                            <td className="px-7 py-4">
+                              <span className={`text-[10px] font-bold px-2.5 py-1 rounded-lg ${TYPE_COLORS[row.service_type] ?? "bg-zinc-100 text-zinc-500 border border-zinc-200"}`}>
+                                {row.service_type}
+                              </span>
+                            </td>
+                            <td className="px-7 py-4 text-[12px] text-zinc-500">{row.mechanics?.name ?? "—"}</td>
+                            <td className="px-7 py-4 text-[12px] text-zinc-400">{formatDate(row.service_date)}</td>
+                            <td className="px-7 py-4 text-[12px] text-zinc-400 whitespace-nowrap">{formatDate(row.deleted_at)} · {formatTime(row.deleted_at, locale)}</td>
+                            <td className="px-7 py-4">
+                              <div className="flex items-center justify-end gap-3">
+                                <button onClick={() => confirmRestoreService(row)} className="flex items-center gap-1.5 text-[11px] font-bold text-emerald-600 hover:text-emerald-700 transition-colors" title={t("restoreTitle")}>
+                                  <RotateCcw size={13} /> {t("restoreTitle")}
+                                </button>
+                                <button onClick={() => confirmPermanentDeleteService(row)} className="text-zinc-300 hover:text-red-600 transition-colors" title={t("permanentDeleteTitle")}>
+                                  <Trash2 size={14} />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           <p className="text-center text-[10px] text-zinc-300 mt-12 font-medium">{t("mainFooterNote")}</p>
         </div>
       </div>
@@ -2380,16 +2736,31 @@ export default function AdminPage() {
 
       {/* ══ CONFIRM ACTION MODAL ══ */}
       {confirmAction && (
-        <div className="fixed inset-0 z-50 bg-zinc-900/40 flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 bg-zinc-900/40 backdrop-blur-[1px] flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6 text-center">
             <div className={`w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3 ${confirmAction.danger ? "bg-red-50" : "bg-amber-50"}`}>
               <AlertCircle size={20} className={confirmAction.danger ? "text-red-500" : "text-amber-500"} />
             </div>
             <h3 className="text-[16px] font-black text-zinc-900 mb-2">{confirmAction.title}</h3>
             <p className="text-[13px] text-zinc-500 mb-5">{confirmAction.body}</p>
+            {confirmAction.requireTypeToConfirm && (
+              <div className="mb-5 text-left">
+                <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1.5">
+                  {t("typeToConfirmLabel", { word: confirmAction.requireTypeToConfirm })}
+                </label>
+                <input
+                  type="text"
+                  value={confirmTypedText}
+                  onChange={(e) => setConfirmTypedText(e.target.value)}
+                  autoFocus
+                  className="w-full rounded-xl border border-zinc-200 bg-white px-3 py-[9px] text-[13px] font-mono outline-none focus:border-red-400 transition-colors"
+                  placeholder={confirmAction.requireTypeToConfirm}
+                />
+              </div>
+            )}
             <div className="flex gap-3">
-              <button onClick={() => setConfirmAction(null)} disabled={confirmBusy}
-                className="flex-1 border border-zinc-200 text-zinc-700 font-bold py-3 rounded-xl text-[13px] hover:bg-zinc-50">
+              <button onClick={() => { setConfirmAction(null); setConfirmTypedText(""); }} disabled={confirmBusy}
+                className="flex-1 border border-zinc-200 text-zinc-700 font-bold py-3 rounded-xl text-[13px] hover:bg-zinc-50 transition-colors">
                 {t("cancel")}
               </button>
               <button
@@ -2398,9 +2769,10 @@ export default function AdminPage() {
                   await confirmAction.onConfirm();
                   setConfirmBusy(false);
                   setConfirmAction(null);
+                  setConfirmTypedText("");
                 }}
-                disabled={confirmBusy}
-                className={`flex-1 disabled:opacity-60 text-white font-bold py-3 rounded-xl text-[13px] transition-all ${
+                disabled={confirmBusy || (!!confirmAction.requireTypeToConfirm && confirmTypedText !== confirmAction.requireTypeToConfirm)}
+                className={`flex-1 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold py-3 rounded-xl text-[13px] transition-all ${
                   confirmAction.danger ? "bg-red-600 hover:bg-red-500" : "bg-zinc-900 hover:bg-zinc-800"
                 }`}
               >
