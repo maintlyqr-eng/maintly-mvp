@@ -1,4 +1,10 @@
 import type { NextConfig } from "next";
+import createNextIntlPlugin from "next-intl/plugin";
+
+// Points at src/i18n/request.ts, which loads the right messages/{locale}.json
+// for each request — see that file and src/middleware.ts for the rest of the
+// i18n setup (added July 2026, MaintlyQR going multi-language).
+const withNextIntl = createNextIntlPlugin("./src/i18n/request.ts");
 
 const nextConfig: NextConfig = {
   // Every <Image> in this app points at a local file under /public/images —
@@ -22,4 +28,4 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+export default withNextIntl(nextConfig);

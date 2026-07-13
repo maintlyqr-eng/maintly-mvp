@@ -1,0 +1,50 @@
+{
+  "Nav": {
+    "product": "Product",
+    "howItWorks": "How It Works",
+    "industries": "Industries",
+    "pricing": "Pricing",
+    "resources": "Resources",
+    "api": "API",
+    "about": "About",
+    "login": "Login",
+    "logout": "Log out"
+  },
+  "LanguageSwitcher": {
+    "changeLanguage": "Change language"
+  },
+  "HomePage": {
+    "homeAriaLabel": "Maintly home",
+    "heroTitleLine1": "Every Machine",
+    "heroTitleLine2Prefix": "Has a ",
+    "heroTitleHighlight": "Story.",
+    "heroSubtitleHighlight": "One QR.",
+    "heroSubtitleRest": "Lifetime Maintenance History.",
+    "heroDescription": "Scan any QR code and instantly access the complete maintenance history of any machine, anywhere in the world.",
+    "scanCardTitle": "Scan QR Code",
+    "scanCardDescriptionLine1": "Use your camera to",
+    "scanCardDescriptionLine2": "scan any QR code",
+    "scanCardButton": "Open Camera",
+    "or": "OR",
+    "enterCardTitle": "Enter QR Code",
+    "enterCardDescriptionLine1": "Type or paste your",
+    "enterCardDescriptionLine2": "Maintly code",
+    "enterCardPlaceholder": "Paste your code here",
+    "trustBarText": "Open history. No login required.",
+    "viewLiveExample": "View Live Example",
+    "statMachines": "Machines Tracked",
+    "statServices": "Services Logged",
+    "statMechanics": "Verified Maintlers",
+    "statGrowing": "Growing Every Day",
+    "pillarSecure": "100% Secure",
+    "pillarAccess": "Access Anywhere",
+    "pillarHistory": "Full History",
+    "pillarGrow": "Built to Grow",
+    "footerBrand": "Maintly®",
+    "footerTagline": "Maintenance. Tracked.",
+    "footerTerms": "Terms",
+    "footerPrivacy": "Privacy",
+    "footerCookies": "Cookies",
+    "footerRights": "All Rights Reserved"
+  }
+}

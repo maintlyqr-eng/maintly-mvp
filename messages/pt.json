@@ -1,0 +1,50 @@
+{
+  "Nav": {
+    "product": "Produto",
+    "howItWorks": "Como Funciona",
+    "industries": "Indústrias",
+    "pricing": "Preços",
+    "resources": "Recursos",
+    "api": "API",
+    "about": "Sobre",
+    "login": "Entrar",
+    "logout": "Sair"
+  },
+  "LanguageSwitcher": {
+    "changeLanguage": "Mudar idioma"
+  },
+  "HomePage": {
+    "homeAriaLabel": "Início da Maintly",
+    "heroTitleLine1": "Cada Máquina",
+    "heroTitleLine2Prefix": "Tem uma ",
+    "heroTitleHighlight": "História.",
+    "heroSubtitleHighlight": "Um QR.",
+    "heroSubtitleRest": "Histórico de Manutenção Vitalício.",
+    "heroDescription": "Escaneie qualquer código QR e acesse instantaneamente o histórico completo de manutenção de qualquer máquina, em qualquer lugar do mundo.",
+    "scanCardTitle": "Escanear QR",
+    "scanCardDescriptionLine1": "Use sua câmera para",
+    "scanCardDescriptionLine2": "escanear qualquer código QR",
+    "scanCardButton": "Abrir Câmera",
+    "or": "OU",
+    "enterCardTitle": "Inserir Código QR",
+    "enterCardDescriptionLine1": "Digite ou cole seu",
+    "enterCardDescriptionLine2": "código Maintly",
+    "enterCardPlaceholder": "Cole seu código aqui",
+    "trustBarText": "Histórico aberto. Sem necessidade de login.",
+    "viewLiveExample": "Ver Exemplo ao Vivo",
+    "statMachines": "Máquinas Registradas",
+    "statServices": "Serviços Registrados",
+    "statMechanics": "Maintlers Verificados",
+    "statGrowing": "Crescendo Todos os Dias",
+    "pillarSecure": "100% Seguro",
+    "pillarAccess": "Acesso de Qualquer Lugar",
+    "pillarHistory": "Histórico Completo",
+    "pillarGrow": "Feito para Crescer",
+    "footerBrand": "Maintly®",
+    "footerTagline": "Manutenção. Registrada.",
+    "footerTerms": "Termos",
+    "footerPrivacy": "Privacidade",
+    "footerCookies": "Cookies",
+    "footerRights": "Todos os Direitos Reservados"
+  }
+}
