@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { isAdminRequest } from "@/lib/adminAuth";
+import { isAdminRequest, getAdminUsername } from "@/lib/adminAuth";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
+import { logAdminAction, getRequestIp } from "@/lib/auditLog";
 
 // GET: the full admin <-> mechanic conversation history, oldest first
 // (the client groups rows into one thread per mechanic_id).
@@ -108,6 +109,17 @@ export async function DELETE(req: NextRequest) {
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  const adminUsername = getAdminUsername(req);
+  if (adminUsername) {
+    await logAdminAction({
+      adminUsername,
+      action: "support_thread.clear",
+      entityType: "support_thread",
+      entityId: mechanicId,
+      ipAddress: getRequestIp(req),
+    });
   }
 
   return NextResponse.json({ ok: true });

@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
+import { signAdminToken } from "@/lib/adminAuth";
+import { logAdminAction, getRequestIp } from "@/lib/auditLog";
 
 // This file runs ONLY on the server. Nothing here — including the
 // comparison below and the ADMIN_USERNAME / ADMIN_PASSWORD values it
@@ -7,11 +9,6 @@ import crypto from "crypto";
 
 const COOKIE_NAME = "mly_admin_session";
 const SESSION_TTL_MS = 12 * 60 * 60 * 1000; // 12 hours
-
-function sign(expiry: number, secret: string) {
-  const hmac = crypto.createHmac("sha256", secret).update(String(expiry)).digest("hex");
-  return `${expiry}.${hmac}`;
-}
 
 export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({}));
@@ -37,7 +34,7 @@ export async function POST(req: NextRequest) {
   }
 
   const expiry = Date.now() + SESSION_TTL_MS;
-  const token = sign(expiry, secret);
+  const token = signAdminToken(expiry, validUser, secret);
 
   const res = NextResponse.json({ ok: true });
   res.cookies.set(COOKIE_NAME, token, {
@@ -47,6 +44,10 @@ export async function POST(req: NextRequest) {
     path: "/",
     maxAge: SESSION_TTL_MS / 1000,
   });
+
+  // Best-effort — a logging hiccup should never block a successful login.
+  await logAdminAction({ adminUsername: validUser, action: "admin.login", ipAddress: getRequestIp(req) });
+
   return res;
 }
 

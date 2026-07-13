@@ -2,7 +2,7 @@
 
 import { Link } from "@/i18n/navigation";
 import Image from "next/image";
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { useTranslations, useLocale } from "next-intl";
 import {
   Users, Box, Wrench, QrCode, BarChart3, Shield,
@@ -10,7 +10,7 @@ import {
   Layers, Eye, EyeOff, Menu, X, Search,
   Ban, ShieldCheck, ShieldOff, Trash2, KeyRound, UserCog,
   UserPlus, UserMinus, Plus, Link2Off, ScanLine, ClipboardList,
-  LifeBuoy, Send, MessageCircle, Flag,
+  LifeBuoy, Send, MessageCircle, Flag, History, ChevronDown, ChevronRight,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { formatDateDMY } from "@/lib/date";
@@ -93,7 +93,7 @@ type UsageMetrics = {
   checkedAt: string;
 };
 
-type Section = "dashboard" | "accounts" | "mechanics" | "verifications" | "assets" | "services" | "qr" | "support" | "team-chat";
+type Section = "dashboard" | "accounts" | "mechanics" | "verifications" | "assets" | "services" | "qr" | "support" | "team-chat" | "audit-log";
 
 type SupportMessageRow = {
   id: string;
@@ -150,6 +150,24 @@ type MechanicReportRow = {
   created_at: string;
   reporter: { name: string; email: string } | null;
   reported: { name: string; email: string } | null;
+};
+
+// Item 11 del pedido de Facu (ver claude/MAINTLYQR_FEATURE_BACKLOG.md) —
+// registro inalterable de acciones administrativas. Escrito por el server
+// desde src/lib/auditLog.ts, leído acá desde /api/admin/audit-logs. El tipo
+// de acción se mantiene como string suelto (no importa el union type del
+// server) para no acoplar el bundle del cliente a un archivo server-only.
+type AdminAuditLogRow = {
+  id: string;
+  created_at: string;
+  admin_username: string;
+  action: string;
+  entity_type: string | null;
+  entity_id: string | null;
+  old_value: unknown;
+  new_value: unknown;
+  reason: string | null;
+  ip_address: string | null;
 };
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -395,6 +413,18 @@ export default function AdminPage() {
   const [mechanicReports, setMechanicReports] = useState<MechanicReportRow[]>([]);
   const [mechanicReportsLoading, setMechanicReportsLoading] = useState(true);
 
+  // ── Audit log (Logs de auditoría — item 11 del pedido de Facu) ──
+  const AUDIT_LOG_PAGE_SIZE = 25;
+  const [auditLogs, setAuditLogs] = useState<AdminAuditLogRow[]>([]);
+  const [auditLogsLoading, setAuditLogsLoading] = useState(true);
+  const [auditLogsTotal, setAuditLogsTotal] = useState(0);
+  const [auditLogsPage, setAuditLogsPage] = useState(1);
+  const [auditLogActionFilter, setAuditLogActionFilter] = useState("all");
+  const [auditLogEntityFilter, setAuditLogEntityFilter] = useState("all");
+  const [auditLogFrom, setAuditLogFrom] = useState("");
+  const [auditLogTo, setAuditLogTo] = useState("");
+  const [expandedAuditLogId, setExpandedAuditLogId] = useState<string | null>(null);
+
   // ── Assets UI state ──
   const [assetSearch, setAssetSearch] = useState("");
 
@@ -597,6 +627,29 @@ export default function AdminPage() {
     }
   }
 
+  // Real server-side pagination (page/pageSize -> range() on the server) —
+  // this table is meant to grow indefinitely, unlike the "fetch up to N and
+  // slice client-side" pattern used for the other tables in this panel.
+  async function loadAuditLogs() {
+    setAuditLogsLoading(true);
+    try {
+      const params = new URLSearchParams();
+      params.set("page", String(auditLogsPage));
+      params.set("pageSize", String(AUDIT_LOG_PAGE_SIZE));
+      if (auditLogActionFilter !== "all") params.set("action", auditLogActionFilter);
+      if (auditLogEntityFilter !== "all") params.set("entityType", auditLogEntityFilter);
+      if (auditLogFrom) params.set("from", new Date(auditLogFrom).toISOString());
+      if (auditLogTo) params.set("to", new Date(new Date(auditLogTo).getTime() + 86400000).toISOString());
+
+      const res = await fetch(`/api/admin/audit-logs?${params.toString()}`);
+      const data = await res.json().catch(() => ({}));
+      setAuditLogs((data.logs as AdminAuditLogRow[]) ?? []);
+      setAuditLogsTotal((data.total as number) ?? 0);
+    } finally {
+      setAuditLogsLoading(false);
+    }
+  }
+
   // Grouped by unordered pair (sorted id pair joined into one key) rather
   // than by a single "mechanic_id" the way support conversations are,
   // since here BOTH sides are ordinary Maintlers — there's no fixed
@@ -726,6 +779,20 @@ export default function AdminPage() {
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [section, adminAuthed]);
+
+  // Audit log: refetch on open AND whenever a filter or the page changes —
+  // unlike the other lazy-refetch tabs, this one has server-side filters/
+  // pagination, so a filter change has to trigger a real new request. Each
+  // filter's onChange resets auditLogsPage to 1 in the SAME event handler
+  // (see the JSX below) rather than via a separate effect reacting to the
+  // filter — that would cause two renders (one with the stale page, one
+  // after the reset) and fetch twice per filter change.
+  useEffect(() => {
+    if (section === "audit-log" && adminAuthed) {
+      loadAuditLogs();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [section, adminAuthed, auditLogsPage, auditLogActionFilter, auditLogEntityFilter, auditLogFrom, auditLogTo]);
 
   async function handleAdminLogin(e: React.FormEvent) {
     e.preventDefault();
@@ -1029,11 +1096,31 @@ export default function AdminPage() {
     { id: "qr",        label: t("navQr"), icon: QrCode   },
     { id: "support",   label: t("navSupport"),   icon: LifeBuoy  },
     { id: "team-chat", label: t("navTeamChat"), icon: MessageCircle },
+    { id: "audit-log", label: t("navAuditLog"), icon: History },
   ];
   const sectionLabels: Record<Section, string> = {
     dashboard: t("navDashboard"), accounts: t("navAccounts"), mechanics: t("navMechanics"), verifications: t("navVerifications"),
     assets: t("navAssets"), services: t("navServices"), qr: t("navQr"), support: t("navSupport"), "team-chat": t("navTeamChat"),
+    "audit-log": t("navAuditLog"),
   };
+  const AUDIT_ACTION_LABEL: Record<string, string> = {
+    "admin.login": t("auditActionAdminLogin"),
+    "admin.logout": t("auditActionAdminLogout"),
+    "account.update": t("auditActionAccountUpdate"),
+    "account.delete": t("auditActionAccountDelete"),
+    "service.delete": t("auditActionServiceDelete"),
+    "qr.generate_batch": t("auditActionQrGenerateBatch"),
+    "qr.unlink": t("auditActionQrUnlink"),
+    "support_thread.clear": t("auditActionSupportThreadClear"),
+  };
+  const AUDIT_ENTITY_LABEL: Record<string, string> = {
+    mechanic: t("auditEntityMechanic"),
+    service_record: t("auditEntityServiceRecord"),
+    qr_code: t("auditEntityQrCode"),
+    qr_batch: t("auditEntityQrBatch"),
+    support_thread: t("auditEntitySupportThread"),
+  };
+  const auditLogTotalPages = Math.max(1, Math.ceil(auditLogsTotal / AUDIT_LOG_PAGE_SIZE));
   const unreadSupportCount = supportMessages.filter((m) => !m.from_admin && !m.read).length;
 
   return (
@@ -1965,7 +2052,167 @@ export default function AdminPage() {
             </div>
           )}
 
-          <p className="text-center text-[10px] text-zinc-300 mt-12 font-medium">MaintlyQR Admin · Internal use only</p>
+          {/* ── AUDIT LOG (Logs de auditoría) ────────────────────────────── */}
+          {section === "audit-log" && (
+            <div className="space-y-4">
+              <p className="text-[12px] text-zinc-400">{t("auditLogIntro")}</p>
+
+              <div className="flex flex-wrap items-end gap-3">
+                <div>
+                  <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1">{t("auditFilterAction")}</label>
+                  <select
+                    value={auditLogActionFilter}
+                    onChange={(e) => { setAuditLogActionFilter(e.target.value); setAuditLogsPage(1); }}
+                    className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-[12px] outline-none focus:border-red-400"
+                  >
+                    <option value="all">{t("auditFilterAll")}</option>
+                    {Object.entries(AUDIT_ACTION_LABEL).map(([key, label]) => (
+                      <option key={key} value={key}>{label}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1">{t("auditFilterEntity")}</label>
+                  <select
+                    value={auditLogEntityFilter}
+                    onChange={(e) => { setAuditLogEntityFilter(e.target.value); setAuditLogsPage(1); }}
+                    className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-[12px] outline-none focus:border-red-400"
+                  >
+                    <option value="all">{t("auditFilterAll")}</option>
+                    {Object.entries(AUDIT_ENTITY_LABEL).map(([key, label]) => (
+                      <option key={key} value={key}>{label}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1">{t("auditFilterFrom")}</label>
+                  <input
+                    type="date" value={auditLogFrom}
+                    onChange={(e) => { setAuditLogFrom(e.target.value); setAuditLogsPage(1); }}
+                    className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-[12px] outline-none focus:border-red-400"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1">{t("auditFilterTo")}</label>
+                  <input
+                    type="date" value={auditLogTo}
+                    onChange={(e) => { setAuditLogTo(e.target.value); setAuditLogsPage(1); }}
+                    className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-[12px] outline-none focus:border-red-400"
+                  />
+                </div>
+                {(auditLogActionFilter !== "all" || auditLogEntityFilter !== "all" || auditLogFrom || auditLogTo) && (
+                  <button
+                    onClick={() => { setAuditLogActionFilter("all"); setAuditLogEntityFilter("all"); setAuditLogFrom(""); setAuditLogTo(""); setAuditLogsPage(1); }}
+                    className="text-[11px] font-bold text-zinc-400 hover:text-red-600 transition-colors px-2 py-2"
+                  >
+                    {t("auditFilterClear")}
+                  </button>
+                )}
+              </div>
+
+              <div className="bg-white rounded-2xl border border-zinc-200/80 shadow-sm overflow-hidden">
+                {auditLogsLoading ? (
+                  <p className="text-[13px] text-zinc-400 text-center py-16">{t("loading")}</p>
+                ) : auditLogs.length === 0 ? (
+                  <div className="text-center py-16">
+                    <History size={28} className="mx-auto text-zinc-200 mb-2" />
+                    <p className="text-[13px] text-zinc-300 font-medium">{t("auditNoLogs")}</p>
+                  </div>
+                ) : (
+                  <>
+                    <div className="overflow-x-auto">
+                      <table className="w-full min-w-[720px]">
+                        <thead>
+                          <tr className="bg-zinc-50 border-b border-zinc-100">
+                            {[t("auditColWhen"), t("auditColAdmin"), t("auditColAction"), t("auditColEntity"), t("auditColEntityId"), ""].map((h) => (
+                              <th key={h} className="px-7 py-3 text-left text-[9px] font-bold text-zinc-400 uppercase tracking-widest">{h}</th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-zinc-50">
+                          {auditLogs.map((log) => {
+                            const isExpanded = expandedAuditLogId === log.id;
+                            return (
+                              <Fragment key={log.id}>
+                                <tr
+                                  className="hover:bg-zinc-50/80 transition-colors cursor-pointer"
+                                  onClick={() => setExpandedAuditLogId(isExpanded ? null : log.id)}
+                                >
+                                  <td className="px-7 py-4 text-[12px] text-zinc-400 whitespace-nowrap">{formatDate(log.created_at)} · {formatTime(log.created_at, locale)}</td>
+                                  <td className="px-7 py-4 text-[12px] font-semibold text-zinc-700">{log.admin_username}</td>
+                                  <td className="px-7 py-4"><Pill tone="blue">{AUDIT_ACTION_LABEL[log.action] ?? log.action}</Pill></td>
+                                  <td className="px-7 py-4 text-[12px] text-zinc-500">{log.entity_type ? (AUDIT_ENTITY_LABEL[log.entity_type] ?? log.entity_type) : "—"}</td>
+                                  <td className="px-7 py-4 text-[12px] font-mono text-zinc-400">{log.entity_id ?? "—"}</td>
+                                  <td className="px-7 py-4 text-right text-zinc-300">
+                                    {isExpanded ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
+                                  </td>
+                                </tr>
+                                {isExpanded && (
+                                  <tr key={`${log.id}-detail`} className="bg-zinc-50/60">
+                                    <td colSpan={6} className="px-7 py-4">
+                                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-[11.5px]">
+                                        <div>
+                                          <p className="font-bold text-zinc-500 uppercase tracking-wide text-[9.5px] mb-1">{t("auditDetailOldValue")}</p>
+                                          <pre className="whitespace-pre-wrap break-words bg-white border border-zinc-200 rounded-lg p-2.5 text-zinc-600 font-mono text-[11px]">
+                                            {log.old_value ? JSON.stringify(log.old_value, null, 2) : "—"}
+                                          </pre>
+                                        </div>
+                                        <div>
+                                          <p className="font-bold text-zinc-500 uppercase tracking-wide text-[9.5px] mb-1">{t("auditDetailNewValue")}</p>
+                                          <pre className="whitespace-pre-wrap break-words bg-white border border-zinc-200 rounded-lg p-2.5 text-zinc-600 font-mono text-[11px]">
+                                            {log.new_value ? JSON.stringify(log.new_value, null, 2) : "—"}
+                                          </pre>
+                                        </div>
+                                        {log.reason && (
+                                          <div className="sm:col-span-2">
+                                            <p className="font-bold text-zinc-500 uppercase tracking-wide text-[9.5px] mb-1">{t("auditDetailReason")}</p>
+                                            <p className="text-zinc-600">{log.reason}</p>
+                                          </div>
+                                        )}
+                                        {log.ip_address && (
+                                          <div className="sm:col-span-2">
+                                            <p className="font-bold text-zinc-500 uppercase tracking-wide text-[9.5px] mb-1">{t("auditDetailIp")}</p>
+                                            <p className="text-zinc-600 font-mono">{log.ip_address}</p>
+                                          </div>
+                                        )}
+                                      </div>
+                                    </td>
+                                  </tr>
+                                )}
+                              </Fragment>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    <div className="flex items-center justify-between px-7 py-4 border-t border-zinc-100">
+                      <p className="text-[11px] text-zinc-400">{t("auditTotalCount", { count: auditLogsTotal })}</p>
+                      <div className="flex items-center gap-3">
+                        <button
+                          onClick={() => setAuditLogsPage((p) => Math.max(1, p - 1))}
+                          disabled={auditLogsPage <= 1}
+                          className="text-[11px] font-bold px-3 py-1.5 rounded-lg border border-zinc-200 text-zinc-600 hover:bg-zinc-50 transition-colors disabled:opacity-30"
+                        >
+                          {t("auditPrevPage")}
+                        </button>
+                        <span className="text-[11px] text-zinc-400">{t("auditPageOf", { page: auditLogsPage, totalPages: auditLogTotalPages })}</span>
+                        <button
+                          onClick={() => setAuditLogsPage((p) => Math.min(auditLogTotalPages, p + 1))}
+                          disabled={auditLogsPage >= auditLogTotalPages}
+                          className="text-[11px] font-bold px-3 py-1.5 rounded-lg border border-zinc-200 text-zinc-600 hover:bg-zinc-50 transition-colors disabled:opacity-30"
+                        >
+                          {t("auditNextPage")}
+                        </button>
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+          )}
+
+          <p className="text-center text-[10px] text-zinc-300 mt-12 font-medium">{t("mainFooterNote")}</p>
         </div>
       </div>
 

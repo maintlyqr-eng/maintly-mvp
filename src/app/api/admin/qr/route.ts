@@ -1,7 +1,8 @@
 import crypto from "crypto";
 import { NextRequest, NextResponse } from "next/server";
-import { isAdminRequest } from "@/lib/adminAuth";
+import { isAdminRequest, getAdminUsername } from "@/lib/adminAuth";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
+import { logAdminAction, getRequestIp } from "@/lib/auditLog";
 
 function genCode() {
   return crypto.randomUUID().replace(/-/g, "").slice(0, 10);
@@ -25,7 +26,22 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  return NextResponse.json({ ok: true, codes: (data ?? []).map((r: any) => r.code) });
+  const codes = (data ?? []).map((r: any) => r.code);
+
+  const adminUsername = getAdminUsername(req);
+  if (adminUsername) {
+    // Logging every code would bloat the row for a 500-code batch — cap the
+    // stored preview and keep the real total in `count`.
+    await logAdminAction({
+      adminUsername,
+      action: "qr.generate_batch",
+      entityType: "qr_batch",
+      newValue: { count: codes.length, codesPreview: codes.slice(0, 20) },
+      ipAddress: getRequestIp(req),
+    });
+  }
+
+  return NextResponse.json({ ok: true, codes });
 }
 
 // PATCH: free up a QR code from whatever asset it's linked to. Body: { code }
@@ -41,10 +57,26 @@ export async function PATCH(req: NextRequest) {
   }
 
   const admin = getSupabaseAdmin();
+
+  const { data: beforeRow } = await admin.from("qr_codes").select("asset_id").eq("code", code).single();
+
   const { error } = await admin.from("qr_codes").update({ asset_id: null }).eq("code", code);
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  const adminUsername = getAdminUsername(req);
+  if (adminUsername) {
+    await logAdminAction({
+      adminUsername,
+      action: "qr.unlink",
+      entityType: "qr_code",
+      entityId: code,
+      oldValue: beforeRow ?? null,
+      newValue: { asset_id: null },
+      ipAddress: getRequestIp(req),
+    });
   }
 
   return NextResponse.json({ ok: true });

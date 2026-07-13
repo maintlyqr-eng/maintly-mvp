@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { isAdminRequest } from "@/lib/adminAuth";
+import { isAdminRequest, getAdminUsername } from "@/lib/adminAuth";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
+import { logAdminAction, getRequestIp, pick } from "@/lib/auditLog";
 
 // PATCH: update role/status flags or basic profile fields on a mechanic
 // (= account) row. Body: { id, is_mechanic?, verified?, suspended?, name?,
@@ -39,6 +40,16 @@ export async function PATCH(req: NextRequest) {
   }
 
   const admin = getSupabaseAdmin();
+
+  // Fetch the current values of just the fields being changed, for the
+  // audit log's old_value — cheap (single row, few columns) and lets the
+  // log show a real before/after instead of just the after.
+  const { data: beforeRow } = await admin
+    .from("mechanics")
+    .select(Object.keys(updates).join(","))
+    .eq("id", id)
+    .single();
+
   const { data, error } = await admin.from("mechanics").update(updates).eq("id", id).select("id").single();
 
   if (error) {
@@ -46,6 +57,19 @@ export async function PATCH(req: NextRequest) {
   }
   if (!data) {
     return NextResponse.json({ error: "Account not found." }, { status: 404 });
+  }
+
+  const adminUsername = getAdminUsername(req);
+  if (adminUsername) {
+    await logAdminAction({
+      adminUsername,
+      action: "account.update",
+      entityType: "mechanic",
+      entityId: id,
+      oldValue: beforeRow ? pick(beforeRow as Record<string, unknown>, Object.keys(updates)) : null,
+      newValue: updates,
+      ipAddress: getRequestIp(req),
+    });
   }
 
   return NextResponse.json({ ok: true });
@@ -67,6 +91,14 @@ export async function DELETE(req: NextRequest) {
 
   const admin = getSupabaseAdmin();
 
+  // Fetch identifying info before deleting — once the auth user is gone
+  // there's nothing left to look up.
+  const { data: beforeRow } = await admin
+    .from("mechanics")
+    .select("name, email, workshop_name, is_mechanic")
+    .eq("id", id)
+    .single();
+
   // Deleting the auth user is the source of truth for "delete this account".
   // If mechanics.id has an on-delete-cascade FK to auth.users.id (the usual
   // Supabase profile-table pattern), the mechanics row goes with it.
@@ -79,6 +111,18 @@ export async function DELETE(req: NextRequest) {
   // a FK without ON DELETE CASCADE). Ignore errors here — the auth user is
   // already gone, which is what matters most.
   await admin.from("mechanics").delete().eq("id", id);
+
+  const adminUsername = getAdminUsername(req);
+  if (adminUsername) {
+    await logAdminAction({
+      adminUsername,
+      action: "account.delete",
+      entityType: "mechanic",
+      entityId: id,
+      oldValue: beforeRow ?? null,
+      ipAddress: getRequestIp(req),
+    });
+  }
 
   return NextResponse.json({ ok: true });
 }
