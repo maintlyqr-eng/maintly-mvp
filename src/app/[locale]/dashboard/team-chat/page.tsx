@@ -1,24 +1,19 @@
 "use client";
 
-import Link from "next/link";
-import Image from "next/image";
 import { useEffect, useLayoutEffect, useRef, useState, Suspense } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
+import { useRouter } from "@/i18n/navigation";
+import { useTranslations, useLocale } from "next-intl";
 import {
-  LayoutGrid, FileText, Box, QrCode, Users, BarChart3, Calendar as CalendarIcon,
-  Mail, FolderOpen, Settings, Bell, X, LogOut, Crown, Menu,
   MessageCircle, Search, Send, Trash2, ArrowLeft, Plus, UserCircle2,
-  Star, Ban, Flag,
+  Star, Ban, Flag, X,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
-import NotificationBell from "@/components/NotificationBell";
 import HoverAvatar from "@/components/HoverAvatar";
-import ContactSupportWidget from "@/components/ContactSupportWidget";
 import { useUnreadMessagesCount } from "@/lib/useUnreadMessages";
 import { formatDateDMY } from "@/lib/date";
-import DashboardSidebar from "@/components/DashboardSidebar";
-import DashboardHeader from "@/components/DashboardHeader";
-import { getInitials } from "@/lib/initials";
+import DashboardSidebarIntl from "@/components/DashboardSidebarIntl";
+import DashboardHeaderIntl from "@/components/DashboardHeaderIntl";
 
 // Mechanic-to-mechanic direct messaging — a second, independent inbox from
 // the customer-facing "Messages" page. Mirrors ContactSupportWidget.tsx's
@@ -39,6 +34,13 @@ import { getInitials } from "@/lib/initials";
 // don't want messages from this person" is Block (enforced for real at
 // the database level, see the mechanic_messages insert policy in the same
 // migration) and Report (flows into the Admin Control Center).
+//
+// Both router targets on this page ("/login", "/dashboard/team-chat" for
+// clearing the ?with= deep-link param) are migrated, so — unlike several
+// earlier dashboard pages — this one DOES use next-intl's locale-aware
+// router from @/i18n/navigation.
+
+const DATE_LOCALE: Record<string, string> = { en: "en-US", es: "es-AR", pt: "pt-BR" };
 
 type MechanicInfo = {
   id: string;
@@ -78,12 +80,6 @@ type SavedContact = {
   createdAt: string;
 };
 
-function formatTime(iso: string) {
-  const d = new Date(iso);
-  if (isNaN(d.getTime())) return "";
-  return d.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" });
-}
-
 function initialsOf(name: string | null | undefined, fallback: string) {
   const n = (name && name.trim()) || fallback;
   return n.split(" ").filter(Boolean).map((p) => p[0]).join("").slice(0, 2).toUpperCase() || "ME";
@@ -96,6 +92,8 @@ function displayName(m: MechanicInfo) {
 function TeamChatPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const t = useTranslations("DashboardTeamChatPage");
+  const locale = useLocale();
   const [checkingAuth, setCheckingAuth] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [mechanicId, setMechanicId] = useState("");
@@ -103,6 +101,12 @@ function TeamChatPageInner() {
   const [mechanicPhoto, setMechanicPhoto] = useState("");
   const [mechanicEmail, setMechanicEmail] = useState("");
   const [maintlerCode, setMaintlerCode] = useState("");
+
+  function formatTime(iso: string) {
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return "";
+    return d.toLocaleTimeString(DATE_LOCALE[locale] ?? "en-US", { hour: "2-digit", minute: "2-digit" });
+  }
 
   const unreadMessages = useUnreadMessagesCount(mechanicId);
   // No useUnreadMechanicMessages() call on this page — unlike the other 11
@@ -354,7 +358,7 @@ function TeamChatPageInner() {
       .insert({ owner_id: mechanicId, saved_id: target.id })
       .select("id, owner_id, saved_id, created_at");
     if (err || !data || data.length === 0) {
-      setSavedActionError("Couldn't save this Maintler. Try again.");
+      setSavedActionError(t("errorSaveContact"));
       return;
     }
     const row = data[0] as SavedContactRow;
@@ -384,7 +388,7 @@ function TeamChatPageInner() {
     setConfirmBlock(false);
     const { error: err } = await supabase.from("maintler_blocks").insert({ blocker_id: mechanicId, blocked_id: targetId });
     if (err) {
-      setBlockActionError("Couldn't block this Maintler. Try again.");
+      setBlockActionError(t("errorBlock"));
       return;
     }
     setBlockedIds((prev) => new Set(prev).add(targetId));
@@ -409,7 +413,7 @@ function TeamChatPageInner() {
       .insert({ reporter_id: mechanicId, reported_id: selectedId, reason: reportReason.trim() || null });
     setReportSending(false);
     if (err) {
-      setReportError("Couldn't send the report. Try again.");
+      setReportError(t("errorReport"));
       return;
     }
     setReportOpen(false);
@@ -446,6 +450,7 @@ function TeamChatPageInner() {
     });
 
     return () => { active = false; listener.subscription.unsubscribe(); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router]);
 
   // Deep link from the notification bell (or anywhere else) —
@@ -690,7 +695,7 @@ function TeamChatPageInner() {
 
     let active = true;
     setSearching(true);
-    const t = setTimeout(async () => {
+    const tm = setTimeout(async () => {
       const { data, error: searchErr } = await supabase
         .from("mechanics")
         .select("id, name, email, workshop_name, photo_url")
@@ -701,7 +706,7 @@ function TeamChatPageInner() {
       if (active) {
         if (searchErr) {
           console.error("[team-chat] mechanic search error:", searchErr);
-          setSearchError(searchErr.message || "Search failed — check the browser console for details.");
+          setSearchError(searchErr.message || t("errorSearchFailed"));
         } else {
           setSearchError("");
         }
@@ -710,7 +715,7 @@ function TeamChatPageInner() {
       }
     }, 300);
 
-    return () => { active = false; clearTimeout(t); };
+    return () => { active = false; clearTimeout(tm); };
   }, [searchTerm, newChatOpen, mechanicId]);
 
   async function handleLogout() {
@@ -797,8 +802,8 @@ function TeamChatPageInner() {
       // instead of the SQL wording.
       setComposeError(
         err && /row-level security|policy/i.test(err.message ?? "")
-          ? "This message couldn't be delivered."
-          : "Couldn't send your message. Try again."
+          ? t("errorMessageBlocked")
+          : t("errorSendMessage")
       );
       return;
     }
@@ -832,7 +837,7 @@ function TeamChatPageInner() {
   if (checkingAuth) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-zinc-50">
-        <p className="text-zinc-400 text-[13px]">Loading...</p>
+        <p className="text-zinc-400 text-[13px]">{t("loadingAuth")}</p>
       </div>
     );
   }
@@ -880,8 +885,8 @@ function TeamChatPageInner() {
           page has that context, so this substitution is local to Team Chat —
           the other 11 pages keep using the hook, which is correct there (no
           open conversation to exclude). */}
-      <DashboardSidebar
-        activeLabel="Team Chat"
+      <DashboardSidebarIntl
+        activeHref="/dashboard/team-chat"
         sidebarOpen={sidebarOpen}
         onCloseSidebar={() => setSidebarOpen(false)}
         mechanicId={mechanicId}
@@ -895,9 +900,9 @@ function TeamChatPageInner() {
       {/* ════ MAIN ════ */}
       <div className="flex-1 flex flex-col min-w-0 min-h-0">
 
-        <DashboardHeader
-          title="Team Chat"
-          subtitle="Message other Maintlers on MaintlyQR directly."
+        <DashboardHeaderIntl
+          title={t("headerTitle")}
+          subtitle={t("headerSubtitle")}
           onOpenSidebar={() => setSidebarOpen(true)}
           mechanicId={mechanicId}
           unreadMessages={unreadMessages}
@@ -920,7 +925,7 @@ function TeamChatPageInner() {
                   activeTab === "chats" ? "bg-red-50 text-red-600" : "text-zinc-400 hover:bg-zinc-50"
                 }`}
               >
-                <MessageCircle size={13} /> Chats
+                <MessageCircle size={13} /> {t("chats")}
                 {totalUnread > 0 && (
                   <span className="bg-red-600 text-white text-[9px] font-black rounded-full min-w-[15px] h-[15px] flex items-center justify-center px-1">{totalUnread}</span>
                 )}
@@ -931,35 +936,35 @@ function TeamChatPageInner() {
                   activeTab === "network" ? "bg-red-50 text-red-600" : "text-zinc-400 hover:bg-zinc-50"
                 }`}
               >
-                <Star size={13} /> My Maintlers
+                <Star size={13} /> {t("myMaintlers")}
               </button>
             </div>
 
             <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-100 shrink-0">
               <p className="text-[11.5px] text-zinc-400">
                 {activeTab === "chats"
-                  ? `${conversations.length} conversation${conversations.length !== 1 ? "s" : ""}`
-                  : `${savedContacts.length} saved Maintler${savedContacts.length !== 1 ? "s" : ""}`}
+                  ? t("conversationsCount", { count: conversations.length })
+                  : t("savedMaintlersCount", { count: savedContacts.length })}
               </p>
               <button
                 onClick={() => setNewChatOpen(true)}
                 className="flex items-center gap-1 text-[11px] font-bold text-white bg-red-600 hover:bg-red-500 px-2.5 py-1.5 rounded-lg transition-colors"
               >
-                <Plus size={13} /> Find a Maintler
+                <Plus size={13} /> {t("findAMaintler")}
               </button>
             </div>
 
             <div className="flex-1 min-h-0 overflow-y-auto">
               {activeTab === "chats" ? (
                 conversationsLoading ? (
-                  <p className="text-[12px] text-zinc-300 text-center py-10">Loading…</p>
+                  <p className="text-[12px] text-zinc-300 text-center py-10">{t("loading")}</p>
                 ) : conversations.length === 0 ? (
                   <div className="text-center py-12 px-5">
                     <div className="inline-flex items-center justify-center w-11 h-11 rounded-full border border-zinc-100 bg-zinc-50 mb-3">
                       <MessageCircle size={18} className="text-zinc-300" />
                     </div>
-                    <p className="text-[12px] text-zinc-400 mb-1">No conversations yet.</p>
-                    <p className="text-[11px] text-zinc-300">Search for a Maintler to start one.</p>
+                    <p className="text-[12px] text-zinc-400 mb-1">{t("noConversationsYet")}</p>
+                    <p className="text-[11px] text-zinc-300">{t("searchToStart")}</p>
                   </div>
                 ) : (
                   conversations.map((c) => (
@@ -984,7 +989,7 @@ function TeamChatPageInner() {
                           {isSaved(c.counterparty.id) && <Star size={10} className="text-amber-400 fill-amber-400 shrink-0" />}
                         </div>
                         <p className={`text-[11.5px] truncate ${c.unread > 0 ? "text-zinc-600 font-medium" : "text-zinc-400"}`}>
-                          {c.lastFromMe ? "You: " : ""}{c.lastBody}
+                          {c.lastFromMe ? t("youPrefix") : ""}{c.lastBody}
                         </p>
                       </div>
                       <div className="flex flex-col items-end gap-1 shrink-0">
@@ -997,14 +1002,14 @@ function TeamChatPageInner() {
                   ))
                 )
               ) : savedContactsLoading ? (
-                <p className="text-[12px] text-zinc-300 text-center py-10">Loading…</p>
+                <p className="text-[12px] text-zinc-300 text-center py-10">{t("loading")}</p>
               ) : savedContacts.length === 0 ? (
                 <div className="text-center py-12 px-5">
                   <div className="inline-flex items-center justify-center w-11 h-11 rounded-full border border-zinc-100 bg-zinc-50 mb-3">
                     <Star size={18} className="text-zinc-300" />
                   </div>
-                  <p className="text-[12px] text-zinc-400 mb-1">No Maintlers saved yet.</p>
-                  <p className="text-[11px] text-zinc-300">Find a Maintler above and save them — your saved Maintlers are who you'll be able to hand off equipment to later.</p>
+                  <p className="text-[12px] text-zinc-400 mb-1">{t("noMaintlersSavedYet")}</p>
+                  <p className="text-[11px] text-zinc-300">{t("findAndSaveHint")}</p>
                 </div>
               ) : (
                 savedContacts.map((c) => (
@@ -1024,14 +1029,14 @@ function TeamChatPageInner() {
                       <button
                         onClick={() => { setActiveTab("chats"); openConversation(c.contact); }}
                         className="w-7 h-7 flex items-center justify-center rounded-lg bg-zinc-100 hover:bg-zinc-200 text-zinc-500 transition-colors"
-                        title="Message"
+                        title={t("message")}
                       >
                         <Send size={12} />
                       </button>
                       <button
                         onClick={() => unsaveContactByTargetId(c.contact.id)}
                         className="w-7 h-7 flex items-center justify-center rounded-lg text-amber-400 hover:text-red-600 hover:bg-red-50 transition-colors"
-                        title="Remove from saved Maintlers"
+                        title={t("removeFromSaved")}
                       >
                         <Star size={14} className="fill-current" />
                       </button>
@@ -1049,8 +1054,8 @@ function TeamChatPageInner() {
                 <div className="inline-flex items-center justify-center w-14 h-14 rounded-full border border-zinc-100 bg-zinc-50 mb-4">
                   <MessageCircle size={22} className="text-zinc-300" />
                 </div>
-                <p className="text-[13px] text-zinc-400 mb-1">Select a conversation, or start a new one.</p>
-                <p className="text-[12px] text-zinc-300">Any Maintler on MaintlyQR can be reached here.</p>
+                <p className="text-[13px] text-zinc-400 mb-1">{t("selectConversation")}</p>
+                <p className="text-[12px] text-zinc-300">{t("anyMaintlerReachable")}</p>
               </div>
             ) : (
               <>
@@ -1077,14 +1082,14 @@ function TeamChatPageInner() {
                       className={`w-8 h-8 flex items-center justify-center rounded-lg transition-colors ${
                         isSaved(selectedInfo.id) ? "text-amber-400 hover:text-amber-500 hover:bg-amber-50" : "text-zinc-300 hover:text-amber-400 hover:bg-amber-50"
                       }`}
-                      title={isSaved(selectedInfo.id) ? "Remove from saved Maintlers" : "Save as a Maintler"}
+                      title={isSaved(selectedInfo.id) ? t("removeFromSaved") : t("saveAsMaintler")}
                     >
                       <Star size={16} className={isSaved(selectedInfo.id) ? "fill-current" : ""} />
                     </button>
                     <button
                       onClick={() => { setReportOpen((v) => !v); setConfirmBlock(false); setConfirmDeleteThread(false); }}
                       className="w-8 h-8 flex items-center justify-center rounded-lg text-zinc-300 hover:text-amber-600 hover:bg-amber-50 transition-colors"
-                      title="Report to MaintlyQR support"
+                      title={t("reportToSupport")}
                     >
                       <Flag size={15} />
                     </button>
@@ -1092,7 +1097,7 @@ function TeamChatPageInner() {
                       <button
                         onClick={() => handleUnblock(selectedInfo.id)}
                         className="w-8 h-8 flex items-center justify-center rounded-lg text-red-500 hover:bg-red-50 transition-colors"
-                        title="Unblock"
+                        title={t("unblock")}
                       >
                         <Ban size={15} />
                       </button>
@@ -1100,7 +1105,7 @@ function TeamChatPageInner() {
                       <button
                         onClick={() => { setConfirmBlock(true); setReportOpen(false); setConfirmDeleteThread(false); }}
                         className="w-8 h-8 flex items-center justify-center rounded-lg text-zinc-300 hover:text-red-600 hover:bg-red-50 transition-colors"
-                        title="Block"
+                        title={t("block")}
                       >
                         <Ban size={15} />
                       </button>
@@ -1108,7 +1113,7 @@ function TeamChatPageInner() {
                     <button
                       onClick={() => { setConfirmDeleteThread(true); setReportOpen(false); setConfirmBlock(false); }}
                       className="w-8 h-8 flex items-center justify-center rounded-lg text-zinc-300 hover:text-red-600 hover:bg-red-50 transition-colors"
-                      title="Clear conversation (only from your side)"
+                      title={t("clearConversationTitle")}
                     >
                       <Trash2 size={15} />
                     </button>
@@ -1117,17 +1122,17 @@ function TeamChatPageInner() {
 
                 {reportSent && (
                   <div className="px-5 py-2 bg-emerald-50 border-b border-emerald-100 shrink-0">
-                    <p className="text-[11px] text-emerald-700 font-medium">Reported to the MaintlyQR team. Thanks for flagging it.</p>
+                    <p className="text-[11px] text-emerald-700 font-medium">{t("reportedThanks")}</p>
                   </div>
                 )}
 
                 {reportOpen && (
                   <div className="px-5 py-3 bg-amber-50 border-b border-amber-100 shrink-0 space-y-2">
-                    <p className="text-[11px] text-amber-800 font-medium">Report {displayName(selectedInfo)} to the MaintlyQR team.</p>
+                    <p className="text-[11px] text-amber-800 font-medium">{t("reportPrompt", { name: displayName(selectedInfo) })}</p>
                     <textarea
                       value={reportReason}
                       onChange={(e) => setReportReason(e.target.value)}
-                      placeholder="What happened? (optional, but helps us look into it)"
+                      placeholder={t("reportPlaceholder")}
                       rows={2}
                       className="w-full rounded-lg border border-amber-200 px-3 py-2 text-[12px] outline-none focus:border-amber-400 resize-none bg-white"
                     />
@@ -1138,19 +1143,19 @@ function TeamChatPageInner() {
                         disabled={reportSending}
                         className="text-[11px] font-bold text-white bg-amber-600 hover:bg-amber-500 disabled:opacity-50 px-3 py-1.5 rounded-lg transition-colors"
                       >
-                        Send report
+                        {t("sendReport")}
                       </button>
-                      <button onClick={() => { setReportOpen(false); setReportReason(""); }} className="text-[11px] font-semibold text-zinc-500 hover:text-zinc-700 px-1.5">Cancel</button>
+                      <button onClick={() => { setReportOpen(false); setReportReason(""); }} className="text-[11px] font-semibold text-zinc-500 hover:text-zinc-700 px-1.5">{t("cancel")}</button>
                     </div>
                   </div>
                 )}
 
                 {confirmBlock && (
                   <div className="flex items-center justify-between gap-2 px-5 py-2.5 bg-red-50 border-b border-red-100 shrink-0">
-                    <span className="text-[11px] text-red-700 font-medium">Block {displayName(selectedInfo)}? Neither of you will be able to message the other anymore.</span>
+                    <span className="text-[11px] text-red-700 font-medium">{t("blockConfirm", { name: displayName(selectedInfo) })}</span>
                     <div className="flex items-center gap-1.5 shrink-0">
-                      <button onClick={() => handleBlock(selectedInfo.id)} className="text-[11px] font-bold text-white bg-red-600 hover:bg-red-500 px-2.5 py-1 rounded-lg transition-colors">Block</button>
-                      <button onClick={() => setConfirmBlock(false)} className="text-[11px] font-semibold text-zinc-400 hover:text-zinc-700 px-1.5">Cancel</button>
+                      <button onClick={() => handleBlock(selectedInfo.id)} className="text-[11px] font-bold text-white bg-red-600 hover:bg-red-500 px-2.5 py-1 rounded-lg transition-colors">{t("block")}</button>
+                      <button onClick={() => setConfirmBlock(false)} className="text-[11px] font-semibold text-zinc-400 hover:text-zinc-700 px-1.5">{t("cancel")}</button>
                     </div>
                   </div>
                 )}
@@ -1163,10 +1168,10 @@ function TeamChatPageInner() {
 
                 {confirmDeleteThread && (
                   <div className="flex items-center justify-between gap-2 px-5 py-2.5 bg-red-50 border-b border-red-100 shrink-0">
-                    <span className="text-[11px] text-red-700 font-medium">Clear this conversation from your side only?</span>
+                    <span className="text-[11px] text-red-700 font-medium">{t("clearConfirm")}</span>
                     <div className="flex items-center gap-1.5 shrink-0">
-                      <button onClick={handleDeleteThread} className="text-[11px] font-bold text-white bg-red-600 hover:bg-red-500 px-2.5 py-1 rounded-lg transition-colors">Confirm</button>
-                      <button onClick={() => setConfirmDeleteThread(false)} className="text-[11px] font-semibold text-zinc-400 hover:text-zinc-700 px-1.5">Cancel</button>
+                      <button onClick={handleDeleteThread} className="text-[11px] font-bold text-white bg-red-600 hover:bg-red-500 px-2.5 py-1 rounded-lg transition-colors">{t("confirm")}</button>
+                      <button onClick={() => setConfirmDeleteThread(false)} className="text-[11px] font-semibold text-zinc-400 hover:text-zinc-700 px-1.5">{t("cancel")}</button>
                     </div>
                   </div>
                 )}
@@ -1174,8 +1179,8 @@ function TeamChatPageInner() {
                 {selectedIsBlocked && (
                   <div className="px-5 py-2.5 bg-zinc-50 border-b border-zinc-100 shrink-0">
                     <p className="text-[11px] text-zinc-500">
-                      You've blocked {displayName(selectedInfo)} — neither of you can send new messages here.{" "}
-                      <button onClick={() => handleUnblock(selectedInfo.id)} className="text-red-600 font-bold hover:underline">Unblock</button>
+                      {t("blockedBanner", { name: displayName(selectedInfo) })}{" "}
+                      <button onClick={() => handleUnblock(selectedInfo.id)} className="text-red-600 font-bold hover:underline">{t("unblock")}</button>
                     </p>
                   </div>
                 )}
@@ -1187,9 +1192,9 @@ function TeamChatPageInner() {
                 >
                   <div ref={threadContentRef} className="space-y-2.5">
                     {threadLoading ? (
-                      <p className="text-[12px] text-zinc-300 text-center py-8">Loading…</p>
+                      <p className="text-[12px] text-zinc-300 text-center py-8">{t("loading")}</p>
                     ) : thread.length === 0 ? (
-                      <p className="text-[12px] text-zinc-300 text-center py-8">No messages yet — say hi!</p>
+                      <p className="text-[12px] text-zinc-300 text-center py-8">{t("noMessagesYet")}</p>
                     ) : (
                       thread.map((m, i) => {
                         const fromMe = m.sender_id === mechanicId;
@@ -1199,7 +1204,7 @@ function TeamChatPageInner() {
                           <div key={m.id} className={`flex flex-col ${fromMe ? "items-end" : "items-start"}`}>
                             {showLabel && (
                               <p className={`text-[10px] font-black uppercase tracking-wide mb-1 px-1 ${fromMe ? "text-zinc-500" : "text-zinc-400"}`}>
-                                {fromMe ? "You" : displayName(selectedInfo)}
+                                {fromMe ? t("you") : displayName(selectedInfo)}
                               </p>
                             )}
                             <div className={`max-w-[80%] rounded-2xl px-3.5 py-2.5 text-[12.5px] leading-snug ${
@@ -1217,7 +1222,7 @@ function TeamChatPageInner() {
 
                 {selectedIsBlocked ? (
                   <div className="px-4 py-4 border-t border-zinc-100 shrink-0 text-center">
-                    <p className="text-[11.5px] text-zinc-400">You can't send messages while this Maintler is blocked.</p>
+                    <p className="text-[11.5px] text-zinc-400">{t("cannotSendBlocked")}</p>
                   </div>
                 ) : (
                   <div className="px-4 py-3 border-t border-zinc-100 shrink-0 space-y-1.5">
@@ -1227,7 +1232,7 @@ function TeamChatPageInner() {
                         value={body}
                         onChange={(e) => setBody(e.target.value)}
                         onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
-                        placeholder="Type a message…"
+                        placeholder={t("typeMessage")}
                         rows={1}
                         className="flex-1 rounded-xl border border-zinc-200 px-3 py-2.5 text-[13px] outline-none focus:border-red-400 resize-none"
                       />
@@ -1255,7 +1260,7 @@ function TeamChatPageInner() {
         >
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-md max-h-[70vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between px-5 py-4 border-b border-zinc-100 shrink-0">
-              <h2 className="text-[15px] font-black text-zinc-900">Find a Maintler</h2>
+              <h2 className="text-[15px] font-black text-zinc-900">{t("findAMaintler")}</h2>
               <button onClick={() => { setNewChatOpen(false); setSearchTerm(""); setSearchResults([]); }} className="text-zinc-400 hover:text-zinc-700">
                 <X size={18} />
               </button>
@@ -1268,7 +1273,7 @@ function TeamChatPageInner() {
                   autoFocus
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  placeholder="Search by name, workshop or email…"
+                  placeholder={t("searchPlaceholder")}
                   className="w-full rounded-xl border border-zinc-200 pl-9 pr-3 py-2.5 text-[13px] outline-none focus:border-red-400"
                 />
               </div>
@@ -1277,11 +1282,11 @@ function TeamChatPageInner() {
             </div>
             <div className="flex-1 min-h-0 overflow-y-auto py-2">
               {searchTerm.trim().length < MIN_SEARCH_LENGTH ? (
-                <p className="text-[12px] text-zinc-300 text-center py-10 px-5">Type at least {MIN_SEARCH_LENGTH} letters of a name, workshop or email to find a Maintler.</p>
+                <p className="text-[12px] text-zinc-300 text-center py-10 px-5">{t("typeAtLeast", { count: MIN_SEARCH_LENGTH })}</p>
               ) : searching ? (
-                <p className="text-[12px] text-zinc-300 text-center py-10">Searching…</p>
+                <p className="text-[12px] text-zinc-300 text-center py-10">{t("searching")}</p>
               ) : searchResults.length === 0 ? (
-                <p className="text-[12px] text-zinc-300 text-center py-10 px-5">No Maintlers found.</p>
+                <p className="text-[12px] text-zinc-300 text-center py-10 px-5">{t("noMaintlersFound")}</p>
               ) : (
                 searchResults.map((m) => {
                   const saved = isSaved(m.id);
@@ -1290,7 +1295,7 @@ function TeamChatPageInner() {
                       <button
                         onClick={() => startNewConversation(m)}
                         className="flex-1 flex items-center gap-3 text-left min-w-0 py-0.5"
-                        title="Message"
+                        title={t("message")}
                       >
                         {m.photo_url ? (
                           <HoverAvatar src={m.photo_url} size={34} />
@@ -1313,9 +1318,9 @@ function TeamChatPageInner() {
                             ? "text-amber-600 border-amber-200 bg-amber-50 hover:bg-amber-100"
                             : "text-zinc-500 border-zinc-200 hover:bg-zinc-50"
                         }`}
-                        title={saved ? "Remove from saved Maintlers" : "Save as a Maintler"}
+                        title={saved ? t("removeFromSaved") : t("saveAsMaintler")}
                       >
-                        <Star size={12} className={saved ? "fill-current" : ""} /> {saved ? "Saved" : "Save"}
+                        <Star size={12} className={saved ? "fill-current" : ""} /> {saved ? t("saved") : t("save")}
                       </button>
                     </div>
                   );

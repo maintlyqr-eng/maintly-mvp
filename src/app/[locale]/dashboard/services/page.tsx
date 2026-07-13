@@ -1,30 +1,36 @@
 "use client";
 
 import Image from "next/image";
+// Assets isn't migrated yet — keep this one plain next/link.
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+// Login is migrated and every router.push()/replace() call on this page
+// targets it — safe to use next-intl's locale-aware router.
+import { useRouter } from "@/i18n/navigation";
+import { useTranslations } from "next-intl";
 import {
-  LayoutGrid, FileText, Box, QrCode, Users, BarChart3, Calendar as CalendarIcon,
-  Mail, FolderOpen, Settings, Bell, Plus, X, LogOut, Crown,
-  Wrench, CheckCircle2, MoreVertical, Menu,
-  MessageCircle,
+  Plus, X, Bell,
+  Wrench, CheckCircle2, MoreVertical,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
-import NotificationBell from "@/components/NotificationBell";
+import DashboardSidebarIntl from "@/components/DashboardSidebarIntl";
+import DashboardHeaderIntl from "@/components/DashboardHeaderIntl";
 import { useUnreadMessagesCount } from "@/lib/useUnreadMessages";
 import { useUnreadMechanicMessages } from "@/lib/useUnreadMechanicMessages";
-import HoverAvatar from "@/components/HoverAvatar";
-import ContactSupportWidget from "@/components/ContactSupportWidget";
-import CustomerPicker, { CustomerOption } from "@/components/CustomerPicker";
+import CustomerPickerIntl, { CustomerOption } from "@/components/CustomerPickerIntl";
 import { formatDateDMY } from "@/lib/date";
-import { computeReminderStatus, REMINDER_STATUS_LABEL, REMINDER_STATUS_COLOR } from "@/lib/reminders";
-import { getUnitLabel, formatUnitValue } from "@/lib/units";
-import DashboardSidebar from "@/components/DashboardSidebar";
-import DashboardHeader from "@/components/DashboardHeader";
-import { getInitials } from "@/lib/initials";
+import { computeReminderStatus, REMINDER_STATUS_COLOR, type ReminderStatus } from "@/lib/reminders";
+import { getUnitKind } from "@/lib/units";
 
-const serviceTypeOptions = ["Oil Change", "Service", "Repair", "Inspection", "Filter Change", "Tire Change", "Brake Service", "Other"];
+const SERVICE_TYPE_ORDER = ["Oil Change", "Service", "Repair", "Inspection", "Filter Change", "Tire Change", "Brake Service", "Other"];
+
+// Service type is a DB-stored English enum also read by other, not-yet-
+// migrated pages — same enum-translation-key pattern used elsewhere.
+const SERVICE_TYPE_KEYS: Record<string, string> = {
+  "Oil Change": "oilChange", "Service": "service", "Repair": "repair",
+  "Inspection": "inspection", "Filter Change": "filterChange",
+  "Tire Change": "tireChange", "Brake Service": "brakeService", "Other": "other",
+};
 
 const typeColors: Record<string, string> = {
   Service: "bg-blue-100 text-blue-700",
@@ -77,12 +83,9 @@ function getAsset(row: ServiceRow): AssetInfo | null {
   return Array.isArray(row.assets) ? row.assets[0] ?? null : row.assets;
 }
 
-function assetLabel(a: AssetOption | null) {
-  if (!a) return "—";
-  return a.nickname || [a.brand, a.model].filter(Boolean).join(" ") || "Unnamed asset";
-}
-
 export default function ServicesPage() {
+  const t = useTranslations("DashboardServicesPage");
+  const tServiceTypes = useTranslations("ServiceTypes");
   const router = useRouter();
   const [checkingAuth, setCheckingAuth] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -100,21 +103,6 @@ export default function ServicesPage() {
   // Filters
   const [filterAsset, setFilterAsset] = useState("all");
   const [filterType, setFilterType] = useState("all");
-
-  // Pre-fill the asset filter from a deep link (e.g. the dashboard's top search bar: /dashboard/services?asset=...)
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const params = new URLSearchParams(window.location.search);
-    const assetId = params.get("asset");
-    if (assetId) setFilterAsset(assetId);
-
-    // The dashboard's own "Add Service" button (and anywhere else that
-    // wants a generic "log a service, pick the asset" entry point) links
-    // here with ?new=1 instead of just landing on the list — this opens the
-    // same Add Service modal used by the button below, asset picker and all.
-    if (params.get("new") === "1") handleOpenAddService();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   // Add Service modal
   const [showForm, setShowForm] = useState(false);
@@ -138,6 +126,39 @@ export default function ServicesPage() {
   const [reminderMinKm, setReminderMinKm] = useState<number | null>(null);
   const [reminderSaving, setReminderSaving] = useState(false);
   const [reminderError, setReminderError] = useState("");
+
+  const REMINDER_STATUS_LABEL: Record<ReminderStatus, string> = {
+    overdue: t("statusOverdue"),
+    due_soon: t("statusDueSoon"),
+    ok: t("statusOk"),
+    none: t("statusNone"),
+  };
+
+  function assetLabel(a: AssetOption | null) {
+    if (!a) return "—";
+    return a.nickname || [a.brand, a.model].filter(Boolean).join(" ") || t("unnamedAsset");
+  }
+
+  function unitLabel(assetType: string | null | undefined) {
+    return getUnitKind(assetType) === "horas" ? t("unitHours") : t("unitKm");
+  }
+
+  function unitValue(value: number | null | undefined, assetType: string | null | undefined) {
+    if (value == null) return "—";
+    const short = getUnitKind(assetType) === "horas" ? t("unitShortHours") : t("unitShortKm");
+    return `${value.toLocaleString()} ${short}`;
+  }
+
+  // Pre-fill the asset filter from a deep link (e.g. the dashboard's top search bar: /dashboard/services?asset=...)
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const assetId = params.get("asset");
+    if (assetId) setFilterAsset(assetId);
+
+    if (params.get("new") === "1") handleOpenAddService();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function loadServices(uid: string) {
     setLoading(true);
@@ -196,6 +217,7 @@ export default function ServicesPage() {
     });
 
     return () => { active = false; listener.subscription.unsubscribe(); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router]);
 
   async function handleLogout() {
@@ -241,8 +263,6 @@ export default function ServicesPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showForm, svcAssetId]);
 
-  // Default the customer field to whoever was on this asset's last service —
-  // the mechanic can still change it per service, this is just a starting point.
   useEffect(() => {
     if (!showForm || !svcAssetId) return;
     const asset = assetOptions.find((a) => a.id === svcAssetId);
@@ -253,11 +273,11 @@ export default function ServicesPage() {
   async function handleAddService(e: React.FormEvent) {
     e.preventDefault();
     setSvcError("");
-    if (!svcAssetId) { setSvcError("Please select an asset."); return; }
+    if (!svcAssetId) { setSvcError(t("errorSelectAsset")); return; }
 
     if (svcKmHours && minKmHours != null && parseFloat(svcKmHours) < minKmHours) {
-      const svcUnit = getUnitLabel(assetOptions.find((a) => a.id === svcAssetId)?.asset_type);
-      setSvcError(`${svcUnit} can't be lower than the last recorded value (${minKmHours.toLocaleString()}).`);
+      const svcUnit = unitLabel(assetOptions.find((a) => a.id === svcAssetId)?.asset_type);
+      setSvcError(t("errorKmTooLow", { unit: svcUnit, value: minKmHours.toLocaleString() }));
       return;
     }
 
@@ -275,8 +295,6 @@ export default function ServicesPage() {
 
     if (error) { setSvcSaving(false); setSvcError(error.message); return; }
 
-    // Keep the asset's "last known customer" cache in sync — no manual
-    // transfer step, it just follows whatever customer was on this service.
     const asset = assetOptions.find((a) => a.id === svcAssetId);
     const newCustomerId = svcCustomerId || null;
     if (asset && asset.customer_id !== newCustomerId) {
@@ -316,13 +334,13 @@ export default function ServicesPage() {
 
     const todayStr = new Date().toISOString().slice(0, 10);
     if (reminderDate && reminderDate < todayStr) {
-      setReminderError("The reminder date can't be in the past.");
+      setReminderError(t("errorDatePast"));
       return;
     }
 
     if (reminderKm && reminderMinKm != null && parseFloat(reminderKm) < reminderMinKm) {
-      const remUnit = getUnitLabel(getAsset(reminderRow)?.asset_type);
-      setReminderError(`${remUnit} can't be lower than the asset's last recorded value (${reminderMinKm.toLocaleString()}).`);
+      const remUnit = unitLabel(getAsset(reminderRow)?.asset_type);
+      setReminderError(t("errorReminderKmTooLow", { unit: remUnit, value: reminderMinKm.toLocaleString() }));
       return;
     }
 
@@ -339,7 +357,7 @@ export default function ServicesPage() {
 
     if (error) { setReminderError(error.message); return; }
     if (!data || data.length === 0) {
-      setReminderError("Couldn't save — the record wasn't updated. This usually means the database is missing the reminder columns (run the migration) or a permissions (RLS) rule is blocking the update.");
+      setReminderError(t("errorSaveFailed"));
       return;
     }
 
@@ -347,8 +365,6 @@ export default function ServicesPage() {
     await loadServices(mechanicId);
   }
 
-  // Declared before the early return below since hooks must run
-  // unconditionally on every render.
   const filtered = useMemo(() => {
     return services.filter(row => {
       const asset = getAsset(row);
@@ -361,7 +377,7 @@ export default function ServicesPage() {
   if (checkingAuth) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-zinc-50">
-        <p className="text-zinc-400 text-[13px]">Loading...</p>
+        <p className="text-zinc-400 text-[13px]">{t("loadingAuth")}</p>
       </div>
     );
   }
@@ -371,8 +387,8 @@ export default function ServicesPage() {
   return (
     <div className="min-h-screen bg-zinc-50 flex relative">
 
-      <DashboardSidebar
-        activeLabel="My Services"
+      <DashboardSidebarIntl
+        activeHref="/dashboard/services"
         sidebarOpen={sidebarOpen}
         onCloseSidebar={() => setSidebarOpen(false)}
         mechanicId={mechanicId}
@@ -386,9 +402,9 @@ export default function ServicesPage() {
       {/* ════ MAIN ════ */}
       <div className="flex-1 flex flex-col min-w-0">
 
-        <DashboardHeader
-          title="My Services"
-          subtitle="Full history of all maintenance records."
+        <DashboardHeaderIntl
+          title={t("title")}
+          subtitle={t("subtitle")}
           onOpenSidebar={() => setSidebarOpen(true)}
           mechanicId={mechanicId}
           unreadMessages={unreadMessages}
@@ -410,7 +426,7 @@ export default function ServicesPage() {
                 onChange={(e) => setFilterAsset(e.target.value)}
                 className="rounded-xl border border-zinc-200 bg-white px-3 py-[9px] text-[12px] outline-none focus:border-red-400"
               >
-                <option value="all">All assets</option>
+                <option value="all">{t("allAssets")}</option>
                 {assetOptions.map(a => <option key={a.id} value={a.id}>{assetLabel(a)}</option>)}
               </select>
               <select
@@ -418,33 +434,33 @@ export default function ServicesPage() {
                 onChange={(e) => setFilterType(e.target.value)}
                 className="rounded-xl border border-zinc-200 bg-white px-3 py-[9px] text-[12px] outline-none focus:border-red-400"
               >
-                <option value="all">All types</option>
-                {serviceTypeOptions.map(t => <option key={t} value={t}>{t}</option>)}
+                <option value="all">{t("allTypes")}</option>
+                {SERVICE_TYPE_ORDER.map(ty => <option key={ty} value={ty}>{tServiceTypes(SERVICE_TYPE_KEYS[ty])}</option>)}
               </select>
             </div>
             <button
               onClick={handleOpenAddService}
               className="flex items-center gap-2 bg-red-600 hover:bg-red-500 active:scale-[0.98] transition-all text-white text-[13px] font-bold px-4 py-[10px] rounded-xl shadow-sm"
             >
-              <Plus size={15} /> Add Service
+              <Plus size={15} /> {t("addService")}
             </button>
           </div>
 
           {/* Table */}
           <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm">
             {loading ? (
-              <p className="text-[13px] text-zinc-400 text-center py-12">Loading services...</p>
+              <p className="text-[13px] text-zinc-400 text-center py-12">{t("loadingServices")}</p>
             ) : filtered.length === 0 ? (
               <div className="text-center py-16">
                 <div className="inline-flex items-center justify-center w-12 h-12 rounded-full border border-red-100 bg-red-50 mb-3">
                   <Wrench size={20} className="text-red-500" />
                 </div>
-                <p className="text-[13px] text-zinc-400 mb-3">No services found.</p>
+                <p className="text-[13px] text-zinc-400 mb-3">{t("noServicesFound")}</p>
                 <button
                   onClick={handleOpenAddService}
                   className="text-[12px] font-bold text-red-600 hover:text-red-700"
                 >
-                  Log your first service →
+                  {t("logFirstService")}
                 </button>
               </div>
             ) : (
@@ -455,13 +471,13 @@ export default function ServicesPage() {
               <table className="w-full min-w-[820px]">
                 <thead>
                   <tr className="text-left text-[10px] text-zinc-400 font-bold uppercase border-b border-zinc-100">
-                    <th className="px-5 py-3 font-bold">Asset</th>
-                    <th className="px-3 py-3 font-bold">Service Type</th>
-                    <th className="px-3 py-3 font-bold">Date</th>
-                    <th className="px-3 py-3 font-bold">Reading</th>
-                    <th className="px-3 py-3 font-bold">Notes</th>
-                    <th className="px-3 py-3 font-bold">Status</th>
-                    <th className="px-3 py-3 font-bold">Reminder</th>
+                    <th className="px-5 py-3 font-bold">{t("columnAsset")}</th>
+                    <th className="px-3 py-3 font-bold">{t("columnServiceType")}</th>
+                    <th className="px-3 py-3 font-bold">{t("columnDate")}</th>
+                    <th className="px-3 py-3 font-bold">{t("columnReading")}</th>
+                    <th className="px-3 py-3 font-bold">{t("columnNotes")}</th>
+                    <th className="px-3 py-3 font-bold">{t("columnStatus")}</th>
+                    <th className="px-3 py-3 font-bold">{t("columnReminder")}</th>
                     <th className="px-3 py-3"></th>
                   </tr>
                 </thead>
@@ -469,7 +485,7 @@ export default function ServicesPage() {
                   {filtered.map((row) => {
                     const asset = getAsset(row);
                     const img = asset ? assetTypeImg[asset.asset_type] ?? "/images/car.png" : "/images/car.png";
-                    const label = asset?.nickname || [asset?.brand, asset?.model].filter(Boolean).join(" ") || "Unknown asset";
+                    const label = asset?.nickname || [asset?.brand, asset?.model].filter(Boolean).join(" ") || t("unknownAsset");
                     const hasReminder = row.next_due_date != null || row.next_due_km_hours != null;
                     const reminderStatus = computeReminderStatus({
                       nextDueDate: row.next_due_date,
@@ -491,21 +507,23 @@ export default function ServicesPage() {
                           </div>
                         </td>
                         <td className="px-3 py-3">
-                          <span className={`text-[10.5px] font-semibold px-2 py-[3px] rounded-full ${typeColors[row.service_type] ?? "bg-zinc-100 text-zinc-700"}`}>{row.service_type}</span>
+                          <span className={`text-[10.5px] font-semibold px-2 py-[3px] rounded-full ${typeColors[row.service_type] ?? "bg-zinc-100 text-zinc-700"}`}>
+                            {tServiceTypes(SERVICE_TYPE_KEYS[row.service_type] ?? "other")}
+                          </span>
                         </td>
                         <td className="px-3 py-3 text-[12px] text-zinc-700">{formatDateDMY(row.service_date)}</td>
-                        <td className="px-3 py-3 text-[12px] text-zinc-700 font-medium">{formatUnitValue(row.km_hours, asset?.asset_type)}</td>
+                        <td className="px-3 py-3 text-[12px] text-zinc-700 font-medium">{unitValue(row.km_hours, asset?.asset_type)}</td>
                         <td className="px-3 py-3 text-[11px] text-zinc-500 max-w-[180px] truncate">{row.notes || "—"}</td>
                         <td className="px-3 py-3">
                           <span className="flex items-center gap-1 text-[11px] font-semibold text-green-600">
-                            <CheckCircle2 size={12} /> Completed
+                            <CheckCircle2 size={12} /> {t("completed")}
                           </span>
                         </td>
                         <td className="px-3 py-3">
                           {hasReminder ? (
                             <button
                               onClick={() => openReminderModal(row)}
-                              title="View / edit reminder"
+                              title={t("viewEditReminder")}
                               className={`inline-flex items-center gap-1.5 text-[10.5px] font-semibold px-2 py-[3px] rounded-full transition-opacity hover:opacity-75 ${rc.bg} ${rc.text}`}
                             >
                               <span className={`w-1.5 h-1.5 rounded-full ${rc.dot}`} />
@@ -514,10 +532,10 @@ export default function ServicesPage() {
                           ) : (
                             <button
                               onClick={() => openReminderModal(row)}
-                              title="Set reminder"
+                              title={t("setReminder")}
                               className="text-[11px] text-zinc-300 hover:text-zinc-500 transition-colors"
                             >
-                              — Set
+                              {t("setDash")}
                             </button>
                           )}
                         </td>
@@ -535,7 +553,7 @@ export default function ServicesPage() {
                                 className="w-full flex items-center gap-2 px-3 py-2 text-[12px] font-medium text-zinc-700 hover:bg-zinc-50"
                               >
                                 <Bell size={13} className="text-zinc-400" />
-                                {hasReminder ? "Edit Reminder" : "Set Reminder"}
+                                {hasReminder ? t("editReminderMenu") : t("setReminderMenu")}
                               </button>
                             </div>
                           )}
@@ -549,7 +567,7 @@ export default function ServicesPage() {
             )}
           </div>
 
-          <p className="text-center text-[11px] text-zinc-400 mt-8">© 2026 Maintly. All rights reserved.</p>
+          <p className="text-center text-[11px] text-zinc-400 mt-8">{t("copyright")}</p>
         </div>
       </div>
 
@@ -562,17 +580,17 @@ export default function ServicesPage() {
                 <div className="w-8 h-8 rounded-xl bg-red-50 flex items-center justify-center">
                   <Wrench size={15} className="text-red-600" />
                 </div>
-                <h2 className="text-[16px] font-black text-zinc-900">Log New Service</h2>
+                <h2 className="text-[16px] font-black text-zinc-900">{t("modalLogNewService")}</h2>
               </div>
               <button onClick={() => setShowForm(false)} className="text-zinc-400 hover:text-zinc-700"><X size={18} /></button>
             </div>
 
             <form onSubmit={handleAddService} className="px-6 py-5 space-y-4">
               <div>
-                <label className="text-[12px] font-bold text-zinc-700">Asset *</label>
+                <label className="text-[12px] font-bold text-zinc-700">{t("assetLabel")}</label>
                 {assetOptions.length === 0 ? (
                   <div className="mt-1 rounded-xl border border-amber-200 bg-amber-50 px-3 py-3 text-[12px] text-amber-700">
-                    No assets yet. <Link href="/dashboard/assets" className="font-bold underline">Create one first →</Link>
+                    {t("noAssetsYet")} <Link href="/dashboard/assets" className="font-bold underline">{t("createOneFirst")}</Link>
                   </div>
                 ) : (
                   <select value={svcAssetId} onChange={(e) => setSvcAssetId(e.target.value)} required className="w-full mt-1 rounded-xl border border-zinc-200 px-3 py-[10px] text-[13px] outline-none focus:border-red-500">
@@ -582,37 +600,37 @@ export default function ServicesPage() {
               </div>
 
               <div>
-                <label className="text-[12px] font-bold text-zinc-700">Service type *</label>
+                <label className="text-[12px] font-bold text-zinc-700">{t("serviceTypeLabel")}</label>
                 <select value={svcType} onChange={(e) => setSvcType(e.target.value)} required className="w-full mt-1 rounded-xl border border-zinc-200 px-3 py-[10px] text-[13px] outline-none focus:border-red-500">
-                  {serviceTypeOptions.map(t => <option key={t} value={t}>{t}</option>)}
+                  {SERVICE_TYPE_ORDER.map(ty => <option key={ty} value={ty}>{tServiceTypes(SERVICE_TYPE_KEYS[ty])}</option>)}
                 </select>
               </div>
 
               <div className="rounded-xl bg-zinc-50 border border-zinc-200 px-3 py-2.5 text-[12px] text-zinc-500">
-                Service date will be recorded automatically as today, {formatDateDMY(new Date().toISOString().slice(0, 10))}.
+                {t("serviceDateAutoNote", { date: formatDateDMY(new Date().toISOString().slice(0, 10)) })}
               </div>
 
               <div>
-                <label className="text-[12px] font-bold text-zinc-700">{getUnitLabel(svcAssetType)}</label>
+                <label className="text-[12px] font-bold text-zinc-700">{unitLabel(svcAssetType)}</label>
                 <input
                   type="number" min={minKmHours ?? 0} step="0.1"
                   value={svcKmHours} onChange={(e) => setSvcKmHours(e.target.value)}
-                  placeholder="e.g. 45000"
+                  placeholder={t("kmPlaceholder")}
                   className="w-full mt-1 rounded-xl border border-zinc-200 px-3 py-[10px] text-[13px] outline-none focus:border-red-500"
                 />
                 {minKmHoursLoading ? (
-                  <p className="text-[11px] text-zinc-400 mt-1">Checking last recorded value…</p>
+                  <p className="text-[11px] text-zinc-400 mt-1">{t("checkingLastValue")}</p>
                 ) : minKmHours != null ? (
-                  <p className="text-[11px] text-zinc-400 mt-1">Last recorded: {formatUnitValue(minKmHours, svcAssetType)}. Can&apos;t be lower than that.</p>
+                  <p className="text-[11px] text-zinc-400 mt-1">{t("lastRecorded", { value: unitValue(minKmHours, svcAssetType) })}</p>
                 ) : null}
               </div>
 
               <div>
-                <label className="text-[12px] font-bold text-zinc-700">Notes (optional)</label>
-                <textarea rows={3} value={svcNotes} onChange={(e) => setSvcNotes(e.target.value)} placeholder="Parts used, observations, next service..." className="w-full mt-1 rounded-xl border border-zinc-200 px-3 py-[10px] text-[13px] outline-none focus:border-red-500 resize-none" />
+                <label className="text-[12px] font-bold text-zinc-700">{t("notesOptional")}</label>
+                <textarea rows={3} value={svcNotes} onChange={(e) => setSvcNotes(e.target.value)} placeholder={t("notesPlaceholder")} className="w-full mt-1 rounded-xl border border-zinc-200 px-3 py-[10px] text-[13px] outline-none focus:border-red-500 resize-none" />
               </div>
 
-              <CustomerPicker
+              <CustomerPickerIntl
                 mechanicId={mechanicId}
                 customers={customers}
                 value={svcCustomerId}
@@ -625,9 +643,9 @@ export default function ServicesPage() {
               )}
 
               <div className="flex gap-3 pt-1">
-                <button type="button" onClick={() => setShowForm(false)} className="flex-1 border border-zinc-200 text-zinc-700 font-bold py-[11px] rounded-xl text-[13px] hover:bg-zinc-50">Cancel</button>
+                <button type="button" onClick={() => setShowForm(false)} className="flex-1 border border-zinc-200 text-zinc-700 font-bold py-[11px] rounded-xl text-[13px] hover:bg-zinc-50">{t("cancel")}</button>
                 <button type="submit" disabled={svcSaving || assetOptions.length === 0} className="flex-1 bg-red-600 hover:bg-red-500 disabled:opacity-60 transition-all text-white font-bold py-[11px] rounded-xl text-[13px]">
-                  {svcSaving ? "Saving..." : "Save Service"}
+                  {svcSaving ? t("saving") : t("saveService")}
                 </button>
               </div>
             </form>
@@ -645,13 +663,13 @@ export default function ServicesPage() {
                   <Bell size={15} className="text-amber-600" />
                 </div>
                 <div className="min-w-0">
-                  <h2 className="text-[16px] font-black text-zinc-900 leading-tight">Maintenance Reminder</h2>
+                  <h2 className="text-[16px] font-black text-zinc-900 leading-tight">{t("maintenanceReminderTitle")}</h2>
                   {reminderRow && (() => {
                     const a = getAsset(reminderRow);
-                    const label = a?.nickname || [a?.brand, a?.model].filter(Boolean).join(" ") || "Unknown asset";
+                    const label = a?.nickname || [a?.brand, a?.model].filter(Boolean).join(" ") || t("unknownAsset");
                     return (
                       <p className="text-[11px] text-zinc-400 truncate">
-                        {label} · {reminderRow.service_type} on {formatDateDMY(reminderRow.service_date)}
+                        {label} · {tServiceTypes(SERVICE_TYPE_KEYS[reminderRow.service_type] ?? "other")} {t("onDate", { date: formatDateDMY(reminderRow.service_date) })}
                       </p>
                     );
                   })()}
@@ -662,11 +680,11 @@ export default function ServicesPage() {
 
             <form onSubmit={handleSaveReminder} className="px-6 py-5 space-y-4">
               <p className="text-[12px] text-zinc-500 -mt-1">
-                Set when this asset&apos;s next service is expected. Leave blank to clear.
+                {t("setReminderHint")}
               </p>
 
               <div>
-                <label className="text-[12px] font-bold text-zinc-700">Next service due date</label>
+                <label className="text-[12px] font-bold text-zinc-700">{t("nextServiceDueDate")}</label>
                 <input
                   type="date" min={new Date().toISOString().slice(0, 10)} value={reminderDate} onChange={(e) => setReminderDate(e.target.value)}
                   className="w-full mt-1 rounded-xl border border-zinc-200 px-3 py-[10px] text-[13px] outline-none focus:border-red-500"
@@ -674,16 +692,16 @@ export default function ServicesPage() {
               </div>
 
               <div>
-                <label className="text-[12px] font-bold text-zinc-700">Next service due at ({getUnitLabel(getAsset(reminderRow)?.asset_type)})</label>
+                <label className="text-[12px] font-bold text-zinc-700">{t("nextServiceDueAt", { unit: unitLabel(getAsset(reminderRow)?.asset_type) })}</label>
                 <input
                   type="number" min={reminderMinKm ?? 0} step="0.1" value={reminderKm} onChange={(e) => setReminderKm(e.target.value)}
-                  placeholder="e.g. 50000"
+                  placeholder={t("egPlaceholder")}
                   className="w-full mt-1 rounded-xl border border-zinc-200 px-3 py-[10px] text-[13px] outline-none focus:border-red-500"
                 />
                 {reminderMinKm != null ? (
-                  <p className="text-[11px] text-zinc-400 mt-1">This asset&apos;s last recorded reading: {formatUnitValue(reminderMinKm, getAsset(reminderRow)?.asset_type)}. Can&apos;t be lower than that.</p>
+                  <p className="text-[11px] text-zinc-400 mt-1">{t("lastRecordedReading", { value: unitValue(reminderMinKm, getAsset(reminderRow)?.asset_type) })}</p>
                 ) : (
-                  <p className="text-[11px] text-zinc-400 mt-1">No {getUnitLabel(getAsset(reminderRow)?.asset_type).toLowerCase()} recorded yet for this asset.</p>
+                  <p className="text-[11px] text-zinc-400 mt-1">{t("noRecordedYet", { unit: unitLabel(getAsset(reminderRow)?.asset_type).toLowerCase() })}</p>
                 )}
               </div>
 
@@ -692,9 +710,9 @@ export default function ServicesPage() {
               )}
 
               <div className="flex gap-3 pt-1">
-                <button type="button" onClick={() => setReminderRow(null)} className="flex-1 border border-zinc-200 text-zinc-700 font-bold py-[11px] rounded-xl text-[13px] hover:bg-zinc-50">Cancel</button>
+                <button type="button" onClick={() => setReminderRow(null)} className="flex-1 border border-zinc-200 text-zinc-700 font-bold py-[11px] rounded-xl text-[13px] hover:bg-zinc-50">{t("cancel")}</button>
                 <button type="submit" disabled={reminderSaving} className="flex-1 bg-red-600 hover:bg-red-500 disabled:opacity-60 transition-all text-white font-bold py-[11px] rounded-xl text-[13px]">
-                  {reminderSaving ? "Saving..." : "Save Reminder"}
+                  {reminderSaving ? t("saving") : t("saveReminder")}
                 </button>
               </div>
             </form>

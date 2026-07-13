@@ -4,6 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useTranslations, useLocale } from "next-intl";
 import {
   Box, QrCode, Search, Plus, MoreVertical,
   CheckCircle2, Clock, TrendingUp, TrendingDown, ChevronLeft, ChevronRight,
@@ -13,17 +14,31 @@ import { supabase } from "@/lib/supabase";
 import { useUnreadMessagesCount } from "@/lib/useUnreadMessages";
 import { useUnreadMechanicMessages } from "@/lib/useUnreadMechanicMessages";
 import { formatDateDMY } from "@/lib/date";
-import { computeReminderStatus, REMINDER_STATUS_LABEL, REMINDER_STATUS_COLOR, type ReminderStatus } from "@/lib/reminders";
-import { getUnitLabel, getUnitShort, formatUnitValue } from "@/lib/units";
-import ContactSupportWidget from "@/components/ContactSupportWidget";
-import DashboardSidebar from "@/components/DashboardSidebar";
-import DashboardHeader from "@/components/DashboardHeader";
-import CalendarDayCell, { type DayInfo } from "@/components/CalendarDayCell";
+import { computeReminderStatus, REMINDER_STATUS_COLOR, type ReminderStatus } from "@/lib/reminders";
+import { getUnitKind } from "@/lib/units";
+import ContactSupportWidgetIntl from "@/components/ContactSupportWidgetIntl";
+import DashboardSidebarIntl from "@/components/DashboardSidebarIntl";
+import DashboardHeaderIntl from "@/components/DashboardHeaderIntl";
+import CalendarDayCellIntl, { type DayInfo } from "@/components/CalendarDayCellIntl";
 import { buildMonthGridMondayFirst } from "@/lib/calendarGrid";
-import AddAssetChooser from "@/components/AddAssetChooser";
-import NewAssetModal from "@/components/NewAssetModal";
-import LinkExistingAssetModal from "@/components/LinkExistingAssetModal";
+import AddAssetChooserIntl from "@/components/AddAssetChooserIntl";
+import NewAssetModalIntl from "@/components/NewAssetModalIntl";
+import LinkExistingAssetModalIntl from "@/components/LinkExistingAssetModalIntl";
 import { assetTypeImg } from "@/lib/assetTypes";
+
+// NOTE: this page's router stays on plain next/navigation's useRouter
+// (not @/i18n/navigation) — it does router.push(`/dashboard/assets?q=...`)
+// and /dashboard/assets is not migrated yet. Per the established rule, ALL
+// of a page's router targets must be migrated before the swap; one
+// unmigrated target (assets) blocks it even though /dashboard/services IS
+// migrated. router.replace("/login") is fine either way since /login is
+// migrated.
+
+const SERVICE_TYPE_KEYS: Record<string, string> = {
+  "Oil Change": "oilChange", "Service": "service", "Repair": "repair",
+  "Inspection": "inspection", "Filter Change": "filterChange",
+  "Tire Change": "tireChange", "Brake Service": "brakeService", "Other": "other",
+};
 
 const typeColors: Record<string, string> = {
   "Oil Change":    "bg-amber-100 text-amber-700",
@@ -35,6 +50,7 @@ const typeColors: Record<string, string> = {
   "Brake Service": "bg-orange-100 text-orange-700",
 };
 
+const DATE_LOCALE: Record<string, string> = { en: "en-US", es: "es-AR", pt: "pt-BR" };
 
 type AssetInfo = {
   brand: string | null;
@@ -93,6 +109,9 @@ function MiniSparkline({ color }: { color: string }) {
 
 export default function DashboardPage() {
   const router = useRouter();
+  const t = useTranslations("DashboardHomePage");
+  const tServiceTypes = useTranslations("ServiceTypes");
+  const locale = useLocale();
   const [authChecked, setAuthChecked] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [mechanicId, setMechanicId] = useState("");
@@ -106,6 +125,22 @@ export default function DashboardPage() {
   const [totalAssets, setTotalAssets] = useState(0);
   const [realServices, setRealServices] = useState<RealService[]>([]);
   const [reminders, setReminders] = useState<ReminderItem[]>([]);
+
+  const REMINDER_STATUS_LABEL: Record<ReminderStatus, string> = {
+    overdue: t("statusOverdue"),
+    due_soon: t("statusDueSoon"),
+    ok: t("statusOk"),
+    none: t("statusNone"),
+  };
+
+  function unitShort(assetType: string | null | undefined) {
+    return getUnitKind(assetType) === "horas" ? t("unitShortHours") : t("unitShortKm");
+  }
+
+  function unitValue(value: number | null | undefined, assetType: string | null | undefined) {
+    if (value == null) return "—";
+    return `${value.toLocaleString()} ${unitShort(assetType)}`;
+  }
 
   // ── Mini calendar widget ──
   const [calViewDate, setCalViewDate] = useState(() => new Date());
@@ -122,8 +157,8 @@ export default function DashboardPage() {
 
   // ── Add Equipment flow (choose → new / existing) ──
   // Shared components (also used by the Assets page) so this behaves
-  // identically everywhere — see src/components/{AddAssetChooser,
-  // NewAssetModal,LinkExistingAssetModal}.tsx.
+  // identically everywhere — see src/components/{AddAssetChooserIntl,
+  // NewAssetModalIntl,LinkExistingAssetModalIntl}.tsx.
   const [addStep, setAddStep] = useState<"closed" | "choose" | "new" | "existing">("closed");
 
   async function refreshTotalAssets(uid: string) {
@@ -212,7 +247,7 @@ export default function DashboardPage() {
 
       const allReminderItems: ReminderItem[] = ((remRows ?? []) as any[]).map((r) => {
         const a = Array.isArray(r.assets) ? r.assets[0] : r.assets;
-        const label = a?.nickname || [a?.brand, a?.model].filter(Boolean).join(" ") || "Unknown asset";
+        const label = a?.nickname || [a?.brand, a?.model].filter(Boolean).join(" ") || t("unknownAsset");
         const status = computeReminderStatus({
           nextDueDate: r.next_due_date,
           nextDueKmHours: r.next_due_km_hours,
@@ -239,7 +274,7 @@ export default function DashboardPage() {
       setCalServices(
         ((allSvcRows ?? []) as any[]).map((r) => {
           const a = Array.isArray(r.assets) ? r.assets[0] : r.assets;
-          const label = a?.nickname || [a?.brand, a?.model].filter(Boolean).join(" ") || "Unknown asset";
+          const label = a?.nickname || [a?.brand, a?.model].filter(Boolean).join(" ") || t("unknownAsset");
           return { date: r.service_date, label, type: r.service_type };
         })
       );
@@ -254,7 +289,7 @@ export default function DashboardPage() {
           const qr = Array.isArray(a.qr_codes) ? a.qr_codes[0]?.code : a.qr_codes?.code;
           return {
             id: a.id,
-            name: a.nickname || [a.brand, a.model].filter(Boolean).join(" ") || "Unknown Asset",
+            name: a.nickname || [a.brand, a.model].filter(Boolean).join(" ") || t("unknownAsset"),
             brand: a.brand ?? null,
             model: a.model ?? null,
             vin: a.vin_serial ?? null,
@@ -275,6 +310,7 @@ export default function DashboardPage() {
     });
 
     return () => { active = false; listener.subscription.unsubscribe(); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router]);
 
   // ── Live search: services (debounced, searches full history, not just the recent 6) ──
@@ -287,7 +323,7 @@ export default function DashboardPage() {
 
     let cancelled = false;
     setSearchingServices(true);
-    const t = setTimeout(async () => {
+    const timer = setTimeout(async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session || cancelled) { if (!cancelled) setSearchingServices(false); return; }
 
@@ -307,14 +343,15 @@ export default function DashboardPage() {
           asset_id: s.asset_id,
           service_type: s.service_type,
           service_date: s.service_date,
-          assetName: a?.nickname || [a?.brand, a?.model].filter(Boolean).join(" ") || "Unknown Asset",
+          assetName: a?.nickname || [a?.brand, a?.model].filter(Boolean).join(" ") || t("unknownAsset"),
         };
       });
       setSearchServiceResults(results);
       setSearchingServices(false);
     }, 300);
 
-    return () => { cancelled = true; clearTimeout(t); };
+    return () => { cancelled = true; clearTimeout(timer); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchQuery]);
 
   async function handleLogout() {
@@ -325,7 +362,7 @@ export default function DashboardPage() {
   if (!authChecked) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-zinc-50">
-        <p className="text-zinc-400 text-[13px]">Loading...</p>
+        <p className="text-zinc-400 text-[13px]">{t("loadingAuth")}</p>
       </div>
     );
   }
@@ -357,18 +394,22 @@ export default function DashboardPage() {
   }
 
   const statsCards = [
-    { label: "TOTAL SERVICES", value: String(totalServices), up: true,  icon: CalendarIcon, color: "bg-red-50 text-red-500"   },
-    { label: "TOTAL ASSETS",   value: String(totalAssets),   up: true,  icon: Box,          color: "bg-blue-50 text-blue-500"  },
-    { label: "COMPLETED",      value: String(totalServices), up: true,  icon: CheckCircle2, color: "bg-green-50 text-green-500" },
-    { label: "PENDING",        value: "0",                   up: true,  icon: Clock,        color: "bg-amber-50 text-amber-500" },
+    { label: t("statTotalServices"), value: String(totalServices), up: true,  icon: CalendarIcon, color: "bg-red-50 text-red-500"   },
+    { label: t("statTotalAssets"),   value: String(totalAssets),   up: true,  icon: Box,          color: "bg-blue-50 text-blue-500"  },
+    { label: t("statCompleted"),     value: String(totalServices), up: true,  icon: CheckCircle2, color: "bg-green-50 text-green-500" },
+    { label: t("statPending"),       value: "0",                   up: true,  icon: Clock,        color: "bg-amber-50 text-amber-500" },
   ];
 
   const CAL_MONTH_LABELS = [
-    "January", "February", "March", "April", "May", "June",
-    "July", "August", "September", "October", "November", "December",
+    t("monthJanuary"), t("monthFebruary"), t("monthMarch"), t("monthApril"), t("monthMay"), t("monthJune"),
+    t("monthJuly"), t("monthAugust"), t("monthSeptember"), t("monthOctober"), t("monthNovember"), t("monthDecember"),
   ];
   const calendarMonth = `${CAL_MONTH_LABELS[calViewDate.getMonth()]} ${calViewDate.getFullYear()}`;
   const calendarGrid = buildMonthGridMondayFirst(calViewDate.getFullYear(), calViewDate.getMonth());
+
+  const WEEKDAY_LABELS = [
+    t("weekdayMon"), t("weekdayTue"), t("weekdayWed"), t("weekdayThu"), t("weekdayFri"), t("weekdaySat"), t("weekdaySun"),
+  ];
 
   const calActivityByDate: Record<string, DayInfo> = {};
   function ensureCalDay(k: string): DayInfo {
@@ -376,13 +417,13 @@ export default function DashboardPage() {
   }
   for (const s of calServices) ensureCalDay(s.date).services.push({ label: s.label, type: s.type });
   for (const r of calReminders) ensureCalDay(r.date).reminders.push({ label: r.label, type: r.type, status: r.status });
-  for (const t of calTasks) ensureCalDay(t.date).tasks.push({ title: t.title, done: t.done });
+  for (const task of calTasks) ensureCalDay(task.date).tasks.push({ title: task.title, done: task.done });
 
   function calDotColor(info?: DayInfo) {
     if (!info) return null;
     const overdue = info.reminders.some((r) => r.status === "overdue");
     const dueSoon = info.reminders.some((r) => r.status === "due_soon");
-    const openTasks = info.tasks.some((t) => !t.done);
+    const openTasks = info.tasks.some((t2) => !t2.done);
     if (overdue) return "bg-red-500";
     if (dueSoon) return "bg-amber-500";
     if (openTasks) return "bg-blue-500";
@@ -392,13 +433,13 @@ export default function DashboardPage() {
   }
 
   const miniStats = [
-    { label: "SERVICES",  value: String(totalServices), color: "#16a34a" },
-    { label: "ASSETS",    value: String(totalAssets),   color: "#2563eb" },
-    { label: "COMPLETED", value: String(totalServices), color: "#7c3aed" },
-    { label: "PENDING",   value: "0",                   color: "#ea580c" },
+    { label: t("miniServices"),  value: String(totalServices), color: "#16a34a" },
+    { label: t("miniAssets"),    value: String(totalAssets),   color: "#2563eb" },
+    { label: t("miniCompleted"), value: String(totalServices), color: "#7c3aed" },
+    { label: t("miniPending"),   value: "0",                   color: "#ea580c" },
   ];
 
-  // ── Top search bar, rendered inside DashboardHeader's extraHeaderContent
+  // ── Top search bar, rendered inside DashboardHeaderIntl's extraHeaderContent
   // slot — this is the one bit of header markup unique to this page (no
   // other dashboard page has a live search box), which is why Dashboard
   // stayed on its own hand-rolled header/sidebar until this slot existed. ──
@@ -412,7 +453,7 @@ export default function DashboardPage() {
         onFocus={() => { if (searchQuery.trim()) setSearchOpen(true); }}
         onBlur={() => setTimeout(() => setSearchOpen(false), 150)}
         onKeyDown={(e) => { if (e.key === "Enter") handleSearchSubmit(); if (e.key === "Escape") setSearchOpen(false); }}
-        placeholder="Search assets, QR codes, services..."
+        placeholder={t("searchPlaceholder")}
         className="w-[280px] rounded-xl border border-zinc-200 bg-zinc-50 pl-9 pr-3 py-[9px] text-[12px] outline-none focus:border-red-400 transition-colors"
       />
 
@@ -420,7 +461,7 @@ export default function DashboardPage() {
         <div className="absolute top-[calc(100%+6px)] left-0 w-[340px] bg-white rounded-xl border border-zinc-200 shadow-lg py-2 z-50 max-h-[360px] overflow-y-auto">
           {matchedAssets.length > 0 && (
             <div className="px-2">
-              <p className="px-2 pb-1 text-[10px] font-bold text-zinc-400 uppercase tracking-wide">Assets</p>
+              <p className="px-2 pb-1 text-[10px] font-bold text-zinc-400 uppercase tracking-wide">{t("searchAssets")}</p>
               {matchedAssets.map((a) => (
                 <button
                   key={a.id}
@@ -441,7 +482,7 @@ export default function DashboardPage() {
 
           {searchServiceResults.length > 0 && (
             <div className="px-2 mt-1">
-              <p className="px-2 pb-1 text-[10px] font-bold text-zinc-400 uppercase tracking-wide">Services</p>
+              <p className="px-2 pb-1 text-[10px] font-bold text-zinc-400 uppercase tracking-wide">{t("searchServices")}</p>
               {searchServiceResults.map((s) => (
                 <button
                   key={s.id}
@@ -452,7 +493,7 @@ export default function DashboardPage() {
                     <Wrench size={13} className="text-blue-500" />
                   </div>
                   <div className="min-w-0">
-                    <p className="text-[12px] font-bold text-zinc-800 truncate">{s.service_type} · {s.assetName}</p>
+                    <p className="text-[12px] font-bold text-zinc-800 truncate">{tServiceTypes(SERVICE_TYPE_KEYS[s.service_type] ?? "other")} · {s.assetName}</p>
                     <p className="text-[10px] text-zinc-400 truncate">{formatDateDMY(s.service_date)}</p>
                   </div>
                 </button>
@@ -462,7 +503,7 @@ export default function DashboardPage() {
 
           {!hasSearchResults && (
             <p className="px-4 py-3 text-[12px] text-zinc-400">
-              {searchingServices ? "Searching…" : `No results for "${searchQuery.trim()}"`}
+              {searchingServices ? t("searching") : t("noResultsFor", { query: searchQuery.trim() })}
             </p>
           )}
         </div>
@@ -473,7 +514,7 @@ export default function DashboardPage() {
   return (
     <div className="min-h-screen bg-zinc-50 flex relative">
 
-      {/* hideSupportWidget: this page renders ContactSupportWidget itself,
+      {/* hideSupportWidget: this page renders ContactSupportWidgetIntl itself,
           inline in the main content area below (variant="inline"), not in
           the sidebar — same placement Facu specifically likes here, kept
           unchanged by this migration. name/email are passed as `displayName`
@@ -481,8 +522,8 @@ export default function DashboardPage() {
           so the shared component's initials-fallback math matches exactly
           what this page computed before the migration (a mechanic with no
           name set still got an initial derived from their email). */}
-      <DashboardSidebar
-        activeLabel="Dashboard"
+      <DashboardSidebarIntl
+        activeHref="/dashboard"
         sidebarOpen={sidebarOpen}
         onCloseSidebar={() => setSidebarOpen(false)}
         mechanicId={mechanicId}
@@ -497,9 +538,9 @@ export default function DashboardPage() {
       {/* ════ MAIN CONTENT ════ */}
       <div className="flex-1 flex flex-col min-w-0">
 
-        <DashboardHeader
-          title="Dashboard"
-          subtitle={`Welcome back, ${mechanicName || "Maintler"}! Here's what's happening with your maintenance work.`}
+        <DashboardHeaderIntl
+          title={t("headerTitle")}
+          subtitle={t("headerSubtitle", { name: mechanicName || t("defaultMaintlerName") })}
           onOpenSidebar={() => setSidebarOpen(true)}
           mechanicId={mechanicId}
           unreadMessages={unreadMessages}
@@ -516,19 +557,19 @@ export default function DashboardPage() {
 
           {/* ── Action buttons ── */}
           <div className="flex justify-between items-center gap-3 mb-5 -mt-2">
-            <ContactSupportWidget mechanicId={mechanicId} variant="inline" />
+            <ContactSupportWidgetIntl mechanicId={mechanicId} variant="inline" />
             <div className="flex gap-3">
             <button
               onClick={() => setAddStep("choose")}
               className="flex items-center gap-2 border border-zinc-200 bg-white hover:bg-zinc-50 active:scale-[0.98] transition-all text-zinc-700 text-[13px] font-bold px-4 py-[10px] rounded-xl shadow-sm"
             >
-              <Box size={15} /> Add Equipment
+              <Box size={15} /> {t("addEquipment")}
             </button>
             <Link
               href="/dashboard/services?new=1"
               className="flex items-center gap-2 bg-red-600 hover:bg-red-500 active:scale-[0.98] transition-all text-white text-[13px] font-bold px-4 py-[10px] rounded-xl shadow-sm"
             >
-              <Plus size={15} /> Add Service
+              <Plus size={15} /> {t("addService")}
             </Link>
             </div>
           </div>
@@ -547,7 +588,7 @@ export default function DashboardPage() {
                     <p className="text-[24px] font-black text-zinc-900 mt-1">{value}</p>
                     <div className={`flex items-center gap-1 text-[10px] font-semibold mt-1 ${up ? "text-green-600" : "text-red-500"}`}>
                       {up ? <TrendingUp size={11} /> : <TrendingDown size={11} />}
-                      Your totals
+                      {t("yourTotals")}
                     </div>
                   </div>
                 ))}
@@ -555,25 +596,25 @@ export default function DashboardPage() {
 
               <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm p-5">
                 <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-[15px] font-black text-zinc-900">Recent Services</h2>
-                  <Link href="/dashboard/services" className="text-[12px] font-semibold text-zinc-500 hover:text-zinc-800 border border-zinc-200 rounded-lg px-3 py-[6px] transition-colors">View all</Link>
+                  <h2 className="text-[15px] font-black text-zinc-900">{t("recentServices")}</h2>
+                  <Link href="/dashboard/services" className="text-[12px] font-semibold text-zinc-500 hover:text-zinc-800 border border-zinc-200 rounded-lg px-3 py-[6px] transition-colors">{t("viewAll")}</Link>
                 </div>
 
                 {realServices.length === 0 ? (
                   <div className="text-center py-10">
-                    <p className="text-[13px] text-zinc-400 mb-3">No services recorded yet.</p>
-                    <Link href="/dashboard/services?new=1" className="text-[12px] font-bold text-red-600 hover:text-red-700">Log your first service →</Link>
+                    <p className="text-[13px] text-zinc-400 mb-3">{t("noServicesYet")}</p>
+                    <Link href="/dashboard/services?new=1" className="text-[12px] font-bold text-red-600 hover:text-red-700">{t("logFirstService")}</Link>
                   </div>
                 ) : (
                   <div className="overflow-x-auto -mx-5 px-5">
                   <table className="w-full min-w-[560px]">
                     <thead>
                       <tr className="text-left text-[10px] text-zinc-400 font-bold uppercase">
-                        <th className="pb-2 font-bold">Asset</th>
-                        <th className="pb-2 font-bold">Service Type</th>
-                        <th className="pb-2 font-bold">Date</th>
-                        <th className="pb-2 font-bold">Reading</th>
-                        <th className="pb-2 font-bold">Status</th>
+                        <th className="pb-2 font-bold">{t("columnAsset")}</th>
+                        <th className="pb-2 font-bold">{t("columnServiceType")}</th>
+                        <th className="pb-2 font-bold">{t("columnDate")}</th>
+                        <th className="pb-2 font-bold">{t("columnReading")}</th>
+                        <th className="pb-2 font-bold">{t("columnStatus")}</th>
                         <th className="pb-2"></th>
                       </tr>
                     </thead>
@@ -581,7 +622,7 @@ export default function DashboardPage() {
                       {realServices.map((s) => {
                         const asset = Array.isArray(s.assets) ? s.assets[0] ?? null : (s.assets as AssetInfo | null);
                         const img = asset ? assetTypeImg[asset.asset_type] ?? "/images/car.png" : "/images/car.png";
-                        const label = asset?.nickname || [asset?.brand, asset?.model].filter(Boolean).join(" ") || "Unknown asset";
+                        const label = asset?.nickname || [asset?.brand, asset?.model].filter(Boolean).join(" ") || t("unknownAsset");
                         return (
                           <tr key={s.id} className="border-t border-zinc-100">
                             <td className="py-3 pr-3">
@@ -596,13 +637,13 @@ export default function DashboardPage() {
                               </div>
                             </td>
                             <td className="py-3 pr-3">
-                              <span className={`text-[10.5px] font-semibold px-2 py-[3px] rounded-full ${typeColors[s.service_type] ?? "bg-zinc-100 text-zinc-700"}`}>{s.service_type}</span>
+                              <span className={`text-[10.5px] font-semibold px-2 py-[3px] rounded-full ${typeColors[s.service_type] ?? "bg-zinc-100 text-zinc-700"}`}>{tServiceTypes(SERVICE_TYPE_KEYS[s.service_type] ?? "other")}</span>
                             </td>
                             <td className="py-3 pr-3 text-[12px] text-zinc-700">{formatDateDMY(s.service_date)}</td>
-                            <td className="py-3 pr-3 text-[12px] text-zinc-700 font-medium">{formatUnitValue(s.km_hours, asset?.asset_type)}</td>
+                            <td className="py-3 pr-3 text-[12px] text-zinc-700 font-medium">{unitValue(s.km_hours, asset?.asset_type)}</td>
                             <td className="py-3 pr-3">
                               <span className="flex items-center gap-1 text-[11px] font-semibold text-green-600">
-                                <CheckCircle2 size={12} /> Completed
+                                <CheckCircle2 size={12} /> {t("completed")}
                               </span>
                             </td>
                             <td className="py-3 text-right">
@@ -623,11 +664,11 @@ export default function DashboardPage() {
 
               <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm p-5">
                 <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-[13px] font-black text-zinc-900">Upcoming Reminders</h3>
-                  <Link href="/dashboard/services" className="text-[11px] font-semibold text-zinc-400 hover:text-zinc-700">View all</Link>
+                  <h3 className="text-[13px] font-black text-zinc-900">{t("upcomingReminders")}</h3>
+                  <Link href="/dashboard/services" className="text-[11px] font-semibold text-zinc-400 hover:text-zinc-700">{t("viewAll")}</Link>
                 </div>
                 {reminders.length === 0 ? (
-                  <p className="text-[12px] text-zinc-400 text-center py-4">No reminders due soon.</p>
+                  <p className="text-[12px] text-zinc-400 text-center py-4">{t("noRemindersDueSoon")}</p>
                 ) : (
                   <div className="space-y-2">
                     {reminders.slice(0, 5).map((r) => {
@@ -638,9 +679,9 @@ export default function DashboardPage() {
                           <div className="flex-1 min-w-0">
                             <p className="text-[12px] font-bold text-zinc-800 truncate">{r.assetLabel}</p>
                             <p className="text-[10px] text-zinc-400">
-                              {r.next_due_date ? `Due ${formatDateDMY(r.next_due_date)}` : ""}
+                              {r.next_due_date ? t("dueOn", { date: formatDateDMY(r.next_due_date) }) : ""}
                               {r.next_due_date && r.next_due_km_hours != null ? " · " : ""}
-                              {r.next_due_km_hours != null ? `${r.next_due_km_hours.toLocaleString()} ${getUnitShort(r.assetType)}` : ""}
+                              {r.next_due_km_hours != null ? `${r.next_due_km_hours.toLocaleString()} ${unitShort(r.assetType)}` : ""}
                             </p>
                           </div>
                           <span className={`text-[9px] font-bold px-1.5 py-[2px] rounded-full shrink-0 ${rc.bg} ${rc.text}`}>{REMINDER_STATUS_LABEL[r.status]}</span>
@@ -653,8 +694,8 @@ export default function DashboardPage() {
 
               <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm p-5">
                 <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-[13px] font-black text-zinc-900">Calendar</h3>
-                  <Link href="/dashboard/calendar" className="text-[10px] font-bold text-red-600 hover:text-red-700">View all →</Link>
+                  <h3 className="text-[13px] font-black text-zinc-900">{t("calendar")}</h3>
+                  <Link href="/dashboard/calendar" className="text-[10px] font-bold text-red-600 hover:text-red-700">{t("viewAllArrow")}</Link>
                 </div>
                 <div className="flex items-center justify-between mb-3">
                   <button
@@ -668,17 +709,17 @@ export default function DashboardPage() {
                   ><ChevronRight size={16} /></button>
                 </div>
                 <div className="grid grid-cols-7 gap-1 text-center">
-                  {["MON","TUE","WED","THU","FRI","SAT","SUN"].map(d => (
+                  {WEEKDAY_LABELS.map(d => (
                     <span key={d} className="text-[8px] font-bold text-zinc-400 pb-1">{d}</span>
                   ))}
                   {calendarGrid.map((cell) => (
-                    <CalendarDayCell
+                    <CalendarDayCellIntl
                       key={cell.key}
                       dateKey={cell.key}
                       day={cell.day}
                       inMonth={cell.inMonth}
                       isToday={cell.isToday}
-                      dateLabel={new Date(cell.key + "T00:00:00").toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" })}
+                      dateLabel={new Date(cell.key + "T00:00:00").toLocaleDateString(DATE_LOCALE[locale] ?? "en-US", { weekday: "long", month: "short", day: "numeric" })}
                       info={calActivityByDate[cell.key]}
                       dotColor={calDotColor(calActivityByDate[cell.key])}
                     />
@@ -687,15 +728,15 @@ export default function DashboardPage() {
               </div>
 
               <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm p-5">
-                <h3 className="text-[13px] font-black text-zinc-900 mb-3">Quick Access</h3>
+                <h3 className="text-[13px] font-black text-zinc-900 mb-3">{t("quickAccess")}</h3>
                 <div className="space-y-2">
                   <Link href="/dashboard/services" className="flex items-center gap-3 p-3 rounded-xl hover:bg-zinc-50 transition-colors">
                     <div className="w-9 h-9 rounded-xl bg-red-50 flex items-center justify-center shrink-0">
                       <FileText size={14} className="text-red-500" />
                     </div>
                     <div>
-                      <p className="text-[12px] font-bold text-zinc-800 leading-tight">My Services</p>
-                      <p className="text-[10px] text-zinc-400">{totalServices} records</p>
+                      <p className="text-[12px] font-bold text-zinc-800 leading-tight">{t("myServices")}</p>
+                      <p className="text-[10px] text-zinc-400">{t("recordsCount", { count: totalServices })}</p>
                     </div>
                   </Link>
                   <Link href="/dashboard/assets" className="flex items-center gap-3 p-3 rounded-xl hover:bg-zinc-50 transition-colors">
@@ -703,8 +744,8 @@ export default function DashboardPage() {
                       <Box size={14} className="text-blue-500" />
                     </div>
                     <div>
-                      <p className="text-[12px] font-bold text-zinc-800 leading-tight">Assets &amp; QR Codes</p>
-                      <p className="text-[10px] text-zinc-400">{totalAssets} assets registered</p>
+                      <p className="text-[12px] font-bold text-zinc-800 leading-tight">{t("assetsQrCodes")}</p>
+                      <p className="text-[10px] text-zinc-400">{t("assetsRegistered", { count: totalAssets })}</p>
                     </div>
                   </Link>
                   <button
@@ -715,15 +756,15 @@ export default function DashboardPage() {
                       <QrCode size={14} className="text-purple-500" />
                     </div>
                     <div>
-                      <p className="text-[12px] font-bold text-zinc-800 leading-tight">Link Existing Asset</p>
-                      <p className="text-[10px] text-zinc-400">Scan or enter a QR code</p>
+                      <p className="text-[12px] font-bold text-zinc-800 leading-tight">{t("linkExistingAsset")}</p>
+                      <p className="text-[10px] text-zinc-400">{t("scanOrEnterQr")}</p>
                     </div>
                   </button>
                 </div>
               </div>
 
               <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm p-5">
-                <h3 className="text-[13px] font-black text-zinc-900 mb-3">Your Statistics</h3>
+                <h3 className="text-[13px] font-black text-zinc-900 mb-3">{t("yourStatistics")}</h3>
                 <div className="grid grid-cols-2 gap-4">
                   {miniStats.map((s) => (
                     <div key={s.label}>
@@ -738,24 +779,24 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          <p className="text-center text-[11px] text-zinc-400 mt-8">© 2026 Maintly. All rights reserved.</p>
+          <p className="text-center text-[11px] text-zinc-400 mt-8">{t("copyright")}</p>
         </div>
       </div>
 
       {/* ════ ADD EQUIPMENT FLOW (shared with the Assets page) ════ */}
-      <AddAssetChooser
+      <AddAssetChooserIntl
         open={addStep === "choose"}
         onClose={() => setAddStep("closed")}
         onChooseNew={() => setAddStep("new")}
         onChooseExisting={() => setAddStep("existing")}
       />
-      <NewAssetModal
+      <NewAssetModalIntl
         open={addStep === "new"}
         onClose={() => setAddStep("closed")}
         mechanicId={mechanicId}
         onCreated={() => refreshTotalAssets(mechanicId)}
       />
-      <LinkExistingAssetModal
+      <LinkExistingAssetModalIntl
         open={addStep === "existing"}
         onClose={() => setAddStep("closed")}
         mechanicId={mechanicId}

@@ -1,25 +1,21 @@
 "use client";
 
-import Link from "next/link";
-import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+// Login is migrated and every router.push()/replace() call on this page
+// targets it — safe to use next-intl's locale-aware router.
+import { useRouter } from "@/i18n/navigation";
+import { useTranslations } from "next-intl";
 import {
-  LayoutGrid, FileText, Box, QrCode, Users, BarChart3, Calendar as CalendarIcon,
-  Mail, FolderOpen, Settings, Bell, Plus, X, LogOut, Crown, Menu,
+  Plus, X,
   Search, Trash2, Download, File as FileIcon, Image as ImageIcon, FileSpreadsheet,
-  MessageCircle,
+  FileText, FolderOpen,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
-import NotificationBell from "@/components/NotificationBell";
+import DashboardSidebarIntl from "@/components/DashboardSidebarIntl";
+import DashboardHeaderIntl from "@/components/DashboardHeaderIntl";
 import { useUnreadMessagesCount } from "@/lib/useUnreadMessages";
 import { useUnreadMechanicMessages } from "@/lib/useUnreadMechanicMessages";
-import HoverAvatar from "@/components/HoverAvatar";
-import ContactSupportWidget from "@/components/ContactSupportWidget";
 import { formatDateDMY } from "@/lib/date";
-import DashboardSidebar from "@/components/DashboardSidebar";
-import DashboardHeader from "@/components/DashboardHeader";
-import { getInitials } from "@/lib/initials";
 
 const MAX_FILE_BYTES = 25 * 1024 * 1024; // 25MB — generous for invoices/manuals/photos, cheap to keep sane
 
@@ -39,10 +35,8 @@ type DocumentRow = {
 type AssetLite = { id: string; nickname: string | null; brand: string | null; model: string | null };
 type CustomerLite = { id: string; name: string };
 
-function assetLabel(a: AssetLite) {
-  return a.nickname || [a.brand, a.model].filter(Boolean).join(" ") || "Unnamed asset";
-}
-
+// File-size units (B/KB/MB) are the same abbreviation in en/es/pt — no
+// translation needed here, unlike the rest of the page's copy.
 function formatFileSize(bytes: number | null) {
   if (bytes == null) return "—";
   if (bytes < 1024) return `${bytes} B`;
@@ -62,6 +56,7 @@ function iconFor(fileType: string | null, fileName: string) {
 }
 
 export default function DocumentsPage() {
+  const t = useTranslations("DashboardDocumentsPage");
   const router = useRouter();
   const [checkingAuth, setCheckingAuth] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -91,6 +86,10 @@ export default function DocumentsPage() {
   const [uploadNotes, setUploadNotes] = useState("");
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState("");
+
+  function assetLabel(a: AssetLite) {
+    return a.nickname || [a.brand, a.model].filter(Boolean).join(" ") || t("unnamedAsset");
+  }
 
   async function loadAll(uid: string) {
     setLoading(true);
@@ -135,6 +134,7 @@ export default function DocumentsPage() {
     });
 
     return () => { active = false; listener.subscription.unsubscribe(); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router]);
 
   async function handleLogout() {
@@ -144,11 +144,11 @@ export default function DocumentsPage() {
 
   function assetNameFor(id: string | null) {
     if (!id) return null;
-    return assets.find((a) => a.id === id) ? assetLabel(assets.find((a) => a.id === id)!) : "Unknown asset";
+    return assets.find((a) => a.id === id) ? assetLabel(assets.find((a) => a.id === id)!) : t("unknownAsset");
   }
   function customerNameFor(id: string | null) {
     if (!id) return null;
-    return customers.find((c) => c.id === id)?.name ?? "Unknown customer";
+    return customers.find((c) => c.id === id)?.name ?? t("unknownCustomer");
   }
 
   function openUploadModal() {
@@ -162,8 +162,8 @@ export default function DocumentsPage() {
 
   async function handleUpload(e: React.FormEvent) {
     e.preventDefault();
-    if (!uploadFile) { setUploadError("Choose a file first."); return; }
-    if (uploadFile.size > MAX_FILE_BYTES) { setUploadError("That file is too large — max 25MB."); return; }
+    if (!uploadFile) { setUploadError(t("chooseFileFirst")); return; }
+    if (uploadFile.size > MAX_FILE_BYTES) { setUploadError(t("fileTooLarge")); return; }
 
     setUploading(true);
     setUploadError("");
@@ -174,7 +174,7 @@ export default function DocumentsPage() {
     const { error: uploadErr } = await supabase.storage.from("documents").upload(path, uploadFile);
     if (uploadErr) {
       setUploading(false);
-      setUploadError("Couldn't upload the file. If this keeps happening, the \"documents\" storage bucket may not be set up yet.");
+      setUploadError(t("uploadFailedBucket"));
       return;
     }
 
@@ -198,7 +198,7 @@ export default function DocumentsPage() {
     if (error || !data) {
       // File made it to storage but the DB row failed — clean up so it's not an orphan.
       await supabase.storage.from("documents").remove([path]);
-      setUploadError("Couldn't save the document. Try again.");
+      setUploadError(t("saveFailed"));
       return;
     }
 
@@ -210,7 +210,7 @@ export default function DocumentsPage() {
     setPageMsg(null);
     const { data, error } = await supabase.storage.from("documents").createSignedUrl(doc.file_path, 60);
     if (error || !data?.signedUrl) {
-      setPageMsg({ text: "Couldn't open that file. Try again in a moment.", ok: false });
+      setPageMsg({ text: t("openFileFailed"), ok: false });
       return;
     }
     window.open(data.signedUrl, "_blank", "noopener,noreferrer");
@@ -220,12 +220,12 @@ export default function DocumentsPage() {
     setPageMsg(null);
     const { error: storageErr } = await supabase.storage.from("documents").remove([doc.file_path]);
     if (storageErr) {
-      setPageMsg({ text: "Couldn't delete that file. Try again in a moment.", ok: false });
+      setPageMsg({ text: t("deleteFailed"), ok: false });
       return;
     }
     const { error: dbErr } = await supabase.from("documents").delete().eq("id", doc.id);
     if (dbErr) {
-      setPageMsg({ text: "Couldn't delete that file. Try again in a moment.", ok: false });
+      setPageMsg({ text: t("deleteFailed"), ok: false });
       return;
     }
     setDocuments((prev) => prev.filter((d) => d.id !== doc.id));
@@ -251,18 +251,16 @@ export default function DocumentsPage() {
   if (checkingAuth) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-zinc-50">
-        <p className="text-zinc-400 text-[13px]">Loading...</p>
+        <p className="text-zinc-400 text-[13px]">{t("loadingAuth")}</p>
       </div>
     );
   }
 
-  const initials = getInitials(mechanicName);
-
   return (
     <div className="min-h-screen bg-zinc-50 flex relative">
 
-      <DashboardSidebar
-        activeLabel="Document Library"
+      <DashboardSidebarIntl
+        activeHref="/dashboard/documents"
         sidebarOpen={sidebarOpen}
         onCloseSidebar={() => setSidebarOpen(false)}
         mechanicId={mechanicId}
@@ -276,9 +274,9 @@ export default function DocumentsPage() {
       {/* ════ MAIN ════ */}
       <div className="flex-1 flex flex-col min-w-0">
 
-        <DashboardHeader
-          title="Document Library"
-          subtitle="Invoices, manuals, certificates — private to you, never shown on the public QR page."
+        <DashboardHeaderIntl
+          title={t("title")}
+          subtitle={t("subtitle")}
           onOpenSidebar={() => setSidebarOpen(true)}
           mechanicId={mechanicId}
           unreadMessages={unreadMessages}
@@ -299,7 +297,7 @@ export default function DocumentsPage() {
                 <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
                 <input
                   value={search} onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Search by file name or note..."
+                  placeholder={t("searchPlaceholder")}
                   className="w-full rounded-xl border border-zinc-200 bg-white pl-9 pr-3 py-[9px] text-[12px] outline-none focus:border-red-400"
                 />
               </div>
@@ -307,17 +305,17 @@ export default function DocumentsPage() {
                 value={linkFilter} onChange={(e) => setLinkFilter(e.target.value as typeof linkFilter)}
                 className="rounded-xl border border-zinc-200 bg-white px-3 py-[9px] text-[12px] outline-none focus:border-red-400"
               >
-                <option value="all">All documents</option>
-                <option value="asset">Linked to equipment</option>
-                <option value="customer">Linked to a customer</option>
-                <option value="general">General (unlinked)</option>
+                <option value="all">{t("filterAll")}</option>
+                <option value="asset">{t("filterAsset")}</option>
+                <option value="customer">{t("filterCustomer")}</option>
+                <option value="general">{t("filterGeneral")}</option>
               </select>
             </div>
             <button
               onClick={openUploadModal}
               className="flex items-center gap-2 bg-red-600 hover:bg-red-500 active:scale-[0.98] transition-all text-white text-[13px] font-bold px-4 py-[10px] rounded-xl shadow-sm"
             >
-              <Plus size={15} /> Upload Document
+              <Plus size={15} /> {t("uploadDocument")}
             </button>
           </div>
 
@@ -330,18 +328,18 @@ export default function DocumentsPage() {
           {/* Table */}
           <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm">
             {loading ? (
-              <p className="text-[13px] text-zinc-400 text-center py-12">Loading documents...</p>
+              <p className="text-[13px] text-zinc-400 text-center py-12">{t("loadingDocuments")}</p>
             ) : filtered.length === 0 ? (
               <div className="text-center py-16">
                 <div className="inline-flex items-center justify-center w-12 h-12 rounded-full border border-red-100 bg-red-50 mb-3">
                   <FolderOpen size={20} className="text-red-500" />
                 </div>
                 <p className="text-[13px] text-zinc-400 mb-3">
-                  {documents.length === 0 ? "No documents yet." : "No documents match this search/filter."}
+                  {documents.length === 0 ? t("noDocumentsYet") : t("noDocumentsMatch")}
                 </p>
                 {documents.length === 0 && (
                   <button onClick={openUploadModal} className="text-[12px] font-bold text-red-600 hover:text-red-700">
-                    Upload your first document →
+                    {t("uploadFirstDocument")}
                   </button>
                 )}
               </div>
@@ -350,11 +348,11 @@ export default function DocumentsPage() {
                 <table className="w-full min-w-[700px]">
                   <thead>
                     <tr className="text-left text-[10px] text-zinc-400 font-bold uppercase border-b border-zinc-100">
-                      <th className="px-5 py-3 font-bold">File</th>
-                      <th className="px-3 py-3 font-bold">Linked to</th>
-                      <th className="px-3 py-3 font-bold">Size</th>
-                      <th className="px-3 py-3 font-bold">Uploaded</th>
-                      <th className="px-3 py-3 font-bold text-right">Actions</th>
+                      <th className="px-5 py-3 font-bold">{t("columnFile")}</th>
+                      <th className="px-3 py-3 font-bold">{t("columnLinkedTo")}</th>
+                      <th className="px-3 py-3 font-bold">{t("columnSize")}</th>
+                      <th className="px-3 py-3 font-bold">{t("columnUploaded")}</th>
+                      <th className="px-3 py-3 font-bold text-right">{t("columnActions")}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -376,25 +374,25 @@ export default function DocumentsPage() {
                             </div>
                           </td>
                           <td className="px-3 py-3 text-[12px] text-zinc-500">
-                            {asset && <p>Equipment: {asset}</p>}
-                            {customer && <p className={asset ? "text-zinc-400" : ""}>Customer: {customer}</p>}
-                            {!asset && !customer && "General"}
+                            {asset && <p>{t("equipmentPrefix")} {asset}</p>}
+                            {customer && <p className={asset ? "text-zinc-400" : ""}>{t("customerPrefix")} {customer}</p>}
+                            {!asset && !customer && t("general")}
                           </td>
                           <td className="px-3 py-3 text-[12px] text-zinc-400">{formatFileSize(d.file_size)}</td>
                           <td className="px-3 py-3 text-[12px] text-zinc-400">{formatDateDMY(d.created_at)}</td>
                           <td className="px-3 py-3">
                             {confirmDeleteId === d.id ? (
                               <div className="flex items-center justify-end gap-1.5">
-                                <span className="text-[10px] text-red-600 font-semibold">Delete?</span>
-                                <button onClick={() => handleDelete(d)} className="text-[11px] font-bold text-white bg-red-600 hover:bg-red-500 px-2 py-1 rounded-lg transition-colors">Yes</button>
-                                <button onClick={() => setConfirmDeleteId(null)} className="text-[11px] font-semibold text-zinc-400 hover:text-zinc-700 px-1">No</button>
+                                <span className="text-[10px] text-red-600 font-semibold">{t("deleteQuestion")}</span>
+                                <button onClick={() => handleDelete(d)} className="text-[11px] font-bold text-white bg-red-600 hover:bg-red-500 px-2 py-1 rounded-lg transition-colors">{t("yes")}</button>
+                                <button onClick={() => setConfirmDeleteId(null)} className="text-[11px] font-semibold text-zinc-400 hover:text-zinc-700 px-1">{t("no")}</button>
                               </div>
                             ) : (
                               <div className="flex items-center justify-end gap-3">
-                                <button onClick={() => handleDownload(d)} className="text-zinc-400 hover:text-zinc-800 transition-colors" title="Download">
+                                <button onClick={() => handleDownload(d)} className="text-zinc-400 hover:text-zinc-800 transition-colors" title={t("download")}>
                                   <Download size={15} />
                                 </button>
-                                <button onClick={() => setConfirmDeleteId(d.id)} className="text-zinc-300 hover:text-red-600 transition-colors" title="Delete">
+                                <button onClick={() => setConfirmDeleteId(d.id)} className="text-zinc-300 hover:text-red-600 transition-colors" title={t("delete")}>
                                   <Trash2 size={15} />
                                 </button>
                               </div>
@@ -409,7 +407,7 @@ export default function DocumentsPage() {
             )}
           </div>
 
-          <p className="text-center text-[11px] text-zinc-400 mt-8">© 2026 Maintly. All rights reserved.</p>
+          <p className="text-center text-[11px] text-zinc-400 mt-8">{t("copyright")}</p>
         </div>
       </div>
 
@@ -422,53 +420,53 @@ export default function DocumentsPage() {
                 <div className="w-8 h-8 rounded-xl bg-red-50 flex items-center justify-center">
                   <FolderOpen size={15} className="text-red-600" />
                 </div>
-                <h2 className="text-[16px] font-black text-zinc-900">Upload Document</h2>
+                <h2 className="text-[16px] font-black text-zinc-900">{t("modalTitle")}</h2>
               </div>
               <button onClick={() => setShowUpload(false)} className="text-zinc-400 hover:text-zinc-700"><X size={18} /></button>
             </div>
             <form onSubmit={handleUpload} className="px-6 py-5 space-y-4">
               <div>
-                <label className="text-[12px] font-bold text-zinc-700">File *</label>
+                <label className="text-[12px] font-bold text-zinc-700">{t("fileLabel")}</label>
                 <input
                   type="file" required
                   onChange={(e) => setUploadFile(e.target.files?.[0] ?? null)}
                   className="w-full mt-1 rounded-xl border border-zinc-200 px-3 py-[10px] text-[12px] outline-none focus:border-red-500 file:mr-3 file:rounded-lg file:border-0 file:bg-zinc-100 file:px-3 file:py-1.5 file:text-[11px] file:font-bold file:text-zinc-700"
                 />
-                <p className="text-[10.5px] text-zinc-400 mt-1">Max 25MB. Only you can see this — it's never shown on the public QR page.</p>
+                <p className="text-[10.5px] text-zinc-400 mt-1">{t("fileHint")}</p>
               </div>
               <div>
-                <label className="text-[12px] font-bold text-zinc-700">Link to equipment (optional)</label>
+                <label className="text-[12px] font-bold text-zinc-700">{t("linkToEquipmentLabel")}</label>
                 <select
                   value={uploadAssetId} onChange={(e) => setUploadAssetId(e.target.value)}
                   className="w-full mt-1 rounded-xl border border-zinc-200 px-3 py-[10px] text-[13px] outline-none focus:border-red-500"
                 >
-                  <option value="">No specific equipment</option>
+                  <option value="">{t("noSpecificEquipment")}</option>
                   {assets.map((a) => <option key={a.id} value={a.id}>{assetLabel(a)}</option>)}
                 </select>
               </div>
               <div>
-                <label className="text-[12px] font-bold text-zinc-700">Link to customer (optional)</label>
+                <label className="text-[12px] font-bold text-zinc-700">{t("linkToCustomerLabel")}</label>
                 <select
                   value={uploadCustomerId} onChange={(e) => setUploadCustomerId(e.target.value)}
                   className="w-full mt-1 rounded-xl border border-zinc-200 px-3 py-[10px] text-[13px] outline-none focus:border-red-500"
                 >
-                  <option value="">No specific customer</option>
+                  <option value="">{t("noSpecificCustomer")}</option>
                   {customers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>
               </div>
               <div>
-                <label className="text-[12px] font-bold text-zinc-700">Notes (optional)</label>
+                <label className="text-[12px] font-bold text-zinc-700">{t("notesLabel")}</label>
                 <textarea
                   rows={2} value={uploadNotes} onChange={(e) => setUploadNotes(e.target.value)}
-                  placeholder="e.g. Invoice #4021, or warranty until 2027"
+                  placeholder={t("notesPlaceholder")}
                   className="w-full mt-1 rounded-xl border border-zinc-200 px-3 py-[10px] text-[13px] outline-none focus:border-red-500 resize-none"
                 />
               </div>
               {uploadError && <div className="rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-[12px] text-red-700">{uploadError}</div>}
               <div className="flex gap-3 pt-1">
-                <button type="button" onClick={() => setShowUpload(false)} className="flex-1 border border-zinc-200 text-zinc-700 font-bold py-[11px] rounded-xl text-[13px] hover:bg-zinc-50">Cancel</button>
+                <button type="button" onClick={() => setShowUpload(false)} className="flex-1 border border-zinc-200 text-zinc-700 font-bold py-[11px] rounded-xl text-[13px] hover:bg-zinc-50">{t("cancel")}</button>
                 <button type="submit" disabled={uploading || !uploadFile} className="flex-1 bg-red-600 hover:bg-red-500 disabled:opacity-60 transition-all text-white font-bold py-[11px] rounded-xl text-[13px]">
-                  {uploading ? "Uploading..." : "Upload"}
+                  {uploading ? t("uploading") : t("upload")}
                 </button>
               </div>
             </form>

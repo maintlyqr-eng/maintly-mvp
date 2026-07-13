@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { Link } from "@/i18n/navigation";
 import Image from "next/image";
 import { X, Crown } from "lucide-react";
 import { useTranslations } from "next-intl";
@@ -9,34 +9,26 @@ import ContactSupportWidgetIntl from "@/components/ContactSupportWidgetIntl";
 import { navItems } from "@/lib/dashboardNav";
 import { getInitials } from "@/lib/initials";
 
-// Localized twin of src/components/DashboardSidebar.tsx — see that file's
-// comment for the general "why one shared sidebar" history. This copy
-// exists ONLY because useTranslations() throws when rendered outside a
-// NextIntlClientProvider, and not every dashboard page is migrated to
-// src/app/[locale]/dashboard/... yet (see MAINTLYQR_FEATURE_BACKLOG.md,
-// Phase 2 rollout order). Each dashboard page switches its import from
-// "@/components/DashboardSidebar" to "@/components/DashboardSidebarIntl"
-// exactly when IT gets migrated — the old file keeps serving the
-// not-yet-migrated pages untouched in the meantime. Once every dashboard
-// page + admin has moved over, this becomes the only sidebar and the old
-// one gets deleted (see the "Final cleanup" task in the backlog).
+// The sidebar used by every dashboard page + admin now that the full
+// Phase 2 i18n rollout is complete (see MAINTLYQR_FEATURE_BACKLOG.md). It
+// used to exist as a twin of a plain (non-translated) DashboardSidebar,
+// duplicated only because useTranslations() throws outside a
+// NextIntlClientProvider and not every dashboard page was migrated yet.
+// That old file has been deleted now that all 12 dashboard routes + admin
+// are migrated — this is simply "the sidebar" going forward. Kept the
+// "Intl" name rather than renaming, to avoid a churny rename across every
+// consumer for no functional benefit.
 //
-// Two deliberate differences from the original, both fixing fragility that
-// would otherwise break once labels are translated:
+// Two deliberate differences from the pre-i18n version, both fixing
+// fragility that would otherwise break once labels are translated:
 //   1. `activeHref` (compared against item.href) replaces `activeLabel`
 //      (compared against item.label) for highlighting the current page —
 //      href is stable across locales, a translated label is not.
 //   2. The unread-badge checks compare item.key ("messages" / "teamChat")
 //      instead of item.label === "Messages" / "Team Chat".
 //
-// Nav links stay plain next/link (not next-intl's locale-aware Link) on
-// purpose: this sidebar's nav visits all 12 dashboard routes, and until
-// every one of them is migrated, a locale-aware Link here would 404 on
-// whichever route isn't ready yet. All 12 get swapped to locale-aware Link
-// together, in one pass, once the last one lands — see the "Final cleanup"
-// backlog task. Until then, clicking a nav item to a not-yet-migrated page
-// intentionally lands you on that page's plain English version, same as
-// the established pattern used for the Maintler page's un-migrated targets.
+// Nav links now use next-intl's locale-aware Link — safe now that every
+// dashboard route has a [locale] version, so no target 404s.
 export default function DashboardSidebarIntl({
   activeHref,
   sidebarOpen,

@@ -1,15 +1,15 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { Plus, QrCode } from "lucide-react";
 
-// The first step of "Add Equipment": pick between registering a brand new
-// asset or linking one that already exists (e.g. another Maintler's, or one
-// bought secondhand with a sticker already on it). Shared by the dashboard
-// and the Assets page so both offer the exact same two options — previously
-// the Assets page skipped straight to "new" with no way to link an existing
-// one, and the dashboard's own copy of this choice led to a broken "new"
-// form.
-export default function AddAssetChooser({
+// Localized twin of AddAssetChooser.tsx — see DashboardSidebarIntl.tsx for
+// why these "*Intl" components exist as separate files during the i18n
+// rollout instead of being edited in place. This component is shared by the
+// dashboard home page AND the Assets page; it can only become the single
+// source of truth (replacing the original) once BOTH consumers are migrated
+// to [locale] routes.
+export default function AddAssetChooserIntl({
   open,
   onClose,
   onChooseNew,
@@ -20,13 +20,15 @@ export default function AddAssetChooser({
   onChooseNew: () => void;
   onChooseExisting: () => void;
 }) {
+  const t = useTranslations("AddAssetChooser");
+
   if (!open) return null;
 
   return (
     <div className="fixed inset-0 z-50 bg-zinc-900/40 flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg">
         <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-200">
-          <h3 className="text-[16px] font-black text-zinc-900">Add Equipment</h3>
+          <h3 className="text-[16px] font-black text-zinc-900">{t("title")}</h3>
           <button onClick={onClose} className="text-zinc-400 hover:text-zinc-700 text-[22px] leading-none transition-colors">×</button>
         </div>
 
@@ -39,8 +41,8 @@ export default function AddAssetChooser({
               <Plus size={26} className="text-red-600" />
             </div>
             <div>
-              <p className="text-[14px] font-black text-zinc-900">New Equipment</p>
-              <p className="text-[11px] text-zinc-500 mt-1 leading-relaxed">Register a new machine and generate a unique QR code</p>
+              <p className="text-[14px] font-black text-zinc-900">{t("newTitle")}</p>
+              <p className="text-[11px] text-zinc-500 mt-1 leading-relaxed">{t("newDesc")}</p>
             </div>
           </button>
 
@@ -52,8 +54,8 @@ export default function AddAssetChooser({
               <QrCode size={26} className="text-blue-600" />
             </div>
             <div>
-              <p className="text-[14px] font-black text-zinc-900">Existing Equipment</p>
-              <p className="text-[11px] text-zinc-500 mt-1 leading-relaxed">Scan or enter a QR code to link an asset to your workshop</p>
+              <p className="text-[14px] font-black text-zinc-900">{t("existingTitle")}</p>
+              <p className="text-[11px] text-zinc-500 mt-1 leading-relaxed">{t("existingDesc")}</p>
             </div>
           </button>
         </div>

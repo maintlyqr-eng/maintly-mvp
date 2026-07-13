@@ -1,7 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+// Login is migrated and every router.push()/replace() call on this page
+// targets it — safe to use next-intl's locale-aware router.
+import { useRouter } from "@/i18n/navigation";
+import { useTranslations } from "next-intl";
 import {
   QrCode, Plus, X,
   Search, Download, Printer, Sparkles, ScanLine, Tag, Wrench,
@@ -10,11 +13,11 @@ import { supabase } from "@/lib/supabase";
 import { authedFetch } from "@/lib/apiAuth";
 import { useUnreadMessagesCount } from "@/lib/useUnreadMessages";
 import { useUnreadMechanicMessages } from "@/lib/useUnreadMechanicMessages";
-import DashboardSidebar from "@/components/DashboardSidebar";
-import DashboardHeader from "@/components/DashboardHeader";
+import DashboardSidebarIntl from "@/components/DashboardSidebarIntl";
+import DashboardHeaderIntl from "@/components/DashboardHeaderIntl";
 import QrCodeCanvas, { type QrCodeCanvasHandle } from "@/components/QrCodeCanvas";
 import QrThemePicker from "@/components/QrThemePicker";
-import NewAssetModal from "@/components/NewAssetModal";
+import NewAssetModalIntl from "@/components/NewAssetModalIntl";
 import { DEFAULT_QR_THEME } from "@/lib/qrThemes";
 import { formatDateDMY } from "@/lib/date";
 
@@ -31,11 +34,8 @@ type QrCodeRow = {
 
 const BATCH_PRESETS = [6, 12, 24];
 
-function assetLabel(a: QrAsset) {
-  return a.nickname || [a.brand, a.model].filter(Boolean).join(" ") || "Unnamed equipment";
-}
-
 export default function QrCodesPage() {
+  const t = useTranslations("DashboardQrCodesPage");
   const router = useRouter();
   const [checkingAuth, setCheckingAuth] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -74,15 +74,7 @@ export default function QrCodesPage() {
   // Assign-to-new-equipment (for a blank code, from this page)
   const [assignCode, setAssignCode] = useState<string | null>(null);
 
-  // Codes currently shown in the print-sheet overlay — set either by the
-  // bulk "Print Sheet (N)" toolbar button (from the checkbox selection) or
-  // by a single card's own "Print" button, kept deliberately independent of
-  // `selected` so printing one code doesn't disturb a bulk selection.
   const [printCodes, setPrintCodes] = useState<string[] | null>(null);
-  // How big each code+frame prints, in CSS px (frame width, not just the
-  // QR — see QrCodeCanvas's `size` semantics). Adjustable before printing
-  // since a sticker meant for a small part and one meant for a truck door
-  // want very different sizes, and there was no way to change it before.
   const [printSize, setPrintSize] = useState(180);
   const PRINT_SIZE_PRESETS: { label: string; value: number }[] = [
     { label: "S", value: 120 },
@@ -92,13 +84,11 @@ export default function QrCodesPage() {
   ];
   const PRINT_SIZE_MIN = 80;
   const PRINT_SIZE_MAX = 400;
-  // Per-code overrides on top of `printSize` — so a sheet can mix sizes
-  // (e.g. most codes small for parts, one big one for a truck door) instead
-  // of every code on the sheet being forced to the same size. Codes not in
-  // here just use the global `printSize`. Changing the global size/preset
-  // clears these, since "set them all to X" is the more common intent when
-  // touching the global control — per-code tweaks are for the exceptions.
   const [printSizeOverrides, setPrintSizeOverrides] = useState<Record<string, number>>({});
+
+  function assetLabel(a: QrAsset) {
+    return a.nickname || [a.brand, a.model].filter(Boolean).join(" ") || t("unnamedEquipment");
+  }
 
   function sizeForPrint(code: string) {
     return printSizeOverrides[code] ?? printSize;
@@ -123,7 +113,7 @@ export default function QrCodesPage() {
     const res = await authedFetch("/api/qr-codes");
     const json = await res.json().catch(() => ({}));
     if (!res.ok) {
-      setLoadError(json.error || "Couldn't load your QR codes.");
+      setLoadError(json.error || t("errorLoad"));
       setLoading(false);
       return;
     }
@@ -174,6 +164,7 @@ export default function QrCodesPage() {
       const haystack = [c.code, c.label, c.asset ? assetLabel(c.asset) : ""].filter(Boolean).join(" ").toLowerCase();
       return haystack.includes(q);
     });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [codes, search, filter]);
 
   const stats = useMemo(() => ({
@@ -200,7 +191,7 @@ export default function QrCodesPage() {
     });
     const json = await res.json().catch(() => ({}));
     setGenerating(false);
-    if (!res.ok) { setGenError(json.error || "Couldn't generate codes."); return; }
+    if (!res.ok) { setGenError(json.error || t("errorGenerate")); return; }
 
     const newRows: QrCodeRow[] = (json.codes ?? []).map((c: any) => ({
       code: c.code, theme: c.theme, label: null, createdAt: c.created_at, asset: null, scanCount: 0, lastScanned: null,
@@ -208,7 +199,10 @@ export default function QrCodesPage() {
     setCodes((prev) => [...newRows, ...prev]);
     setSelected(new Set(newRows.map((r) => r.code)));
     setShowGenerate(false);
-    setPageMsg({ text: `${newRows.length} blank QR code${newRows.length === 1 ? "" : "s"} ready — select more or head to Print Sheet.`, ok: true });
+    setPageMsg({
+      text: t(newRows.length === 1 ? "generatedOne" : "generatedMany", { count: newRows.length }),
+      ok: true,
+    });
   }
 
   function openPersonalize(row: QrCodeRow) {
@@ -228,7 +222,7 @@ export default function QrCodesPage() {
     });
     const json = await res.json().catch(() => ({}));
     setPersonalizing(false);
-    if (!res.ok) { setPError(json.error || "Couldn't save changes."); return; }
+    if (!res.ok) { setPError(json.error || t("errorSaveChanges")); return; }
 
     setCodes((prev) => prev.map((c) => c.code === personalizeCode.code ? { ...c, theme: pTheme, label: pLabel.trim() || null } : c));
     setPersonalizeCode(null);
@@ -241,7 +235,7 @@ export default function QrCodesPage() {
   if (checkingAuth) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-zinc-50">
-        <p className="text-zinc-400 text-[13px]">Loading...</p>
+        <p className="text-zinc-400 text-[13px]">{t("loadingAuth")}</p>
       </div>
     );
   }
@@ -251,8 +245,8 @@ export default function QrCodesPage() {
   return (
     <div className="min-h-screen bg-zinc-50 flex relative">
 
-      <DashboardSidebar
-        activeLabel="QR Codes"
+      <DashboardSidebarIntl
+        activeHref="/dashboard/qr-codes"
         sidebarOpen={sidebarOpen}
         onCloseSidebar={() => setSidebarOpen(false)}
         mechanicId={mechanicId}
@@ -266,9 +260,9 @@ export default function QrCodesPage() {
 
       {/* ════ MAIN ════ */}
       <div className="flex-1 flex flex-col min-w-0">
-        <DashboardHeader
-          title="QR Codes"
-          subtitle="Generate blank codes to print, personalize their look, and track every scan."
+        <DashboardHeaderIntl
+          title={t("title")}
+          subtitle={t("subtitle")}
           onOpenSidebar={() => setSidebarOpen(true)}
           mechanicId={mechanicId}
           unreadMessages={unreadMessages}
@@ -286,10 +280,10 @@ export default function QrCodesPage() {
           {/* Stats */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
             {[
-              { label: "TOTAL CODES", value: stats.total, color: "#18181b" },
-              { label: "ASSIGNED", value: stats.assigned, color: "#16a34a" },
-              { label: "UNASSIGNED", value: stats.unassigned, color: "#dc2626" },
-              { label: "TOTAL SCANS", value: stats.scans, color: "#2563eb" },
+              { label: t("statTotalCodes"), value: stats.total, color: "#18181b" },
+              { label: t("statAssigned"), value: stats.assigned, color: "#16a34a" },
+              { label: t("statUnassigned"), value: stats.unassigned, color: "#dc2626" },
+              { label: t("statTotalScans"), value: stats.scans, color: "#2563eb" },
             ].map((s) => (
               <div key={s.label} className="bg-white rounded-2xl border border-zinc-200 p-4">
                 <p className="text-[10px] font-bold text-zinc-400 tracking-wide mb-1">{s.label}</p>
@@ -305,7 +299,7 @@ export default function QrCodesPage() {
                 <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
                 <input
                   value={search} onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Search by code, label or equipment..."
+                  placeholder={t("searchPlaceholder")}
                   className="w-full rounded-xl border border-zinc-200 bg-white pl-9 pr-3 py-[9px] text-[12px] outline-none focus:border-red-400"
                 />
               </div>
@@ -313,9 +307,9 @@ export default function QrCodesPage() {
                 value={filter} onChange={(e) => setFilter(e.target.value as typeof filter)}
                 className="rounded-xl border border-zinc-200 bg-white px-3 py-[9px] text-[12px] outline-none focus:border-red-400"
               >
-                <option value="all">All codes</option>
-                <option value="assigned">Assigned</option>
-                <option value="unassigned">Unassigned / blank</option>
+                <option value="all">{t("filterAll")}</option>
+                <option value="assigned">{t("filterAssigned")}</option>
+                <option value="unassigned">{t("filterUnassigned")}</option>
               </select>
             </div>
             <div className="flex items-center gap-2">
@@ -324,14 +318,14 @@ export default function QrCodesPage() {
                   onClick={() => setPrintCodes(Array.from(selected))}
                   className="flex items-center gap-2 border border-zinc-200 hover:border-zinc-300 bg-white text-zinc-700 text-[13px] font-bold px-4 py-[10px] rounded-xl transition-all"
                 >
-                  <Printer size={15} /> Print Sheet ({selected.size})
+                  <Printer size={15} /> {t("printSheetCount", { count: selected.size })}
                 </button>
               )}
               <button
                 onClick={() => { setGenError(""); setShowGenerate(true); }}
                 className="flex items-center gap-2 bg-red-600 hover:bg-red-500 active:scale-[0.98] transition-all text-white text-[13px] font-bold px-4 py-[10px] rounded-xl shadow-sm"
               >
-                <Plus size={15} /> Generate Blank Codes
+                <Plus size={15} /> {t("generateBlankCodes")}
               </button>
             </div>
           </div>
@@ -347,18 +341,18 @@ export default function QrCodesPage() {
 
           {/* Grid */}
           {loading ? (
-            <p className="text-[13px] text-zinc-400 text-center py-12">Loading your QR codes...</p>
+            <p className="text-[13px] text-zinc-400 text-center py-12">{t("loadingCodes")}</p>
           ) : filtered.length === 0 ? (
             <div className="bg-white rounded-2xl border border-zinc-200 text-center py-16">
               <div className="inline-flex items-center justify-center w-12 h-12 rounded-full border border-red-100 bg-red-50 mb-3">
                 <QrCode size={20} className="text-red-500" />
               </div>
               <p className="text-[13px] text-zinc-400 mb-3">
-                {codes.length === 0 ? "No QR codes yet." : "No codes match this search/filter."}
+                {codes.length === 0 ? t("noCodesYet") : t("noCodesMatch")}
               </p>
               {codes.length === 0 && (
                 <button onClick={() => setShowGenerate(true)} className="text-[12px] font-bold text-red-600 hover:text-red-700">
-                  Generate your first batch →
+                  {t("generateFirstBatch")}
                 </button>
               )}
             </div>
@@ -385,41 +379,41 @@ export default function QrCodesPage() {
                       </span>
                     ) : (
                       <span className="inline-flex items-center gap-1 text-[10.5px] font-bold text-zinc-500 bg-zinc-100 border border-zinc-200 px-2 py-0.5 rounded-full">
-                        Unassigned — ready to print
+                        {t("unassignedReadyToPrint")}
                       </span>
                     )}
                   </div>
 
                   <p className="text-[10.5px] text-zinc-400 mt-2 flex items-center gap-1">
-                    <ScanLine size={11} /> {row.scanCount} scan{row.scanCount === 1 ? "" : "s"}
-                    {row.lastScanned && ` · last ${formatDateDMY(row.lastScanned)}`}
+                    <ScanLine size={11} /> {t(row.scanCount === 1 ? "scanCountOne" : "scanCountMany", { count: row.scanCount })}
+                    {row.lastScanned && ` · ${t("lastScanned", { date: formatDateDMY(row.lastScanned) })}`}
                   </p>
 
                   <div className="flex items-center gap-2 mt-3 pt-3 border-t border-zinc-100 w-full justify-center flex-wrap">
-                    <button onClick={() => openPersonalize(row)} className="flex items-center gap-1 text-[11px] font-bold text-zinc-600 hover:text-red-600 transition-colors" title="Personalize">
-                      <Sparkles size={12} /> Personalize
+                    <button onClick={() => openPersonalize(row)} className="flex items-center gap-1 text-[11px] font-bold text-zinc-600 hover:text-red-600 transition-colors" title={t("personalize")}>
+                      <Sparkles size={12} /> {t("personalize")}
                     </button>
-                    <button onClick={() => handleDownload(row)} className="flex items-center gap-1 text-[11px] font-bold text-zinc-600 hover:text-red-600 transition-colors" title="Download PNG">
-                      <Download size={12} /> Download
+                    <button onClick={() => handleDownload(row)} className="flex items-center gap-1 text-[11px] font-bold text-zinc-600 hover:text-red-600 transition-colors" title={t("downloadPng")}>
+                      <Download size={12} /> {t("download")}
                     </button>
-                    <button onClick={() => setPrintCodes([row.code])} className="flex items-center gap-1 text-[11px] font-bold text-zinc-600 hover:text-red-600 transition-colors" title="Print just this code">
-                      <Printer size={12} /> Print
+                    <button onClick={() => setPrintCodes([row.code])} className="flex items-center gap-1 text-[11px] font-bold text-zinc-600 hover:text-red-600 transition-colors" title={t("printJustThisCode")}>
+                      <Printer size={12} /> {t("print")}
                     </button>
                     {!row.asset && (
-                      <button onClick={() => setAssignCode(row.code)} className="flex items-center gap-1 text-[11px] font-bold text-zinc-600 hover:text-red-600 transition-colors" title="Assign to a new asset">
-                        <Tag size={12} /> Assign
+                      <button onClick={() => setAssignCode(row.code)} className="flex items-center gap-1 text-[11px] font-bold text-zinc-600 hover:text-red-600 transition-colors" title={t("assignToNewAsset")}>
+                        <Tag size={12} /> {t("assign")}
                       </button>
                     )}
                   </div>
                   {row.asset && (
-                    <p className="text-[9.5px] text-zinc-300 mt-1.5">Sticker lost or damaged? Just download/print this same code again — it never stops belonging to this equipment.</p>
+                    <p className="text-[9.5px] text-zinc-300 mt-1.5">{t("stickerLostHint")}</p>
                   )}
                 </div>
               ))}
             </div>
           )}
 
-          <p className="text-center text-[11px] text-zinc-400 mt-8">© 2026 Maintly. All rights reserved.</p>
+          <p className="text-center text-[11px] text-zinc-400 mt-8">{t("copyright")}</p>
         </div>
       </div>
 
@@ -428,11 +422,11 @@ export default function QrCodesPage() {
         <div className="no-print fixed inset-0 z-50 bg-zinc-900/40 flex items-center justify-center p-4" onClick={() => setShowGenerate(false)}>
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-200">
-              <h2 className="text-[16px] font-black text-zinc-900">Generate Blank QR Codes</h2>
+              <h2 className="text-[16px] font-black text-zinc-900">{t("generateModalTitle")}</h2>
               <button onClick={() => setShowGenerate(false)} className="text-zinc-400 hover:text-zinc-700"><X size={18} /></button>
             </div>
             <div className="px-6 py-5">
-              <label className="text-[12px] font-bold text-zinc-700">How many?</label>
+              <label className="text-[12px] font-bold text-zinc-700">{t("howMany")}</label>
               <div className="flex items-center gap-2 mt-1.5 mb-4 flex-wrap">
                 {BATCH_PRESETS.map((n) => (
                   <button
@@ -449,15 +443,15 @@ export default function QrCodesPage() {
                 />
               </div>
 
-              <label className="text-[12px] font-bold text-zinc-700 mb-1.5 block">Default look (you can personalize each one later)</label>
+              <label className="text-[12px] font-bold text-zinc-700 mb-1.5 block">{t("defaultLookHint")}</label>
               <QrThemePicker value={genTheme} onChange={setGenTheme} />
 
               {genError && <div className="mt-4 rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-[12px] text-red-700">{genError}</div>}
 
               <div className="flex gap-3 pt-5">
-                <button type="button" onClick={() => setShowGenerate(false)} className="flex-1 border border-zinc-200 text-zinc-700 font-bold py-[11px] rounded-xl text-[13px] hover:bg-zinc-50">Cancel</button>
+                <button type="button" onClick={() => setShowGenerate(false)} className="flex-1 border border-zinc-200 text-zinc-700 font-bold py-[11px] rounded-xl text-[13px] hover:bg-zinc-50">{t("cancel")}</button>
                 <button type="button" disabled={generating} onClick={handleGenerate} className="flex-1 bg-red-600 hover:bg-red-500 disabled:opacity-60 transition-all text-white font-bold py-[11px] rounded-xl text-[13px]">
-                  {generating ? "Generating..." : `Generate ${genCount} Code${genCount === 1 ? "" : "s"}`}
+                  {generating ? t("generating") : t(genCount === 1 ? "generateCountOne" : "generateCountMany", { count: genCount })}
                 </button>
               </div>
             </div>
@@ -470,7 +464,7 @@ export default function QrCodesPage() {
         <div className="no-print fixed inset-0 z-50 bg-zinc-900/40 flex items-center justify-center p-4" onClick={() => setPersonalizeCode(null)}>
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-200">
-              <h2 className="text-[16px] font-black text-zinc-900">Personalize QR</h2>
+              <h2 className="text-[16px] font-black text-zinc-900">{t("personalizeModalTitle")}</h2>
               <button onClick={() => setPersonalizeCode(null)} className="text-zinc-400 hover:text-zinc-700"><X size={18} /></button>
             </div>
             <div className="px-6 py-5">
@@ -478,22 +472,22 @@ export default function QrCodesPage() {
                 <QrCodeCanvas code={personalizeCode.code} theme={pTheme} size={140} />
               </div>
 
-              <label className="text-[12px] font-bold text-zinc-700">Label (optional, just for you)</label>
+              <label className="text-[12px] font-bold text-zinc-700">{t("labelOptional")}</label>
               <input
                 value={pLabel} onChange={(e) => setPLabel(e.target.value)}
-                placeholder="e.g. Reserved for Truck #3"
+                placeholder={t("labelPlaceholder")}
                 className="w-full mt-1 mb-4 rounded-xl border border-zinc-200 px-3 py-[10px] text-[13px] outline-none focus:border-red-500"
               />
 
-              <label className="text-[12px] font-bold text-zinc-700 mb-1.5 block">Look</label>
+              <label className="text-[12px] font-bold text-zinc-700 mb-1.5 block">{t("look")}</label>
               <QrThemePicker value={pTheme} onChange={setPTheme} previewCode={personalizeCode.code} />
 
               {pError && <div className="mt-4 rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-[12px] text-red-700">{pError}</div>}
 
               <div className="flex gap-3 pt-5">
-                <button type="button" onClick={() => setPersonalizeCode(null)} className="flex-1 border border-zinc-200 text-zinc-700 font-bold py-[11px] rounded-xl text-[13px] hover:bg-zinc-50">Cancel</button>
+                <button type="button" onClick={() => setPersonalizeCode(null)} className="flex-1 border border-zinc-200 text-zinc-700 font-bold py-[11px] rounded-xl text-[13px] hover:bg-zinc-50">{t("cancel")}</button>
                 <button type="button" disabled={personalizing} onClick={handleSavePersonalize} className="flex-1 bg-red-600 hover:bg-red-500 disabled:opacity-60 transition-all text-white font-bold py-[11px] rounded-xl text-[13px]">
-                  {personalizing ? "Saving..." : "Save"}
+                  {personalizing ? t("saving") : t("save")}
                 </button>
               </div>
             </div>
@@ -502,7 +496,7 @@ export default function QrCodesPage() {
       )}
 
       {/* ════ ASSIGN TO NEW EQUIPMENT ════ */}
-      <NewAssetModal
+      <NewAssetModalIntl
         open={!!assignCode}
         onClose={() => setAssignCode(null)}
         mechanicId={mechanicId}
@@ -515,16 +509,16 @@ export default function QrCodesPage() {
         <div id="qr-print-sheet" className="fixed inset-0 z-50 bg-white overflow-y-auto">
           <div className="no-print sticky top-0 bg-white z-10 border-b border-zinc-200">
             <div className="flex items-center justify-between px-6 py-4">
-              <h2 className="text-[16px] font-black text-zinc-900">Print Sheet — {printRows.length} code{printRows.length === 1 ? "" : "s"}</h2>
+              <h2 className="text-[16px] font-black text-zinc-900">{t("printSheetTitle", { count: printRows.length })}</h2>
               <div className="flex items-center gap-2">
                 <button onClick={() => window.print()} className="flex items-center gap-2 bg-red-600 hover:bg-red-500 text-white text-[13px] font-bold px-4 py-2 rounded-xl">
-                  <Printer size={14} /> Print
+                  <Printer size={14} /> {t("print")}
                 </button>
                 <button onClick={() => setPrintCodes(null)} className="text-zinc-400 hover:text-zinc-700 px-2"><X size={20} /></button>
               </div>
             </div>
             <div className="flex items-center gap-3 px-6 pb-2 flex-wrap">
-              <span className="text-[11px] font-bold text-zinc-500">Size (all):</span>
+              <span className="text-[11px] font-bold text-zinc-500">{t("sizeAll")}</span>
               {PRINT_SIZE_PRESETS.map((p) => (
                 <button
                   key={p.label} type="button" onClick={() => applyGlobalPrintSize(p.value)}
@@ -541,16 +535,9 @@ export default function QrCodesPage() {
               <span className="text-[11px] text-zinc-400 tabular-nums">{printSize}px</span>
             </div>
             <p className="px-6 pb-3 text-[10.5px] text-zinc-400">
-              Need one code bigger or smaller than the rest? Use the −/+ under its own preview below — the size above sets the baseline for everyone.
+              {t("perCodeSizeHint")}
             </p>
           </div>
-          {/* flex-wrap + justify-center instead of a CSS grid: with a grid,
-              a single code (or a partial last row) sits pinned to the first
-              cell — left-aligned inside the centered container — instead of
-              centered on the page, which read as "off to the side / cut
-              off" when printing just one code. Flex centers every row
-              (including a lone item or a short last row) regardless of
-              count. */}
           <div className="p-8 flex flex-wrap justify-center gap-8 max-w-4xl mx-auto">
             {printRows.map((row) => {
               const codeSize = sizeForPrint(row.code);
@@ -560,14 +547,11 @@ export default function QrCodesPage() {
                   <QrCodeCanvas code={row.code} theme={row.theme} size={codeSize} />
                   <p className="text-[11px] font-mono font-bold text-zinc-800">{row.code}</p>
                   {row.label && <p className="text-[10px] text-zinc-500">{row.label}</p>}
-                  {/* Per-code size nudge — hidden from the actual printout,
-                      just here so a mix of sizes on one sheet is possible
-                      without a full slider per card cluttering the layout. */}
                   <div className="no-print flex items-center gap-1.5 mt-0.5">
                     <button
                       type="button" onClick={() => nudgeCodeSize(row.code, -20)}
                       className="w-5 h-5 flex items-center justify-center rounded border border-zinc-200 text-zinc-500 hover:border-red-300 hover:text-red-600 text-[12px] font-bold leading-none"
-                      title="Smaller"
+                      title={t("smaller")}
                     >
                       −
                     </button>
@@ -575,7 +559,7 @@ export default function QrCodesPage() {
                     <button
                       type="button" onClick={() => nudgeCodeSize(row.code, 20)}
                       className="w-5 h-5 flex items-center justify-center rounded border border-zinc-200 text-zinc-500 hover:border-red-300 hover:text-red-600 text-[12px] font-bold leading-none"
-                      title="Bigger"
+                      title={t("bigger")}
                     >
                       +
                     </button>
@@ -591,12 +575,6 @@ export default function QrCodesPage() {
         @media print {
           body * { visibility: hidden; }
           #qr-print-sheet, #qr-print-sheet * { visibility: visible; }
-          /* The on-screen modal is "fixed inset-0 ... overflow-y-auto" so it
-             can scroll within the viewport. Those rules (right/bottom pinned
-             to the screen edge, overflow-y: auto) stay active during print
-             unless explicitly reset here — otherwise the sheet is clipped to
-             one viewport-tall page and everything past it just sits behind
-             an inert scrollbar instead of flowing onto page 2, 3, etc. */
           #qr-print-sheet {
             position: absolute;
             top: 0;

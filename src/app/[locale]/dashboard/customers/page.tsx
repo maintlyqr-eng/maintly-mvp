@@ -1,24 +1,22 @@
 "use client";
 
+// Services isn't migrated yet — keep this one plain next/link.
 import Link from "next/link";
-import Image from "next/image";
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+// Login is migrated and every router.push()/replace() call on this page
+// targets it — safe to use next-intl's locale-aware router.
+import { useRouter } from "@/i18n/navigation";
+import { useTranslations } from "next-intl";
 import {
-  LayoutGrid, FileText, Box, QrCode, Users, BarChart3, Calendar as CalendarIcon,
-  Mail, FolderOpen, Settings, Bell, Plus, X, LogOut, Crown, Menu,
-  Search, Trash2, UserCircle2,
-  MessageCircle,
+  Plus, X,
+  Search, Trash2, UserCircle2, Users,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
-import NotificationBell from "@/components/NotificationBell";
+import DashboardSidebarIntl from "@/components/DashboardSidebarIntl";
+import DashboardHeaderIntl from "@/components/DashboardHeaderIntl";
 import { useUnreadMessagesCount } from "@/lib/useUnreadMessages";
 import { useUnreadMechanicMessages } from "@/lib/useUnreadMechanicMessages";
-import HoverAvatar from "@/components/HoverAvatar";
-import ContactSupportWidget from "@/components/ContactSupportWidget";
 import { formatDateDMY } from "@/lib/date";
-import DashboardSidebar from "@/components/DashboardSidebar";
-import DashboardHeader from "@/components/DashboardHeader";
 
 const assetTypeImg: Record<string, string> = {
   automotive: "/images/car.png",
@@ -29,6 +27,8 @@ const assetTypeImg: Record<string, string> = {
   aviation: "/images/avion.png",
 };
 
+// Purely visual, color only — no text — so it stays keyed by the raw
+// English DB enum value regardless of locale.
 const typeColors: Record<string, string> = {
   "Oil Change": "bg-amber-100 text-amber-700",
   Service: "bg-blue-100 text-blue-700",
@@ -37,6 +37,14 @@ const typeColors: Record<string, string> = {
   "Filter Change": "bg-green-100 text-green-700",
   "Tire Change": "bg-cyan-100 text-cyan-700",
   "Brake Service": "bg-orange-100 text-orange-700",
+};
+
+// Service type is a DB-stored English enum also read by other, not-yet-
+// migrated pages — same enum-translation-key pattern used elsewhere.
+const SERVICE_TYPE_KEYS: Record<string, string> = {
+  "Oil Change": "oilChange", "Service": "service", "Repair": "repair",
+  "Inspection": "inspection", "Filter Change": "filterChange",
+  "Tire Change": "tireChange", "Brake Service": "brakeService", "Other": "other",
 };
 
 type CustomerRow = {
@@ -65,15 +73,13 @@ type ServiceLite = {
   asset_id: string;
 };
 
-function assetLabel(a: AssetLite) {
-  return a.nickname || [a.brand, a.model].filter(Boolean).join(" ") || "Unnamed asset";
-}
-
 function getInitials(name: string) {
   return name.split(" ").filter(Boolean).map((p) => p[0]).join("").slice(0, 2).toUpperCase() || "?";
 }
 
 export default function CustomersPage() {
+  const t = useTranslations("DashboardCustomersPage");
+  const tServiceTypes = useTranslations("ServiceTypes");
   const router = useRouter();
   const [checkingAuth, setCheckingAuth] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -109,6 +115,10 @@ export default function CustomersPage() {
   const [detailSaving, setDetailSaving] = useState(false);
   const [detailMsg, setDetailMsg] = useState<{ text: string; ok: boolean } | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
+
+  function assetLabel(a: AssetLite) {
+    return a.nickname || [a.brand, a.model].filter(Boolean).join(" ") || t("unnamedAsset");
+  }
 
   async function loadAll(uid: string) {
     setLoading(true);
@@ -149,6 +159,7 @@ export default function CustomersPage() {
     });
 
     return () => { active = false; listener.subscription.unsubscribe(); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router]);
 
   async function handleLogout() {
@@ -183,7 +194,7 @@ export default function CustomersPage() {
       .select("id, name, phone, email, notes, created_at")
       .single();
     setAddSaving(false);
-    if (error || !data) { setAddError("Couldn't add the customer. Try again."); return; }
+    if (error || !data) { setAddError(t("addCustomerFailed")); return; }
     setCustomers((prev) => [...prev, data as CustomerRow].sort((a, b) => a.name.localeCompare(b.name)));
     setShowAddModal(false);
   }
@@ -205,10 +216,10 @@ export default function CustomersPage() {
     const patch = { name: detailName.trim(), phone: detailPhone.trim() || null, email: detailEmail.trim() || null, notes: detailNotes.trim() || null };
     const { data, error } = await supabase.from("customers").update(patch).eq("id", detail.id).select("id");
     setDetailSaving(false);
-    if (error || !data || data.length === 0) { setDetailMsg({ text: "Couldn't save changes.", ok: false }); return; }
+    if (error || !data || data.length === 0) { setDetailMsg({ text: t("saveChangesFailed"), ok: false }); return; }
     setCustomers((prev) => prev.map((c) => (c.id === detail.id ? { ...c, ...patch } : c)).sort((a, b) => a.name.localeCompare(b.name)));
     setDetail((prev) => (prev ? { ...prev, ...patch } : prev));
-    setDetailMsg({ text: "Saved.", ok: true });
+    setDetailMsg({ text: t("saved"), ok: true });
   }
 
   async function handleDeleteCustomer() {
@@ -216,7 +227,7 @@ export default function CustomersPage() {
     setDetailMsg(null);
     const { error } = await supabase.from("customers").delete().eq("id", detail.id);
     if (error) {
-      setDetailMsg({ text: "Couldn't delete this customer. Try again.", ok: false });
+      setDetailMsg({ text: t("deleteCustomerFailed"), ok: false });
       return;
     }
     setCustomers((prev) => prev.filter((c) => c.id !== detail.id));
@@ -228,7 +239,7 @@ export default function CustomersPage() {
   if (checkingAuth) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-zinc-50">
-        <p className="text-zinc-400 text-[13px]">Loading...</p>
+        <p className="text-zinc-400 text-[13px]">{t("loadingAuth")}</p>
       </div>
     );
   }
@@ -241,8 +252,8 @@ export default function CustomersPage() {
   return (
     <div className="min-h-screen bg-zinc-50 flex relative">
 
-      <DashboardSidebar
-        activeLabel="Customers"
+      <DashboardSidebarIntl
+        activeHref="/dashboard/customers"
         sidebarOpen={sidebarOpen}
         onCloseSidebar={() => setSidebarOpen(false)}
         mechanicId={mechanicId}
@@ -256,9 +267,9 @@ export default function CustomersPage() {
       {/* ════ MAIN ════ */}
       <div className="flex-1 flex flex-col min-w-0">
 
-        <DashboardHeader
-          title="Customers"
-          subtitle="Whoever's responsible for the upkeep of each piece of equipment."
+        <DashboardHeaderIntl
+          title={t("title")}
+          subtitle={t("subtitle")}
           onOpenSidebar={() => setSidebarOpen(true)}
           mechanicId={mechanicId}
           unreadMessages={unreadMessages}
@@ -278,7 +289,7 @@ export default function CustomersPage() {
               <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
               <input
                 value={search} onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search by name, phone or email..."
+                placeholder={t("searchPlaceholder")}
                 className="w-full rounded-xl border border-zinc-200 bg-white pl-9 pr-3 py-[9px] text-[12px] outline-none focus:border-red-400"
               />
             </div>
@@ -286,23 +297,23 @@ export default function CustomersPage() {
               onClick={openAddModal}
               className="flex items-center gap-2 bg-red-600 hover:bg-red-500 active:scale-[0.98] transition-all text-white text-[13px] font-bold px-4 py-[10px] rounded-xl shadow-sm"
             >
-              <Plus size={15} /> New Customer
+              <Plus size={15} /> {t("newCustomer")}
             </button>
           </div>
 
           {/* Table */}
           <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm">
             {loading ? (
-              <p className="text-[13px] text-zinc-400 text-center py-12">Loading customers...</p>
+              <p className="text-[13px] text-zinc-400 text-center py-12">{t("loadingCustomers")}</p>
             ) : filtered.length === 0 ? (
               <div className="text-center py-16">
                 <div className="inline-flex items-center justify-center w-12 h-12 rounded-full border border-red-100 bg-red-50 mb-3">
                   <Users size={20} className="text-red-500" />
                 </div>
-                <p className="text-[13px] text-zinc-400 mb-3">{customers.length === 0 ? "No customers yet." : "No customers match your search."}</p>
+                <p className="text-[13px] text-zinc-400 mb-3">{customers.length === 0 ? t("noCustomersYet") : t("noCustomersMatch")}</p>
                 {customers.length === 0 && (
                   <button onClick={openAddModal} className="text-[12px] font-bold text-red-600 hover:text-red-700">
-                    Add your first customer →
+                    {t("addFirstCustomer")}
                   </button>
                 )}
               </div>
@@ -311,11 +322,11 @@ export default function CustomersPage() {
                 <table className="w-full min-w-[680px]">
                   <thead>
                     <tr className="text-left text-[10px] text-zinc-400 font-bold uppercase border-b border-zinc-100">
-                      <th className="px-5 py-3 font-bold">Name</th>
-                      <th className="px-3 py-3 font-bold">Contact</th>
-                      <th className="px-3 py-3 font-bold">Equipment</th>
-                      <th className="px-3 py-3 font-bold">Services</th>
-                      <th className="px-3 py-3 font-bold">Last Service</th>
+                      <th className="px-5 py-3 font-bold">{t("columnName")}</th>
+                      <th className="px-3 py-3 font-bold">{t("columnContact")}</th>
+                      <th className="px-3 py-3 font-bold">{t("columnEquipment")}</th>
+                      <th className="px-3 py-3 font-bold">{t("columnServices")}</th>
+                      <th className="px-3 py-3 font-bold">{t("columnLastService")}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -350,7 +361,7 @@ export default function CustomersPage() {
             )}
           </div>
 
-          <p className="text-center text-[11px] text-zinc-400 mt-8">© 2026 Maintly. All rights reserved.</p>
+          <p className="text-center text-[11px] text-zinc-400 mt-8">{t("copyright")}</p>
         </div>
       </div>
 
@@ -363,36 +374,36 @@ export default function CustomersPage() {
                 <div className="w-8 h-8 rounded-xl bg-red-50 flex items-center justify-center">
                   <UserCircle2 size={15} className="text-red-600" />
                 </div>
-                <h2 className="text-[16px] font-black text-zinc-900">New Customer</h2>
+                <h2 className="text-[16px] font-black text-zinc-900">{t("modalNewCustomerTitle")}</h2>
               </div>
               <button onClick={() => setShowAddModal(false)} className="text-zinc-400 hover:text-zinc-700"><X size={18} /></button>
             </div>
             <form onSubmit={handleAddCustomer} className="px-6 py-5 space-y-4">
               <div>
-                <label className="text-[12px] font-bold text-zinc-700">Name *</label>
+                <label className="text-[12px] font-bold text-zinc-700">{t("nameLabel")}</label>
                 <input value={newName} onChange={(e) => setNewName(e.target.value)} required autoFocus
                   className="w-full mt-1 rounded-xl border border-zinc-200 px-3 py-[10px] text-[13px] outline-none focus:border-red-500" />
               </div>
               <div>
-                <label className="text-[12px] font-bold text-zinc-700">Phone (optional)</label>
+                <label className="text-[12px] font-bold text-zinc-700">{t("phoneLabel")}</label>
                 <input value={newPhone} onChange={(e) => setNewPhone(e.target.value)}
                   className="w-full mt-1 rounded-xl border border-zinc-200 px-3 py-[10px] text-[13px] outline-none focus:border-red-500" />
               </div>
               <div>
-                <label className="text-[12px] font-bold text-zinc-700">Email (optional)</label>
+                <label className="text-[12px] font-bold text-zinc-700">{t("emailLabel")}</label>
                 <input type="email" value={newEmail} onChange={(e) => setNewEmail(e.target.value)}
                   className="w-full mt-1 rounded-xl border border-zinc-200 px-3 py-[10px] text-[13px] outline-none focus:border-red-500" />
               </div>
               <div>
-                <label className="text-[12px] font-bold text-zinc-700">Notes (optional)</label>
-                <textarea rows={3} value={newNotes} onChange={(e) => setNewNotes(e.target.value)} placeholder="Anything worth remembering for follow-up..."
+                <label className="text-[12px] font-bold text-zinc-700">{t("notesLabel")}</label>
+                <textarea rows={3} value={newNotes} onChange={(e) => setNewNotes(e.target.value)} placeholder={t("notesPlaceholder")}
                   className="w-full mt-1 rounded-xl border border-zinc-200 px-3 py-[10px] text-[13px] outline-none focus:border-red-500 resize-none" />
               </div>
               {addError && <div className="rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-[12px] text-red-700">{addError}</div>}
               <div className="flex gap-3 pt-1">
-                <button type="button" onClick={() => setShowAddModal(false)} className="flex-1 border border-zinc-200 text-zinc-700 font-bold py-[11px] rounded-xl text-[13px] hover:bg-zinc-50">Cancel</button>
+                <button type="button" onClick={() => setShowAddModal(false)} className="flex-1 border border-zinc-200 text-zinc-700 font-bold py-[11px] rounded-xl text-[13px] hover:bg-zinc-50">{t("cancel")}</button>
                 <button type="submit" disabled={addSaving || !newName.trim()} className="flex-1 bg-red-600 hover:bg-red-500 disabled:opacity-60 transition-all text-white font-bold py-[11px] rounded-xl text-[13px]">
-                  {addSaving ? "Saving..." : "Add Customer"}
+                  {addSaving ? t("saving") : t("addCustomer")}
                 </button>
               </div>
             </form>
@@ -411,7 +422,7 @@ export default function CustomersPage() {
                 </div>
                 <div className="min-w-0">
                   <h2 className="text-[15px] font-black text-zinc-900 truncate">{detail.name}</h2>
-                  <p className="text-[11px] text-zinc-400">Customer since {formatDateDMY(detail.created_at)}</p>
+                  <p className="text-[11px] text-zinc-400">{t("customerSince", { date: formatDateDMY(detail.created_at) })}</p>
                 </div>
               </div>
               <button onClick={() => setDetail(null)} className="text-zinc-400 hover:text-zinc-700 shrink-0"><X size={18} /></button>
@@ -422,50 +433,50 @@ export default function CustomersPage() {
               <div className="grid grid-cols-2 gap-3">
                 <div className="bg-zinc-50 rounded-xl p-3 text-center">
                   <p className="text-[18px] font-black text-zinc-900">{assetsFor(detail.id).length}</p>
-                  <p className="text-[9px] font-bold text-zinc-400 uppercase tracking-wide mt-0.5">Equipment</p>
+                  <p className="text-[9px] font-bold text-zinc-400 uppercase tracking-wide mt-0.5">{t("equipment")}</p>
                 </div>
                 <div className="bg-zinc-50 rounded-xl p-3 text-center">
                   <p className="text-[18px] font-black text-zinc-900">{servicesFor(detail.id).length}</p>
-                  <p className="text-[9px] font-bold text-zinc-400 uppercase tracking-wide mt-0.5">Services</p>
+                  <p className="text-[9px] font-bold text-zinc-400 uppercase tracking-wide mt-0.5">{t("services")}</p>
                 </div>
               </div>
 
               {/* Editable fields */}
               <div className="space-y-3">
                 <div>
-                  <label className="text-[11px] font-bold text-zinc-600">Name</label>
+                  <label className="text-[11px] font-bold text-zinc-600">{t("detailNameLabel")}</label>
                   <input value={detailName} onChange={(e) => setDetailName(e.target.value)}
                     className="w-full mt-1 rounded-xl border border-zinc-200 px-3 py-2 text-[13px] outline-none focus:border-red-400" />
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="text-[11px] font-bold text-zinc-600">Phone</label>
-                    <input value={detailPhone} onChange={(e) => setDetailPhone(e.target.value)} placeholder="Not set"
+                    <label className="text-[11px] font-bold text-zinc-600">{t("detailPhoneLabel")}</label>
+                    <input value={detailPhone} onChange={(e) => setDetailPhone(e.target.value)} placeholder={t("detailPhonePlaceholder")}
                       className="w-full mt-1 rounded-xl border border-zinc-200 px-3 py-2 text-[13px] outline-none focus:border-red-400" />
                   </div>
                   <div>
-                    <label className="text-[11px] font-bold text-zinc-600">Email</label>
-                    <input value={detailEmail} onChange={(e) => setDetailEmail(e.target.value)} placeholder="Not set"
+                    <label className="text-[11px] font-bold text-zinc-600">{t("detailEmailLabel")}</label>
+                    <input value={detailEmail} onChange={(e) => setDetailEmail(e.target.value)} placeholder={t("detailEmailPlaceholder")}
                       className="w-full mt-1 rounded-xl border border-zinc-200 px-3 py-2 text-[13px] outline-none focus:border-red-400" />
                   </div>
                 </div>
                 <div>
-                  <label className="text-[11px] font-bold text-zinc-600">Notes</label>
-                  <textarea rows={2} value={detailNotes} onChange={(e) => setDetailNotes(e.target.value)} placeholder="Nothing noted yet"
+                  <label className="text-[11px] font-bold text-zinc-600">{t("detailNotesLabel")}</label>
+                  <textarea rows={2} value={detailNotes} onChange={(e) => setDetailNotes(e.target.value)} placeholder={t("detailNotesPlaceholder")}
                     className="w-full mt-1 rounded-xl border border-zinc-200 px-3 py-2 text-[13px] outline-none focus:border-red-400 resize-none" />
                 </div>
                 {detailMsg && <p className={`text-[12px] ${detailMsg.ok ? "text-emerald-600" : "text-red-600"}`}>{detailMsg.text}</p>}
                 <button onClick={handleSaveDetail} disabled={detailSaving || !detailName.trim()}
                   className="w-full bg-zinc-900 hover:bg-zinc-800 disabled:opacity-60 text-white font-bold py-2.5 rounded-xl text-[13px] transition-all">
-                  {detailSaving ? "Saving…" : "Save changes"}
+                  {detailSaving ? t("savingEllipsis") : t("saveChanges")}
                 </button>
               </div>
 
               {/* Equipment */}
               <div className="border-t border-zinc-100 pt-4 space-y-2">
-                <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">Equipment</p>
+                <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">{t("equipment")}</p>
                 {assetsFor(detail.id).length === 0 ? (
-                  <p className="text-[12px] text-zinc-300">No equipment currently linked to this customer.</p>
+                  <p className="text-[12px] text-zinc-300">{t("noEquipmentLinked")}</p>
                 ) : (
                   assetsFor(detail.id).map((a) => (
                     <Link key={a.id} href={`/dashboard/services?asset=${a.id}`}
@@ -482,9 +493,9 @@ export default function CustomersPage() {
 
               {/* Service history */}
               <div className="border-t border-zinc-100 pt-4 space-y-2">
-                <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">Service history</p>
+                <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">{t("serviceHistory")}</p>
                 {servicesFor(detail.id).length === 0 ? (
-                  <p className="text-[12px] text-zinc-300">No services logged for this customer yet.</p>
+                  <p className="text-[12px] text-zinc-300">{t("noServicesLogged")}</p>
                 ) : (
                   <div className="space-y-1.5 max-h-56 overflow-y-auto">
                     {servicesFor(detail.id).map((s) => {
@@ -492,8 +503,10 @@ export default function CustomersPage() {
                       return (
                         <div key={s.id} className="flex items-center justify-between gap-2 px-3 py-2 rounded-xl bg-zinc-50">
                           <div className="min-w-0">
-                            <p className="text-[12px] font-semibold text-zinc-700 truncate">{asset ? assetLabel(asset) : "Unknown asset"}</p>
-                            <span className={`inline-block mt-0.5 text-[9.5px] font-bold px-1.5 py-[1px] rounded-full ${typeColors[s.service_type] ?? "bg-zinc-100 text-zinc-600"}`}>{s.service_type}</span>
+                            <p className="text-[12px] font-semibold text-zinc-700 truncate">{asset ? assetLabel(asset) : t("unknownAsset")}</p>
+                            <span className={`inline-block mt-0.5 text-[9.5px] font-bold px-1.5 py-[1px] rounded-full ${typeColors[s.service_type] ?? "bg-zinc-100 text-zinc-600"}`}>
+                              {tServiceTypes(SERVICE_TYPE_KEYS[s.service_type] ?? "other")}
+                            </span>
                           </div>
                           <p className="text-[11px] text-zinc-400 shrink-0">{formatDateDMY(s.service_date)}</p>
                         </div>
@@ -507,15 +520,15 @@ export default function CustomersPage() {
               <div className="border-t border-zinc-100 pt-4">
                 {confirmDelete ? (
                   <div className="flex items-center justify-between gap-2 bg-red-50 border border-red-100 rounded-xl px-3 py-2.5">
-                    <span className="text-[11px] text-red-700 font-medium">Delete this customer? Their equipment and service history stay, just unlinked.</span>
+                    <span className="text-[11px] text-red-700 font-medium">{t("deleteCustomerConfirm")}</span>
                     <div className="flex items-center gap-1.5 shrink-0">
-                      <button onClick={handleDeleteCustomer} className="text-[11px] font-bold text-white bg-red-600 hover:bg-red-500 px-2.5 py-1.5 rounded-lg transition-colors">Confirm</button>
-                      <button onClick={() => setConfirmDelete(false)} className="text-[11px] font-semibold text-zinc-400 hover:text-zinc-700 px-1.5">Cancel</button>
+                      <button onClick={handleDeleteCustomer} className="text-[11px] font-bold text-white bg-red-600 hover:bg-red-500 px-2.5 py-1.5 rounded-lg transition-colors">{t("confirm")}</button>
+                      <button onClick={() => setConfirmDelete(false)} className="text-[11px] font-semibold text-zinc-400 hover:text-zinc-700 px-1.5">{t("cancel")}</button>
                     </div>
                   </div>
                 ) : (
                   <button onClick={() => setConfirmDelete(true)} className="flex items-center gap-2 text-[12px] font-semibold text-zinc-400 hover:text-red-600 transition-colors">
-                    <Trash2 size={13} /> Delete customer
+                    <Trash2 size={13} /> {t("deleteCustomer")}
                   </button>
                 )}
               </div>

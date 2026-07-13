@@ -1,35 +1,26 @@
 "use client";
 
+// Scheduled and Services aren't migrated yet — keep this one plain next/link.
 import Link from "next/link";
-import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+// Login is migrated and every router.push()/replace() call on this page
+// targets it — safe to use next-intl's locale-aware router.
+import { useRouter } from "@/i18n/navigation";
+import { useTranslations, useLocale } from "next-intl";
 import {
-  LayoutGrid, FileText, Box, QrCode, Users, BarChart3, Calendar as CalendarIcon,
-  Mail, FolderOpen, Settings, Bell, X, LogOut, Crown, Menu,
   ChevronLeft, ChevronRight, Plus, Trash2, CheckCircle2, Circle, Gauge, Wrench,
-  MessageCircle,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
-import NotificationBell from "@/components/NotificationBell";
+import DashboardSidebarIntl from "@/components/DashboardSidebarIntl";
+import DashboardHeaderIntl from "@/components/DashboardHeaderIntl";
 import { useUnreadMessagesCount } from "@/lib/useUnreadMessages";
 import { useUnreadMechanicMessages } from "@/lib/useUnreadMechanicMessages";
-import HoverAvatar from "@/components/HoverAvatar";
-import ContactSupportWidget from "@/components/ContactSupportWidget";
-import CustomerPicker, { CustomerOption } from "@/components/CustomerPicker";
-import { formatDateDMY } from "@/lib/date";
-import { computeReminderStatus, REMINDER_STATUS_LABEL, REMINDER_STATUS_COLOR, type ReminderStatus } from "@/lib/reminders";
-import { formatUnitValue } from "@/lib/units";
+import CustomerPickerIntl, { CustomerOption } from "@/components/CustomerPickerIntl";
+import { computeReminderStatus, REMINDER_STATUS_COLOR, type ReminderStatus } from "@/lib/reminders";
+import { getUnitKind } from "@/lib/units";
 import { dateKey, todayKey, buildMonthGrid } from "@/lib/calendarGrid";
-import DashboardSidebar from "@/components/DashboardSidebar";
-import DashboardHeader from "@/components/DashboardHeader";
-import { getInitials } from "@/lib/initials";
 
-const WEEKDAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-const MONTH_LABELS = [
-  "January", "February", "March", "April", "May", "June",
-  "July", "August", "September", "October", "November", "December",
-];
+const DATE_LOCALE: Record<string, string> = { en: "en-US", es: "es-AR", pt: "pt-BR" };
 
 type AssetInfo = {
   id: string;
@@ -66,12 +57,18 @@ function getAsset(a: AssetInfo | AssetInfo[] | null): AssetInfo | null {
   return Array.isArray(a) ? a[0] ?? null : a;
 }
 
-function assetLabel(a: AssetInfo | AssetOption | null) {
-  if (!a) return "Unknown asset";
-  return a.nickname || [a.brand, a.model].filter(Boolean).join(" ") || "Unnamed asset";
-}
+// Service type is a DB-stored English enum also read by other, not-yet-
+// migrated pages — same enum-translation-key pattern used elsewhere.
+const SERVICE_TYPE_KEYS: Record<string, string> = {
+  "Oil Change": "oilChange", "Service": "service", "Repair": "repair",
+  "Inspection": "inspection", "Filter Change": "filterChange",
+  "Tire Change": "tireChange", "Brake Service": "brakeService", "Other": "other",
+};
 
 export default function CalendarPage() {
+  const t = useTranslations("DashboardCalendarPage");
+  const tServiceTypes = useTranslations("ServiceTypes");
+  const locale = useLocale();
   const router = useRouter();
   const [checkingAuth, setCheckingAuth] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -85,6 +82,33 @@ export default function CalendarPage() {
 
   const [viewDate, setViewDate] = useState(() => new Date());
   const [selectedKey, setSelectedKey] = useState(() => todayKey());
+
+  const WEEKDAY_LABELS = [
+    t("weekdaySun"), t("weekdayMon"), t("weekdayTue"), t("weekdayWed"),
+    t("weekdayThu"), t("weekdayFri"), t("weekdaySat"),
+  ];
+  const MONTH_LABELS = [
+    t("monthJanuary"), t("monthFebruary"), t("monthMarch"), t("monthApril"),
+    t("monthMay"), t("monthJune"), t("monthJuly"), t("monthAugust"),
+    t("monthSeptember"), t("monthOctober"), t("monthNovember"), t("monthDecember"),
+  ];
+  const REMINDER_STATUS_LABEL: Record<ReminderStatus, string> = {
+    overdue: t("statusOverdue"),
+    due_soon: t("statusDueSoon"),
+    ok: t("statusOk"),
+    none: t("statusNone"),
+  };
+
+  function assetLabel(a: AssetInfo | AssetOption | null) {
+    if (!a) return t("unknownAsset");
+    return a.nickname || [a.brand, a.model].filter(Boolean).join(" ") || t("unnamedAsset");
+  }
+
+  function unitValue(value: number | null | undefined, assetType: string | null | undefined) {
+    if (value == null) return "—";
+    const short = getUnitKind(assetType) === "horas" ? t("unitShortHours") : t("unitShortKm");
+    return `${value.toLocaleString()} ${short}`;
+  }
 
   // Deep link from the Dashboard's mini calendar widget: /dashboard/calendar?date=YYYY-MM-DD
   useEffect(() => {
@@ -184,6 +208,7 @@ export default function CalendarPage() {
     });
 
     return () => { active = false; listener.subscription.unsubscribe(); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router]);
 
   async function handleLogout() {
@@ -213,11 +238,12 @@ export default function CalendarPage() {
       }
     }
     return { servicesByDate: services, remindersByDate: reminders };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [serviceRows, maxKmByAsset]);
 
   const tasksByDate = useMemo(() => {
     const map: Record<string, TaskRow[]> = {};
-    for (const t of taskRows) (map[t.task_date] ??= []).push(t);
+    for (const tk of taskRows) (map[tk.task_date] ??= []).push(tk);
     return map;
   }, [taskRows]);
 
@@ -231,7 +257,7 @@ export default function CalendarPage() {
 
   async function handleAddTask(e: React.FormEvent) {
     e.preventDefault();
-    if (!taskTitle.trim()) { setTaskError("Give the task a short title."); return; }
+    if (!taskTitle.trim()) { setTaskError(t("giveTaskTitle")); return; }
 
     setTaskSaving(true);
     setTaskError("");
@@ -249,7 +275,7 @@ export default function CalendarPage() {
     setTaskSaving(false);
 
     if (error || !data || data.length === 0) {
-      setTaskError(error?.message || "Couldn't save the task — please try again.");
+      setTaskError(error?.message || t("saveTaskFailed"));
       return;
     }
 
@@ -259,13 +285,13 @@ export default function CalendarPage() {
   }
 
   async function handleToggleTask(task: TaskRow) {
-    setTaskRows((prev) => prev.map((t) => (t.id === task.id ? { ...t, done: !t.done } : t)));
+    setTaskRows((prev) => prev.map((tk) => (tk.id === task.id ? { ...tk, done: !tk.done } : tk)));
     const { error } = await supabase.from("calendar_tasks").update({ done: !task.done }).eq("id", task.id);
     if (error) await loadTasks(mechanicId);
   }
 
   async function handleDeleteTask(task: TaskRow) {
-    setTaskRows((prev) => prev.filter((t) => t.id !== task.id));
+    setTaskRows((prev) => prev.filter((tk) => tk.id !== task.id));
     const { error } = await supabase.from("calendar_tasks").delete().eq("id", task.id);
     if (error) await loadTasks(mechanicId);
   }
@@ -273,7 +299,7 @@ export default function CalendarPage() {
   if (checkingAuth) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-zinc-50">
-        <p className="text-zinc-400 text-[13px]">Loading...</p>
+        <p className="text-zinc-400 text-[13px]">{t("loadingAuth")}</p>
       </div>
     );
   }
@@ -289,23 +315,23 @@ export default function CalendarPage() {
   const selectedServices = servicesByDate[selectedKey] ?? [];
 
   const selectedDateObj = new Date(selectedKey + "T00:00:00");
-  const selectedLabel = selectedDateObj.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" });
+  const selectedLabel = selectedDateObj.toLocaleDateString(DATE_LOCALE[locale] ?? "en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" });
 
   function goToMonth(delta: number) {
     setViewDate(new Date(year, month + delta, 1));
   }
 
   function goToToday() {
-    const t = new Date();
-    setViewDate(t);
-    setSelectedKey(dateKey(t.getFullYear(), t.getMonth(), t.getDate()));
+    const tNow = new Date();
+    setViewDate(tNow);
+    setSelectedKey(dateKey(tNow.getFullYear(), tNow.getMonth(), tNow.getDate()));
   }
 
   return (
     <div className="min-h-screen bg-zinc-50 flex relative">
 
-      <DashboardSidebar
-        activeLabel="Calendar"
+      <DashboardSidebarIntl
+        activeHref="/dashboard/calendar"
         sidebarOpen={sidebarOpen}
         onCloseSidebar={() => setSidebarOpen(false)}
         mechanicId={mechanicId}
@@ -319,9 +345,9 @@ export default function CalendarPage() {
       {/* ════ MAIN ════ */}
       <div className="flex-1 flex flex-col min-w-0">
 
-        <DashboardHeader
-          title="Calendar"
-          subtitle="Plan future work and see what happened each day."
+        <DashboardHeaderIntl
+          title={t("title")}
+          subtitle={t("subtitle")}
           onOpenSidebar={() => setSidebarOpen(true)}
           mechanicId={mechanicId}
           unreadMessages={unreadMessages}
@@ -342,7 +368,7 @@ export default function CalendarPage() {
                 <h2 className="text-[15px] font-black text-zinc-900">{MONTH_LABELS[month]} {year}</h2>
                 <div className="flex items-center gap-1.5">
                   <button onClick={goToToday} className="text-[11px] font-bold text-zinc-500 hover:text-red-600 px-2.5 py-1.5 rounded-lg hover:bg-red-50 transition-colors mr-1">
-                    Today
+                    {t("today")}
                   </button>
                   <button onClick={() => goToMonth(-1)} className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-800 hover:bg-zinc-50 transition-colors">
                     <ChevronLeft size={16} />
@@ -354,15 +380,15 @@ export default function CalendarPage() {
               </div>
 
               <div className="grid grid-cols-7 border-b border-zinc-100">
-                {WEEKDAY_LABELS.map((w) => (
-                  <div key={w} className="text-center text-[9px] font-bold text-zinc-400 uppercase tracking-wide py-2">{w}</div>
+                {WEEKDAY_LABELS.map((w, i) => (
+                  <div key={i} className="text-center text-[9px] font-bold text-zinc-400 uppercase tracking-wide py-2">{w}</div>
                 ))}
               </div>
 
               <div className="grid grid-cols-7">
                 {grid.map((cell) => {
                   const tasks = tasksByDate[cell.key] ?? [];
-                  const openTasks = tasks.filter((t) => !t.done).length;
+                  const openTasks = tasks.filter((tk) => !tk.done).length;
                   const reminders = remindersByDate[cell.key] ?? [];
                   const services = servicesByDate[cell.key] ?? [];
                   const worstStatus: ReminderStatus | null = reminders.some((r) => r.status === "overdue")
@@ -387,15 +413,17 @@ export default function CalendarPage() {
                       </span>
                       <div className="flex flex-wrap gap-1 mt-1.5">
                         {openTasks > 0 && (
-                          <span className="text-[9px] font-bold text-blue-700 bg-blue-50 rounded px-1 leading-[14px]">{openTasks} task{openTasks > 1 ? "s" : ""}</span>
+                          <span className="text-[9px] font-bold text-blue-700 bg-blue-50 rounded px-1 leading-[14px]">
+                            {openTasks} {openTasks > 1 ? t("tasksPlural") : t("taskSingular")}
+                          </span>
                         )}
                         {worstStatus && (
                           <span className={`text-[9px] font-bold rounded px-1 leading-[14px] ${REMINDER_STATUS_COLOR[worstStatus].bg} ${REMINDER_STATUS_COLOR[worstStatus].text}`}>
-                            {reminders.length} due
+                            {t("dueCount", { count: reminders.length })}
                           </span>
                         )}
                         {services.length > 0 && (
-                          <span className="text-[9px] font-bold text-emerald-700 bg-emerald-50 rounded px-1 leading-[14px]">{services.length} done</span>
+                          <span className="text-[9px] font-bold text-emerald-700 bg-emerald-50 rounded px-1 leading-[14px]">{t("doneCount", { count: services.length })}</span>
                         )}
                       </div>
                     </button>
@@ -406,18 +434,18 @@ export default function CalendarPage() {
 
             {/* ── DAY DETAIL ── */}
             <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm p-5 lg:sticky lg:top-7">
-              <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-wide">{selectedKey === todayKeyStr ? "Today" : ""}</p>
+              <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-wide">{selectedKey === todayKeyStr ? t("today") : ""}</p>
               <h3 className="text-[14px] font-black text-zinc-900 mb-4">{selectedLabel}</h3>
 
               {/* Planned tasks */}
               <div className="mb-5">
                 <div className="flex items-center justify-between mb-2">
-                  <p className="text-[11px] font-bold text-zinc-500 uppercase tracking-wide">Planned tasks</p>
+                  <p className="text-[11px] font-bold text-zinc-500 uppercase tracking-wide">{t("plannedTasks")}</p>
                   <button
                     onClick={() => { setShowAddTask((v) => !v); resetTaskForm(); }}
                     className="flex items-center gap-1 text-[11px] font-bold text-red-600 hover:text-red-700"
                   >
-                    <Plus size={13} /> Add
+                    <Plus size={13} /> {t("add")}
                   </button>
                 </div>
 
@@ -425,57 +453,56 @@ export default function CalendarPage() {
                   <form onSubmit={handleAddTask} className="mb-3 p-3 rounded-xl bg-zinc-50 border border-zinc-100 space-y-2">
                     <input
                       value={taskTitle} onChange={(e) => setTaskTitle(e.target.value)}
-                      placeholder="e.g. Oil change for Ford F-150"
+                      placeholder={t("taskTitlePlaceholder")}
                       className="w-full rounded-lg border border-zinc-200 px-2.5 py-2 text-[12px] outline-none focus:border-red-500"
                     />
                     <select
                       value={taskAssetId} onChange={(e) => setTaskAssetId(e.target.value)}
                       className="w-full rounded-lg border border-zinc-200 px-2.5 py-2 text-[12px] outline-none focus:border-red-500 bg-white"
                     >
-                      <option value="">No specific asset</option>
+                      <option value="">{t("noSpecificAsset")}</option>
                       {assetOptions.map((a) => (
                         <option key={a.id} value={a.id}>{assetLabel(a)}</option>
                       ))}
                     </select>
                     <textarea
                       value={taskNotes} onChange={(e) => setTaskNotes(e.target.value)}
-                      placeholder="Notes (optional)" rows={2}
+                      placeholder={t("notesOptionalPlaceholder")} rows={2}
                       className="w-full rounded-lg border border-zinc-200 px-2.5 py-2 text-[12px] outline-none focus:border-red-500 resize-none"
                     />
-                    <CustomerPicker
+                    <CustomerPickerIntl
                       mechanicId={mechanicId}
                       customers={customers}
                       value={taskCustomerId}
                       onChange={setTaskCustomerId}
                       onCreated={(c) => setCustomers((prev) => [...prev, c].sort((a, b) => a.name.localeCompare(b.name)))}
-                      label="Customer (optional)"
                     />
                     {taskError && <p className="text-[11px] text-red-600 font-semibold">{taskError}</p>}
                     <div className="flex gap-2">
-                      <button type="button" onClick={() => setShowAddTask(false)} className="flex-1 text-[12px] font-bold text-zinc-500 hover:bg-zinc-100 py-1.5 rounded-lg transition-colors">Cancel</button>
+                      <button type="button" onClick={() => setShowAddTask(false)} className="flex-1 text-[12px] font-bold text-zinc-500 hover:bg-zinc-100 py-1.5 rounded-lg transition-colors">{t("cancel")}</button>
                       <button type="submit" disabled={taskSaving} className="flex-1 text-[12px] font-bold text-white bg-zinc-900 hover:bg-zinc-800 disabled:opacity-50 py-1.5 rounded-lg transition-colors">
-                        {taskSaving ? "Saving…" : "Save task"}
+                        {taskSaving ? t("savingEllipsis") : t("saveTask")}
                       </button>
                     </div>
                   </form>
                 )}
 
                 {selectedTasks.length === 0 ? (
-                  <p className="text-[12px] text-zinc-300">No tasks planned for this day.</p>
+                  <p className="text-[12px] text-zinc-300">{t("noTasksPlanned")}</p>
                 ) : (
                   <div className="space-y-1.5">
-                    {selectedTasks.map((t) => {
-                      const asset = getAsset(t.assets);
+                    {selectedTasks.map((tk) => {
+                      const asset = getAsset(tk.assets);
                       return (
-                        <div key={t.id} className="flex items-start gap-2 group">
-                          <button onClick={() => handleToggleTask(t)} className="mt-0.5 shrink-0 text-zinc-300 hover:text-emerald-600 transition-colors">
-                            {t.done ? <CheckCircle2 size={16} className="text-emerald-500" /> : <Circle size={16} />}
+                        <div key={tk.id} className="flex items-start gap-2 group">
+                          <button onClick={() => handleToggleTask(tk)} className="mt-0.5 shrink-0 text-zinc-300 hover:text-emerald-600 transition-colors">
+                            {tk.done ? <CheckCircle2 size={16} className="text-emerald-500" /> : <Circle size={16} />}
                           </button>
                           <div className="flex-1 min-w-0">
-                            <p className={`text-[12.5px] font-semibold leading-tight ${t.done ? "text-zinc-300 line-through" : "text-zinc-800"}`}>{t.title}</p>
+                            <p className={`text-[12.5px] font-semibold leading-tight ${tk.done ? "text-zinc-300 line-through" : "text-zinc-800"}`}>{tk.title}</p>
                             {asset && <p className="text-[11px] text-zinc-400 truncate">{assetLabel(asset)}</p>}
                           </div>
-                          <button onClick={() => handleDeleteTask(t)} className="shrink-0 opacity-0 group-hover:opacity-100 text-zinc-300 hover:text-red-600 transition-all">
+                          <button onClick={() => handleDeleteTask(tk)} className="shrink-0 opacity-0 group-hover:opacity-100 text-zinc-300 hover:text-red-600 transition-all">
                             <Trash2 size={13} />
                           </button>
                         </div>
@@ -488,7 +515,7 @@ export default function CalendarPage() {
               {/* Due reminders */}
               {selectedReminders.length > 0 && (
                 <div className="mb-5">
-                  <p className="text-[11px] font-bold text-zinc-500 uppercase tracking-wide mb-2">Due this day</p>
+                  <p className="text-[11px] font-bold text-zinc-500 uppercase tracking-wide mb-2">{t("dueThisDay")}</p>
                   <div className="space-y-2">
                     {selectedReminders.map((r) => {
                       const sc = REMINDER_STATUS_COLOR[r.status];
@@ -499,8 +526,8 @@ export default function CalendarPage() {
                             <span className={`shrink-0 text-[9px] font-bold px-1.5 py-[2px] rounded-full ${sc.bg} ${sc.text}`}>{REMINDER_STATUS_LABEL[r.status]}</span>
                           </div>
                           <p className="text-[11px] text-zinc-400 flex items-center gap-1 mt-0.5">
-                            <Wrench size={10} /> {r.type}
-                            {r.kmHours != null && <span className="flex items-center gap-1"><Gauge size={10} /> {formatUnitValue(r.kmHours, r.assetType)}</span>}
+                            <Wrench size={10} /> {tServiceTypes(SERVICE_TYPE_KEYS[r.type] ?? "other")}
+                            {r.kmHours != null && <span className="flex items-center gap-1"><Gauge size={10} /> {unitValue(r.kmHours, r.assetType)}</span>}
                           </p>
                         </Link>
                       );
@@ -511,15 +538,15 @@ export default function CalendarPage() {
 
               {/* Services logged */}
               <div>
-                <p className="text-[11px] font-bold text-zinc-500 uppercase tracking-wide mb-2">Services logged</p>
+                <p className="text-[11px] font-bold text-zinc-500 uppercase tracking-wide mb-2">{t("servicesLogged")}</p>
                 {selectedServices.length === 0 ? (
-                  <p className="text-[12px] text-zinc-300">No services were logged this day.</p>
+                  <p className="text-[12px] text-zinc-300">{t("noServicesLoggedDay")}</p>
                 ) : (
                   <div className="space-y-2">
                     {selectedServices.map((s) => (
                       <Link key={s.id} href={`/dashboard/services?asset=${s.assetId}`} className="block p-2.5 rounded-xl bg-emerald-50/60 hover:bg-emerald-50 transition-colors">
                         <p className="text-[12px] font-bold text-zinc-800 truncate">{s.label}</p>
-                        <p className="text-[11px] text-zinc-500">{s.type}</p>
+                        <p className="text-[11px] text-zinc-500">{tServiceTypes(SERVICE_TYPE_KEYS[s.type] ?? "other")}</p>
                       </Link>
                     ))}
                   </div>
@@ -528,7 +555,7 @@ export default function CalendarPage() {
             </div>
           </div>
 
-          <p className="text-center text-[11px] text-zinc-400 mt-8">© 2026 Maintly. All rights reserved.</p>
+          <p className="text-center text-[11px] text-zinc-400 mt-8">{t("copyright")}</p>
         </div>
       </div>
     </div>

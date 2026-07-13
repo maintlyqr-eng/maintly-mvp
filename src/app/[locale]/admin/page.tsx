@@ -1,8 +1,9 @@
 "use client";
 
-import Link from "next/link";
+import { Link } from "@/i18n/navigation";
 import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
+import { useTranslations, useLocale } from "next-intl";
 import {
   Users, Box, Wrench, QrCode, BarChart3, Shield,
   LogOut, RefreshCw, AlertCircle,
@@ -14,6 +15,19 @@ import {
 import { supabase } from "@/lib/supabase";
 import { formatDateDMY } from "@/lib/date";
 import HoverAvatar from "@/components/HoverAvatar";
+
+// Local enum-key maps, same pattern as ShareAssetModal.tsx / the Settings
+// and Assets [locale] pages — raw DB values (English) map to translation
+// keys looked up in the ProfessionTypes namespace.
+const PROFESSION_KEYS: Record<string, string> = {
+  "Owner": "owner",
+  "Mechanic": "mechanic",
+  "Electrician": "electrician",
+  "HVAC Technician": "hvacTechnician",
+  "Fleet Manager": "fleetManager",
+  "Business": "business",
+  "Inspector": "inspector",
+};
 
 // ────────────────────────────────────────────────────────────────────────────
 // Types
@@ -169,10 +183,12 @@ function formatDate(iso: string) {
   return formatDateDMY(iso);
 }
 
-function formatTime(iso: string) {
+const DATE_LOCALE: Record<string, string> = { en: "en-US", es: "es-AR", pt: "pt-BR" };
+
+function formatTime(iso: string, locale: string) {
   const d = new Date(iso);
   if (isNaN(d.getTime())) return "";
-  return d.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" });
+  return d.toLocaleTimeString(DATE_LOCALE[locale] ?? "en-US", { hour: "2-digit", minute: "2-digit" });
 }
 function getInitials(name: string) {
   return (name || "?").split(" ").filter(Boolean).map(p => p[0]).join("").toUpperCase().slice(0, 2) || "?";
@@ -269,6 +285,7 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
 }
 
 function TrendRow({ label, data, color }: { label: string; data: DayBucket[]; color: string }) {
+  const t = useTranslations("AdminPage");
   const max = Math.max(...data.map((d) => d.count), 1);
   const total = data.reduce((s, d) => s + d.count, 0);
   return (
@@ -276,7 +293,7 @@ function TrendRow({ label, data, color }: { label: string; data: DayBucket[]; co
       <div className="w-36 shrink-0">
         <p className="text-[11px] font-bold text-zinc-600">{label}</p>
         <p className="text-[18px] font-black text-zinc-900 leading-none mt-0.5">{total}</p>
-        <p className="text-[10px] text-zinc-300">last {data.length} days</p>
+        <p className="text-[10px] text-zinc-300">{t("lastDays", { count: data.length })}</p>
       </div>
       <div className="flex-1 flex items-end gap-[3px] h-10">
         {data.map((d, i) => (
@@ -312,6 +329,10 @@ function Pill({ children, tone }: { children: React.ReactNode; tone: "zinc" | "b
 // ────────────────────────────────────────────────────────────────────────────
 
 export default function AdminPage() {
+  const t = useTranslations("AdminPage");
+  const tProfessionTypes = useTranslations("ProfessionTypes");
+  const tAssetTypes = useTranslations("AssetTypes");
+  const locale = useLocale();
   const [adminAuthed, setAdminAuthed] = useState(false);
   const [loginUser, setLoginUser]     = useState("");
   const [loginPass, setLoginPass]     = useState("");
@@ -416,7 +437,7 @@ export default function AdminPage() {
     ]);
 
     if (!bulkRes || bulkRes.error) {
-      flash(bulkRes?.error || "Couldn't load platform data.", "error");
+      flash(bulkRes?.error || t("errorLoadPlatformData"), "error");
       setRefreshing(false);
       setLoading(false);
       return;
@@ -466,7 +487,7 @@ export default function AdminPage() {
         id: s.id, service_date: s.service_date, service_type: s.service_type,
         mechanic_id: s.mechanic_id, mechanic_name: mech?.name ?? "—",
         asset_id: s.asset_id,
-        asset_label: asset?.nickname || [asset?.brand, asset?.model].filter(Boolean).join(" ") || "Unknown",
+        asset_label: asset?.nickname || [asset?.brand, asset?.model].filter(Boolean).join(" ") || t("unknown"),
         customer_name: s.customer_id ? (customerNameById[s.customer_id] ?? "—") : "—",
       };
     });
@@ -607,7 +628,7 @@ export default function AdminPage() {
 
   function teamChatPersonLabel(m: MechanicMsgRow, id: string): string {
     const info = id === m.sender_id ? m.sender : id === m.recipient_id ? m.recipient : null;
-    return info?.workshop_name || info?.name || info?.email || "Unknown Maintler";
+    return info?.workshop_name || info?.name || info?.email || t("unknownMaintler");
   }
 
   const activeThread = supportConversations.find((c) => c.mechanicId === selectedThreadMechanic) ?? null;
@@ -618,7 +639,7 @@ export default function AdminPage() {
     const hasUnread = supportMessages.some((m) => m.mechanic_id === mechanicId && !m.from_admin && !m.read);
     if (hasUnread) {
       const result = await adminFetch("/api/admin/support-messages", "PATCH", { mechanicId });
-      if (!result.ok) { flash(result.error || "Couldn't mark messages as read.", "error"); return; }
+      if (!result.ok) { flash(result.error || t("couldntMarkRead"), "error"); return; }
       setSupportMessages((prev) => prev.map((x) => (x.mechanic_id === mechanicId && !x.from_admin ? { ...x, read: true } : x)));
     }
   }
@@ -642,13 +663,13 @@ export default function AdminPage() {
       ]);
       return true;
     }
-    flash(result.error || "Couldn't send the message.", "error");
+    flash(result.error || t("couldntSendMessage"), "error");
     return false;
   }
 
   async function handleClearThread(mechanicId: string) {
     const result = await adminFetch("/api/admin/support-messages", "DELETE", { mechanicId });
-    if (!result.ok) { flash(result.error || "Couldn't clear the conversation.", "error"); return; }
+    if (!result.ok) { flash(result.error || t("couldntClearConversation"), "error"); return; }
     setSupportMessages((prev) => prev.filter((m) => m.mechanic_id !== mechanicId));
     setSelectedThreadMechanic(null);
     setConfirmClearThread(false);
@@ -669,9 +690,9 @@ export default function AdminPage() {
     setDetailMessageSaving(false);
     if (ok) {
       setDetailMessageBody("");
-      setDetailMessageMsg({ text: "Message sent.", ok: true });
+      setDetailMessageMsg({ text: t("messageSent"), ok: true });
     } else {
-      setDetailMessageMsg({ text: "Couldn't send the message.", ok: false });
+      setDetailMessageMsg({ text: t("couldntSendMessage"), ok: false });
     }
   }
 
@@ -762,7 +783,7 @@ export default function AdminPage() {
       verification_reviewed_at: new Date().toISOString(),
     });
     setVerificationBusyId(null);
-    if (ok) flash(`${a.name} verified as ${a.profession ?? "a"} Maintler.`);
+    if (ok) flash(t("mechanicVerifiedAs", { name: a.name }));
   }
 
   async function handleRejectVerification(a: AccountRow) {
@@ -773,7 +794,7 @@ export default function AdminPage() {
       verification_reviewed_at: new Date().toISOString(),
     });
     setVerificationBusyId(null);
-    if (ok) flash(`Verification request declined for ${a.name}.`);
+    if (ok) flash(t("verificationDeclinedFor", { name: a.name }));
   }
 
   async function handleViewCertificate(a: AccountRow) {
@@ -790,27 +811,27 @@ export default function AdminPage() {
     setDetailError("");
     const ok = await patchAccount(detailAccount.id, { name: detailName.trim(), workshop_name: detailWorkshop.trim() || null });
     setDetailSaving(false);
-    if (ok) flash("Account updated.");
-    else setDetailError("Couldn't save changes.");
+    if (ok) flash(t("accountUpdated"));
+    else setDetailError(t("couldntSaveChanges"));
   }
 
   async function handleResetPassword(email: string) {
     const { error } = await supabase.auth.resetPasswordForEmail(email);
     if (error) flash(error.message, "error");
-    else flash(`Password reset email sent to ${email}.`);
+    else flash(t("passwordResetSent", { email }));
   }
 
   function confirmDeleteAccount(a: AccountRow) {
     setConfirmAction({
-      title: "Delete account",
-      body: `This permanently deletes ${a.name}'s account (${a.email}). This cannot be undone.`,
+      title: t("deleteAccountConfirmTitle"),
+      body: t("deleteAccountConfirmBody", { name: a.name, email: a.email }),
       danger: true,
       onConfirm: async () => {
         const res = await adminFetch("/api/admin/accounts", "DELETE", { id: a.id });
         if (!res.ok) { flash(res.error, "error"); return; }
         setAccounts((prev) => prev.filter((x) => x.id !== a.id));
         setDetailAccount(null);
-        flash("Account deleted.");
+        flash(t("accountDeleted"));
       },
     });
   }
@@ -818,14 +839,14 @@ export default function AdminPage() {
   // ── Service actions ──
   function confirmDeleteService(s: ServiceRow) {
     setConfirmAction({
-      title: "Delete service record",
-      body: `Delete the "${s.service_type}" service on ${s.asset_label} (${formatDate(s.service_date)})?`,
+      title: t("deleteServiceConfirmTitle"),
+      body: t("deleteServiceConfirmBody", { type: s.service_type, asset: s.asset_label, date: formatDate(s.service_date) }),
       danger: true,
       onConfirm: async () => {
         const res = await adminFetch("/api/admin/services", "DELETE", { id: s.id });
         if (!res.ok) { flash(res.error, "error"); return; }
         setServices((prev) => prev.filter((x) => x.id !== s.id));
-        flash("Service record deleted.");
+        flash(t("serviceRecordDeleted"));
       },
     });
   }
@@ -838,19 +859,19 @@ export default function AdminPage() {
     setGenerating(false);
     if (!res.ok) { flash(res.error, "error"); return; }
     setShowGenerateModal(false);
-    flash(`${count} new QR codes generated.`);
+    flash(t("qrCodesGenerated", { count }));
     await loadData();
   }
 
   function confirmUnlinkQr(q: QrRow) {
     setConfirmAction({
-      title: "Unlink QR code",
-      body: `Free up ${q.code} from its asset? The QR sticker will show "not found" until it's reassigned.`,
+      title: t("unlinkQrConfirmTitle"),
+      body: t("unlinkQrConfirmBody", { code: q.code }),
       onConfirm: async () => {
         const res = await adminFetch("/api/admin/qr", "PATCH", { code: q.code });
         if (!res.ok) { flash(res.error, "error"); return; }
         setQrCodes((prev) => prev.map((x) => (x.code === q.code ? { ...x, asset_id: null } : x)));
-        flash("QR code unlinked.");
+        flash(t("qrCodeUnlinked"));
       },
     });
   }
@@ -933,25 +954,25 @@ export default function AdminPage() {
             <div className="flex justify-center mb-2">
               <Image src="/images/Maintly.png" alt="Maintly" width={36} height={24} priority style={{ objectFit: "contain" }} />
             </div>
-            <p className="text-[12px] text-zinc-400 font-semibold tracking-widest uppercase">Control Center</p>
+            <p className="text-[12px] text-zinc-400 font-semibold tracking-widest uppercase">{t("controlCenterLabel")}</p>
           </div>
 
           <div className="bg-white rounded-3xl border border-zinc-200/80 shadow-2xl shadow-zinc-200/60 p-8">
-            <h1 className="text-[18px] font-black text-zinc-900 mb-1">Sign in</h1>
-            <p className="text-[13px] text-zinc-400 mb-6">Restricted to authorized personnel only.</p>
+            <h1 className="text-[18px] font-black text-zinc-900 mb-1">{t("loginTitle")}</h1>
+            <p className="text-[13px] text-zinc-400 mb-6">{t("loginSubtitle")}</p>
 
             <form onSubmit={handleAdminLogin} className="space-y-4">
               <div>
-                <label className="text-[11px] font-bold text-zinc-600 mb-1.5 block">Username</label>
+                <label className="text-[11px] font-bold text-zinc-600 mb-1.5 block">{t("usernameLabel")}</label>
                 <input
                   type="text" autoComplete="off" value={loginUser}
                   onChange={e => { setLoginUser(e.target.value); setLoginError(""); }}
-                  placeholder="admin"
+                  placeholder={t("usernamePlaceholder")}
                   className="w-full bg-zinc-50 border border-zinc-200 focus:border-red-400 focus:ring-4 focus:ring-red-50 focus:bg-white rounded-xl px-4 py-3 text-[14px] text-zinc-900 placeholder-zinc-300 outline-none transition-all"
                 />
               </div>
               <div>
-                <label className="text-[11px] font-bold text-zinc-600 mb-1.5 block">Password</label>
+                <label className="text-[11px] font-bold text-zinc-600 mb-1.5 block">{t("passwordLabel")}</label>
                 <div className="relative">
                   <input
                     type={showPass ? "text" : "password"} autoComplete="current-password" value={loginPass}
@@ -975,12 +996,12 @@ export default function AdminPage() {
 
               <button type="submit" disabled={loginSubmitting}
                 className="w-full bg-red-600 hover:bg-red-500 active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed text-white font-bold py-3.5 rounded-xl text-[14px] transition-all shadow-lg shadow-red-200 mt-1">
-                {loginSubmitting ? "Checking…" : "Access Control Center"}
+                {loginSubmitting ? t("checking") : t("accessButton")}
               </button>
             </form>
           </div>
 
-          <p className="text-center text-[11px] text-zinc-300 mt-6 font-medium">MaintlyQR · Internal use only</p>
+          <p className="text-center text-[11px] text-zinc-300 mt-6 font-medium">{t("footerNote")}</p>
         </div>
       </div>
     );
@@ -991,7 +1012,7 @@ export default function AdminPage() {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-white gap-4">
         <div className="w-10 h-10 rounded-full border-[3px] border-zinc-100 border-t-red-600 animate-spin" />
-        <p className="text-[13px] text-zinc-400 font-medium">Loading control center…</p>
+        <p className="text-[13px] text-zinc-400 font-medium">{t("loadingControlCenter")}</p>
       </div>
     );
   }
@@ -999,19 +1020,19 @@ export default function AdminPage() {
   const maxAssetCount = Math.max(...assetTypes.map(a => a.count), 1);
   const qrPct = totalQR > 0 ? Math.round((assignedQR / totalQR) * 100) : 0;
   const navItems: { id: Section; label: string; icon: React.ElementType }[] = [
-    { id: "dashboard", label: "Dashboard", icon: BarChart3 },
-    { id: "accounts",  label: "Accounts",  icon: Users     },
-    { id: "mechanics", label: "Mechanics", icon: Wrench    },
-    { id: "verifications", label: "Verifications", icon: ShieldCheck },
-    { id: "assets",    label: "Assets",    icon: Box       },
-    { id: "services",  label: "Services",  icon: ClipboardList },
-    { id: "qr",        label: "QR Manager", icon: QrCode   },
-    { id: "support",   label: "Support",   icon: LifeBuoy  },
-    { id: "team-chat", label: "Team Chat", icon: MessageCircle },
+    { id: "dashboard", label: t("navDashboard"), icon: BarChart3 },
+    { id: "accounts",  label: t("navAccounts"),  icon: Users     },
+    { id: "mechanics", label: t("navMechanics"), icon: Wrench    },
+    { id: "verifications", label: t("navVerifications"), icon: ShieldCheck },
+    { id: "assets",    label: t("navAssets"),    icon: Box       },
+    { id: "services",  label: t("navServices"),  icon: ClipboardList },
+    { id: "qr",        label: t("navQr"), icon: QrCode   },
+    { id: "support",   label: t("navSupport"),   icon: LifeBuoy  },
+    { id: "team-chat", label: t("navTeamChat"), icon: MessageCircle },
   ];
   const sectionLabels: Record<Section, string> = {
-    dashboard: "Dashboard", accounts: "Accounts", mechanics: "Mechanics", verifications: "Verifications",
-    assets: "Assets", services: "Services", qr: "QR Manager", support: "Support", "team-chat": "Team Chat",
+    dashboard: t("navDashboard"), accounts: t("navAccounts"), mechanics: t("navMechanics"), verifications: t("navVerifications"),
+    assets: t("navAssets"), services: t("navServices"), qr: t("navQr"), support: t("navSupport"), "team-chat": t("navTeamChat"),
   };
   const unreadSupportCount = supportMessages.filter((m) => !m.from_admin && !m.read).length;
 
@@ -1031,7 +1052,7 @@ export default function AdminPage() {
             </div>
             <div>
               <Image src="/images/Maintly.png" alt="Maintly" width={26} height={17} priority style={{ objectFit: "contain" }} />
-              <p className="text-[9px] font-bold text-red-500 tracking-[0.12em] uppercase leading-none mt-0.5">Control Center</p>
+              <p className="text-[9px] font-bold text-red-500 tracking-[0.12em] uppercase leading-none mt-0.5">{t("controlCenterLabel")}</p>
             </div>
           </div>
           <button onClick={() => setSidebarOpen(false)} className="md:hidden text-zinc-400 hover:text-zinc-700">
@@ -1040,7 +1061,7 @@ export default function AdminPage() {
         </div>
 
         <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto">
-          <p className="text-[9px] font-bold text-zinc-300 uppercase tracking-widest px-3 pt-2 pb-1.5">Navigation</p>
+          <p className="text-[9px] font-bold text-zinc-300 uppercase tracking-widest px-3 pt-2 pb-1.5">{t("navigationLabel")}</p>
           {navItems.map(({ id, label, icon: Icon }) => (
             <button key={id} onClick={() => { setSection(id); setSidebarOpen(false); }}
               className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13px] font-semibold transition-all text-left ${
@@ -1079,12 +1100,12 @@ export default function AdminPage() {
           <Link href="/dashboard"
             className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13px] font-semibold text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900 transition-all">
             <Layers size={15} />
-            Mechanic View
+            {t("mechanicView")}
           </Link>
           <button onClick={handleAdminLogout}
             className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13px] font-semibold text-zinc-400 hover:bg-red-50 hover:text-red-600 transition-all">
             <LogOut size={15} />
-            Log out
+            {t("logOut")}
           </button>
         </div>
       </aside>
@@ -1099,13 +1120,13 @@ export default function AdminPage() {
             </button>
             <div className="min-w-0">
               <h1 className="text-[18px] md:text-[22px] font-black text-zinc-900 leading-tight truncate">{sectionLabels[section]}</h1>
-              <p className="hidden sm:block text-[12px] text-zinc-400 font-medium mt-0.5">MaintlyQR operations control center</p>
+              <p className="hidden sm:block text-[12px] text-zinc-400 font-medium mt-0.5">{t("headerSubtitle")}</p>
             </div>
           </div>
           <button onClick={loadData} disabled={refreshing}
             className="flex items-center gap-2 bg-white border border-zinc-200 hover:border-zinc-300 hover:bg-zinc-50 text-zinc-600 hover:text-zinc-900 text-[12px] font-bold px-3 md:px-4 py-2.5 rounded-xl transition-all disabled:opacity-40 shadow-sm shrink-0">
             <RefreshCw size={13} className={refreshing ? "animate-spin" : ""} />
-            <span className="hidden sm:inline">Refresh</span>
+            <span className="hidden sm:inline">{t("refresh")}</span>
           </button>
         </header>
 
@@ -1129,26 +1150,26 @@ export default function AdminPage() {
           {section === "dashboard" && (
             <div className="space-y-7">
               <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
-                <StatCard label="Users Registered"   value={totalUsers}             icon={Users}     accent="bg-blue-500" />
-                <StatCard label="Mechanic Accounts"   value={totalMechanicAccounts}  icon={Wrench}    accent="bg-orange-500" />
-                <StatCard label="Verified Mechanics"  value={totalVerifiedMechanics} icon={ShieldCheck} accent="bg-emerald-500" />
-                <StatCard label="Assets Registered"   value={totalAssets}            icon={Box}       accent="bg-purple-500" />
-                <StatCard label="QR Assigned"         value={assignedQR}             icon={QrCode}    accent="bg-red-500" sub={`of ${totalQR} issued`} />
-                <StatCard label="Services Created"    value={totalServices}          icon={ClipboardList} accent="bg-cyan-500" />
-                <StatCard label="Scans Today"         value={scansToday}             icon={ScanLine}  accent="bg-pink-500" />
-                <StatCard label="Scans This Week"     value={scansWeek}              icon={ScanLine}  accent="bg-indigo-500" />
+                <StatCard label={t("usersRegistered")}   value={totalUsers}             icon={Users}     accent="bg-blue-500" />
+                <StatCard label={t("mechanicAccounts")}   value={totalMechanicAccounts}  icon={Wrench}    accent="bg-orange-500" />
+                <StatCard label={t("verifiedMechanics")}  value={totalVerifiedMechanics} icon={ShieldCheck} accent="bg-emerald-500" />
+                <StatCard label={t("assetsRegistered")}   value={totalAssets}            icon={Box}       accent="bg-purple-500" />
+                <StatCard label={t("qrAssigned")}         value={assignedQR}             icon={QrCode}    accent="bg-red-500" sub={t("qrAssignedSub", { total: totalQR })} />
+                <StatCard label={t("servicesCreated")}    value={totalServices}          icon={ClipboardList} accent="bg-cyan-500" />
+                <StatCard label={t("scansToday")}         value={scansToday}             icon={ScanLine}  accent="bg-pink-500" />
+                <StatCard label={t("scansThisWeek")}     value={scansWeek}              icon={ScanLine}  accent="bg-indigo-500" />
               </div>
 
               {usageMetrics && (
                 <div className="bg-white rounded-2xl border border-zinc-200/80 p-6 shadow-sm">
-                  <SectionTitle>Uso de la plataforma (Supabase Free)</SectionTitle>
+                  <SectionTitle>{t("platformUsageTitle")}</SectionTitle>
                   <div className="mt-3">
-                    <UsageBar label="Base de datos" usedMB={usageMetrics.dbSizeMB} limitMB={usageMetrics.dbLimitMB} percent={usageMetrics.dbPercent} />
-                    <UsageBar label="Storage (fotos)" usedMB={usageMetrics.storageSizeMB} limitMB={usageMetrics.storageLimitMB} percent={usageMetrics.storagePercent} />
+                    <UsageBar label={t("databaseLabel")} usedMB={usageMetrics.dbSizeMB} limitMB={usageMetrics.dbLimitMB} percent={usageMetrics.dbPercent} />
+                    <UsageBar label={t("storageLabel")} usedMB={usageMetrics.storageSizeMB} limitMB={usageMetrics.storageLimitMB} percent={usageMetrics.storagePercent} />
                   </div>
                   {(usageMetrics.dbPercent >= 70 || usageMetrics.storagePercent >= 70) && (
                     <p className="mt-3 text-[11px] font-semibold text-amber-600">
-                      Te estás acercando a un límite del plan Free — es buen momento para evaluar Supabase Pro.
+                      {t("approachingLimit")}
                     </p>
                   )}
                 </div>
@@ -1156,20 +1177,20 @@ export default function AdminPage() {
 
               <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
                 <div className="bg-white rounded-2xl border border-zinc-200/80 p-6 shadow-sm">
-                  <SectionTitle>Growth (last 14 days)</SectionTitle>
+                  <SectionTitle>{t("growthTitle")}</SectionTitle>
                   <div className="mt-2">
-                    <TrendRow label="New Users"      data={newUserDays}     color="bg-blue-500" />
-                    <TrendRow label="New Mechanics"  data={newMechanicDays} color="bg-orange-500" />
-                    <TrendRow label="New Assets"     data={newAssetDays}    color="bg-purple-500" />
-                    <TrendRow label="QR Activated"   data={newQrDays}       color="bg-red-500" />
-                    <TrendRow label="Services Created" data={newServiceDays} color="bg-cyan-500" />
+                    <TrendRow label={t("newUsers")}      data={newUserDays}     color="bg-blue-500" />
+                    <TrendRow label={t("newMechanics")}  data={newMechanicDays} color="bg-orange-500" />
+                    <TrendRow label={t("newAssets")}     data={newAssetDays}    color="bg-purple-500" />
+                    <TrendRow label={t("qrActivated")}   data={newQrDays}       color="bg-red-500" />
+                    <TrendRow label={t("servicesCreatedTrend")} data={newServiceDays} color="bg-cyan-500" />
                   </div>
                 </div>
 
                 <div className="space-y-5">
                   <div className="bg-white rounded-2xl border border-zinc-200/80 p-6 shadow-sm">
                     <div className="flex items-center justify-between mb-5">
-                      <SectionTitle>QR Code Utilization</SectionTitle>
+                      <SectionTitle>{t("qrUtilizationTitle")}</SectionTitle>
                       <span className="text-[20px] font-black text-zinc-900">{qrPct}%</span>
                     </div>
                     <div className="w-full h-3 bg-zinc-100 rounded-full overflow-hidden mb-4">
@@ -1179,14 +1200,14 @@ export default function AdminPage() {
                       <div className="flex items-center gap-2.5 bg-emerald-50 border border-emerald-100 rounded-xl px-4 py-3 flex-1">
                         <div className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
                         <div>
-                          <p className="text-[9px] font-bold text-emerald-600 uppercase tracking-widest">Linked</p>
+                          <p className="text-[9px] font-bold text-emerald-600 uppercase tracking-widest">{t("linked")}</p>
                           <p className="text-[22px] font-black text-emerald-700 leading-none">{assignedQR}</p>
                         </div>
                       </div>
                       <div className="flex items-center gap-2.5 bg-zinc-50 border border-zinc-100 rounded-xl px-4 py-3 flex-1">
                         <div className="w-2 h-2 rounded-full bg-zinc-300 shrink-0" />
                         <div>
-                          <p className="text-[9px] font-bold text-zinc-400 uppercase tracking-widest">Free</p>
+                          <p className="text-[9px] font-bold text-zinc-400 uppercase tracking-widest">{t("free")}</p>
                           <p className="text-[22px] font-black text-zinc-500 leading-none">{totalQR - assignedQR}</p>
                         </div>
                       </div>
@@ -1194,9 +1215,9 @@ export default function AdminPage() {
                   </div>
 
                   <div className="bg-white rounded-2xl border border-zinc-200/80 p-6 shadow-sm">
-                    <SectionTitle>Fleet Breakdown</SectionTitle>
+                    <SectionTitle>{t("fleetBreakdownTitle")}</SectionTitle>
                     {assetTypes.length === 0 ? (
-                      <p className="text-[13px] text-zinc-300 mt-4">No assets registered yet.</p>
+                      <p className="text-[13px] text-zinc-300 mt-4">{t("noAssetsYet")}</p>
                     ) : (
                       <div className="space-y-3 mt-4">
                         {assetTypes.map(({ type, count }) => {
@@ -1206,7 +1227,7 @@ export default function AdminPage() {
                               <span className="text-[17px] w-6 shrink-0">{ASSET_ICONS[type] ?? "🔧"}</span>
                               <div className="flex-1">
                                 <div className="flex justify-between items-center mb-1.5">
-                                  <span className="text-[12px] font-semibold text-zinc-700 capitalize">{type}</span>
+                                  <span className="text-[12px] font-semibold text-zinc-700">{tAssetTypes(type)}</span>
                                   <span className="text-[12px] font-bold text-zinc-900">{count}</span>
                                 </div>
                                 <div className="h-1.5 bg-zinc-100 rounded-full overflow-hidden">
@@ -1231,20 +1252,20 @@ export default function AdminPage() {
                 <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
                 <input
                   type="text" value={accountSearch} onChange={(e) => setAccountSearch(e.target.value)}
-                  placeholder="Search by name, email or workshop..."
+                  placeholder={t("searchAccountsPlaceholder")}
                   className="w-full rounded-xl border border-zinc-200 bg-white pl-9 pr-3 py-[9px] text-[12px] outline-none focus:border-red-400 transition-colors"
                 />
               </div>
 
               <div className="bg-white rounded-2xl border border-zinc-200/80 shadow-sm overflow-hidden">
                 <div className="px-7 py-5 border-b border-zinc-100">
-                  <SectionTitle>{visibleAccounts.length} Accounts</SectionTitle>
+                  <SectionTitle>{t("accountsCount", { count: visibleAccounts.length })}</SectionTitle>
                 </div>
                 <div className="overflow-x-auto">
                   <table className="w-full min-w-[820px]">
                     <thead>
                       <tr className="bg-zinc-50 border-b border-zinc-100">
-                        {["Account", "Roles", "Status", "Joined", ""].map((h) => (
+                        {[t("colAccount"), t("colRoles"), t("colStatus"), t("colJoined"), ""].map((h) => (
                           <th key={h} className="px-7 py-3 text-left text-[9px] font-bold text-zinc-400 uppercase tracking-widest">{h}</th>
                         ))}
                       </tr>
@@ -1271,25 +1292,25 @@ export default function AdminPage() {
                             </td>
                             <td className="px-7 py-4">
                               <div className="flex flex-wrap gap-1.5">
-                                {owner && <Pill tone="zinc">Owner</Pill>}
-                                {a.is_mechanic && <Pill tone="blue">Mechanic</Pill>}
-                                {a.is_mechanic && a.verified && <Pill tone="emerald">Verified</Pill>}
+                                {owner && <Pill tone="zinc">{t("ownerPill")}</Pill>}
+                                {a.is_mechanic && <Pill tone="blue">{t("mechanicPill")}</Pill>}
+                                {a.is_mechanic && a.verified && <Pill tone="emerald">{t("verifiedPill")}</Pill>}
                               </div>
                             </td>
                             <td className="px-7 py-4">
                               {a.suspended
-                                ? <Pill tone="red">🔴 Suspended</Pill>
-                                : <Pill tone="emerald">🟢 Active</Pill>}
+                                ? <Pill tone="red">{t("suspendedPill")}</Pill>
+                                : <Pill tone="emerald">{t("activePill")}</Pill>}
                             </td>
                             <td className="px-7 py-4 text-[12px] text-zinc-400">{formatDate(a.created_at)}</td>
                             <td className="px-7 py-4 text-right">
-                              <span className="text-[11px] font-bold text-zinc-400">View →</span>
+                              <span className="text-[11px] font-bold text-zinc-400">{t("viewArrow")}</span>
                             </td>
                           </tr>
                         );
                       })}
                       {visibleAccounts.length === 0 && (
-                        <tr><td colSpan={5} className="px-7 py-16 text-center text-[13px] text-zinc-300">No accounts match your search.</td></tr>
+                        <tr><td colSpan={5} className="px-7 py-16 text-center text-[13px] text-zinc-300">{t("noAccountsMatch")}</td></tr>
                       )}
                     </tbody>
                   </table>
@@ -1302,14 +1323,14 @@ export default function AdminPage() {
           {section === "mechanics" && (
             <div className="space-y-4">
               <div className="flex items-center justify-between">
-                <SectionTitle>{visibleMechanics.length} Mechanics</SectionTitle>
+                <SectionTitle>{t("mechanicsCount", { count: visibleMechanics.length })}</SectionTitle>
                 <button
                   onClick={() => setMechanicPendingOnly((v) => !v)}
                   className={`text-[11px] font-bold px-3 py-1.5 rounded-full border transition-colors ${
                     mechanicPendingOnly ? "bg-amber-500 text-white border-amber-500" : "bg-white border-zinc-200 text-zinc-500 hover:bg-zinc-50"
                   }`}
                 >
-                  Pending verification only
+                  {t("pendingOnlyToggle")}
                 </button>
               </div>
 
@@ -1318,7 +1339,7 @@ export default function AdminPage() {
                   <table className="w-full min-w-[820px]">
                     <thead>
                       <tr className="bg-zinc-50 border-b border-zinc-100">
-                        {["Mechanic", "Workshop", "Verification", "Services", "Joined", "Actions"].map((h) => (
+                        {[t("colMechanic"), t("colWorkshop"), t("colVerification"), t("colServices"), t("colJoined"), t("colActions")].map((h) => (
                           <th key={h} className="px-7 py-3 text-left text-[9px] font-bold text-zinc-400 uppercase tracking-widest">{h}</th>
                         ))}
                       </tr>
@@ -1338,30 +1359,30 @@ export default function AdminPage() {
                               <span className="text-[13px] font-bold text-zinc-900">{m.name}</span>
                             </div>
                           </td>
-                          <td className="px-7 py-4 text-[12px] text-zinc-500">{m.workshop_name ?? <span className="text-zinc-300">Not set</span>}</td>
+                          <td className="px-7 py-4 text-[12px] text-zinc-500">{m.workshop_name ?? <span className="text-zinc-300">{t("notSet")}</span>}</td>
                           <td className="px-7 py-4">
                             {m.verified
-                              ? <Pill tone="emerald">✓ Verified</Pill>
-                              : <Pill tone="amber">Pending</Pill>}
+                              ? <Pill tone="emerald">{t("verifiedCheck")}</Pill>
+                              : <Pill tone="amber">{t("pending")}</Pill>}
                           </td>
                           <td className="px-7 py-4 text-[12px] text-zinc-500">{servicesByMechanic[m.id] ?? 0}</td>
                           <td className="px-7 py-4 text-[12px] text-zinc-400">{formatDate(m.created_at)}</td>
                           <td className="px-7 py-4">
                             <div className="flex items-center gap-1.5">
                               <button
-                                onClick={() => patchAccount(m.id, { verified: !m.verified }).then((ok) => ok && flash(m.verified ? "Verification revoked." : "Mechanic verified."))}
+                                onClick={() => patchAccount(m.id, { verified: !m.verified }).then((ok) => ok && flash(m.verified ? t("verificationRevoked") : t("mechanicVerified")))}
                                 className={`text-[11px] font-bold px-2.5 py-1.5 rounded-lg border transition-colors ${
                                   m.verified ? "border-zinc-200 text-zinc-500 hover:bg-zinc-50" : "border-emerald-200 text-emerald-700 hover:bg-emerald-50"
                                 }`}
                               >
-                                {m.verified ? "Revoke" : "Approve"}
+                                {m.verified ? t("revoke") : t("approve")}
                               </button>
                             </div>
                           </td>
                         </tr>
                       ))}
                       {visibleMechanics.length === 0 && (
-                        <tr><td colSpan={6} className="px-7 py-16 text-center text-[13px] text-zinc-300">No mechanics{mechanicPendingOnly ? " pending verification" : ""}.</td></tr>
+                        <tr><td colSpan={6} className="px-7 py-16 text-center text-[13px] text-zinc-300">{mechanicPendingOnly ? t("noMechanicsPending") : t("noMechanics")}</td></tr>
                       )}
                     </tbody>
                   </table>
@@ -1373,12 +1394,12 @@ export default function AdminPage() {
           {/* ── VERIFICATION REQUESTS ─────────────────────────────────────── */}
           {section === "verifications" && (
             <div className="space-y-4">
-              <SectionTitle>{pendingVerifications.length} Pending {pendingVerifications.length === 1 ? "Request" : "Requests"}</SectionTitle>
+              <SectionTitle>{t("pendingRequestsCount", { count: pendingVerifications.length })}</SectionTitle>
 
               {pendingVerifications.length === 0 ? (
                 <div className="bg-white rounded-2xl border border-zinc-200/80 shadow-sm py-16 text-center">
                   <ShieldCheck size={28} className="text-zinc-200 mx-auto mb-3" />
-                  <p className="text-[13px] text-zinc-300">No pending verification requests.</p>
+                  <p className="text-[13px] text-zinc-300">{t("noPendingRequests")}</p>
                 </div>
               ) : (
                 <div className="space-y-3">
@@ -1396,9 +1417,9 @@ export default function AdminPage() {
                           <p className="text-[13px] font-bold text-zinc-900 truncate">{a.name}</p>
                           <p className="text-[11px] text-zinc-400 truncate">{a.email}</p>
                           <div className="flex items-center gap-2 mt-1">
-                            <Pill tone="amber">{a.profession}</Pill>
+                            <Pill tone="amber">{a.profession ? tProfessionTypes(PROFESSION_KEYS[a.profession] ?? "owner") : ""}</Pill>
                             {a.verification_requested_at && (
-                              <span className="text-[10px] text-zinc-400">Requested {formatDate(a.verification_requested_at)}</span>
+                              <span className="text-[10px] text-zinc-400">{t("requestedOn", { date: formatDate(a.verification_requested_at) })}</span>
                             )}
                           </div>
                         </div>
@@ -1409,21 +1430,21 @@ export default function AdminPage() {
                           disabled={!a.certificate_path}
                           className="text-[11px] font-bold px-3 py-2 rounded-lg border border-zinc-200 text-zinc-600 hover:bg-zinc-50 transition-colors disabled:opacity-40"
                         >
-                          View Certificate
+                          {t("viewCertificate")}
                         </button>
                         <button
                           onClick={() => handleRejectVerification(a)}
                           disabled={verificationBusyId === a.id}
                           className="text-[11px] font-bold px-3 py-2 rounded-lg border border-red-200 text-red-600 hover:bg-red-50 transition-colors disabled:opacity-40"
                         >
-                          Reject
+                          {t("reject")}
                         </button>
                         <button
                           onClick={() => handleApproveVerification(a)}
                           disabled={verificationBusyId === a.id}
                           className="text-[11px] font-bold px-3 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white transition-colors disabled:opacity-40"
                         >
-                          {verificationBusyId === a.id ? "Working…" : "Approve"}
+                          {verificationBusyId === a.id ? t("working") : t("approve")}
                         </button>
                       </div>
                     </div>
@@ -1440,27 +1461,27 @@ export default function AdminPage() {
                 <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
                 <input
                   type="text" value={assetSearch} onChange={(e) => setAssetSearch(e.target.value)}
-                  placeholder="Search by VIN, brand, model, plate or owner..."
+                  placeholder={t("searchAssetsPlaceholder")}
                   className="w-full rounded-xl border border-zinc-200 bg-white pl-9 pr-3 py-[9px] text-[12px] outline-none focus:border-red-400 transition-colors"
                 />
               </div>
 
               <div className="bg-white rounded-2xl border border-zinc-200/80 shadow-sm overflow-hidden">
                 <div className="px-7 py-5 border-b border-zinc-100">
-                  <SectionTitle>{visibleAssets.length} Assets</SectionTitle>
+                  <SectionTitle>{t("assetsCount", { count: visibleAssets.length })}</SectionTitle>
                 </div>
                 <div className="overflow-x-auto">
                   <table className="w-full min-w-[820px]">
                     <thead>
                       <tr className="bg-zinc-50 border-b border-zinc-100">
-                        {["Asset", "Type", "VIN / Serial", "Owner", "Services", "Registered"].map((h) => (
+                        {[t("colAsset"), t("colType"), t("colVin"), t("colOwner"), t("colServices"), t("colRegistered")].map((h) => (
                           <th key={h} className="px-7 py-3 text-left text-[9px] font-bold text-zinc-400 uppercase tracking-widest">{h}</th>
                         ))}
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-zinc-50">
                       {visibleAssets.map((a) => {
-                        const label = a.nickname || [a.brand, a.model].filter(Boolean).join(" ") || "Unnamed asset";
+                        const label = a.nickname || [a.brand, a.model].filter(Boolean).join(" ") || t("unnamedAsset");
                         const owner = a.created_by ? mechanicsById[a.created_by] : null;
                         return (
                           <tr key={a.id} className="hover:bg-zinc-50/80 transition-colors">
@@ -1470,7 +1491,7 @@ export default function AdminPage() {
                                 <span className="text-[13px] font-bold text-zinc-900">{label}</span>
                               </div>
                             </td>
-                            <td className="px-7 py-4 text-[12px] text-zinc-500 capitalize">{a.asset_type}</td>
+                            <td className="px-7 py-4 text-[12px] text-zinc-500">{tAssetTypes(a.asset_type)}</td>
                             <td className="px-7 py-4 text-[12px] text-zinc-500 font-mono">{a.vin_serial || a.plate || "—"}</td>
                             <td className="px-7 py-4 text-[12px] text-zinc-500">{owner?.name ?? "—"}</td>
                             <td className="px-7 py-4 text-[12px] text-zinc-500">{servicesByAsset[a.id] ?? 0}</td>
@@ -1479,7 +1500,7 @@ export default function AdminPage() {
                         );
                       })}
                       {visibleAssets.length === 0 && (
-                        <tr><td colSpan={6} className="px-7 py-16 text-center text-[13px] text-zinc-300">No assets match your search.</td></tr>
+                        <tr><td colSpan={6} className="px-7 py-16 text-center text-[13px] text-zinc-300">{t("noAssetsMatch")}</td></tr>
                       )}
                     </tbody>
                   </table>
@@ -1493,9 +1514,9 @@ export default function AdminPage() {
             <div className="space-y-5">
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 {[
-                  { label: "Total Services", value: totalServices, color: "text-zinc-900" },
-                  { label: "Shown (filtered)", value: visibleServices.length, color: "text-emerald-600" },
-                  { label: "Avg per Mechanic", value: totalMechanicAccounts > 0 ? (totalServices / totalMechanicAccounts).toFixed(1) : "—", color: "text-zinc-900" },
+                  { label: t("totalServices"), value: totalServices, color: "text-zinc-900" },
+                  { label: t("shownFiltered"), value: visibleServices.length, color: "text-emerald-600" },
+                  { label: t("avgPerMechanic"), value: totalMechanicAccounts > 0 ? (totalServices / totalMechanicAccounts).toFixed(1) : "—", color: "text-zinc-900" },
                 ].map(({ label, value, color }) => (
                   <div key={label} className="bg-white border border-zinc-200/80 rounded-2xl p-6 shadow-sm">
                     <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-2">{label}</p>
@@ -1507,25 +1528,25 @@ export default function AdminPage() {
               <div className="flex flex-wrap gap-3">
                 <select value={svcMechanicFilter} onChange={(e) => setSvcMechanicFilter(e.target.value)}
                   className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-[12px] outline-none focus:border-red-400">
-                  <option value="all">All mechanics</option>
+                  <option value="all">{t("allMechanics")}</option>
                   {accounts.filter((a) => a.is_mechanic).map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
                 </select>
                 <select value={svcTypeFilter} onChange={(e) => setSvcTypeFilter(e.target.value)}
                   className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-[12px] outline-none focus:border-red-400">
-                  <option value="all">All types</option>
+                  <option value="all">{t("allTypes")}</option>
                   {serviceTypeOptions.map((t) => <option key={t} value={t}>{t}</option>)}
                 </select>
               </div>
 
               <div className="bg-white rounded-2xl border border-zinc-200/80 shadow-sm overflow-hidden">
                 <div className="px-7 py-5 border-b border-zinc-100">
-                  <SectionTitle>Service History</SectionTitle>
+                  <SectionTitle>{t("serviceHistoryTitle")}</SectionTitle>
                 </div>
                 <div className="overflow-x-auto">
                   <table className="w-full min-w-[680px]">
                     <thead>
                       <tr className="bg-zinc-50 border-b border-zinc-100">
-                        {["Asset", "Service Type", "Mechanic", "Customer", "Date", ""].map(h => (
+                        {[t("colAsset"), t("colServiceType"), t("colMechanic"), t("colCustomer"), t("colDate"), ""].map(h => (
                           <th key={h} className="px-7 py-3 text-left text-[9px] font-bold text-zinc-400 uppercase tracking-widest">{h}</th>
                         ))}
                       </tr>
@@ -1543,19 +1564,19 @@ export default function AdminPage() {
                           <td className="px-7 py-4 text-[12px] text-zinc-500">{s.customer_name}</td>
                           <td className="px-7 py-4 text-[12px] text-zinc-400">{formatDate(s.service_date)}</td>
                           <td className="px-7 py-4 text-right">
-                            <button onClick={() => confirmDeleteService(s)} className="text-zinc-300 hover:text-red-600 transition-colors" title="Delete">
+                            <button onClick={() => confirmDeleteService(s)} className="text-zinc-300 hover:text-red-600 transition-colors" title={t("deleteTitle")}>
                               <Trash2 size={14} />
                             </button>
                           </td>
                         </tr>
                       ))}
                       {visibleServices.length === 0 && (
-                        <tr><td colSpan={6} className="px-7 py-16 text-center text-[13px] text-zinc-300">No services match these filters.</td></tr>
+                        <tr><td colSpan={6} className="px-7 py-16 text-center text-[13px] text-zinc-300">{t("noServicesMatch")}</td></tr>
                       )}
                     </tbody>
                   </table>
                   {visibleServices.length > 200 && (
-                    <p className="text-center text-[11px] text-zinc-300 py-4">Showing the first 200 of {visibleServices.length} — narrow the filters to see more.</p>
+                    <p className="text-center text-[11px] text-zinc-300 py-4">{t("showingFirstOf", { shown: 200, total: visibleServices.length })}</p>
                   )}
                 </div>
               </div>
@@ -1567,9 +1588,9 @@ export default function AdminPage() {
             <div className="space-y-5">
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 {[
-                  { label: "Total QR Codes", value: totalQR, color: "text-zinc-900" },
-                  { label: "Linked to Assets", value: assignedQR, color: "text-emerald-600" },
-                  { label: "Available", value: totalQR - assignedQR, color: "text-zinc-400" },
+                  { label: t("totalQrCodes"), value: totalQR, color: "text-zinc-900" },
+                  { label: t("linkedToAssets"), value: assignedQR, color: "text-emerald-600" },
+                  { label: t("available"), value: totalQR - assignedQR, color: "text-zinc-400" },
                 ].map(({ label, value, color }) => (
                   <div key={label} className="bg-white border border-zinc-200/80 rounded-2xl p-6 shadow-sm">
                     <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-2">{label}</p>
@@ -1583,19 +1604,19 @@ export default function AdminPage() {
                   <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
                   <input
                     type="text" value={qrSearch} onChange={(e) => setQrSearch(e.target.value)}
-                    placeholder="Search code..."
+                    placeholder={t("searchCodePlaceholder")}
                     className="w-full rounded-xl border border-zinc-200 bg-white pl-9 pr-3 py-[9px] text-[12px] outline-none focus:border-red-400 transition-colors"
                   />
                 </div>
                 {(["all", "available", "assigned"] as const).map((f) => (
                   <button key={f} onClick={() => setQrStatusFilter(f)}
                     className={`px-3 py-[7px] rounded-full text-[12px] font-bold transition-colors ${qrStatusFilter === f ? "bg-zinc-900 text-white" : "bg-white border border-zinc-200 text-zinc-500 hover:bg-zinc-50"}`}>
-                    {f === "all" ? "All" : f === "available" ? "🟢 Available" : "🔵 Assigned"}
+                    {f === "all" ? t("filterAll") : f === "available" ? t("filterAvailable") : t("filterAssigned")}
                   </button>
                 ))}
                 <button onClick={() => setShowGenerateModal(true)}
                   className="ml-auto flex items-center gap-2 bg-red-600 hover:bg-red-500 text-white text-[12px] font-bold px-4 py-[9px] rounded-xl transition-all shadow-sm">
-                  <Plus size={14} /> Generate Batch
+                  <Plus size={14} /> {t("generateBatch")}
                 </button>
               </div>
 
@@ -1604,7 +1625,7 @@ export default function AdminPage() {
                   <table className="w-full min-w-[680px]">
                     <thead>
                       <tr className="bg-zinc-50 border-b border-zinc-100">
-                        {["Code", "Status", "Asset", "Created", ""].map((h) => (
+                        {[t("colCode"), t("colStatus"), t("colAsset"), t("colCreated"), ""].map((h) => (
                           <th key={h} className="px-7 py-3 text-left text-[9px] font-bold text-zinc-400 uppercase tracking-widest">{h}</th>
                         ))}
                       </tr>
@@ -1612,18 +1633,18 @@ export default function AdminPage() {
                     <tbody className="divide-y divide-zinc-50">
                       {visibleQr.slice(0, 200).map((q) => {
                         const asset = assets.find((a) => a.id === q.asset_id);
-                        const label = asset ? (asset.nickname || [asset.brand, asset.model].filter(Boolean).join(" ") || "Unnamed asset") : null;
+                        const label = asset ? (asset.nickname || [asset.brand, asset.model].filter(Boolean).join(" ") || t("unnamedAsset")) : null;
                         return (
                           <tr key={q.code} className="hover:bg-zinc-50/80 transition-colors">
                             <td className="px-7 py-4 text-[12px] font-mono font-bold text-zinc-800">{q.code}</td>
                             <td className="px-7 py-4">
-                              {q.asset_id ? <Pill tone="blue">🔵 Assigned</Pill> : <Pill tone="emerald">🟢 Available</Pill>}
+                              {q.asset_id ? <Pill tone="blue">{t("assignedPill")}</Pill> : <Pill tone="emerald">{t("availablePill")}</Pill>}
                             </td>
                             <td className="px-7 py-4 text-[12px] text-zinc-500">{label ?? "—"}</td>
                             <td className="px-7 py-4 text-[12px] text-zinc-400">{formatDate(q.created_at)}</td>
                             <td className="px-7 py-4 text-right">
                               {q.asset_id && (
-                                <button onClick={() => confirmUnlinkQr(q)} className="text-zinc-300 hover:text-red-600 transition-colors" title="Unlink from asset">
+                                <button onClick={() => confirmUnlinkQr(q)} className="text-zinc-300 hover:text-red-600 transition-colors" title={t("unlinkTitle")}>
                                   <Link2Off size={14} />
                                 </button>
                               )}
@@ -1632,12 +1653,12 @@ export default function AdminPage() {
                         );
                       })}
                       {visibleQr.length === 0 && (
-                        <tr><td colSpan={5} className="px-7 py-16 text-center text-[13px] text-zinc-300">No QR codes match this filter.</td></tr>
+                        <tr><td colSpan={5} className="px-7 py-16 text-center text-[13px] text-zinc-300">{t("noQrMatch")}</td></tr>
                       )}
                     </tbody>
                   </table>
                   {visibleQr.length > 200 && (
-                    <p className="text-center text-[11px] text-zinc-300 py-4">Showing the first 200 of {visibleQr.length} — narrow the filters to see more.</p>
+                    <p className="text-center text-[11px] text-zinc-300 py-4">{t("showingFirstOf", { shown: 200, total: visibleQr.length })}</p>
                   )}
                 </div>
               </div>
@@ -1648,17 +1669,17 @@ export default function AdminPage() {
           {section === "support" && (
             <div className="space-y-3">
               <p className="text-[12px] text-zinc-400">
-                Full back-and-forth with each mechanic. Everything sent from either side is kept in one thread.
+                {t("supportIntro")}
               </p>
 
               {supportLoading ? (
                 <div className="bg-white rounded-2xl border border-zinc-200/80 shadow-sm py-16 text-center text-[13px] text-zinc-300">
-                  Loading…
+                  {t("loading")}
                 </div>
               ) : supportConversations.length === 0 ? (
                 <div className="bg-white rounded-2xl border border-zinc-200/80 shadow-sm py-16 text-center">
                   <MessageCircle size={28} className="mx-auto text-zinc-200 mb-2" />
-                  <p className="text-[13px] text-zinc-300 font-medium">No conversations yet.</p>
+                  <p className="text-[13px] text-zinc-300 font-medium">{t("noConversationsYet")}</p>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-[280px_1fr] gap-4 h-[calc(100vh-220px)] min-h-[420px]">
@@ -1675,11 +1696,11 @@ export default function AdminPage() {
                         {c.unreadCount > 0 && <span className="w-2 h-2 rounded-full bg-red-600 mt-1.5 shrink-0" />}
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center justify-between gap-2">
-                            <p className="text-[12.5px] font-bold text-zinc-900 truncate">{c.mechanic?.name ?? "Unknown mechanic"}</p>
+                            <p className="text-[12.5px] font-bold text-zinc-900 truncate">{c.mechanic?.name ?? t("unknownMechanic")}</p>
                             <span className="text-[10px] text-zinc-300 shrink-0">{formatDate(c.lastMessage.created_at)}</span>
                           </div>
                           <p className="text-[11.5px] text-zinc-400 truncate mt-0.5">
-                            {c.lastMessage.from_admin ? "You: " : ""}{c.lastMessage.body}
+                            {c.lastMessage.from_admin ? t("youPrefix") : ""}{c.lastMessage.body}
                           </p>
                         </div>
                         {c.unreadCount > 0 && (
@@ -1693,7 +1714,7 @@ export default function AdminPage() {
                   <div className="bg-white rounded-2xl border border-zinc-200/80 shadow-sm flex flex-col overflow-hidden">
                     {!activeThread ? (
                       <div className="flex-1 flex items-center justify-center text-center px-6">
-                        <p className="text-[12px] text-zinc-300">Pick a conversation to see the full history and reply.</p>
+                        <p className="text-[12px] text-zinc-300">{t("pickConversationReply")}</p>
                       </div>
                     ) : (
                       <>
@@ -1702,30 +1723,30 @@ export default function AdminPage() {
                             <X size={16} />
                           </button>
                           <div className="min-w-0 flex-1">
-                            <p className="text-[13px] font-bold text-zinc-900 truncate">{activeThread.mechanic?.name ?? "Unknown mechanic"}</p>
+                            <p className="text-[13px] font-bold text-zinc-900 truncate">{activeThread.mechanic?.name ?? t("unknownMechanic")}</p>
                             <p className="text-[11px] text-zinc-400 truncate">{activeThread.mechanic?.email ?? ""}</p>
                           </div>
                           {confirmClearThread ? (
                             <div className="flex items-center gap-1.5 shrink-0">
-                              <span className="text-[11px] text-zinc-400 hidden sm:inline">Clear for you only?</span>
+                              <span className="text-[11px] text-zinc-400 hidden sm:inline">{t("clearForYouOnly")}</span>
                               <button
                                 onClick={() => handleClearThread(activeThread.mechanicId)}
                                 className="text-[11px] font-bold text-white bg-red-600 hover:bg-red-500 px-2.5 py-1.5 rounded-lg transition-colors"
                               >
-                                Confirm
+                                {t("confirm")}
                               </button>
                               <button
                                 onClick={() => setConfirmClearThread(false)}
                                 className="text-[11px] font-semibold text-zinc-400 hover:text-zinc-700 px-2 py-1.5"
                               >
-                                Cancel
+                                {t("cancel")}
                               </button>
                             </div>
                           ) : (
                             <button
                               onClick={() => setConfirmClearThread(true)}
                               className="text-zinc-300 hover:text-red-600 transition-colors shrink-0"
-                              title="Clear conversation (only from your view — the mechanic keeps their copy)"
+                              title={t("clearConversationTitle")}
                             >
                               <Trash2 size={15} />
                             </button>
@@ -1740,14 +1761,14 @@ export default function AdminPage() {
                               <div key={m.id} className={`flex flex-col ${m.from_admin ? "items-end" : "items-start"}`}>
                                 {showLabel && (
                                   <p className={`text-[10px] font-black uppercase tracking-wide mb-1 px-1 ${m.from_admin ? "text-zinc-400" : "text-zinc-400"}`}>
-                                    {m.from_admin ? "You" : activeThread.mechanic?.name ?? "Mechanic"}
+                                    {m.from_admin ? t("you") : activeThread.mechanic?.name ?? t("mechanicLabel")}
                                   </p>
                                 )}
                                 <div className={`max-w-[80%] rounded-2xl px-3.5 py-2.5 text-[12.5px] leading-snug ${
                                   m.from_admin ? "bg-red-600 text-white rounded-br-sm" : "bg-white border border-zinc-200 text-zinc-700 rounded-bl-sm"
                                 }`}>
                                   <p className="whitespace-pre-wrap break-words">{m.body}</p>
-                                  <p className={`text-[9.5px] mt-1 ${m.from_admin ? "text-red-100" : "text-zinc-300"}`}>{formatDate(m.created_at)} · {formatTime(m.created_at)}</p>
+                                  <p className={`text-[9.5px] mt-1 ${m.from_admin ? "text-red-100" : "text-zinc-300"}`}>{formatDate(m.created_at)} · {formatTime(m.created_at, locale)}</p>
                                 </div>
                               </div>
                             );
@@ -1759,7 +1780,7 @@ export default function AdminPage() {
                             value={threadDraft}
                             onChange={(e) => setThreadDraft(e.target.value)}
                             onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSendThreadReply(); } }}
-                            placeholder="Type a quick reply…"
+                            placeholder={t("quickReplyPlaceholder")}
                             rows={1}
                             className="flex-1 rounded-xl border border-zinc-200 px-3 py-2.5 text-[13px] outline-none focus:border-red-400 resize-none"
                           />
@@ -1782,7 +1803,7 @@ export default function AdminPage() {
           {section === "team-chat" && (
             <div className="space-y-3">
               <p className="text-[12px] text-zinc-400">
-                Every Maintler-to-Maintler message on Team Chat, including ones a Maintler has cleared from their own view — nothing here is ever actually deleted, only hidden per-side. Read-only: the Control Center doesn't post into these threads.
+                {t("teamChatIntro")}
               </p>
 
               <div className="flex items-center gap-1 bg-white rounded-xl border border-zinc-200/80 p-1 w-fit">
@@ -1792,7 +1813,7 @@ export default function AdminPage() {
                     teamChatView === "conversations" ? "bg-red-600 text-white" : "text-zinc-500 hover:bg-zinc-100"
                   }`}
                 >
-                  Conversations
+                  {t("conversationsTab")}
                 </button>
                 <button
                   onClick={() => setTeamChatView("reports")}
@@ -1800,7 +1821,7 @@ export default function AdminPage() {
                     teamChatView === "reports" ? "bg-red-600 text-white" : "text-zinc-500 hover:bg-zinc-100"
                   }`}
                 >
-                  <Flag size={12} /> Reports
+                  <Flag size={12} /> {t("reportsTab")}
                   {mechanicReports.length > 0 && (
                     <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-full leading-none ${
                       teamChatView === "reports" ? "bg-white text-red-600" : "bg-amber-500 text-white"
@@ -1814,12 +1835,12 @@ export default function AdminPage() {
               {teamChatView === "reports" ? (
                 mechanicReportsLoading ? (
                   <div className="bg-white rounded-2xl border border-zinc-200/80 shadow-sm py-16 text-center text-[13px] text-zinc-300">
-                    Loading…
+                    {t("loading")}
                   </div>
                 ) : mechanicReports.length === 0 ? (
                   <div className="bg-white rounded-2xl border border-zinc-200/80 shadow-sm py-16 text-center">
                     <Flag size={28} className="mx-auto text-zinc-200 mb-2" />
-                    <p className="text-[13px] text-zinc-300 font-medium">No reports filed.</p>
+                    <p className="text-[13px] text-zinc-300 font-medium">{t("noReportsFiled")}</p>
                   </div>
                 ) : (
                   <div className="bg-white rounded-2xl border border-zinc-200/80 shadow-sm divide-y divide-zinc-50">
@@ -1830,18 +1851,22 @@ export default function AdminPage() {
                         <div key={r.id} className="px-5 py-4 flex items-start justify-between gap-3">
                           <div className="min-w-0">
                             <p className="text-[12.5px] font-bold text-zinc-900">
-                              {r.reporter?.name ?? "Unknown"} <span className="font-normal text-zinc-400">reported</span> {r.reported?.name ?? "Unknown"}
+                              {t.rich("reportedLine", {
+                                reporter: r.reporter?.name ?? t("unknown"),
+                                reported: r.reported?.name ?? t("unknown"),
+                                span: (chunks) => <span className="font-normal text-zinc-400">{chunks}</span>,
+                              })}
                             </p>
                             <p className="text-[11px] text-zinc-400 mt-0.5">{r.reporter?.email} → {r.reported?.email}</p>
                             {r.reason && <p className="text-[12px] text-zinc-600 mt-1.5 bg-amber-50 border border-amber-100 rounded-lg px-2.5 py-1.5">{r.reason}</p>}
-                            <p className="text-[10.5px] text-zinc-300 mt-1.5">{formatDate(r.created_at)} · {formatTime(r.created_at)}</p>
+                            <p className="text-[10.5px] text-zinc-300 mt-1.5">{formatDate(r.created_at)} · {formatTime(r.created_at, locale)}</p>
                           </div>
                           {hasThread && (
                             <button
                               onClick={() => { setTeamChatView("conversations"); setSelectedTeamChatPair(pairKey); }}
                               className="text-[11px] font-bold text-red-600 hover:text-red-700 shrink-0 whitespace-nowrap"
                             >
-                              View conversation
+                              {t("viewConversation")}
                             </button>
                           )}
                         </div>
@@ -1851,12 +1876,12 @@ export default function AdminPage() {
                 )
               ) : teamChatLoading ? (
                 <div className="bg-white rounded-2xl border border-zinc-200/80 shadow-sm py-16 text-center text-[13px] text-zinc-300">
-                  Loading…
+                  {t("loading")}
                 </div>
               ) : teamChatConversations.length === 0 ? (
                 <div className="bg-white rounded-2xl border border-zinc-200/80 shadow-sm py-16 text-center">
                   <MessageCircle size={28} className="mx-auto text-zinc-200 mb-2" />
-                  <p className="text-[13px] text-zinc-300 font-medium">No Team Chat conversations yet.</p>
+                  <p className="text-[13px] text-zinc-300 font-medium">{t("noTeamChatConversations")}</p>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-[300px_1fr] gap-4 h-[calc(100vh-260px)] min-h-[420px]">
@@ -1872,7 +1897,7 @@ export default function AdminPage() {
                       >
                         <div className="min-w-0 flex-1">
                           <p className="text-[12px] font-bold text-zinc-900 truncate">
-                            {c.a.info?.name ?? "Unknown"} <span className="font-normal text-zinc-400">↔</span> {c.b.info?.name ?? "Unknown"}
+                            {c.a.info?.name ?? t("unknown")} <span className="font-normal text-zinc-400">↔</span> {c.b.info?.name ?? t("unknown")}
                           </p>
                           <div className="flex items-center justify-between gap-2 mt-0.5">
                             <p className="text-[11.5px] text-zinc-400 truncate">{teamChatPersonLabel(c.lastMessage, c.lastMessage.sender_id)}: {c.lastMessage.body}</p>
@@ -1887,7 +1912,7 @@ export default function AdminPage() {
                   <div className="bg-white rounded-2xl border border-zinc-200/80 shadow-sm flex flex-col overflow-hidden">
                     {!activeTeamChatThread ? (
                       <div className="flex-1 flex items-center justify-center text-center px-6">
-                        <p className="text-[12px] text-zinc-300">Pick a conversation to see the full history.</p>
+                        <p className="text-[12px] text-zinc-300">{t("pickConversationHistory")}</p>
                       </div>
                     ) : (
                       <>
@@ -1897,7 +1922,7 @@ export default function AdminPage() {
                           </button>
                           <div className="min-w-0 flex-1">
                             <p className="text-[13px] font-bold text-zinc-900 truncate">
-                              {activeTeamChatThread.a.info?.name ?? "Unknown"} ↔ {activeTeamChatThread.b.info?.name ?? "Unknown"}
+                              {activeTeamChatThread.a.info?.name ?? t("unknown")} ↔ {activeTeamChatThread.b.info?.name ?? t("unknown")}
                             </p>
                             <p className="text-[11px] text-zinc-400 truncate">{activeTeamChatThread.a.info?.email} · {activeTeamChatThread.b.info?.email}</p>
                           </div>
@@ -1909,8 +1934,8 @@ export default function AdminPage() {
                             const showLabel = !prev || prev.sender_id !== m.sender_id;
                             const isA = m.sender_id === activeTeamChatThread.a.id;
                             const hiddenNote = [
-                              m.hidden_for_sender ? "cleared by sender" : null,
-                              m.hidden_for_recipient ? "cleared by recipient" : null,
+                              m.hidden_for_sender ? t("clearedBySender") : null,
+                              m.hidden_for_recipient ? t("clearedByRecipient") : null,
                             ].filter(Boolean).join(", ");
                             return (
                               <div key={m.id} className={`flex flex-col ${isA ? "items-start" : "items-end"}`}>
@@ -1924,7 +1949,7 @@ export default function AdminPage() {
                                 }`}>
                                   <p className="whitespace-pre-wrap break-words">{m.body}</p>
                                   <p className={`text-[9.5px] mt-1 ${isA ? "text-zinc-300" : "text-red-100"}`}>
-                                    {formatDate(m.created_at)} · {formatTime(m.created_at)}
+                                    {formatDate(m.created_at)} · {formatTime(m.created_at, locale)}
                                     {hiddenNote && ` · ${hiddenNote}`}
                                   </p>
                                 </div>
@@ -1970,48 +1995,48 @@ export default function AdminPage() {
               <div className="grid grid-cols-3 gap-3">
                 <div className="bg-zinc-50 rounded-xl p-3 text-center">
                   <p className="text-[18px] font-black text-zinc-900">{assetsByMechanic[detailAccount.id] ?? 0}</p>
-                  <p className="text-[9px] font-bold text-zinc-400 uppercase tracking-wide mt-0.5">Assets</p>
+                  <p className="text-[9px] font-bold text-zinc-400 uppercase tracking-wide mt-0.5">{t("assetsStat")}</p>
                 </div>
                 <div className="bg-zinc-50 rounded-xl p-3 text-center">
                   <p className="text-[18px] font-black text-zinc-900">{servicesByMechanic[detailAccount.id] ?? 0}</p>
-                  <p className="text-[9px] font-bold text-zinc-400 uppercase tracking-wide mt-0.5">Services</p>
+                  <p className="text-[9px] font-bold text-zinc-400 uppercase tracking-wide mt-0.5">{t("servicesStat")}</p>
                 </div>
                 <div className="bg-zinc-50 rounded-xl p-3 text-center">
                   <p className="text-[18px] font-black text-zinc-900">{qrByMechanic[detailAccount.id] ?? 0}</p>
-                  <p className="text-[9px] font-bold text-zinc-400 uppercase tracking-wide mt-0.5">QR Registered</p>
+                  <p className="text-[9px] font-bold text-zinc-400 uppercase tracking-wide mt-0.5">{t("qrRegisteredStat")}</p>
                 </div>
               </div>
 
-              <p className="text-[11px] text-zinc-400">Joined {formatDate(detailAccount.created_at)}</p>
+              <p className="text-[11px] text-zinc-400">{t("joinedOn", { date: formatDate(detailAccount.created_at) })}</p>
 
               {/* Editable fields */}
               <div className="space-y-3">
                 <div>
-                  <label className="text-[11px] font-bold text-zinc-600">Name</label>
+                  <label className="text-[11px] font-bold text-zinc-600">{t("nameLabel")}</label>
                   <input value={detailName} onChange={(e) => setDetailName(e.target.value)}
                     className="w-full mt-1 rounded-xl border border-zinc-200 px-3 py-2 text-[13px] outline-none focus:border-red-400" />
                 </div>
                 <div>
-                  <label className="text-[11px] font-bold text-zinc-600">Workshop name</label>
-                  <input value={detailWorkshop} onChange={(e) => setDetailWorkshop(e.target.value)} placeholder="Not set"
+                  <label className="text-[11px] font-bold text-zinc-600">{t("workshopLabel")}</label>
+                  <input value={detailWorkshop} onChange={(e) => setDetailWorkshop(e.target.value)} placeholder={t("workshopPlaceholder")}
                     className="w-full mt-1 rounded-xl border border-zinc-200 px-3 py-2 text-[13px] outline-none focus:border-red-400" />
                 </div>
                 {detailError && <p className="text-[12px] text-red-600">{detailError}</p>}
                 <button onClick={handleSaveDetail} disabled={detailSaving}
                   className="w-full bg-zinc-900 hover:bg-zinc-800 disabled:opacity-60 text-white font-bold py-2.5 rounded-xl text-[13px] transition-all">
-                  {detailSaving ? "Saving…" : "Save changes"}
+                  {detailSaving ? t("saving") : t("saveChanges")}
                 </button>
               </div>
 
               {/* Send Message (Control Center -> mechanic) */}
               <div className="border-t border-zinc-100 pt-4 space-y-2.5">
                 <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest flex items-center gap-1.5">
-                  <MessageCircle size={12} /> Send a message
+                  <MessageCircle size={12} /> {t("sendMessageTitle")}
                 </p>
                 <textarea
                   value={detailMessageBody}
                   onChange={(e) => { setDetailMessageBody(e.target.value); setDetailMessageMsg(null); }}
-                  placeholder={`Write to ${detailAccount.name}…`}
+                  placeholder={t("writeToPlaceholder", { name: detailAccount.name })}
                   rows={3}
                   className="w-full rounded-xl border border-zinc-200 px-3 py-2 text-[13px] outline-none focus:border-red-400 resize-none"
                 />
@@ -2020,44 +2045,44 @@ export default function AdminPage() {
                 )}
                 <button onClick={handleSendDirectMessage} disabled={detailMessageSaving || !detailMessageBody.trim()}
                   className="w-full flex items-center justify-center gap-2 bg-red-600 hover:bg-red-500 disabled:opacity-40 text-white font-bold py-2.5 rounded-xl text-[13px] transition-all">
-                  <Send size={14} /> {detailMessageSaving ? "Sending…" : "Send message"}
+                  <Send size={14} /> {detailMessageSaving ? t("sending") : t("sendMessageBtn")}
                 </button>
               </div>
 
               {/* Role toggles */}
               <div className="border-t border-zinc-100 pt-4 space-y-2.5">
-                <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">Roles &amp; status</p>
+                <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">{t("rolesStatusTitle")}</p>
 
                 <button
-                  onClick={() => patchAccount(detailAccount.id, { is_mechanic: !detailAccount.is_mechanic }).then((ok) => ok && flash(detailAccount.is_mechanic ? "Mechanic role removed." : "Converted to mechanic."))}
+                  onClick={() => patchAccount(detailAccount.id, { is_mechanic: !detailAccount.is_mechanic }).then((ok) => ok && flash(detailAccount.is_mechanic ? t("mechanicRoleRemoved") : t("convertedToMechanic")))}
                   className="w-full flex items-center justify-between px-3 py-2.5 rounded-xl border border-zinc-200 hover:bg-zinc-50 transition-colors text-left"
                 >
                   <span className="flex items-center gap-2 text-[12px] font-bold text-zinc-700">
-                    <UserCog size={14} /> {detailAccount.is_mechanic ? "Remove Mechanic role" : "Convert to Mechanic"}
+                    <UserCog size={14} /> {detailAccount.is_mechanic ? t("removeMechanicRole") : t("convertToMechanic")}
                   </span>
                   {detailAccount.is_mechanic ? <UserMinus size={14} className="text-zinc-400" /> : <UserPlus size={14} className="text-zinc-400" />}
                 </button>
 
                 {detailAccount.is_mechanic && (
                   <button
-                    onClick={() => patchAccount(detailAccount.id, { verified: !detailAccount.verified }).then((ok) => ok && flash(detailAccount.verified ? "Verification revoked." : "Mechanic verified."))}
+                    onClick={() => patchAccount(detailAccount.id, { verified: !detailAccount.verified }).then((ok) => ok && flash(detailAccount.verified ? t("verificationRevoked") : t("mechanicVerified")))}
                     className="w-full flex items-center justify-between px-3 py-2.5 rounded-xl border border-zinc-200 hover:bg-zinc-50 transition-colors text-left"
                   >
                     <span className="flex items-center gap-2 text-[12px] font-bold text-zinc-700">
-                      <ShieldCheck size={14} /> {detailAccount.verified ? "Revoke verification" : "Verify mechanic"}
+                      <ShieldCheck size={14} /> {detailAccount.verified ? t("revokeVerification") : t("verifyMechanic")}
                     </span>
                     {detailAccount.verified ? <ShieldOff size={14} className="text-zinc-400" /> : <ShieldCheck size={14} className="text-emerald-500" />}
                   </button>
                 )}
 
                 <button
-                  onClick={() => patchAccount(detailAccount.id, { suspended: !detailAccount.suspended }).then((ok) => ok && flash(detailAccount.suspended ? "Account unsuspended." : "Account suspended."))}
+                  onClick={() => patchAccount(detailAccount.id, { suspended: !detailAccount.suspended }).then((ok) => ok && flash(detailAccount.suspended ? t("accountUnsuspended") : t("accountSuspended")))}
                   className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl border transition-colors text-left ${
                     detailAccount.suspended ? "border-emerald-200 hover:bg-emerald-50" : "border-amber-200 hover:bg-amber-50"
                   }`}
                 >
                   <span className="flex items-center gap-2 text-[12px] font-bold text-zinc-700">
-                    <Ban size={14} /> {detailAccount.suspended ? "Unsuspend account" : "Suspend account"}
+                    <Ban size={14} /> {detailAccount.suspended ? t("unsuspendAccount") : t("suspendAccount")}
                   </span>
                 </button>
 
@@ -2066,7 +2091,7 @@ export default function AdminPage() {
                   className="w-full flex items-center justify-between px-3 py-2.5 rounded-xl border border-zinc-200 hover:bg-zinc-50 transition-colors text-left"
                 >
                   <span className="flex items-center gap-2 text-[12px] font-bold text-zinc-700">
-                    <KeyRound size={14} /> Send password reset email
+                    <KeyRound size={14} /> {t("sendPasswordReset")}
                   </span>
                 </button>
 
@@ -2075,7 +2100,7 @@ export default function AdminPage() {
                   className="w-full flex items-center justify-between px-3 py-2.5 rounded-xl border border-red-200 hover:bg-red-50 transition-colors text-left"
                 >
                   <span className="flex items-center gap-2 text-[12px] font-bold text-red-600">
-                    <Trash2 size={14} /> Delete account
+                    <Trash2 size={14} /> {t("deleteAccount")}
                   </span>
                 </button>
               </div>
@@ -2088,18 +2113,18 @@ export default function AdminPage() {
       {showGenerateModal && (
         <div className="fixed inset-0 z-50 bg-zinc-900/40 flex items-center justify-center p-4" onClick={() => setShowGenerateModal(false)}>
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6" onClick={(e) => e.stopPropagation()}>
-            <h3 className="text-[16px] font-black text-zinc-900 mb-1">Generate QR Batch</h3>
-            <p className="text-[12px] text-zinc-400 mb-4">Creates a batch of unassigned QR codes, ready to print on stickers.</p>
-            <label className="text-[11px] font-bold text-zinc-600">How many codes?</label>
+            <h3 className="text-[16px] font-black text-zinc-900 mb-1">{t("generateQrTitle")}</h3>
+            <p className="text-[12px] text-zinc-400 mb-4">{t("generateQrDesc")}</p>
+            <label className="text-[11px] font-bold text-zinc-600">{t("howManyCodes")}</label>
             <input
               type="number" min={1} max={500} value={generateCount} onChange={(e) => setGenerateCount(e.target.value)}
               className="w-full mt-1 mb-4 rounded-xl border border-zinc-200 px-3 py-2 text-[13px] outline-none focus:border-red-400"
             />
             <div className="flex gap-3">
-              <button onClick={() => setShowGenerateModal(false)} className="flex-1 border border-zinc-200 text-zinc-700 font-bold py-2.5 rounded-xl text-[13px] hover:bg-zinc-50">Cancel</button>
+              <button onClick={() => setShowGenerateModal(false)} className="flex-1 border border-zinc-200 text-zinc-700 font-bold py-2.5 rounded-xl text-[13px] hover:bg-zinc-50">{t("cancel")}</button>
               <button onClick={handleGenerateBatch} disabled={generating}
                 className="flex-1 bg-red-600 hover:bg-red-500 disabled:opacity-60 text-white font-bold py-2.5 rounded-xl text-[13px] transition-all">
-                {generating ? "Generating…" : "Generate"}
+                {generating ? t("generating") : t("generate")}
               </button>
             </div>
           </div>
@@ -2118,7 +2143,7 @@ export default function AdminPage() {
             <div className="flex gap-3">
               <button onClick={() => setConfirmAction(null)} disabled={confirmBusy}
                 className="flex-1 border border-zinc-200 text-zinc-700 font-bold py-3 rounded-xl text-[13px] hover:bg-zinc-50">
-                Cancel
+                {t("cancel")}
               </button>
               <button
                 onClick={async () => {
@@ -2132,7 +2157,7 @@ export default function AdminPage() {
                   confirmAction.danger ? "bg-red-600 hover:bg-red-500" : "bg-zinc-900 hover:bg-zinc-800"
                 }`}
               >
-                {confirmBusy ? "Working…" : "Confirm"}
+                {confirmBusy ? t("working") : t("confirm")}
               </button>
             </div>
           </div>

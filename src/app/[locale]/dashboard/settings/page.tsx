@@ -1,37 +1,59 @@
 "use client";
 
 import Link from "next/link";
-import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import {
-  LayoutGrid, FileText, Box, QrCode, Users, BarChart3, Calendar as CalendarIcon,
-  Mail, FolderOpen, Settings as SettingsIcon, Bell, X, LogOut, Crown, Menu,
-  ShieldCheck, CalendarDays, KeyRound, AlertCircle, CheckCircle2, Camera,
+  FileText, Box, Users, Calendar as CalendarIcon,
+  Mail, KeyRound, AlertCircle, CheckCircle2, Camera,
   Image as ImageIcon,
-  MessageCircle, Copy, Check, Printer, Phone, Globe, MapPin,
+  Copy, Check, Printer, Phone, Globe, ShieldCheck, CalendarDays,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
-import NotificationBell from "@/components/NotificationBell";
 import { useUnreadMessagesCount } from "@/lib/useUnreadMessages";
 import { useUnreadMechanicMessages } from "@/lib/useUnreadMechanicMessages";
 import { formatDateDMY } from "@/lib/date";
 import AvatarCropModal from "@/components/AvatarCropModal";
-import HoverAvatar from "@/components/HoverAvatar";
-import ContactSupportWidget from "@/components/ContactSupportWidget";
-import ProfessionVerificationForm, { VerificationStatusCard } from "@/components/ProfessionVerificationForm";
+import ProfessionVerificationFormIntl, { VerificationStatusCardIntl } from "@/components/ProfessionVerificationFormIntl";
 import { validateImageFile } from "@/lib/imageValidation";
 import MaintlerCardCanvas, { type MaintlerCardCanvasHandle } from "@/components/MaintlerCardCanvas";
 import { yearsSince, computeScore, type MaintlerStats } from "@/lib/maintlerScore";
-import { normalizeContactUrl, isValidPhone, isValidEmail, isSafeHref } from "@/lib/contactValidation";
-import DashboardSidebar from "@/components/DashboardSidebar";
-import DashboardHeader from "@/components/DashboardHeader";
+import { normalizeContactUrl, isValidPhone, isValidEmail, isSafeHref, type ContactUrlErrorCode } from "@/lib/contactValidation";
+import DashboardSidebarIntl from "@/components/DashboardSidebarIntl";
+import DashboardHeaderIntl from "@/components/DashboardHeaderIntl";
 import { getInitials } from "@/lib/initials";
+
+// NOTE: MaintlerCardCanvas is used here UNCHANGED (no Intl variant) — it's
+// already used unmigrated, with its original hardcoded canvas-drawn English
+// text, by two already-migrated Phase 1 pages (src/app/[locale]/maintler/
+// [code]/page.tsx and src/app/[locale]/asset/[code]/page.tsx). This mirrors
+// that existing, already-shipped precedent rather than introducing a new
+// canvas-text-localization effort as part of this page.
+//
+// This page's router stays on plain next/navigation's useRouter (not
+// @/i18n/navigation) is NOT actually required here — every router target on
+// this page is "/login", which is migrated — but it's left as plain
+// next/navigation anyway since nothing on this page needs locale-aware
+// linking beyond what plain Link already provides for its two external
+// targets (/maintler/:code, both already migrated).
+
+const PROFESSION_KEYS: Record<string, string> = {
+  "Owner": "owner",
+  "Mechanic": "mechanic",
+  "Electrician": "electrician",
+  "HVAC Technician": "hvacTechnician",
+  "Fleet Manager": "fleetManager",
+  "Business": "business",
+  "Inspector": "inspector",
+};
 
 type SpecialtyRow = { asset_type: string; services_count: number };
 
 export default function SettingsPage() {
   const router = useRouter();
+  const t = useTranslations("DashboardSettingsPage");
+  const tProfessionTypes = useTranslations("ProfessionTypes");
   const [checkingAuth, setCheckingAuth] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [mechanicId, setMechanicId] = useState("");
@@ -119,6 +141,16 @@ export default function SettingsPage() {
   const [passwordSaving, setPasswordSaving] = useState(false);
   const [passwordMsg, setPasswordMsg] = useState<{ text: string; ok: boolean } | null>(null);
 
+  const CONTACT_URL_ERROR_MESSAGES: Record<ContactUrlErrorCode, string> = {
+    invalidUrl: t("errorInvalidUrl"),
+    invalidScheme: t("errorInvalidScheme"),
+  };
+
+  function professionLabel(p: string | null) {
+    if (!p) return "";
+    return tProfessionTypes(PROFESSION_KEYS[p] ?? "owner");
+  }
+
   useEffect(() => {
     let active = true;
 
@@ -177,6 +209,7 @@ export default function SettingsPage() {
     });
 
     return () => { active = false; listener.subscription.unsubscribe(); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router]);
 
   async function handleLogout() {
@@ -255,12 +288,12 @@ export default function SettingsPage() {
     setPhotoUploading(false);
 
     if (dbError || !updated || updated.length === 0) {
-      setPhotoMsg({ text: dbError?.message || "Uploaded, but couldn't save it to your profile.", ok: false });
+      setPhotoMsg({ text: dbError?.message || t("errorPhotoSavedButNotProfile"), ok: false });
       return;
     }
 
     setPhotoUrl(publicUrl);
-    setPhotoMsg({ text: "Profile photo updated.", ok: true });
+    setPhotoMsg({ text: t("successPhotoUpdated"), ok: true });
   }
 
   async function handleCropSave(file: File) {
@@ -276,7 +309,7 @@ export default function SettingsPage() {
 
     if (!name.trim()) {
       profileBusyRef.current = false;
-      setProfileMsg({ text: "Name can't be empty.", ok: false });
+      setProfileMsg({ text: t("errorNameEmpty"), ok: false });
       return;
     }
 
@@ -290,9 +323,9 @@ export default function SettingsPage() {
     profileBusyRef.current = false;
 
     if (error) { setProfileMsg({ text: error.message, ok: false }); return; }
-    if (!data || data.length === 0) { setProfileMsg({ text: "Couldn't save — please try again.", ok: false }); return; }
+    if (!data || data.length === 0) { setProfileMsg({ text: t("errorSaveFailed"), ok: false }); return; }
 
-    setProfileMsg({ text: "Profile updated.", ok: true });
+    setProfileMsg({ text: t("successProfileUpdated"), ok: true });
   }
 
   async function handleSaveContactInfo(e: React.FormEvent) {
@@ -309,15 +342,15 @@ export default function SettingsPage() {
     // See src/lib/contactValidation.ts for the rationale.
     const errors: string[] = [];
 
-    if (!isValidPhone(contactPhone)) errors.push("El teléfono no parece válido.");
-    if (!isValidEmail(contactEmail)) errors.push("El email público no parece válido.");
+    if (!isValidPhone(contactPhone)) errors.push(t("errorPhoneInvalid"));
+    if (!isValidEmail(contactEmail)) errors.push(t("errorEmailInvalid"));
 
     const instagram = normalizeContactUrl(instagramUrl);
-    if (instagram.error) errors.push(`Instagram: ${instagram.error}.`);
+    if (instagram.error) errors.push(t("fieldError", { field: t("instagram"), error: CONTACT_URL_ERROR_MESSAGES[instagram.error] }));
     const facebook = normalizeContactUrl(facebookUrl);
-    if (facebook.error) errors.push(`Facebook: ${facebook.error}.`);
+    if (facebook.error) errors.push(t("fieldError", { field: t("facebook"), error: CONTACT_URL_ERROR_MESSAGES[facebook.error] }));
     const website = normalizeContactUrl(websiteUrl);
-    if (website.error) errors.push(`Website: ${website.error}.`);
+    if (website.error) errors.push(t("fieldError", { field: t("website"), error: CONTACT_URL_ERROR_MESSAGES[website.error] }));
 
     if (errors.length > 0) {
       contactBusyRef.current = false;
@@ -341,7 +374,7 @@ export default function SettingsPage() {
     contactBusyRef.current = false;
 
     if (error) { setContactMsg({ text: error.message, ok: false }); return; }
-    if (!data || data.length === 0) { setContactMsg({ text: "Couldn't save — please try again.", ok: false }); return; }
+    if (!data || data.length === 0) { setContactMsg({ text: t("errorSaveFailed"), ok: false }); return; }
 
     // Reflect the normalized (scheme-added) values back into the form so
     // what's shown matches exactly what's now stored/live on the public card.
@@ -349,7 +382,7 @@ export default function SettingsPage() {
     setFacebookUrl(facebook.value ?? "");
     setWebsiteUrl(website.value ?? "");
 
-    setContactMsg({ text: "Contact info updated.", ok: true });
+    setContactMsg({ text: t("successContactUpdated"), ok: true });
   }
 
   async function handleChangePassword(e: React.FormEvent) {
@@ -360,12 +393,12 @@ export default function SettingsPage() {
 
     if (newPassword.length < 6) {
       passwordBusyRef.current = false;
-      setPasswordMsg({ text: "Password must be at least 6 characters.", ok: false });
+      setPasswordMsg({ text: t("errorPasswordTooShort"), ok: false });
       return;
     }
     if (newPassword !== confirmPassword) {
       passwordBusyRef.current = false;
-      setPasswordMsg({ text: "Passwords do not match.", ok: false });
+      setPasswordMsg({ text: t("errorPasswordMismatch"), ok: false });
       return;
     }
 
@@ -378,13 +411,13 @@ export default function SettingsPage() {
 
     setNewPassword("");
     setConfirmPassword("");
-    setPasswordMsg({ text: "Password updated.", ok: true });
+    setPasswordMsg({ text: t("successPasswordUpdated"), ok: true });
   }
 
   if (checkingAuth) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-zinc-50">
-        <p className="text-zinc-400 text-[13px]">Loading...</p>
+        <p className="text-zinc-400 text-[13px]">{t("loadingAuth")}</p>
       </div>
     );
   }
@@ -396,8 +429,8 @@ export default function SettingsPage() {
   return (
     <div className="min-h-screen bg-zinc-50 flex relative">
 
-      <DashboardSidebar
-        activeLabel="Settings"
+      <DashboardSidebarIntl
+        activeHref="/dashboard/settings"
         sidebarOpen={sidebarOpen}
         onCloseSidebar={() => setSidebarOpen(false)}
         mechanicId={mechanicId}
@@ -411,9 +444,9 @@ export default function SettingsPage() {
       {/* ════ MAIN ════ */}
       <div className="flex-1 flex flex-col min-w-0">
 
-        <DashboardHeader
-          title="Settings"
-          subtitle="Manage your account and profile."
+        <DashboardHeaderIntl
+          title={t("headerTitle")}
+          subtitle={t("headerSubtitle")}
           onOpenSidebar={() => setSidebarOpen(true)}
           mechanicId={mechanicId}
           unreadMessages={unreadMessages}
@@ -432,7 +465,7 @@ export default function SettingsPage() {
             <div className="bg-white rounded-2xl border border-zinc-200 p-4 shadow-sm flex items-center gap-3">
               <div className="w-9 h-9 rounded-xl bg-zinc-50 flex items-center justify-center shrink-0"><CalendarDays size={16} className="text-zinc-500" /></div>
               <div>
-                <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-wide">Member since</p>
+                <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-wide">{t("memberSince")}</p>
                 <p className="text-[13px] font-bold text-zinc-800">{createdAt ? formatDateDMY(createdAt) : "—"}</p>
               </div>
             </div>
@@ -441,8 +474,10 @@ export default function SettingsPage() {
                 <ShieldCheck size={16} className={verified ? "text-emerald-500" : "text-zinc-400"} />
               </div>
               <div>
-                <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-wide">Status</p>
-                <p className="text-[13px] font-bold text-zinc-800">{verified && profession ? `${profession} Maintler` : verified ? "Verified Maintler" : "Maintler"}</p>
+                <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-wide">{t("statusLabel")}</p>
+                <p className="text-[13px] font-bold text-zinc-800">
+                  {verified && profession ? t("statusProfessionMaintler", { profession: professionLabel(profession) }) : verified ? t("statusVerifiedMaintler") : t("statusMaintler")}
+                </p>
               </div>
             </div>
           </div>
@@ -458,9 +493,9 @@ export default function SettingsPage() {
               side by side using the extra width, same as his mockup;
               they still stack on mobile. */}
           <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm p-6 mb-6">
-            <h2 className="text-[14px] font-black text-zinc-900 mb-1">My Maintler Card</h2>
+            <h2 className="text-[14px] font-black text-zinc-900 mb-1">{t("myMaintlerCard")}</h2>
             <p className="text-[12px] text-zinc-400 mb-5">
-              Your digital identity as a Maintler. Share, scan, or save your card.
+              {t("myMaintlerCardDesc")}
             </p>
 
             {maintlerCode ? (
@@ -493,7 +528,7 @@ export default function SettingsPage() {
                       target="_blank"
                       className="text-[13px] font-bold text-zinc-800 hover:text-red-600 transition-colors"
                     >
-                      Scan to view my <span className="text-red-600">Maintler Profile</span>
+                      {t("scanToView")} <span className="text-red-600">{t("maintlerProfile")}</span>
                     </Link>
                   </div>
                   {/* Round 8 ("no me gustan tantos botones"): download, share,
@@ -508,7 +543,7 @@ export default function SettingsPage() {
                       onClick={handlePrintCard}
                       className="flex items-center gap-1.5 text-[11.5px] font-bold text-zinc-600 hover:text-red-600 border border-zinc-200 hover:bg-zinc-50 px-3.5 py-2.5 rounded-xl transition-colors"
                     >
-                      <Printer size={13} /> Print
+                      <Printer size={13} /> {t("print")}
                     </button>
                   </div>
 
@@ -557,13 +592,13 @@ export default function SettingsPage() {
                       onClick={handleCopyCardLink}
                       className="shrink-0 flex items-center gap-1.5 text-[11.5px] font-bold text-zinc-600 hover:text-zinc-900 border border-zinc-200 hover:bg-zinc-50 px-3 py-2.5 rounded-xl transition-colors"
                     >
-                      {cardLinkCopied ? <><Check size={13} className="text-emerald-500" /> Copied</> : <><Copy size={13} /> Copy</>}
+                      {cardLinkCopied ? <><Check size={13} className="text-emerald-500" /> {t("copied")}</> : <><Copy size={13} /> {t("copy")}</>}
                     </button>
                   </div>
                 </div>
               </div>
             ) : (
-              <p className="text-[12px] text-zinc-300">Loading your card…</p>
+              <p className="text-[12px] text-zinc-300">{t("loadingCard")}</p>
             )}
           </div>
 
@@ -572,26 +607,26 @@ export default function SettingsPage() {
               mobile. */}
           <div className="lg:grid lg:grid-cols-2 lg:gap-6 lg:items-start mb-6">
           <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm p-6 mb-6 lg:mb-0">
-            <h2 className="text-[14px] font-black text-zinc-900 mb-1">Profession & Verification</h2>
+            <h2 className="text-[14px] font-black text-zinc-900 mb-1">{t("professionVerification")}</h2>
             <p className="text-[12px] text-zinc-400 mb-5">
-              Optional. Declare your profession and upload a certificate to earn a verified badge on every service you log.
+              {t("professionVerificationDesc")}
             </p>
 
             {verificationStatus !== "none" && !showVerificationForm && (
               <div className="space-y-3">
-                <VerificationStatusCard status={verificationStatus} profession={profession} note={verificationNote} />
+                <VerificationStatusCardIntl status={verificationStatus} profession={profession} note={verificationNote} />
                 <button
                   type="button"
                   onClick={() => setShowVerificationForm(true)}
                   className="text-[12px] font-bold text-zinc-500 hover:text-red-600 transition-colors"
                 >
-                  {verificationStatus === "verified" ? "Update profession or certificate" : "Edit and resubmit"}
+                  {verificationStatus === "verified" ? t("updateProfessionOrCertificate") : t("editAndResubmit")}
                 </button>
               </div>
             )}
 
             {(verificationStatus === "none" || showVerificationForm) && (
-              <ProfessionVerificationForm
+              <ProfessionVerificationFormIntl
                 mechanicId={mechanicId}
                 initialProfession={profession}
                 onSubmitted={(p) => {
@@ -614,22 +649,22 @@ export default function SettingsPage() {
               had 6 tiles; these are the 6 real ones available. */}
           <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm p-6 mb-6 lg:mb-0">
             <div className="flex items-center justify-between mb-5">
-              <h2 className="text-[14px] font-black text-zinc-900">Maintly Stats</h2>
+              <h2 className="text-[14px] font-black text-zinc-900">{t("maintlyStats")}</h2>
               {maintlerCode && (
                 <Link href={`/maintler/${maintlerCode}`} target="_blank" className="text-[11.5px] font-bold text-zinc-500 hover:text-red-600 transition-colors">
-                  View all
+                  {t("viewAll")}
                 </Link>
               )}
             </div>
             {stats ? (
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
                 {[
-                  { value: stats.services_count, label: "Services logged", icon: FileText, color: "text-blue-500", bg: "bg-blue-50" },
-                  { value: stats.assets_count, label: "Assets maintained", icon: Box, color: "text-red-500", bg: "bg-red-50" },
-                  { value: stats.customers_count, label: "Customers served", icon: Users, color: "text-purple-500", bg: "bg-purple-50" },
-                  { value: stats.repeat_customers_count, label: "Repeat customers", icon: Users, color: "text-amber-500", bg: "bg-amber-50" },
-                  { value: yearsActive, label: "Years active", icon: CalendarDays, color: "text-emerald-500", bg: "bg-emerald-50" },
-                  { value: `${maintlyScore ?? "—"}/5`, label: "Maintly Score", icon: ShieldCheck, color: "text-zinc-700", bg: "bg-zinc-100" },
+                  { value: stats.services_count, label: t("statServicesLogged"), icon: FileText, color: "text-blue-500", bg: "bg-blue-50" },
+                  { value: stats.assets_count, label: t("statAssetsMaintained"), icon: Box, color: "text-red-500", bg: "bg-red-50" },
+                  { value: stats.customers_count, label: t("statCustomersServed"), icon: Users, color: "text-purple-500", bg: "bg-purple-50" },
+                  { value: stats.repeat_customers_count, label: t("statRepeatCustomers"), icon: Users, color: "text-amber-500", bg: "bg-amber-50" },
+                  { value: yearsActive, label: t("statYearsActive"), icon: CalendarDays, color: "text-emerald-500", bg: "bg-emerald-50" },
+                  { value: `${maintlyScore ?? "—"}/5`, label: t("statMaintlyScore"), icon: ShieldCheck, color: "text-zinc-700", bg: "bg-zinc-100" },
                 ].map(({ value, label, icon: Icon, color, bg }) => (
                   <div key={label} className="flex items-center gap-2.5">
                     <div className={`w-9 h-9 rounded-lg ${bg} flex items-center justify-center shrink-0`}><Icon size={15} className={color} /></div>
@@ -641,15 +676,15 @@ export default function SettingsPage() {
                 ))}
               </div>
             ) : (
-              <p className="text-[12px] text-zinc-300">Loading stats…</p>
+              <p className="text-[12px] text-zinc-300">{t("loadingStats")}</p>
             )}
           </div>
           </div>
 
           {/* ── PROFILE ── */}
           <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm p-6 mb-6">
-            <h2 className="text-[14px] font-black text-zinc-900 mb-1">Profile</h2>
-            <p className="text-[12px] text-zinc-400 mb-5">This is what customers see when you log a service on their asset.</p>
+            <h2 className="text-[14px] font-black text-zinc-900 mb-1">{t("profile")}</h2>
+            <p className="text-[12px] text-zinc-400 mb-5">{t("profileDesc")}</p>
 
             <div className="flex items-center gap-4 mb-6">
               <div className="relative shrink-0">
@@ -664,7 +699,7 @@ export default function SettingsPage() {
                   onClick={() => setShowSourceMenu(true)}
                   disabled={photoUploading}
                   className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-zinc-900 hover:bg-zinc-800 flex items-center justify-center cursor-pointer border-2 border-white transition-colors disabled:opacity-50"
-                  title="Change photo"
+                  title={t("changePhotoTitle")}
                 >
                   <Camera size={12} className="text-white" />
                 </button>
@@ -678,14 +713,14 @@ export default function SettingsPage() {
                         onClick={() => { setShowSourceMenu(false); cameraInputRef.current?.click(); }}
                         className="w-full text-left px-3 py-2 text-[12px] font-semibold text-zinc-700 hover:bg-zinc-50 flex items-center gap-2"
                       >
-                        <Camera size={13} /> Take a photo
+                        <Camera size={13} /> {t("takeAPhoto")}
                       </button>
                       <button
                         type="button"
                         onClick={() => { setShowSourceMenu(false); fileInputRef.current?.click(); }}
                         className="w-full text-left px-3 py-2 text-[12px] font-semibold text-zinc-700 hover:bg-zinc-50 flex items-center gap-2"
                       >
-                        <ImageIcon size={13} /> Choose from files
+                        <ImageIcon size={13} /> {t("chooseFromFiles")}
                       </button>
                     </div>
                   </>
@@ -707,9 +742,9 @@ export default function SettingsPage() {
                   disabled={photoUploading}
                   className="inline-block text-[12px] font-bold text-zinc-700 hover:text-red-600 cursor-pointer transition-colors disabled:opacity-50"
                 >
-                  {photoUploading ? "Uploading…" : "Change profile photo"}
+                  {photoUploading ? t("uploadingPhoto") : t("changeProfilePhoto")}
                 </button>
-                <p className="text-[11px] text-zinc-400 mt-0.5">JPG or PNG, shown to customers on your services.</p>
+                <p className="text-[11px] text-zinc-400 mt-0.5">{t("photoHint")}</p>
                 {photoMsg && (
                   <p className={`text-[11px] font-semibold mt-1 ${photoMsg.ok ? "text-emerald-600" : "text-red-600"}`}>{photoMsg.text}</p>
                 )}
@@ -726,34 +761,34 @@ export default function SettingsPage() {
 
             <form onSubmit={handleSaveProfile} className="space-y-4">
               <div>
-                <label className="text-[12px] font-bold text-zinc-700">Full name</label>
+                <label className="text-[12px] font-bold text-zinc-700">{t("fullName")}</label>
                 <input
                   value={name} onChange={(e) => { setName(e.target.value); if (profileMsg) setProfileMsg(null); }}
                   className="w-full mt-1 rounded-xl border border-zinc-200 px-3 py-[10px] text-[13px] outline-none focus:border-red-500"
                 />
               </div>
               <div>
-                <label className="text-[12px] font-bold text-zinc-700">Workshop name <span className="text-zinc-300 font-normal">(optional)</span></label>
+                <label className="text-[12px] font-bold text-zinc-700">{t("workshopName")} <span className="text-zinc-300 font-normal">{t("optional")}</span></label>
                 <input
-                  value={workshopName} onChange={(e) => { setWorkshopName(e.target.value); if (profileMsg) setProfileMsg(null); }} placeholder="e.g. Ledesma Motors"
+                  value={workshopName} onChange={(e) => { setWorkshopName(e.target.value); if (profileMsg) setProfileMsg(null); }} placeholder={t("workshopNamePlaceholder")}
                   className="w-full mt-1 rounded-xl border border-zinc-200 px-3 py-[10px] text-[13px] outline-none focus:border-red-500"
                 />
               </div>
               <div>
-                <label className="text-[12px] font-bold text-zinc-700">Location <span className="text-zinc-300 font-normal">(optional)</span></label>
+                <label className="text-[12px] font-bold text-zinc-700">{t("location")} <span className="text-zinc-300 font-normal">{t("optional")}</span></label>
                 <input
-                  value={location} onChange={(e) => { setLocation(e.target.value); if (profileMsg) setProfileMsg(null); }} placeholder="e.g. Emerald, QLD, Australia"
+                  value={location} onChange={(e) => { setLocation(e.target.value); if (profileMsg) setProfileMsg(null); }} placeholder={t("locationPlaceholder")}
                   className="w-full mt-1 rounded-xl border border-zinc-200 px-3 py-[10px] text-[13px] outline-none focus:border-red-500"
                 />
-                <p className="text-[11px] text-zinc-400 mt-1">Shown on your public Maintler card, under your profession.</p>
+                <p className="text-[11px] text-zinc-400 mt-1">{t("locationHint")}</p>
               </div>
               <div>
-                <label className="text-[12px] font-bold text-zinc-700">Email</label>
+                <label className="text-[12px] font-bold text-zinc-700">{t("email")}</label>
                 <input
                   value={email} disabled
                   className="w-full mt-1 rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-[10px] text-[13px] text-zinc-400 outline-none cursor-not-allowed"
                 />
-                <p className="text-[11px] text-zinc-400 mt-1">To change the email on your account, contact support@maintlyqr.com.</p>
+                <p className="text-[11px] text-zinc-400 mt-1">{t("emailHint")}</p>
               </div>
 
               {profileMsg && (
@@ -765,7 +800,7 @@ export default function SettingsPage() {
 
               <button type="submit" disabled={profileSaving}
                 className="bg-red-600 hover:bg-red-500 disabled:opacity-60 transition-all text-white font-bold py-[11px] px-6 rounded-xl text-[13px]">
-                {profileSaving ? "Saving..." : "Save changes"}
+                {profileSaving ? t("saving") : t("saveChanges")}
               </button>
             </form>
           </div>
@@ -778,44 +813,44 @@ export default function SettingsPage() {
               purpose (a mechanic may want to publish a shop email
               instead of their personal one). */}
           <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm p-6 mb-6">
-            <h2 className="text-[14px] font-black text-zinc-900 mb-1">Contact Info</h2>
+            <h2 className="text-[14px] font-black text-zinc-900 mb-1">{t("contactInfo")}</h2>
             <p className="text-[12px] text-zinc-400 mb-5">
-              Optional. Anything you fill in here shows up on your public Maintler card so people can reach you directly.
+              {t("contactInfoDesc")}
             </p>
 
             <form onSubmit={handleSaveContactInfo} className="space-y-4">
               <div>
-                <label className="text-[12px] font-bold text-zinc-700">Phone / WhatsApp</label>
+                <label className="text-[12px] font-bold text-zinc-700">{t("phoneWhatsapp")}</label>
                 <input
-                  value={contactPhone} onChange={(e) => { setContactPhone(e.target.value); if (contactMsg) setContactMsg(null); }} placeholder="+54 9 11 1234 5678"
+                  value={contactPhone} onChange={(e) => { setContactPhone(e.target.value); if (contactMsg) setContactMsg(null); }} placeholder={t("phonePlaceholder")}
                   className="w-full mt-1 rounded-xl border border-zinc-200 px-3 py-[10px] text-[13px] outline-none focus:border-red-500"
                 />
               </div>
               <div>
-                <label className="text-[12px] font-bold text-zinc-700">Public email <span className="text-zinc-300 font-normal">(can differ from your account email)</span></label>
+                <label className="text-[12px] font-bold text-zinc-700">{t("publicEmail")} <span className="text-zinc-300 font-normal">{t("publicEmailHint")}</span></label>
                 <input
-                  value={contactEmail} onChange={(e) => { setContactEmail(e.target.value); if (contactMsg) setContactMsg(null); }} placeholder="taller@example.com"
+                  value={contactEmail} onChange={(e) => { setContactEmail(e.target.value); if (contactMsg) setContactMsg(null); }} placeholder={t("publicEmailPlaceholder")}
                   className="w-full mt-1 rounded-xl border border-zinc-200 px-3 py-[10px] text-[13px] outline-none focus:border-red-500"
                 />
               </div>
               <div>
-                <label className="text-[12px] font-bold text-zinc-700">Instagram</label>
+                <label className="text-[12px] font-bold text-zinc-700">{t("instagram")}</label>
                 <input
-                  value={instagramUrl} onChange={(e) => { setInstagramUrl(e.target.value); if (contactMsg) setContactMsg(null); }} placeholder="https://instagram.com/tutaller"
+                  value={instagramUrl} onChange={(e) => { setInstagramUrl(e.target.value); if (contactMsg) setContactMsg(null); }} placeholder={t("instagramPlaceholder")}
                   className="w-full mt-1 rounded-xl border border-zinc-200 px-3 py-[10px] text-[13px] outline-none focus:border-red-500"
                 />
               </div>
               <div>
-                <label className="text-[12px] font-bold text-zinc-700">Facebook</label>
+                <label className="text-[12px] font-bold text-zinc-700">{t("facebook")}</label>
                 <input
-                  value={facebookUrl} onChange={(e) => { setFacebookUrl(e.target.value); if (contactMsg) setContactMsg(null); }} placeholder="https://facebook.com/tutaller"
+                  value={facebookUrl} onChange={(e) => { setFacebookUrl(e.target.value); if (contactMsg) setContactMsg(null); }} placeholder={t("facebookPlaceholder")}
                   className="w-full mt-1 rounded-xl border border-zinc-200 px-3 py-[10px] text-[13px] outline-none focus:border-red-500"
                 />
               </div>
               <div>
-                <label className="text-[12px] font-bold text-zinc-700">Website</label>
+                <label className="text-[12px] font-bold text-zinc-700">{t("website")}</label>
                 <input
-                  value={websiteUrl} onChange={(e) => { setWebsiteUrl(e.target.value); if (contactMsg) setContactMsg(null); }} placeholder="https://tutaller.com"
+                  value={websiteUrl} onChange={(e) => { setWebsiteUrl(e.target.value); if (contactMsg) setContactMsg(null); }} placeholder={t("websitePlaceholder")}
                   className="w-full mt-1 rounded-xl border border-zinc-200 px-3 py-[10px] text-[13px] outline-none focus:border-red-500"
                 />
               </div>
@@ -829,26 +864,26 @@ export default function SettingsPage() {
 
               <button type="submit" disabled={contactSaving}
                 className="bg-red-600 hover:bg-red-500 disabled:opacity-60 transition-all text-white font-bold py-[11px] px-6 rounded-xl text-[13px]">
-                {contactSaving ? "Saving..." : "Save changes"}
+                {contactSaving ? t("saving") : t("saveChanges")}
               </button>
             </form>
           </div>
 
           {/* ── PASSWORD ── */}
           <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm p-6 mb-6">
-            <h2 className="text-[14px] font-black text-zinc-900 mb-1 flex items-center gap-2"><KeyRound size={15} className="text-zinc-400" /> Password</h2>
-            <p className="text-[12px] text-zinc-400 mb-5">Choose a new password for your account.</p>
+            <h2 className="text-[14px] font-black text-zinc-900 mb-1 flex items-center gap-2"><KeyRound size={15} className="text-zinc-400" /> {t("password")}</h2>
+            <p className="text-[12px] text-zinc-400 mb-5">{t("passwordDesc")}</p>
 
             <form onSubmit={handleChangePassword} className="space-y-4">
               <div>
-                <label className="text-[12px] font-bold text-zinc-700">New password</label>
+                <label className="text-[12px] font-bold text-zinc-700">{t("newPassword")}</label>
                 <input
-                  type="password" value={newPassword} onChange={(e) => { setNewPassword(e.target.value); if (passwordMsg) setPasswordMsg(null); }} placeholder="At least 6 characters"
+                  type="password" value={newPassword} onChange={(e) => { setNewPassword(e.target.value); if (passwordMsg) setPasswordMsg(null); }} placeholder={t("newPasswordPlaceholder")}
                   className="w-full mt-1 rounded-xl border border-zinc-200 px-3 py-[10px] text-[13px] outline-none focus:border-red-500"
                 />
               </div>
               <div>
-                <label className="text-[12px] font-bold text-zinc-700">Confirm new password</label>
+                <label className="text-[12px] font-bold text-zinc-700">{t("confirmNewPassword")}</label>
                 <input
                   type="password" value={confirmPassword} onChange={(e) => { setConfirmPassword(e.target.value); if (passwordMsg) setPasswordMsg(null); }}
                   className="w-full mt-1 rounded-xl border border-zinc-200 px-3 py-[10px] text-[13px] outline-none focus:border-red-500"
@@ -864,12 +899,12 @@ export default function SettingsPage() {
 
               <button type="submit" disabled={passwordSaving}
                 className="bg-zinc-900 hover:bg-zinc-800 disabled:opacity-60 transition-all text-white font-bold py-[11px] px-6 rounded-xl text-[13px]">
-                {passwordSaving ? "Updating..." : "Update password"}
+                {passwordSaving ? t("updating") : t("updatePassword")}
               </button>
             </form>
           </div>
 
-          <p className="text-center text-[11px] text-zinc-400 mt-8">© 2026 Maintly. All rights reserved.</p>
+          <p className="text-center text-[11px] text-zinc-400 mt-8">{t("copyright")}</p>
         </div>
       </div>
     </div>

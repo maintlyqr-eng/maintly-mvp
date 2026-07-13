@@ -1,9 +1,25 @@
 "use client";
 
 import { useRef, useState } from "react";
-import Link from "next/link";
+import { useTranslations } from "next-intl";
+import { Link } from "@/i18n/navigation";
 import { Wrench, Bell, CheckCircle2, Circle } from "lucide-react";
-import { REMINDER_STATUS_COLOR, REMINDER_STATUS_LABEL, type ReminderStatus } from "@/lib/reminders";
+import { REMINDER_STATUS_COLOR, type ReminderStatus } from "@/lib/reminders";
+
+// Localized twin of CalendarDayCell.tsx — see DashboardSidebarIntl.tsx for
+// why these "*Intl" components exist as separate files during the i18n
+// rollout instead of being edited in place. Shared by the dashboard home
+// page AND the Assets page.
+//
+// Unlike the sidebar's nav links (which visit many not-yet-migrated
+// routes), this component's only link target is "/dashboard/calendar",
+// which IS already migrated — so it's safe to use next-intl's locale-aware
+// Link here directly instead of staying on plain next/link.
+//
+// REMINDER_STATUS_LABEL is NOT imported from @/lib/reminders (that map is
+// English-only and stays untouched for not-yet-migrated consumers) — this
+// component builds its own translated equivalent locally, same pattern used
+// in the Scheduled/Calendar/Services pages.
 
 const BUBBLE_WIDTH = 272;
 const MAX_ITEMS_PER_SECTION = 4;
@@ -24,7 +40,14 @@ type Props = {
   dotColor: string | null;
 };
 
-export default function CalendarDayCell({ dateKey, day, inMonth, isToday, dateLabel, info, dotColor }: Props) {
+export default function CalendarDayCellIntl({ dateKey, day, inMonth, isToday, dateLabel, info, dotColor }: Props) {
+  const t = useTranslations("CalendarDayCell");
+  const REMINDER_STATUS_LABEL: Record<ReminderStatus, string> = {
+    overdue: t("statusOverdue"),
+    due_soon: t("statusDueSoon"),
+    ok: t("statusOk"),
+    none: t("statusNone"),
+  };
   const anchorRef = useRef<HTMLAnchorElement>(null);
   const [hover, setHover] = useState(false);
   const [pos, setPos] = useState({ top: 0, left: 0, arrowLeft: BUBBLE_WIDTH / 2 });
@@ -71,14 +94,14 @@ export default function CalendarDayCell({ dateKey, day, inMonth, isToday, dateLa
           <div className="relative bg-white rounded-2xl border border-zinc-200 shadow-2xl p-4">
             <div className="flex items-center justify-between mb-2.5">
               <p className="text-[12px] font-black text-zinc-900">{dateLabel}</p>
-              {isToday && <span className="text-[9px] font-bold text-red-600 bg-red-50 rounded-full px-2 py-[2px]">Today</span>}
+              {isToday && <span className="text-[9px] font-bold text-red-600 bg-red-50 rounded-full px-2 py-[2px]">{t("today")}</span>}
             </div>
 
             <div className="space-y-3">
               {info.reminders.length > 0 && (
                 <div>
                   <p className="flex items-center gap-1.5 text-[9px] font-bold text-zinc-400 uppercase tracking-wide mb-1.5">
-                    <Bell size={10} /> Due this day
+                    <Bell size={10} /> {t("dueThisDay")}
                   </p>
                   <div className="space-y-1">
                     {info.reminders.slice(0, MAX_ITEMS_PER_SECTION).map((r, i) => {
@@ -92,7 +115,7 @@ export default function CalendarDayCell({ dateKey, day, inMonth, isToday, dateLa
                       );
                     })}
                     {info.reminders.length > MAX_ITEMS_PER_SECTION && (
-                      <p className="text-[10px] text-zinc-400">+{info.reminders.length - MAX_ITEMS_PER_SECTION} more</p>
+                      <p className="text-[10px] text-zinc-400">{t("more", { count: info.reminders.length - MAX_ITEMS_PER_SECTION })}</p>
                     )}
                   </div>
                 </div>
@@ -101,17 +124,17 @@ export default function CalendarDayCell({ dateKey, day, inMonth, isToday, dateLa
               {info.tasks.length > 0 && (
                 <div>
                   <p className="flex items-center gap-1.5 text-[9px] font-bold text-zinc-400 uppercase tracking-wide mb-1.5">
-                    <CheckCircle2 size={10} /> Planned tasks
+                    <CheckCircle2 size={10} /> {t("plannedTasks")}
                   </p>
                   <div className="space-y-1">
-                    {info.tasks.slice(0, MAX_ITEMS_PER_SECTION).map((t, i) => (
+                    {info.tasks.slice(0, MAX_ITEMS_PER_SECTION).map((t2, i) => (
                       <div key={i} className="flex items-center gap-1.5">
-                        {t.done ? <CheckCircle2 size={11} className="text-emerald-500 shrink-0" /> : <Circle size={11} className="text-blue-400 shrink-0" />}
-                        <p className={`text-[11px] truncate ${t.done ? "text-zinc-300 line-through" : "text-zinc-700"}`}>{t.title}</p>
+                        {t2.done ? <CheckCircle2 size={11} className="text-emerald-500 shrink-0" /> : <Circle size={11} className="text-blue-400 shrink-0" />}
+                        <p className={`text-[11px] truncate ${t2.done ? "text-zinc-300 line-through" : "text-zinc-700"}`}>{t2.title}</p>
                       </div>
                     ))}
                     {info.tasks.length > MAX_ITEMS_PER_SECTION && (
-                      <p className="text-[10px] text-zinc-400">+{info.tasks.length - MAX_ITEMS_PER_SECTION} more</p>
+                      <p className="text-[10px] text-zinc-400">{t("more", { count: info.tasks.length - MAX_ITEMS_PER_SECTION })}</p>
                     )}
                   </div>
                 </div>
@@ -120,7 +143,7 @@ export default function CalendarDayCell({ dateKey, day, inMonth, isToday, dateLa
               {info.services.length > 0 && (
                 <div>
                   <p className="flex items-center gap-1.5 text-[9px] font-bold text-zinc-400 uppercase tracking-wide mb-1.5">
-                    <Wrench size={10} /> Services logged
+                    <Wrench size={10} /> {t("servicesLogged")}
                   </p>
                   <div className="space-y-1">
                     {info.services.slice(0, MAX_ITEMS_PER_SECTION).map((s, i) => (
@@ -130,14 +153,14 @@ export default function CalendarDayCell({ dateKey, day, inMonth, isToday, dateLa
                       </div>
                     ))}
                     {info.services.length > MAX_ITEMS_PER_SECTION && (
-                      <p className="text-[10px] text-zinc-400">+{info.services.length - MAX_ITEMS_PER_SECTION} more</p>
+                      <p className="text-[10px] text-zinc-400">{t("more", { count: info.services.length - MAX_ITEMS_PER_SECTION })}</p>
                     )}
                   </div>
                 </div>
               )}
             </div>
 
-            <p className="text-[9.5px] text-zinc-300 mt-3 pt-2 border-t border-zinc-100">Click to open in Calendar →</p>
+            <p className="text-[9.5px] text-zinc-300 mt-3 pt-2 border-t border-zinc-100">{t("clickToOpen")}</p>
           </div>
         </div>
       )}

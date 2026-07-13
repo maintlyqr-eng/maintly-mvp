@@ -1,9 +1,17 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
 import { X, Share2, CheckCircle2, Search, AlertCircle } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { getInitials } from "@/lib/initials";
+
+// Edited in place (not an "*Intl" duplicate) — its ONLY consumer is
+// src/app/[locale]/dashboard/assets/page.tsx (the old un-migrated
+// src/app/dashboard/assets/page.tsx it used to also serve has since been
+// deleted, see the "Final cleanup" backlog task). See AvatarCropModal.tsx /
+// DashboardSidebarIntl.tsx for the general rule and this
+// "exactly-once-migrated-together" exception to it.
 
 // "Share" an equipment already in my own workshop with another Maintler,
 // so it lands in THEIR workshop too — full access, not a read-only peek.
@@ -28,6 +36,16 @@ type SavedContactInfo = {
   profession: string | null;
 };
 
+const PROFESSION_KEYS: Record<string, string> = {
+  "Owner": "owner",
+  "Mechanic": "mechanic",
+  "Electrician": "electrician",
+  "HVAC Technician": "hvacTechnician",
+  "Fleet Manager": "fleetManager",
+  "Business": "business",
+  "Inspector": "inspector",
+};
+
 export default function ShareAssetModal({
   open,
   onClose,
@@ -41,6 +59,8 @@ export default function ShareAssetModal({
   asset: { id: string; name: string; qrCode: string | null } | null;
   onShared: (recipientName: string) => void;
 }) {
+  const t = useTranslations("ShareAssetModal");
+  const tProfessionTypes = useTranslations("ProfessionTypes");
   const [contacts, setContacts] = useState<SavedContactInfo[]>([]);
   const [loadingContacts, setLoadingContacts] = useState(true);
   const [search, setSearch] = useState("");
@@ -119,7 +139,7 @@ export default function ShareAssetModal({
 
     if (shareErr) {
       setSharingId(null);
-      setError("Couldn't share this equipment. Try again.");
+      setError(t("errorShareFailed"));
       return;
     }
 
@@ -137,7 +157,7 @@ export default function ShareAssetModal({
     await supabase.from("mechanic_messages").insert({
       sender_id: mechanicId,
       recipient_id: contact.id,
-      body: `Compartió el equipo "${asset.name}" con vos. Ya está en tu Equipamiento.`,
+      body: t("notificationBody", { name: asset.name }),
     });
 
     setSharingId(null);
@@ -149,7 +169,7 @@ export default function ShareAssetModal({
     <div className="fixed inset-0 z-50 bg-zinc-900/40 flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-md">
         <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-200">
-          <h3 className="text-[16px] font-black text-zinc-900">Share Equipment</h3>
+          <h3 className="text-[16px] font-black text-zinc-900">{t("title")}</h3>
           <button onClick={onClose} className="text-zinc-400 hover:text-zinc-700"><X size={18} /></button>
         </div>
 
@@ -160,10 +180,14 @@ export default function ShareAssetModal({
                 <div className="w-16 h-16 rounded-full bg-zinc-100 flex items-center justify-center mx-auto mb-4">
                   <AlertCircle size={32} className="text-zinc-400" />
                 </div>
-                <h4 className="text-[18px] font-black text-zinc-900 mb-1">Already shared</h4>
+                <h4 className="text-[18px] font-black text-zinc-900 mb-1">{t("alreadySharedTitle")}</h4>
                 <p className="text-[13px] text-zinc-500 mb-6">
-                  <span className="font-semibold text-zinc-700">{shareResult.contact.name}</span> already has{" "}
-                  <span className="font-semibold text-zinc-700">{asset.name}</span> in their workshop — no need to share it again.
+                  {t.rich("alreadySharedDesc", {
+                    name: shareResult.contact.name,
+                    asset: asset.name,
+                    b1: (chunks) => <span className="font-semibold text-zinc-700">{chunks}</span>,
+                    b2: (chunks) => <span className="font-semibold text-zinc-700">{chunks}</span>,
+                  })}
                 </p>
               </>
             ) : (
@@ -171,28 +195,32 @@ export default function ShareAssetModal({
                 <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-4">
                   <CheckCircle2 size={32} className="text-green-600" />
                 </div>
-                <h4 className="text-[18px] font-black text-zinc-900 mb-1">Shared!</h4>
+                <h4 className="text-[18px] font-black text-zinc-900 mb-1">{t("sharedTitle")}</h4>
                 <p className="text-[13px] text-zinc-500 mb-6">
-                  <span className="font-semibold text-zinc-700">{asset.name}</span> is now in{" "}
-                  <span className="font-semibold text-zinc-700">{shareResult.contact.name}</span>'s workshop too — they can view and log services on it right away.
+                  {t.rich("sharedDesc", {
+                    name: shareResult.contact.name,
+                    asset: asset.name,
+                    b1: (chunks) => <span className="font-semibold text-zinc-700">{chunks}</span>,
+                    b2: (chunks) => <span className="font-semibold text-zinc-700">{chunks}</span>,
+                  })}
                 </p>
               </>
             )}
             <button onClick={onClose} className="w-full bg-red-600 hover:bg-red-500 text-white font-bold py-3 rounded-xl text-[13px] transition-colors">
-              Done
+              {t("done")}
             </button>
           </div>
         ) : (
           <div className="p-6">
             <p className="text-[13px] text-zinc-500 mb-4">
-              Send <span className="font-semibold text-zinc-700">{asset.name}</span> to a saved Maintler's own workshop — useful if they can't scan the QR themselves right now. They'll get full access, same as if they'd scanned it.
+              {t.rich("intro", { asset: asset.name, b2: (chunks) => <span className="font-semibold text-zinc-700">{chunks}</span> })}
             </p>
 
             <div className="relative mb-3">
               <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
               <input
                 type="text"
-                placeholder="Search your saved Maintlers..."
+                placeholder={t("searchPlaceholder")}
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 className="w-full rounded-xl border border-zinc-200 pl-9 pr-4 py-2.5 text-[13px] outline-none focus:border-blue-400 transition-colors"
@@ -208,14 +236,14 @@ export default function ShareAssetModal({
 
             <div className="max-h-80 overflow-y-auto -mx-2 px-2">
               {loadingContacts ? (
-                <p className="text-[13px] text-zinc-400 text-center py-8">Loading your saved Maintlers...</p>
+                <p className="text-[13px] text-zinc-400 text-center py-8">{t("loadingContacts")}</p>
               ) : contacts.length === 0 ? (
                 <div className="text-center py-8">
-                  <p className="text-[13px] text-zinc-500 mb-1">You haven't saved any Maintlers yet.</p>
-                  <p className="text-[12px] text-zinc-400">Save one from Team Chat first, then you can share equipment with them.</p>
+                  <p className="text-[13px] text-zinc-500 mb-1">{t("noContactsTitle")}</p>
+                  <p className="text-[12px] text-zinc-400">{t("noContactsDesc")}</p>
                 </div>
               ) : filtered.length === 0 ? (
-                <p className="text-[13px] text-zinc-400 text-center py-8">No saved Maintlers match your search.</p>
+                <p className="text-[13px] text-zinc-400 text-center py-8">{t("noContactsMatch")}</p>
               ) : (
                 <div className="space-y-1">
                   {filtered.map((c) => (
@@ -235,7 +263,7 @@ export default function ShareAssetModal({
                       </div>
                       <div className="min-w-0 flex-1">
                         <p className="text-[13px] font-bold text-zinc-900 truncate">{c.name}</p>
-                        <p className="text-[11px] text-zinc-400 truncate">{c.workshop_name || c.profession || "Maintler"}</p>
+                        <p className="text-[11px] text-zinc-400 truncate">{c.workshop_name || (c.profession ? tProfessionTypes(PROFESSION_KEYS[c.profession] ?? "owner") : t("maintlerFallback"))}</p>
                       </div>
                       <Share2 size={15} className="text-zinc-300 shrink-0" />
                     </button>

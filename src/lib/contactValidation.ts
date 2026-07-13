@@ -15,7 +15,12 @@
 
 const HTTP_SCHEME = /^https?:\/\//i;
 
-export function normalizeContactUrl(input: string): { value: string | null; error: string | null } {
+// `error` is a stable CODE, not display text — this lib is shared across
+// locales, so it can't bake in one language's message. Callers map the code
+// to a translated string (e.g. Settings' CONTACT_URL_ERROR_MESSAGES).
+export type ContactUrlErrorCode = "invalidUrl" | "invalidScheme";
+
+export function normalizeContactUrl(input: string): { value: string | null; error: ContactUrlErrorCode | null } {
   const trimmed = input.trim();
   if (!trimmed) return { value: null, error: null }; // optional field, blank is fine
 
@@ -27,11 +32,11 @@ export function normalizeContactUrl(input: string): { value: string | null; erro
   try {
     parsed = new URL(withScheme);
   } catch {
-    return { value: null, error: "no parece un link válido" };
+    return { value: null, error: "invalidUrl" };
   }
 
   if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
-    return { value: null, error: "los links deben empezar con http:// o https://" };
+    return { value: null, error: "invalidScheme" };
   }
 
   return { value: parsed.toString(), error: null };
