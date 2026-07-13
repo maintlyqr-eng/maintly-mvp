@@ -10,7 +10,7 @@ import {
   Wrench, Pencil, History, CheckCircle2, UserCircle2, Camera, Gauge, Menu,
   Search, MoreVertical, Trash2, Clock, CalendarClock, ListChecks, ChevronDown,
   QrCode as QrIcon, AlertTriangle,
-  MessageCircle,
+  MessageCircle, Share2,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import NotificationBell from "@/components/NotificationBell";
@@ -25,6 +25,7 @@ import { getUnitLabel, getUnitShort } from "@/lib/units";
 import { validateImageFile } from "@/lib/imageValidation";
 import NewAssetModal from "@/components/NewAssetModal";
 import LinkExistingAssetModal from "@/components/LinkExistingAssetModal";
+import ShareAssetModal from "@/components/ShareAssetModal";
 import AddAssetChooser from "@/components/AddAssetChooser";
 import { assetTypeOptions, fuelTypeOptions, assetTypeImg } from "@/lib/assetTypes";
 import { fetchMechanicPublicProfiles } from "@/lib/mechanicPublicProfile";
@@ -92,6 +93,9 @@ type AssetRow = {
   created_at: string;
   customer_id: string | null;
   qr_codes: QrRow[] | QrRow | null;
+  // Set only when this row landed in my workshop via Share (migration 029)
+  // rather than my own scan/creation — drives the "Shared by X" badge.
+  sharedByName: string | null;
 };
 
 type AssetAgg = {
@@ -154,6 +158,9 @@ export default function AssetsPage() {
   const [removeTarget, setRemoveTarget] = useState<AssetRow | null>(null);
   const [removing, setRemoving] = useState(false);
 
+  // ── Share with a saved Maintler (migration 029) ──
+  const [shareTarget, setShareTarget] = useState<AssetRow | null>(null);
+
   // ── Add Equipment flow (choose → new / existing) ──
   // Shared components (also used by the dashboard's own "Add Equipment"
   // button) so creating or linking an asset behaves identically everywhere.
@@ -203,14 +210,22 @@ export default function AssetsPage() {
 
   async function loadAssets(uid: string) {
     setLoadingAssets(true);
-    // Traer todos los assets del workshop del mecánico (los que creó + los que vinculó)
+    // Traer todos los assets del workshop del mecánico (los que creó + los que
+    // vinculó + los que otro Maintler le compartió — ver migration 029).
+    // "sharer" resuelve el nombre de quien compartió vía shared_by; viene null
+    // para cualquier fila que el mecánico agregó por su cuenta (escaneo propio).
     const { data } = await supabase
       .from("mechanic_assets")
-      .select("asset_id, assets(id, asset_type, brand, model, nickname, vin_serial, year, plate, fuel_type, location, photo_url, created_at, customer_id, qr_codes(code))")
+      .select("asset_id, shared_by, sharer:mechanics!mechanic_assets_shared_by_fkey(name), assets(id, asset_type, brand, model, nickname, vin_serial, year, plate, fuel_type, location, photo_url, created_at, customer_id, qr_codes(code))")
       .eq("mechanic_id", uid)
       .order("added_at", { ascending: false });
     const assetList = (data ?? [])
-      .map((row: any) => Array.isArray(row.assets) ? row.assets[0] : row.assets)
+      .map((row: any) => {
+        const a = Array.isArray(row.assets) ? row.assets[0] : row.assets;
+        if (!a) return null;
+        const sharer = Array.isArray(row.sharer) ? row.sharer[0] : row.sharer;
+        return { ...a, sharedByName: row.shared_by ? (sharer?.name ?? "another Maintler") : null };
+      })
       .filter(Boolean);
     setAssets(assetList as unknown as AssetRow[]);
     setLoadingAssets(false);
@@ -749,6 +764,11 @@ export default function AssetsPage() {
                       <div className="min-w-0 flex-1">
                         <p className="text-[14px] font-bold text-zinc-900 leading-tight truncate">{label}</p>
                         <p className="text-[11px] text-zinc-400 leading-tight">{a.year ? a.year + " · " : ""}{a.plate || a.vin_serial || "—"}</p>
+                        {a.sharedByName && (
+                          <p className="text-[10px] text-blue-500 font-semibold leading-tight mt-0.5 flex items-center gap-1">
+                            <Share2 size={9} /> Shared by {a.sharedByName}
+                          </p>
+                        )}
                       </div>
                       <span className={`shrink-0 flex items-center gap-1 text-[10px] font-bold px-2 py-[3px] rounded-full ${statusColor.bg} ${statusColor.text}`}>
                         <span className={`w-1.5 h-1.5 rounded-full ${statusColor.dot}`} />
@@ -770,6 +790,12 @@ export default function AssetsPage() {
                               className="w-full flex items-center gap-2 px-3 py-2 text-[12px] font-semibold text-zinc-600 hover:bg-zinc-50 text-left"
                             >
                               <Pencil size={13} /> Edit Asset
+                            </button>
+                            <button
+                              onClick={() => { setOpenCardMenuId(null); setShareTarget(a); }}
+                              className="w-full flex items-center gap-2 px-3 py-2 text-[12px] font-semibold text-zinc-600 hover:bg-zinc-50 text-left"
+                            >
+                              <Share2 size={13} /> Share Equipment
                             </button>
                             <button
                               onClick={() => { setOpenCardMenuId(null); setRemoveTarget(a); }}
@@ -1226,6 +1252,15 @@ export default function AssetsPage() {
           </div>
         </div>
       )}
+
+      {/* ════ SHARE EQUIPMENT ════ */}
+      <ShareAssetModal
+        open={!!shareTarget}
+        onClose={() => setShareTarget(null)}
+        mechanicId={mechanicId}
+        asset={shareTarget ? { id: shareTarget.id, name: assetDisplayName(shareTarget), qrCode: getQrCode(shareTarget) } : null}
+        onShared={() => { void loadAssets(mechanicId); }}
+      />
 
     </div>
   );
