@@ -83,6 +83,17 @@ type QrRow = {
   created_at: string;
 };
 
+// "Actividad en tiempo real" (item Fase 2 / punto 2 del pedido) — un escaneo
+// crudo, traído directo con el cliente de anon key (mismo criterio ya
+// establecido en loadData() de que qr_scans tiene RLS angosta y segura para
+// esto, ver migración 006), solo para alimentar el feed de actividad
+// reciente del Dashboard.
+type RecentScanRow = {
+  code: string;
+  asset_id: string | null;
+  scanned_at: string;
+};
+
 // ── Papelera (soft delete + restauración — item 14 del pedido de Facu) ──
 // Fed by /api/admin/trash, not bulk-data — these are the rows bulk-data
 // deliberately excludes (deleted_at is not null).
@@ -311,6 +322,25 @@ function formatTime(iso: string, locale: string) {
   if (isNaN(d.getTime())) return "";
   return d.toLocaleTimeString(DATE_LOCALE[locale] ?? "en-US", { hour: "2-digit", minute: "2-digit" });
 }
+
+// "Hace 2 min" / "hace 3 h" para el feed de Actividad reciente — Intl ya
+// trae esto sin necesitar una librería nueva.
+const RELATIVE_TIME_UNITS: [Intl.RelativeTimeFormatUnit, number][] = [
+  ["year", 31536000], ["month", 2592000], ["week", 604800],
+  ["day", 86400], ["hour", 3600], ["minute", 60],
+];
+function timeAgo(iso: string, locale: string) {
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return "";
+  const seconds = Math.round((d.getTime() - Date.now()) / 1000);
+  const rtf = new Intl.RelativeTimeFormat(DATE_LOCALE[locale] ?? "en-US", { numeric: "auto" });
+  for (const [unit, secondsInUnit] of RELATIVE_TIME_UNITS) {
+    if (Math.abs(seconds) >= secondsInUnit) {
+      return rtf.format(Math.round(seconds / secondsInUnit), unit);
+    }
+  }
+  return rtf.format(seconds, "second");
+}
 function getInitials(name: string) {
   return (name || "?").split(" ").filter(Boolean).map(p => p[0]).join("").toUpperCase().slice(0, 2) || "?";
 }
@@ -487,6 +517,21 @@ export default function AdminPage() {
   const [dataTruncatedNotice, setDataTruncatedNotice] = useState<string | null>(null);
   const [mechanicsTotalCount, setMechanicsTotalCount] = useState<number | null>(null);
   const [usageMetrics, setUsageMetrics] = useState<UsageMetrics | null>(null);
+
+  // ── Actividad en tiempo real (item Fase 2 / punto 2 del pedido) ──
+  // Aproximación deliberada por polling en vez de suscripciones push
+  // (supabase.channel().on("postgres_changes", ...), ya usadas en Team Chat
+  // y NotificationBellIntl) — esas requieren que la tabla esté agregada a
+  // la publicación supabase_realtime Y que su RLS permita leer con la
+  // anon key, y no se puede verificar ninguna de las dos cosas para
+  // mechanics/assets/service_records desde este sandbox (misma limitación
+  // documentada para esas tablas desde el incremento 2 de Item 6). Refrescar
+  // cada 30s con datos ya cubiertos por rutas/policies confirmadas es lo
+  // más "tiempo real" que se puede ofrecer con confianza sin poder probar
+  // contra la base real — ver el comentario del useEffect que la dispara.
+  const [recentAuditLogs, setRecentAuditLogs] = useState<AdminAuditLogRow[]>([]);
+  const [recentScans, setRecentScans] = useState<RecentScanRow[]>([]);
+  const [activityRefreshedAt, setActivityRefreshedAt] = useState<string | null>(null);
 
   // ── Accounts / Mechanics UI state ──
   const [accountSearch, setAccountSearch] = useState("");
@@ -834,6 +879,30 @@ export default function AdminPage() {
     }
   }
 
+  const RECENT_ACTIVITY_LOG_LIMIT = 20;
+  const RECENT_SCANS_LIMIT = 15;
+
+  // Refresco liviano para el feed de "Actividad reciente" del Dashboard —
+  // deliberadamente separado de loadData() (que re-trae accounts/assets/
+  // services enteros, capados pero igual pesados) para que el polling cada
+  // 30s no repita ese costo. Cuentas/assets/registros nuevos igual aparecen
+  // en el feed porque ya están ordenados por fecha en el estado que dejó el
+  // último loadData() — ver recentActivityFeed más abajo.
+  async function loadRecentActivity() {
+    try {
+      const [logsRes, scansRes] = await Promise.all([
+        fetch(`/api/admin/audit-logs?page=1&pageSize=${RECENT_ACTIVITY_LOG_LIMIT}`).then((r) => r.json()).catch(() => null),
+        supabase.from("qr_scans").select("code, asset_id, scanned_at").order("scanned_at", { ascending: false }).limit(RECENT_SCANS_LIMIT),
+      ]);
+      if (logsRes && Array.isArray(logsRes.logs)) setRecentAuditLogs(logsRes.logs as AdminAuditLogRow[]);
+      if (scansRes && !scansRes.error && scansRes.data) setRecentScans(scansRes.data as RecentScanRow[]);
+      setActivityRefreshedAt(new Date().toISOString());
+    } catch {
+      // Best-effort, silencioso — un refresco de fondo que falla no debería
+      // interrumpir al admin ni mostrar un error intrusivo.
+    }
+  }
+
   // Reportes y Moderación: mismo patrón de paginación real server-side que
   // el log de auditoría (esta tabla la alimenta un formulario público
   // anónimo, así que puede crecer sin límite — ver /api/admin/reports).
@@ -1053,6 +1122,19 @@ export default function AdminPage() {
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [section, adminAuthed, analyticsFrom, analyticsTo]);
+
+  // "Actividad en tiempo real" (item Fase 2 / punto 2 del pedido): mientras
+  // el admin esté mirando el Dashboard, refresca el feed de actividad cada
+  // 30s. Se detiene solo (clearInterval) al salir de la sección o cerrar
+  // sesión, para no seguir pegándole al servidor desde una pestaña en
+  // segundo plano en otra sección del panel.
+  useEffect(() => {
+    if (section !== "dashboard" || !adminAuthed) return;
+    loadRecentActivity();
+    const interval = setInterval(loadRecentActivity, 30000);
+    return () => clearInterval(interval);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [section, adminAuthed]);
 
   // Papelera: refetch every time the tab opens, same lazy pattern as
   // Support/Team Chat — a restore or permanent delete elsewhere shouldn't
@@ -1388,6 +1470,12 @@ export default function AdminPage() {
     return map;
   }, [accounts]);
 
+  const assetsById = useMemo(() => {
+    const map: Record<string, AssetRow> = {};
+    for (const a of assets) map[a.id] = a;
+    return map;
+  }, [assets]);
+
   const visibleAccounts = useMemo(() => {
     const q = accountSearch.trim().toLowerCase();
     if (!q) return accounts;
@@ -1631,6 +1719,68 @@ export default function AdminPage() {
   const reportsTotalPages = Math.max(1, Math.ceil(reportsTotal / REPORTS_PAGE_SIZE));
   const unreadSupportCount = supportMessages.filter((m) => !m.from_admin && !m.read).length;
 
+  // "Actividad en tiempo real" (item 1 del pedido: "actividad reciente" del
+  // Dashboard, y Fase 2 / punto 2: "Actividad en tiempo real") — mezcla, en
+  // el cliente, 5 fuentes que YA se cargan por separado en distintas partes
+  // del panel: cuentas/assets/servicios nuevos vienen de `accounts`/
+  // `assets`/`services` (ya ordenados por fecha desde bulk-data, así que
+  // `.slice(0, N)` alcanza sin pedir nada de nuevo); escaneos y acciones de
+  // admin vienen de `recentScans`/`recentAuditLogs`, refrescados cada 30s
+  // por loadRecentActivity(). `services` usa `service_date` como proxy de
+  // "cuándo pasó" (no hay `created_at` en ese tipo) — una carga atrasada
+  // podría aparecer "vieja" acá aunque se haya cargado recién; aceptable
+  // para un feed de actividad, no para una métrica de auditoría exacta.
+  const ACTIVITY_FEED_LIMIT = 20;
+  type ActivityEvent = {
+    id: string; type: "new_mechanic" | "new_asset" | "new_service" | "qr_scan" | "admin_action";
+    timestamp: string; icon: React.ElementType; iconBg: string; text: string;
+    onClick?: () => void;
+  };
+  const recentActivityFeed = useMemo(() => {
+    const events: ActivityEvent[] = [];
+
+    for (const a of accounts.slice(0, 8)) {
+      events.push({
+        id: `mech-${a.id}`, type: "new_mechanic", timestamp: a.created_at,
+        icon: Users, iconBg: "bg-blue-500",
+        text: t("activityNewMechanic", { name: a.name }),
+        onClick: () => openDetail(a),
+      });
+    }
+    for (const a of assets.slice(0, 8)) {
+      events.push({
+        id: `asset-${a.id}`, type: "new_asset", timestamp: a.created_at,
+        icon: Box, iconBg: "bg-purple-500",
+        text: t("activityNewAsset", { asset: assetLabel(a) }),
+      });
+    }
+    for (const s of services.slice(0, 8)) {
+      events.push({
+        id: `svc-${s.id}`, type: "new_service", timestamp: s.service_date,
+        icon: ClipboardList, iconBg: "bg-cyan-500",
+        text: t("activityNewService", { type: s.service_type, asset: s.asset_label }),
+      });
+    }
+    for (const sc of recentScans) {
+      const asset = sc.asset_id ? assetsById[sc.asset_id] : null;
+      events.push({
+        id: `scan-${sc.code}-${sc.scanned_at}`, type: "qr_scan", timestamp: sc.scanned_at,
+        icon: ScanLine, iconBg: "bg-pink-500",
+        text: asset ? t("activityQrScan", { asset: assetLabel(asset) }) : t("activityQrScanUnlinked", { code: sc.code }),
+      });
+    }
+    for (const log of recentAuditLogs) {
+      events.push({
+        id: `log-${log.id}`, type: "admin_action", timestamp: log.created_at,
+        icon: History, iconBg: "bg-zinc-700",
+        text: t("activityAdminAction", { action: AUDIT_ACTION_LABEL[log.action] ?? log.action }),
+        onClick: log.entity_type && log.entity_id ? () => viewHistory(log.entity_type as string, log.entity_id as string) : undefined,
+      });
+    }
+
+    return events.sort((a, b) => b.timestamp.localeCompare(a.timestamp)).slice(0, ACTIVITY_FEED_LIMIT);
+  }, [accounts, assets, services, recentScans, recentAuditLogs, assetsById, AUDIT_ACTION_LABEL, t]);
+
   return (
     <div className="min-h-screen bg-zinc-50/60 flex text-zinc-900 relative">
 
@@ -1843,6 +1993,46 @@ export default function AdminPage() {
                     )}
                   </div>
                 </div>
+              </div>
+
+              {/* Actividad en tiempo real (item 1 del pedido + Fase 2 punto
+                  2) — mezcla cuentas/assets/servicios nuevos, escaneos de QR
+                  y acciones de admin en un solo feed, con un refresco
+                  automático cada 30s mientras esta pestaña está abierta. */}
+              <div className="bg-white rounded-2xl border border-zinc-200/80 p-6 shadow-sm">
+                <div className="flex items-center justify-between mb-1">
+                  <div className="flex items-center gap-2">
+                    <SectionTitle>{t("dashboardActivityTitle")}</SectionTitle>
+                    <span className="relative flex h-2 w-2">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+                    </span>
+                  </div>
+                  {activityRefreshedAt && (
+                    <span className="text-[10px] font-medium text-zinc-300">{t("activityRefreshedAt", { time: timeAgo(activityRefreshedAt, locale) })}</span>
+                  )}
+                </div>
+                <p className="text-[11px] text-zinc-400 mb-4">{t("dashboardActivitySub")}</p>
+
+                {recentActivityFeed.length === 0 ? (
+                  <p className="text-[13px] text-zinc-300 text-center py-8">{t("noRecentActivity")}</p>
+                ) : (
+                  <div className="space-y-1 max-h-[420px] overflow-y-auto -mx-2 pr-1">
+                    {recentActivityFeed.map((ev) => (
+                      <div
+                        key={ev.id}
+                        onClick={ev.onClick}
+                        className={`w-full flex items-center gap-3 px-2 py-2 rounded-xl transition-colors ${ev.onClick ? "hover:bg-zinc-50 cursor-pointer" : ""}`}
+                      >
+                        <div className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 ${ev.iconBg} bg-opacity-10`}>
+                          <ev.icon size={13} className="opacity-80" />
+                        </div>
+                        <p className="flex-1 text-[12px] text-zinc-700 leading-snug min-w-0 truncate">{ev.text}</p>
+                        <span className="text-[10px] text-zinc-300 shrink-0 whitespace-nowrap">{timeAgo(ev.timestamp, locale)}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           )}

@@ -1882,7 +1882,17 @@
     "auditFilterEntityIdPlaceholder": "Pegá un ID exacto…",
     "auditActionAssetUpdate": "Editó un asset",
     "auditActionReportUpdateStatus": "Actualizó el estado de un reporte",
-    "auditEntityContentReport": "Reporte"
+    "auditEntityContentReport": "Reporte",
+    "dashboardActivityTitle": "Actividad reciente",
+    "dashboardActivitySub": "Nuevos Maintlers, assets, registros de servicio, escaneos de QR y acciones de admin — se actualiza sola cada 30 segundos.",
+    "activityRefreshedAt": "actualizado {time}",
+    "noRecentActivity": "Todavía no hay actividad reciente.",
+    "activityNewMechanic": "{name} se unió a MaintlyQR",
+    "activityNewAsset": "Nuevo asset registrado: {asset}",
+    "activityNewService": "Se cargó {type} en {asset}",
+    "activityQrScan": "QR escaneado — {asset}",
+    "activityQrScanUnlinked": "QR escaneado — código {code} (sin asset vinculado)",
+    "activityAdminAction": "Acción de admin: {action}"
   },
   "ReportIssueModal": {
     "title": "Reportar un problema",
