@@ -11,7 +11,7 @@ import {
   Ban, ShieldCheck, ShieldOff, Trash2, KeyRound, UserCog,
   UserPlus, UserMinus, Plus, Link2Off, ScanLine, ClipboardList,
   LifeBuoy, Send, MessageCircle, Flag, History, ChevronDown, ChevronRight,
-  Trash, RotateCcw, TrendingUp, MapPin, Calendar, Pencil,
+  Trash, RotateCcw, TrendingUp, MapPin, Calendar, Pencil, Download,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { formatDateDMY } from "@/lib/date";
@@ -353,6 +353,54 @@ function getAvatarColor(name: string) {
   return colors[(name || "?").charCodeAt(0) % colors.length];
 }
 
+// ────────────────────────────────────────────────────────────────────────────
+// Exportación CSV (Fase 2 / punto 5 del pedido: "Exportación de reportes", y
+// item 15: "tablas con ... exportación") — export client-side, sin pedir nada
+// al backend, para las tablas cuyos datos YA están completos en memoria
+// (bulk-data trae todo de una, sin paginación server-side): Maintlers,
+// Assets, Servicios, QR. Se exporta el conjunto ya filtrado/buscado que el
+// admin está viendo (`visibleX`), no la tabla entera sin filtrar. Las
+// secciones con paginación real server-side (Logs de Auditoría, Reportes y
+// Moderación) tienen su propio export vía backend — ver esos botones más
+// abajo, que pegan contra `?export=csv` en sus rutas existentes en vez de
+// usar esta función.
+function csvEscape(value: unknown): string {
+  if (value === null || value === undefined) return "";
+  const s = String(value);
+  return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+}
+function downloadCsv(filename: string, headers: string[], rows: unknown[][]) {
+  const lines = [headers, ...rows].map((row) => row.map(csvEscape).join(","));
+  // BOM al principio para que Excel abra el UTF-8 sin arruinar acentos (es/pt).
+  const blob = new Blob(["\uFEFF" + lines.join("\r\n")], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+/** Descarga un export server-side (Logs de Auditoría / Reportes) pegándole a la misma ruta GET con `?export=csv` + los filtros vigentes. */
+async function downloadCsvFromApi(url: string, fallbackFilename: string) {
+  const res = await fetch(url);
+  if (!res.ok) return false;
+  const blob = await res.blob();
+  const disposition = res.headers.get("Content-Disposition") || "";
+  const match = disposition.match(/filename="([^"]+)"/);
+  const filename = match?.[1] ?? fallbackFilename;
+  const objectUrl = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = objectUrl;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(objectUrl);
+  return true;
+}
+
 /** Buckets a list of ISO date strings into daily counts for the last `days` days. */
 function bucketDaily(dates: string[], days: number): DayBucket[] {
   const buckets: Record<string, number> = {};
@@ -576,6 +624,11 @@ export default function AdminPage() {
   const [auditLogFrom, setAuditLogFrom] = useState("");
   const [auditLogTo, setAuditLogTo] = useState("");
   const [expandedAuditLogId, setExpandedAuditLogId] = useState<string | null>(null);
+  // Export CSV (Fase 2 / punto 5 del pedido: "Exportación de reportes") — esta
+  // sección tiene paginación real server-side, así que el export no puede
+  // armarse desde `auditLogs` (solo tiene la página actual); pega contra la
+  // misma ruta GET con `?export=csv`, respetando los filtros vigentes.
+  const [auditExportBusy, setAuditExportBusy] = useState(false);
 
   // ── Analytics (item 8 del pedido de Facu) ──
   // Rango con fecha por defecto de últimos 30 días, mismo criterio que el
@@ -601,6 +654,10 @@ export default function AdminPage() {
   // keystroke.
   const [reportNotesDraft, setReportNotesDraft] = useState<Record<string, string>>({});
   const [reportNotesSaving, setReportNotesSaving] = useState<string | null>(null);
+  // Export CSV — mismo criterio que auditExportBusy arriba: paginación real
+  // server-side, así que pega contra /api/admin/reports?export=csv con los
+  // filtros vigentes en vez de exportar solo la página cargada en memoria.
+  const [reportsExportBusy, setReportsExportBusy] = useState(false);
 
   // ── Papelera (Trash — soft delete + restauración, item 14 del pedido) ──
   const [trashMechanics, setTrashMechanics] = useState<TrashMechanicRow[]>([]);
@@ -844,17 +901,24 @@ export default function AdminPage() {
   // Real server-side pagination (page/pageSize -> range() on the server) —
   // this table is meant to grow indefinitely, unlike the "fetch up to N and
   // slice client-side" pattern used for the other tables in this panel.
+  // Filtros compartidos por loadAuditLogs() y el export CSV — se separó para
+  // no repetir la misma construcción de params en dos lugares.
+  function auditLogFilterParams() {
+    const params = new URLSearchParams();
+    if (auditLogActionFilter !== "all") params.set("action", auditLogActionFilter);
+    if (auditLogEntityFilter !== "all") params.set("entityType", auditLogEntityFilter);
+    if (auditLogEntityIdFilter.trim()) params.set("entityId", auditLogEntityIdFilter.trim());
+    if (auditLogFrom) params.set("from", new Date(auditLogFrom).toISOString());
+    if (auditLogTo) params.set("to", new Date(new Date(auditLogTo).getTime() + 86400000).toISOString());
+    return params;
+  }
+
   async function loadAuditLogs() {
     setAuditLogsLoading(true);
     try {
-      const params = new URLSearchParams();
+      const params = auditLogFilterParams();
       params.set("page", String(auditLogsPage));
       params.set("pageSize", String(AUDIT_LOG_PAGE_SIZE));
-      if (auditLogActionFilter !== "all") params.set("action", auditLogActionFilter);
-      if (auditLogEntityFilter !== "all") params.set("entityType", auditLogEntityFilter);
-      if (auditLogEntityIdFilter.trim()) params.set("entityId", auditLogEntityIdFilter.trim());
-      if (auditLogFrom) params.set("from", new Date(auditLogFrom).toISOString());
-      if (auditLogTo) params.set("to", new Date(new Date(auditLogTo).getTime() + 86400000).toISOString());
 
       const res = await fetch(`/api/admin/audit-logs?${params.toString()}`);
       const data = await res.json().catch(() => ({}));
@@ -862,6 +926,21 @@ export default function AdminPage() {
       setAuditLogsTotal((data.total as number) ?? 0);
     } finally {
       setAuditLogsLoading(false);
+    }
+  }
+
+  // Export CSV (Fase 2 / punto 5 del pedido) — pega contra la misma ruta con
+  // `?export=csv` + los filtros vigentes; el backend ignora la paginación y
+  // devuelve hasta 5000 filas (ver la ruta para el motivo del tope).
+  async function handleExportAuditLogs() {
+    setAuditExportBusy(true);
+    try {
+      const params = auditLogFilterParams();
+      params.set("export", "csv");
+      const ok = await downloadCsvFromApi(`/api/admin/audit-logs?${params.toString()}`, "maintlyqr-audit-log.csv");
+      if (!ok) flash(t("exportFailed"), "error");
+    } finally {
+      setAuditExportBusy(false);
     }
   }
 
@@ -906,14 +985,19 @@ export default function AdminPage() {
   // Reportes y Moderación: mismo patrón de paginación real server-side que
   // el log de auditoría (esta tabla la alimenta un formulario público
   // anónimo, así que puede crecer sin límite — ver /api/admin/reports).
+  function reportsFilterParams() {
+    const params = new URLSearchParams();
+    if (reportStatusFilter !== "all") params.set("status", reportStatusFilter);
+    if (reportTypeFilter !== "all") params.set("reportType", reportTypeFilter);
+    return params;
+  }
+
   async function loadReports() {
     setReportsLoading(true);
     try {
-      const params = new URLSearchParams();
+      const params = reportsFilterParams();
       params.set("page", String(reportsPage));
       params.set("pageSize", String(REPORTS_PAGE_SIZE));
-      if (reportStatusFilter !== "all") params.set("status", reportStatusFilter);
-      if (reportTypeFilter !== "all") params.set("reportType", reportTypeFilter);
 
       const res = await fetch(`/api/admin/reports?${params.toString()}`);
       const data = await res.json().catch(() => ({}));
@@ -922,6 +1006,19 @@ export default function AdminPage() {
       setReportsNewCount((data.newCount as number) ?? 0);
     } finally {
       setReportsLoading(false);
+    }
+  }
+
+  // Export CSV — mismo patrón que handleExportAuditLogs() más arriba.
+  async function handleExportReports() {
+    setReportsExportBusy(true);
+    try {
+      const params = reportsFilterParams();
+      params.set("export", "csv");
+      const ok = await downloadCsvFromApi(`/api/admin/reports?${params.toString()}`, "maintlyqr-reports.csv");
+      if (!ok) flash(t("exportFailed"), "error");
+    } finally {
+      setReportsExportBusy(false);
     }
   }
 
@@ -2048,13 +2145,31 @@ export default function AdminPage() {
           {/* ── ACCOUNTS ──────────────────────────────────────────────────── */}
           {section === "accounts" && (
             <div className="space-y-4">
-              <div className="relative max-w-md">
-                <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
-                <input
-                  type="text" value={accountSearch} onChange={(e) => setAccountSearch(e.target.value)}
-                  placeholder={t("searchAccountsPlaceholder")}
-                  className="w-full rounded-xl border border-zinc-200 bg-white pl-9 pr-3 py-[9px] text-[12px] outline-none focus:border-red-400 transition-colors"
-                />
+              <div className="flex flex-wrap items-center gap-3">
+                <div className="relative max-w-md flex-1 min-w-[200px]">
+                  <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
+                  <input
+                    type="text" value={accountSearch} onChange={(e) => setAccountSearch(e.target.value)}
+                    placeholder={t("searchAccountsPlaceholder")}
+                    className="w-full rounded-xl border border-zinc-200 bg-white pl-9 pr-3 py-[9px] text-[12px] outline-none focus:border-red-400 transition-colors"
+                  />
+                </div>
+                <button
+                  onClick={() => downloadCsv(
+                    `maintlyqr-maintlers-${new Date().toISOString().slice(0, 10)}.csv`,
+                    [t("colAccount"), "email", t("colRoles"), t("colStatus"), t("colLastActive"), t("colJoined")],
+                    visibleAccounts.map((a) => [
+                      a.name, a.email,
+                      [a.is_mechanic ? t("mechanicPill") : "", a.is_mechanic && a.verified ? t("verifiedPill") : ""].filter(Boolean).join(" / "),
+                      a.suspended ? t("suspendedPill") : t("activePill"),
+                      a.last_active_at ? formatDate(a.last_active_at) : t("neverActive"),
+                      formatDate(a.created_at),
+                    ])
+                  )}
+                  className="flex items-center gap-2 bg-white border border-zinc-200 hover:bg-zinc-50 text-zinc-600 text-[12px] font-bold px-3.5 py-[9px] rounded-xl transition-colors"
+                >
+                  <Download size={13} /> {t("exportCsv")}
+                </button>
               </div>
 
               <div className="bg-white rounded-2xl border border-zinc-200/80 shadow-sm overflow-hidden">
@@ -2266,13 +2381,30 @@ export default function AdminPage() {
           {/* ── ASSETS ────────────────────────────────────────────────────── */}
           {section === "assets" && (
             <div className="space-y-4">
-              <div className="relative max-w-md">
-                <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
-                <input
-                  type="text" value={assetSearch} onChange={(e) => setAssetSearch(e.target.value)}
-                  placeholder={t("searchAssetsPlaceholder")}
-                  className="w-full rounded-xl border border-zinc-200 bg-white pl-9 pr-3 py-[9px] text-[12px] outline-none focus:border-red-400 transition-colors"
-                />
+              <div className="flex flex-wrap items-center gap-3">
+                <div className="relative max-w-md flex-1 min-w-[200px]">
+                  <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
+                  <input
+                    type="text" value={assetSearch} onChange={(e) => setAssetSearch(e.target.value)}
+                    placeholder={t("searchAssetsPlaceholder")}
+                    className="w-full rounded-xl border border-zinc-200 bg-white pl-9 pr-3 py-[9px] text-[12px] outline-none focus:border-red-400 transition-colors"
+                  />
+                </div>
+                <button
+                  onClick={() => downloadCsv(
+                    `maintlyqr-assets-${new Date().toISOString().slice(0, 10)}.csv`,
+                    [t("colAsset"), t("colType"), t("colVin"), t("colOwner"), t("colServices"), t("colRegistered"), "asset_id", "qr_code"],
+                    visibleAssets.map((a) => [
+                      assetLabel(a), tAssetTypes(a.asset_type), a.vin_serial || a.plate || "",
+                      (a.created_by ? mechanicsById[a.created_by]?.name : "") ?? "",
+                      servicesByAsset[a.id] ?? 0, formatDate(a.created_at),
+                      a.id, (qrCodesByAssetId[a.id] ?? []).join(", "),
+                    ])
+                  )}
+                  className="flex items-center gap-2 bg-white border border-zinc-200 hover:bg-zinc-50 text-zinc-600 text-[12px] font-bold px-3.5 py-[9px] rounded-xl transition-colors"
+                >
+                  <Download size={13} /> {t("exportCsv")}
+                </button>
               </div>
 
               <div className="bg-white rounded-2xl border border-zinc-200/80 shadow-sm overflow-hidden">
@@ -2347,7 +2479,7 @@ export default function AdminPage() {
                 ))}
               </div>
 
-              <div className="flex flex-wrap gap-3">
+              <div className="flex flex-wrap items-center gap-3">
                 <select value={svcMechanicFilter} onChange={(e) => setSvcMechanicFilter(e.target.value)}
                   className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-[12px] outline-none focus:border-red-400">
                   <option value="all">{t("allMechanics")}</option>
@@ -2358,6 +2490,16 @@ export default function AdminPage() {
                   <option value="all">{t("allTypes")}</option>
                   {serviceTypeOptions.map((t) => <option key={t} value={t}>{t}</option>)}
                 </select>
+                <button
+                  onClick={() => downloadCsv(
+                    `maintlyqr-services-${new Date().toISOString().slice(0, 10)}.csv`,
+                    [t("colAsset"), t("colServiceType"), t("colMechanic"), t("colCustomer"), t("colDate")],
+                    visibleServices.map((s) => [s.asset_label, s.service_type, s.mechanic_name, s.customer_name, formatDate(s.service_date)])
+                  )}
+                  className="ml-auto flex items-center gap-2 bg-white border border-zinc-200 hover:bg-zinc-50 text-zinc-600 text-[12px] font-bold px-3.5 py-[9px] rounded-xl transition-colors"
+                >
+                  <Download size={13} /> {t("exportCsv")}
+                </button>
               </div>
 
               <div className="bg-white rounded-2xl border border-zinc-200/80 shadow-sm overflow-hidden">
@@ -2436,8 +2578,21 @@ export default function AdminPage() {
                     {f === "all" ? t("filterAll") : f === "available" ? t("filterAvailable") : t("filterAssigned")}
                   </button>
                 ))}
+                <button
+                  onClick={() => downloadCsv(
+                    `maintlyqr-qr-codes-${new Date().toISOString().slice(0, 10)}.csv`,
+                    [t("colCode"), t("colStatus"), t("colAsset"), t("colCreated")],
+                    visibleQr.map((q) => {
+                      const asset = q.asset_id ? assetsById[q.asset_id] : null;
+                      return [q.code, q.asset_id ? t("assignedPill") : t("availablePill"), asset ? assetLabel(asset) : "", formatDate(q.created_at)];
+                    })
+                  )}
+                  className="ml-auto flex items-center gap-2 bg-white border border-zinc-200 hover:bg-zinc-50 text-zinc-600 text-[12px] font-bold px-3.5 py-[9px] rounded-xl transition-colors"
+                >
+                  <Download size={13} /> {t("exportCsv")}
+                </button>
                 <button onClick={() => setShowGenerateModal(true)}
-                  className="ml-auto flex items-center gap-2 bg-red-600 hover:bg-red-500 text-white text-[12px] font-bold px-4 py-[9px] rounded-xl transition-all shadow-sm">
+                  className="flex items-center gap-2 bg-red-600 hover:bg-red-500 text-white text-[12px] font-bold px-4 py-[9px] rounded-xl transition-all shadow-sm">
                   <Plus size={14} /> {t("generateBatch")}
                 </button>
               </div>
@@ -2852,6 +3007,12 @@ export default function AdminPage() {
                     {t("auditFilterClear")}
                   </button>
                 )}
+                <button
+                  onClick={handleExportAuditLogs} disabled={auditExportBusy}
+                  className="ml-auto flex items-center gap-2 bg-white border border-zinc-200 hover:bg-zinc-50 disabled:opacity-60 text-zinc-600 text-[12px] font-bold px-3.5 py-[9px] rounded-xl transition-colors"
+                >
+                  <Download size={13} /> {auditExportBusy ? t("exporting") : t("exportCsv")}
+                </button>
               </div>
 
               <div className="bg-white rounded-2xl border border-zinc-200/80 shadow-sm overflow-hidden">
@@ -2996,6 +3157,12 @@ export default function AdminPage() {
                     {t("auditFilterClear")}
                   </button>
                 )}
+                <button
+                  onClick={handleExportReports} disabled={reportsExportBusy}
+                  className="ml-auto flex items-center gap-2 bg-white border border-zinc-200 hover:bg-zinc-50 disabled:opacity-60 text-zinc-600 text-[12px] font-bold px-3.5 py-[9px] rounded-xl transition-colors"
+                >
+                  <Download size={13} /> {reportsExportBusy ? t("exporting") : t("exportCsv")}
+                </button>
               </div>
 
               <div className="bg-white rounded-2xl border border-zinc-200/80 shadow-sm overflow-hidden">

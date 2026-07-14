@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { isAdminRequest, getAdminUsername } from "@/lib/adminAuth";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 import { logAdminAction, getRequestIp } from "@/lib/auditLog";
+import { toCsv, csvResponse } from "@/lib/csv";
 
 const STATUSES = ["new", "in_review", "resolved", "closed"] as const;
 
@@ -33,11 +34,22 @@ export type ContentReportRow = {
 // client-side" pattern used elsewhere in this admin panel.
 //
 // Query params (all optional): page (default 1), pageSize (default 25, max
-// 200), status, reportType, from (ISO date), to (ISO date).
+// 200), status, reportType, from (ISO date), to (ISO date), export ("csv").
 //
 // Also always returns `newCount` — the total count of status="new" reports
 // regardless of the filters above — so the sidebar badge can show how many
 // need a first look without a second request.
+//
+// export=csv (Fase 2 / punto 5 del pedido: "Exportación de reportes"): mismo
+// criterio que /api/admin/audit-logs — ignora la paginación y devuelve hasta
+// EXPORT_ROW_CAP filas que matcheen los filtros, como CSV. A diferencia del
+// JSON normal, el CSV NO enriquece con el resumen de asset/mecánico (esa
+// segunda consulta batched más abajo) — trae los IDs crudos (asset_id,
+// service_record_id, mechanic_id, qr_code) para mantener el export simple;
+// un admin que necesite el detalle legible puede seguir usando la vista
+// paginada de la sección, que sí muestra el resumen enriquecido.
+const EXPORT_ROW_CAP = 5000;
+
 export async function GET(req: NextRequest) {
   if (!isAdminRequest(req)) {
     return NextResponse.json({ error: "Not authorized." }, { status: 401 });
@@ -50,6 +62,7 @@ export async function GET(req: NextRequest) {
   const reportType = url.searchParams.get("reportType");
   const from = url.searchParams.get("from");
   const to = url.searchParams.get("to");
+  const wantsCsv = url.searchParams.get("export") === "csv";
 
   const admin = getSupabaseAdmin();
 
@@ -62,6 +75,23 @@ export async function GET(req: NextRequest) {
   if (reportType) query = query.eq("report_type", reportType);
   if (from) query = query.gte("created_at", from);
   if (to) query = query.lte("created_at", to);
+
+  if (wantsCsv) {
+    const { data, error } = await query.limit(EXPORT_ROW_CAP);
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+    const rows = (data ?? []) as ContentReportRow[];
+    const csv = toCsv(
+      ["created_at", "report_type", "status", "message", "reporter_name", "reporter_contact", "asset_id", "service_record_id", "mechanic_id", "qr_code", "internal_notes", "resolved_at", "resolved_by"],
+      rows.map((r) => [
+        r.created_at, r.report_type, r.status, r.message, r.reporter_name ?? "", r.reporter_contact ?? "",
+        r.asset_id ?? "", r.service_record_id ?? "", r.mechanic_id ?? "", r.qr_code ?? "",
+        r.internal_notes ?? "", r.resolved_at ?? "", r.resolved_by ?? "",
+      ])
+    );
+    return csvResponse(`maintlyqr-reports-${new Date().toISOString().slice(0, 10)}.csv`, csv);
+  }
 
   const start = (page - 1) * pageSize;
   const end = start + pageSize - 1;

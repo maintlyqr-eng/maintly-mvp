@@ -1892,7 +1892,10 @@
     "activityNewService": "{type} logged on {asset}",
     "activityQrScan": "QR scanned — {asset}",
     "activityQrScanUnlinked": "QR scanned — code {code} (not linked to an asset)",
-    "activityAdminAction": "Admin action: {action}"
+    "activityAdminAction": "Admin action: {action}",
+    "exportCsv": "Export CSV",
+    "exporting": "Exporting…",
+    "exportFailed": "Couldn't generate the export. Please try again."
   },
   "ReportIssueModal": {
     "title": "Report an issue",

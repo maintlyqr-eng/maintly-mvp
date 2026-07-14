@@ -1892,7 +1892,10 @@
     "activityNewService": "{type} registrado em {asset}",
     "activityQrScan": "QR lido — {asset}",
     "activityQrScanUnlinked": "QR lido — código {code} (sem asset vinculado)",
-    "activityAdminAction": "Ação de admin: {action}"
+    "activityAdminAction": "Ação de admin: {action}",
+    "exportCsv": "Exportar CSV",
+    "exporting": "Exportando…",
+    "exportFailed": "Não foi possível gerar a exportação. Tente novamente."
   },
   "ReportIssueModal": {
     "title": "Reportar um problema",
