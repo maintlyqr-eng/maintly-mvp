@@ -162,6 +162,20 @@ type SupportConversation = {
   unreadCount: number;
 };
 
+// Herramientas de soporte (item 7 del pedido de Facu: "cambiar estado,
+// asignar prioridad, notas internas, ... cerrar caso") — metadata por
+// thread (una fila por mechanic_id), separada de los mensajes en sí.
+// Un thread sin fila todavía en `support_thread_state` se trata como
+// status "open" / priority "normal" / sin notas (ver defaultThreadState()).
+type SupportThreadState = {
+  mechanic_id: string;
+  status: "open" | "closed";
+  priority: "low" | "normal" | "high";
+  internal_notes: string | null;
+  closed_at: string | null;
+  closed_by: string | null;
+};
+
 // Team Chat oversight — Facu's own words: "esto es una pagina profesional
 // y yo quiero tener control sobre los temas que se hablan". These rows
 // come from a service-role admin route (see /api/admin/mechanic-messages),
@@ -600,6 +614,16 @@ export default function AdminPage() {
   const [threadDraft, setThreadDraft] = useState("");
   const [threadSending, setThreadSending] = useState(false);
   const [confirmClearThread, setConfirmClearThread] = useState(false);
+  // Herramientas de soporte (incremento 9, item 7 del pedido + Fase 2 punto
+  // 6: "herramientas de soporte") — búsqueda/filtro sobre la lista de casos,
+  // más el estado por thread (status/prioridad/notas internas) cargado junto
+  // con los mensajes en loadSupportMessages().
+  const [supportSearch, setSupportSearch] = useState("");
+  const [supportStatusFilter, setSupportStatusFilter] = useState<"all" | "open" | "closed">("all");
+  const [supportPriorityFilter, setSupportPriorityFilter] = useState<"all" | "low" | "normal" | "high">("all");
+  const [supportThreadStates, setSupportThreadStates] = useState<Record<string, SupportThreadState>>({});
+  const [supportNotesDraft, setSupportNotesDraft] = useState("");
+  const [supportStateSaving, setSupportStateSaving] = useState(false);
 
   // ── Team Chat oversight (mechanic <-> mechanic, read-only for admin) ──
   const [teamChatView, setTeamChatView] = useState<"conversations" | "reports">("conversations");
@@ -846,6 +870,11 @@ export default function AdminPage() {
       const res = await fetch("/api/admin/support-messages");
       const data = await res.json().catch(() => ({}));
       setSupportMessages((data.messages as SupportMessageRow[]) ?? []);
+      // El estado por thread (status/prioridad/notas, incremento 9) viaja en
+      // la misma respuesta que los mensajes — un solo fetch, sin pedir nada
+      // nuevo al servidor por separado.
+      const states = (data.states as SupportThreadState[]) ?? [];
+      setSupportThreadStates(Object.fromEntries(states.map((s) => [s.mechanic_id, s])));
     } finally {
       setSupportLoading(false);
     }
@@ -853,6 +882,14 @@ export default function AdminPage() {
 
   function getSupportMechanic(m: SupportMessageRow) {
     return Array.isArray(m.mechanics) ? m.mechanics[0] ?? null : m.mechanics;
+  }
+
+  // Un mechanic_id sin fila todavía en support_thread_state (caso nunca
+  // tocado con las herramientas nuevas) es, por definición, un caso abierto
+  // de prioridad normal sin notas — no hace falta escribir una fila por cada
+  // conversación existente de antemano.
+  function defaultThreadState(mechanicId: string): SupportThreadState {
+    return { mechanic_id: mechanicId, status: "open", priority: "normal", internal_notes: null, closed_at: null, closed_by: null };
   }
 
   const supportConversations: SupportConversation[] = useMemo(() => {
@@ -875,6 +912,21 @@ export default function AdminPage() {
     }
     return conversations.sort((a, b) => b.lastMessage.created_at.localeCompare(a.lastMessage.created_at));
   }, [supportMessages]);
+
+  // Búsqueda (por nombre/email del Maintler) + filtros de estado/prioridad
+  // sobre la lista de casos — item 7 del pedido: "buscar/filtrar".
+  const visibleSupportConversations = useMemo(() => {
+    const q = supportSearch.trim().toLowerCase();
+    return supportConversations.filter((c) => {
+      const state = supportThreadStates[c.mechanicId] ?? defaultThreadState(c.mechanicId);
+      if (supportStatusFilter !== "all" && state.status !== supportStatusFilter) return false;
+      if (supportPriorityFilter !== "all" && state.priority !== supportPriorityFilter) return false;
+      if (!q) return true;
+      const name = (c.mechanic?.name ?? "").toLowerCase();
+      const email = (c.mechanic?.email ?? "").toLowerCase();
+      return name.includes(q) || email.includes(q);
+    });
+  }, [supportConversations, supportThreadStates, supportSearch, supportStatusFilter, supportPriorityFilter]);
 
   async function loadTeamChatMessages() {
     setTeamChatLoading(true);
@@ -1097,12 +1149,39 @@ export default function AdminPage() {
   async function openThread(mechanicId: string) {
     setSelectedThreadMechanic(mechanicId);
     setConfirmClearThread(false);
+    setSupportNotesDraft((supportThreadStates[mechanicId] ?? defaultThreadState(mechanicId)).internal_notes ?? "");
     const hasUnread = supportMessages.some((m) => m.mechanic_id === mechanicId && !m.from_admin && !m.read);
     if (hasUnread) {
       const result = await adminFetch("/api/admin/support-messages", "PATCH", { mechanicId });
       if (!result.ok) { flash(result.error || t("couldntMarkRead"), "error"); return; }
       setSupportMessages((prev) => prev.map((x) => (x.mechanic_id === mechanicId && !x.from_admin ? { ...x, read: true } : x)));
     }
+  }
+
+  // Herramientas de soporte (incremento 9): cambiar estado/prioridad/notas
+  // internas de un caso. Un solo endpoint (`/api/admin/support-thread-state`)
+  // que hace upsert de la fila de estado — el llamador manda solo los campos
+  // que cambian, el resto se completa con el estado actual (o el default).
+  async function updateSupportThreadState(mechanicId: string, updates: Partial<Pick<SupportThreadState, "status" | "priority" | "internal_notes">>) {
+    setSupportStateSaving(true);
+    const result = await adminFetch("/api/admin/support-thread-state", "PATCH", { mechanicId, ...updates });
+    setSupportStateSaving(false);
+    if (!result.ok) { flash(result.error || t("couldntUpdateSupportState"), "error"); return; }
+    const saved = (result.data as { state: SupportThreadState }).state;
+    setSupportThreadStates((prev) => ({ ...prev, [mechanicId]: saved }));
+  }
+
+  async function handleToggleSupportStatus(mechanicId: string) {
+    const current = supportThreadStates[mechanicId] ?? defaultThreadState(mechanicId);
+    await updateSupportThreadState(mechanicId, { status: current.status === "open" ? "closed" : "open" });
+  }
+
+  async function handleChangeSupportPriority(mechanicId: string, priority: SupportThreadState["priority"]) {
+    await updateSupportThreadState(mechanicId, { priority });
+  }
+
+  async function handleSaveSupportNotes(mechanicId: string) {
+    await updateSupportThreadState(mechanicId, { internal_notes: supportNotesDraft });
   }
 
   async function sendSupportReply(mechanicId: string, text: string): Promise<boolean> {
@@ -1689,6 +1768,7 @@ export default function AdminPage() {
     "qr.generate_batch": t("auditActionQrGenerateBatch"),
     "qr.unlink": t("auditActionQrUnlink"),
     "support_thread.clear": t("auditActionSupportThreadClear"),
+    "support_thread.update_state": t("auditActionSupportThreadUpdateState"),
     "report.update_status": t("auditActionReportUpdateStatus"),
   };
 
@@ -2659,10 +2739,60 @@ export default function AdminPage() {
                   <p className="text-[13px] text-zinc-300 font-medium">{t("noConversationsYet")}</p>
                 </div>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-[280px_1fr] gap-4 h-[calc(100vh-220px)] min-h-[420px]">
+                <>
+                  {/* Búsqueda + filtros (incremento 9, item 7 del pedido: "buscar/filtrar") */}
+                  <div className="flex flex-wrap items-end gap-3">
+                    <div className="relative max-w-xs flex-1 min-w-[180px]">
+                      <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
+                      <input
+                        type="text" value={supportSearch} onChange={(e) => setSupportSearch(e.target.value)}
+                        placeholder={t("supportSearchPlaceholder")}
+                        className="w-full rounded-xl border border-zinc-200 bg-white pl-9 pr-3 py-[9px] text-[12px] outline-none focus:border-red-400 transition-colors"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1">{t("supportFilterStatus")}</label>
+                      <select
+                        value={supportStatusFilter}
+                        onChange={(e) => setSupportStatusFilter(e.target.value as typeof supportStatusFilter)}
+                        className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-[12px] outline-none focus:border-red-400"
+                      >
+                        <option value="all">{t("auditFilterAll")}</option>
+                        <option value="open">{t("supportStatusOpen")}</option>
+                        <option value="closed">{t("supportStatusClosed")}</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1">{t("supportFilterPriority")}</label>
+                      <select
+                        value={supportPriorityFilter}
+                        onChange={(e) => setSupportPriorityFilter(e.target.value as typeof supportPriorityFilter)}
+                        className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-[12px] outline-none focus:border-red-400"
+                      >
+                        <option value="all">{t("auditFilterAll")}</option>
+                        <option value="low">{t("supportPriorityLow")}</option>
+                        <option value="normal">{t("supportPriorityNormal")}</option>
+                        <option value="high">{t("supportPriorityHigh")}</option>
+                      </select>
+                    </div>
+                    {(supportSearch || supportStatusFilter !== "all" || supportPriorityFilter !== "all") && (
+                      <button
+                        onClick={() => { setSupportSearch(""); setSupportStatusFilter("all"); setSupportPriorityFilter("all"); }}
+                        className="text-[11px] font-bold text-zinc-400 hover:text-red-600 transition-colors px-2 py-2"
+                      >
+                        {t("auditFilterClear")}
+                      </button>
+                    )}
+                  </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-[280px_1fr] gap-4 h-[calc(100vh-260px)] min-h-[420px]">
                   {/* Conversation list */}
                   <div className={`bg-white rounded-2xl border border-zinc-200/80 shadow-sm overflow-y-auto ${activeThread ? "hidden md:block" : ""}`}>
-                    {supportConversations.map((c) => (
+                    {visibleSupportConversations.length === 0 ? (
+                      <p className="text-[12px] text-zinc-300 text-center py-10 px-4">{t("supportNoMatches")}</p>
+                    ) : visibleSupportConversations.map((c) => {
+                      const state = supportThreadStates[c.mechanicId] ?? defaultThreadState(c.mechanicId);
+                      return (
                       <button
                         key={c.mechanicId}
                         onClick={() => openThread(c.mechanicId)}
@@ -2679,12 +2809,23 @@ export default function AdminPage() {
                           <p className="text-[11.5px] text-zinc-400 truncate mt-0.5">
                             {c.lastMessage.from_admin ? t("youPrefix") : ""}{c.lastMessage.body}
                           </p>
+                          <div className="flex items-center gap-1.5 mt-1.5">
+                            <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-md ${state.status === "closed" ? "bg-zinc-100 text-zinc-400" : "bg-emerald-50 text-emerald-600"}`}>
+                              {state.status === "closed" ? t("supportStatusClosed") : t("supportStatusOpen")}
+                            </span>
+                            {state.priority !== "normal" && (
+                              <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-md ${state.priority === "high" ? "bg-red-50 text-red-600" : "bg-zinc-50 text-zinc-400"}`}>
+                                {state.priority === "high" ? t("supportPriorityHigh") : t("supportPriorityLow")}
+                              </span>
+                            )}
+                          </div>
                         </div>
                         {c.unreadCount > 0 && (
                           <span className="text-[9px] font-black bg-red-600 text-white rounded-full min-w-[16px] h-4 flex items-center justify-center px-1 shrink-0">{c.unreadCount}</span>
                         )}
                       </button>
-                    ))}
+                      );
+                    })}
                   </div>
 
                   {/* Thread */}
@@ -2730,6 +2871,57 @@ export default function AdminPage() {
                           )}
                         </div>
 
+                        {/* Estado / prioridad / notas internas del caso (incremento 9) */}
+                        <div className="px-5 py-2.5 border-b border-zinc-100 bg-zinc-50/60 flex flex-wrap items-center gap-2">
+                          {(() => {
+                            const state = supportThreadStates[activeThread.mechanicId] ?? defaultThreadState(activeThread.mechanicId);
+                            return (
+                              <>
+                                <button
+                                  onClick={() => handleToggleSupportStatus(activeThread.mechanicId)}
+                                  disabled={supportStateSaving}
+                                  className={`text-[11px] font-bold px-2.5 py-1.5 rounded-lg transition-colors disabled:opacity-50 ${
+                                    state.status === "closed" ? "bg-white border border-zinc-200 text-zinc-500 hover:bg-zinc-100" : "bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+                                  }`}
+                                >
+                                  {state.status === "closed" ? t("supportReopenCase") : t("supportCloseCase")}
+                                </button>
+                                <select
+                                  value={state.priority}
+                                  disabled={supportStateSaving}
+                                  onChange={(e) => handleChangeSupportPriority(activeThread.mechanicId, e.target.value as SupportThreadState["priority"])}
+                                  className="text-[11px] font-semibold rounded-lg border border-zinc-200 bg-white px-2 py-1.5 outline-none focus:border-red-400 disabled:opacity-50"
+                                >
+                                  <option value="low">{t("supportPriorityLow")}</option>
+                                  <option value="normal">{t("supportPriorityNormal")}</option>
+                                  <option value="high">{t("supportPriorityHigh")}</option>
+                                </select>
+                                {state.status === "closed" && state.closed_at && (
+                                  <span className="text-[10px] text-zinc-400">
+                                    {t("supportClosedByPrefix")} {state.closed_by ?? "—"} · {formatDate(state.closed_at)}
+                                  </span>
+                                )}
+                              </>
+                            );
+                          })()}
+                        </div>
+                        <div className="px-5 py-2.5 border-b border-zinc-100 flex items-start gap-2">
+                          <textarea
+                            value={supportNotesDraft}
+                            onChange={(e) => setSupportNotesDraft(e.target.value)}
+                            placeholder={t("supportInternalNotesPlaceholder")}
+                            rows={2}
+                            className="flex-1 rounded-lg border border-zinc-200 px-2.5 py-2 text-[11.5px] outline-none focus:border-red-400 resize-none bg-amber-50/40"
+                          />
+                          <button
+                            onClick={() => handleSaveSupportNotes(activeThread.mechanicId)}
+                            disabled={supportStateSaving}
+                            className="text-[11px] font-bold text-white bg-zinc-800 hover:bg-zinc-700 disabled:opacity-50 px-3 py-2 rounded-lg transition-colors shrink-0"
+                          >
+                            {t("save")}
+                          </button>
+                        </div>
+
                         <div className="flex-1 overflow-y-auto px-5 py-4 space-y-2.5 bg-zinc-50/40">
                           {activeThread.messages.map((m, i) => {
                             const prev = activeThread.messages[i - 1];
@@ -2773,6 +2965,7 @@ export default function AdminPage() {
                     )}
                   </div>
                 </div>
+                </>
               )}
             </div>
           )}

@@ -4,24 +4,34 @@ import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 import { logAdminAction, getRequestIp } from "@/lib/auditLog";
 
 // GET: the full admin <-> mechanic conversation history, oldest first
-// (the client groups rows into one thread per mechanic_id).
+// (the client groups rows into one thread per mechanic_id), plus the
+// per-thread state (status/priority/internal notes — incremento 9,
+// "herramientas de soporte") from support_thread_state (migración 034).
+// Both come back in one request since the admin UI always needs both
+// together to render the case list.
 export async function GET(req: NextRequest) {
   if (!isAdminRequest(req)) {
     return NextResponse.json({ error: "Not authorized." }, { status: 401 });
   }
 
   const admin = getSupabaseAdmin();
-  const { data, error } = await admin
-    .from("support_messages")
-    .select("id, mechanic_id, body, read, created_at, from_admin, mechanics(name, email)")
-    .eq("hidden_for_admin", false)
-    .order("created_at", { ascending: true });
+  const [{ data, error }, { data: states, error: statesError }] = await Promise.all([
+    admin
+      .from("support_messages")
+      .select("id, mechanic_id, body, read, created_at, from_admin, mechanics(name, email)")
+      .eq("hidden_for_admin", false)
+      .order("created_at", { ascending: true }),
+    admin.from("support_thread_state").select("*"),
+  ]);
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
+  if (statesError) {
+    return NextResponse.json({ error: statesError.message }, { status: 500 });
+  }
 
-  return NextResponse.json({ messages: data ?? [] });
+  return NextResponse.json({ messages: data ?? [], states: states ?? [] });
 }
 
 // POST: send a message from the Control Center into a mechanic's support

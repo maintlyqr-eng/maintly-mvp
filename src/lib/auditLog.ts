@@ -27,6 +27,7 @@ export type AdminAuditAction =
   | "qr.generate_batch"
   | "qr.unlink"
   | "support_thread.clear"
+  | "support_thread.update_state"
   | "report.update_status";
 
 export type AdminAuditEntityType = "mechanic" | "asset" | "service_record" | "qr_code" | "qr_batch" | "support_thread" | "content_report";
