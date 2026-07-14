@@ -1546,7 +1546,7 @@
     "footerNote": "MaintlyQR · Uso interno apenas",
     "loadingControlCenter": "Carregando central de controle…",
     "navigationLabel": "Navegação",
-    "navDashboard": "Dashboard",
+    "navDashboard": "Painel",
     "navAccounts": "Contas",
     "navMechanics": "Mecânicos",
     "navVerifications": "Verificações",
@@ -1558,7 +1558,6 @@
     "mechanicView": "Visão do Mecânico",
     "logOut": "Sair",
     "headerSubtitle": "Central de controle de operações do MaintlyQR",
-    "refresh": "Atualizar",
     "usersRegistered": "Usuários Registrados",
     "mechanicAccounts": "Contas de Mecânico",
     "verifiedMechanics": "Mecânicos Verificados",
@@ -1911,7 +1910,9 @@
     "supportInternalNotesPlaceholder": "Notas internas (não visíveis para o Maintler)...",
     "auditActionSupportThreadUpdateState": "Atualizou caso de suporte",
     "couldntUpdateSupportState": "Não foi possível atualizar o caso. Tente novamente.",
-    "save": "Salvar"
+    "save": "Salvar",
+    "autoRefreshTitle": "Esta página é atualizada automaticamente",
+    "lastRefreshedAt": "atualizado {time}"
   },
   "ReportIssueModal": {
     "title": "Reportar um problema",

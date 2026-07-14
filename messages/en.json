@@ -1558,7 +1558,6 @@
     "mechanicView": "Mechanic View",
     "logOut": "Log out",
     "headerSubtitle": "MaintlyQR operations control center",
-    "refresh": "Refresh",
     "usersRegistered": "Users Registered",
     "mechanicAccounts": "Mechanic Accounts",
     "verifiedMechanics": "Verified Mechanics",
@@ -1911,7 +1910,9 @@
     "supportInternalNotesPlaceholder": "Internal notes (not visible to the Maintler)...",
     "auditActionSupportThreadUpdateState": "Updated support case",
     "couldntUpdateSupportState": "Couldn't update the case. Please try again.",
-    "save": "Save"
+    "save": "Save",
+    "autoRefreshTitle": "This page updates automatically",
+    "lastRefreshedAt": "updated {time}"
   },
   "ReportIssueModal": {
     "title": "Report an issue",

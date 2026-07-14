@@ -555,6 +555,14 @@ export default function AdminPage() {
   const [loginSubmitting, setLoginSubmitting] = useState(false);
   const [loading, setLoading]         = useState(true);
   const [refreshing, setRefreshing]   = useState(false);
+  // Incremento 10 (14 jul 2026, pedido explícito de Facu: "el boton de
+  // actualizar ese que tengo no deberia existir y la pagina del
+  // administrador deberia actualizarse sola todo el tiempo") — reemplaza el
+  // botón manual "Actualizar" del header por un auto-refresh silencioso
+  // (ver el useEffect de "Auto-refresco global" más abajo); este timestamp
+  // alimenta el indicador de "actualizado hace X" que ocupa el lugar del
+  // botón.
+  const [lastFullRefreshAt, setLastFullRefreshAt] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [section, setSection] = useState<Section>("dashboard");
   const [actionMsg, setActionMsg] = useState<{ text: string; tone: "ok" | "error" } | null>(null);
@@ -861,6 +869,7 @@ export default function AdminPage() {
 
     await loadSupportMessages();
 
+    setLastFullRefreshAt(new Date().toISOString());
     setRefreshing(false);
   }
 
@@ -1247,6 +1256,24 @@ export default function AdminPage() {
       .catch(() => setLoginChecked(true));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Auto-refresco global (incremento 10, 14 jul 2026 — pedido explícito de
+  // Facu: "el boton de actualizar ese que tengo no deberia existir y la
+  // pagina del administrador deberia actualizarse sola todo el tiempo").
+  // Reemplaza el botón manual "Actualizar" del header: mientras haya una
+  // sesión de admin activa, se vuelve a correr `loadData()` (lo mismo que
+  // hacía ese botón) cada 60s, sin importar qué sección esté abierta —
+  // mismo patrón de polling ya usado para "Actividad en tiempo real"
+  // (incremento 7), solo que a nivel de todo el panel en vez de un feed
+  // puntual. `loadData()` no toca `loading` (el spinner de carga inicial),
+  // así que estos refrescos son silenciosos y no generan saltos de layout;
+  // el único indicador visible es el "actualizado hace X" del header.
+  useEffect(() => {
+    if (!adminAuthed) return;
+    const interval = setInterval(loadData, 60000);
+    return () => clearInterval(interval);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [adminAuthed]);
 
   // Support conversations aren't realtime — refetch every time this tab is
   // opened so a reply is never composed against a stale, half-loaded thread.
@@ -2060,11 +2087,12 @@ export default function AdminPage() {
               <p className="hidden sm:block text-[12px] text-zinc-400 font-medium mt-0.5">{t("headerSubtitle")}</p>
             </div>
           </div>
-          <button onClick={loadData} disabled={refreshing}
-            className="flex items-center gap-2 bg-white border border-zinc-200 hover:border-zinc-300 hover:bg-zinc-50 text-zinc-600 hover:text-zinc-900 text-[12px] font-bold px-3 md:px-4 py-2.5 rounded-xl transition-all disabled:opacity-40 shadow-sm shrink-0">
-            <RefreshCw size={13} className={refreshing ? "animate-spin" : ""} />
-            <span className="hidden sm:inline">{t("refresh")}</span>
-          </button>
+          <div className="flex items-center gap-2 text-zinc-400 shrink-0" title={t("autoRefreshTitle")}>
+            <RefreshCw size={13} className={refreshing ? "animate-spin text-zinc-500" : ""} />
+            {lastFullRefreshAt && (
+              <span className="hidden sm:inline text-[11px] font-semibold">{t("lastRefreshedAt", { time: timeAgo(lastFullRefreshAt, locale) })}</span>
+            )}
+          </div>
         </header>
 
         {actionMsg && (
