@@ -1568,6 +1568,95 @@ export default function AdminPage() {
     });
   }, [qrCodes, qrStatusFilter, qrSearch]);
 
+  // Movido acá arriba de los primeros `return` condicionales (login/loading)
+  // — este objeto y el useMemo de abajo (`recentActivityFeed`) tienen que
+  // ejecutarse en TODOS los renders, sin importar el estado de auth/carga.
+  // Antes estaban después de esos `return`, lo que violaba las Reglas de
+  // los Hooks (un useMemo que a veces corre y a veces no, según el render)
+  // y producía "Minified React error #310" en producción una vez logueado
+  // — bug detectado por Facu el 14 jul 2026 y corregido acá.
+  const AUDIT_ACTION_LABEL: Record<string, string> = {
+    "admin.login": t("auditActionAdminLogin"),
+    "admin.logout": t("auditActionAdminLogout"),
+    "account.update": t("auditActionAccountUpdate"),
+    "account.delete": t("auditActionAccountDelete"),
+    "account.restore": t("auditActionAccountRestore"),
+    "account.delete_permanent": t("auditActionAccountDeletePermanent"),
+    "asset.delete": t("auditActionAssetDelete"),
+    "asset.restore": t("auditActionAssetRestore"),
+    "asset.delete_permanent": t("auditActionAssetDeletePermanent"),
+    "asset.update": t("auditActionAssetUpdate"),
+    "service.delete": t("auditActionServiceDelete"),
+    "service.restore": t("auditActionServiceRestore"),
+    "service.delete_permanent": t("auditActionServiceDeletePermanent"),
+    "qr.generate_batch": t("auditActionQrGenerateBatch"),
+    "qr.unlink": t("auditActionQrUnlink"),
+    "support_thread.clear": t("auditActionSupportThreadClear"),
+    "report.update_status": t("auditActionReportUpdateStatus"),
+  };
+
+  // "Actividad en tiempo real" (item 1 del pedido: "actividad reciente" del
+  // Dashboard, y Fase 2 / punto 2: "Actividad en tiempo real") — mezcla, en
+  // el cliente, 5 fuentes que YA se cargan por separado en distintas partes
+  // del panel: cuentas/assets/servicios nuevos vienen de `accounts`/
+  // `assets`/`services` (ya ordenados por fecha desde bulk-data, así que
+  // `.slice(0, N)` alcanza sin pedir nada de nuevo); escaneos y acciones de
+  // admin vienen de `recentScans`/`recentAuditLogs`, refrescados cada 30s
+  // por loadRecentActivity(). `services` usa `service_date` como proxy de
+  // "cuándo pasó" (no hay `created_at` en ese tipo) — una carga atrasada
+  // podría aparecer "vieja" acá aunque se haya cargado recién; aceptable
+  // para un feed de actividad, no para una métrica de auditoría exacta.
+  const ACTIVITY_FEED_LIMIT = 20;
+  type ActivityEvent = {
+    id: string; type: "new_mechanic" | "new_asset" | "new_service" | "qr_scan" | "admin_action";
+    timestamp: string; icon: React.ElementType; iconBg: string; text: string;
+    onClick?: () => void;
+  };
+  const recentActivityFeed = useMemo(() => {
+    const events: ActivityEvent[] = [];
+
+    for (const a of accounts.slice(0, 8)) {
+      events.push({
+        id: `mech-${a.id}`, type: "new_mechanic", timestamp: a.created_at,
+        icon: Users, iconBg: "bg-blue-500",
+        text: t("activityNewMechanic", { name: a.name }),
+        onClick: () => openDetail(a),
+      });
+    }
+    for (const a of assets.slice(0, 8)) {
+      events.push({
+        id: `asset-${a.id}`, type: "new_asset", timestamp: a.created_at,
+        icon: Box, iconBg: "bg-purple-500",
+        text: t("activityNewAsset", { asset: assetLabel(a) }),
+      });
+    }
+    for (const s of services.slice(0, 8)) {
+      events.push({
+        id: `svc-${s.id}`, type: "new_service", timestamp: s.service_date,
+        icon: ClipboardList, iconBg: "bg-cyan-500",
+        text: t("activityNewService", { type: s.service_type, asset: s.asset_label }),
+      });
+    }
+    for (const sc of recentScans) {
+      const asset = sc.asset_id ? assetsById[sc.asset_id] : null;
+      events.push({
+        id: `scan-${sc.code}-${sc.scanned_at}`, type: "qr_scan", timestamp: sc.scanned_at,
+        icon: ScanLine, iconBg: "bg-pink-500",
+        text: asset ? t("activityQrScan", { asset: assetLabel(asset) }) : t("activityQrScanUnlinked", { code: sc.code }),
+      });
+    }
+    for (const log of recentAuditLogs) {
+      events.push({
+        id: `log-${log.id}`, type: "admin_action", timestamp: log.created_at,
+        icon: History, iconBg: "bg-zinc-700",
+        text: t("activityAdminAction", { action: AUDIT_ACTION_LABEL[log.action] ?? log.action }),
+        onClick: log.entity_type && log.entity_id ? () => viewHistory(log.entity_type as string, log.entity_id as string) : undefined,
+      });
+    }
+
+    return events.sort((a, b) => b.timestamp.localeCompare(a.timestamp)).slice(0, ACTIVITY_FEED_LIMIT);
+  }, [accounts, assets, services, recentScans, recentAuditLogs, assetsById, AUDIT_ACTION_LABEL, t]);
+
   if (!loginChecked) return null;
 
   // ── LOGIN ─────────────────────────────────────────────────────────────────────
@@ -1687,25 +1776,6 @@ export default function AdminPage() {
   const REPORT_STATUS_TONE: Record<string, "amber" | "blue" | "emerald" | "zinc"> = {
     new: "amber", in_review: "blue", resolved: "emerald", closed: "zinc",
   };
-  const AUDIT_ACTION_LABEL: Record<string, string> = {
-    "admin.login": t("auditActionAdminLogin"),
-    "admin.logout": t("auditActionAdminLogout"),
-    "account.update": t("auditActionAccountUpdate"),
-    "account.delete": t("auditActionAccountDelete"),
-    "account.restore": t("auditActionAccountRestore"),
-    "account.delete_permanent": t("auditActionAccountDeletePermanent"),
-    "asset.delete": t("auditActionAssetDelete"),
-    "asset.restore": t("auditActionAssetRestore"),
-    "asset.delete_permanent": t("auditActionAssetDeletePermanent"),
-    "asset.update": t("auditActionAssetUpdate"),
-    "service.delete": t("auditActionServiceDelete"),
-    "service.restore": t("auditActionServiceRestore"),
-    "service.delete_permanent": t("auditActionServiceDeletePermanent"),
-    "qr.generate_batch": t("auditActionQrGenerateBatch"),
-    "qr.unlink": t("auditActionQrUnlink"),
-    "support_thread.clear": t("auditActionSupportThreadClear"),
-    "report.update_status": t("auditActionReportUpdateStatus"),
-  };
   const AUDIT_ENTITY_LABEL: Record<string, string> = {
     mechanic: t("auditEntityMechanic"),
     asset: t("auditEntityAsset"),
@@ -1718,68 +1788,6 @@ export default function AdminPage() {
   const auditLogTotalPages = Math.max(1, Math.ceil(auditLogsTotal / AUDIT_LOG_PAGE_SIZE));
   const reportsTotalPages = Math.max(1, Math.ceil(reportsTotal / REPORTS_PAGE_SIZE));
   const unreadSupportCount = supportMessages.filter((m) => !m.from_admin && !m.read).length;
-
-  // "Actividad en tiempo real" (item 1 del pedido: "actividad reciente" del
-  // Dashboard, y Fase 2 / punto 2: "Actividad en tiempo real") — mezcla, en
-  // el cliente, 5 fuentes que YA se cargan por separado en distintas partes
-  // del panel: cuentas/assets/servicios nuevos vienen de `accounts`/
-  // `assets`/`services` (ya ordenados por fecha desde bulk-data, así que
-  // `.slice(0, N)` alcanza sin pedir nada de nuevo); escaneos y acciones de
-  // admin vienen de `recentScans`/`recentAuditLogs`, refrescados cada 30s
-  // por loadRecentActivity(). `services` usa `service_date` como proxy de
-  // "cuándo pasó" (no hay `created_at` en ese tipo) — una carga atrasada
-  // podría aparecer "vieja" acá aunque se haya cargado recién; aceptable
-  // para un feed de actividad, no para una métrica de auditoría exacta.
-  const ACTIVITY_FEED_LIMIT = 20;
-  type ActivityEvent = {
-    id: string; type: "new_mechanic" | "new_asset" | "new_service" | "qr_scan" | "admin_action";
-    timestamp: string; icon: React.ElementType; iconBg: string; text: string;
-    onClick?: () => void;
-  };
-  const recentActivityFeed = useMemo(() => {
-    const events: ActivityEvent[] = [];
-
-    for (const a of accounts.slice(0, 8)) {
-      events.push({
-        id: `mech-${a.id}`, type: "new_mechanic", timestamp: a.created_at,
-        icon: Users, iconBg: "bg-blue-500",
-        text: t("activityNewMechanic", { name: a.name }),
-        onClick: () => openDetail(a),
-      });
-    }
-    for (const a of assets.slice(0, 8)) {
-      events.push({
-        id: `asset-${a.id}`, type: "new_asset", timestamp: a.created_at,
-        icon: Box, iconBg: "bg-purple-500",
-        text: t("activityNewAsset", { asset: assetLabel(a) }),
-      });
-    }
-    for (const s of services.slice(0, 8)) {
-      events.push({
-        id: `svc-${s.id}`, type: "new_service", timestamp: s.service_date,
-        icon: ClipboardList, iconBg: "bg-cyan-500",
-        text: t("activityNewService", { type: s.service_type, asset: s.asset_label }),
-      });
-    }
-    for (const sc of recentScans) {
-      const asset = sc.asset_id ? assetsById[sc.asset_id] : null;
-      events.push({
-        id: `scan-${sc.code}-${sc.scanned_at}`, type: "qr_scan", timestamp: sc.scanned_at,
-        icon: ScanLine, iconBg: "bg-pink-500",
-        text: asset ? t("activityQrScan", { asset: assetLabel(asset) }) : t("activityQrScanUnlinked", { code: sc.code }),
-      });
-    }
-    for (const log of recentAuditLogs) {
-      events.push({
-        id: `log-${log.id}`, type: "admin_action", timestamp: log.created_at,
-        icon: History, iconBg: "bg-zinc-700",
-        text: t("activityAdminAction", { action: AUDIT_ACTION_LABEL[log.action] ?? log.action }),
-        onClick: log.entity_type && log.entity_id ? () => viewHistory(log.entity_type as string, log.entity_id as string) : undefined,
-      });
-    }
-
-    return events.sort((a, b) => b.timestamp.localeCompare(a.timestamp)).slice(0, ACTIVITY_FEED_LIMIT);
-  }, [accounts, assets, services, recentScans, recentAuditLogs, assetsById, AUDIT_ACTION_LABEL, t]);
 
   return (
     <div className="min-h-screen bg-zinc-50/60 flex text-zinc-900 relative">
