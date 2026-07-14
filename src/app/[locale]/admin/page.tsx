@@ -2079,7 +2079,15 @@ export default function AdminPage() {
   // renderizar el sidebar — un rol limitado (Support Admin, Content
   // Moderator, Analytics Viewer) directamente no ve las secciones que no
   // puede tocar, en vez de verlas y chocar con un 403 al abrirlas.
-  const navItems: { id: Section; label: string; icon: React.ElementType }[] = [
+  // ALL_NAV_ITEMS separado de navItems a propósito: si el array literal se
+  // tipa directamente en la misma expresión que el .filter() de abajo,
+  // TypeScript deja de aplicar el tipado contextual de la anotación al
+  // literal (cada `id: "dashboard"` se ensancha a `string` en vez de
+  // quedar como el literal `Section` correspondiente) y el build de
+  // Next.js falla con un error de tipos que este sandbox no puede
+  // reproducir (no corre `next build`, solo `tsc` sobre un archivo
+  // aislado) — detectado recién en el build real de Vercel.
+  const ALL_NAV_ITEMS: { id: Section; label: string; icon: React.ElementType }[] = [
     { id: "dashboard", label: t("navDashboard"), icon: BarChart3 },
     { id: "accounts",  label: t("navAccounts"),  icon: Users     },
     { id: "mechanics", label: t("navMechanics"), icon: Wrench    },
@@ -2094,7 +2102,8 @@ export default function AdminPage() {
     { id: "audit-log", label: t("navAuditLog"), icon: History },
     { id: "trash",     label: t("navTrash"),     icon: Trash    },
     { id: "admins",    label: t("navAdmins"),    icon: UserCog  },
-  ].filter(({ id }) => canSeeSection(id, adminCapabilities));
+  ];
+  const navItems = ALL_NAV_ITEMS.filter(({ id }) => canSeeSection(id, adminCapabilities));
   const sectionLabels: Record<Section, string> = {
     dashboard: t("navDashboard"), accounts: t("navAccounts"), mechanics: t("navMechanics"), verifications: t("navVerifications"),
     assets: t("navAssets"), services: t("navServices"), qr: t("navQr"), support: t("navSupport"), "team-chat": t("navTeamChat"),
