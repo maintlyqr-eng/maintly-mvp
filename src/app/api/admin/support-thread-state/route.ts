@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { isAdminRequest, getAdminUsername } from "@/lib/adminAuth";
+import { adminHasCapability, getAdminUsername } from "@/lib/adminAuth";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 import { logAdminAction, getRequestIp } from "@/lib/auditLog";
 
@@ -27,8 +27,8 @@ export type SupportThreadStateRow = {
 // /api/admin/reports — so these fields always reflect the most recent
 // close, never a stale one from a prior close/reopen cycle).
 export async function PATCH(req: NextRequest) {
-  if (!isAdminRequest(req)) {
-    return NextResponse.json({ error: "Not authorized." }, { status: 401 });
+  if (!adminHasCapability(req, "support")) {
+    return NextResponse.json({ error: "Not authorized." }, { status: 403 });
   }
 
   const body = await req.json().catch(() => ({}));

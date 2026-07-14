@@ -1,12 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
-import { isAdminRequest, getAdminUsername } from "@/lib/adminAuth";
+import { adminHasCapability, getAdminUsername } from "@/lib/adminAuth";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 import { logAdminAction, getRequestIp } from "@/lib/auditLog";
 
 // PATCH: restore a soft-deleted service record. Body: { id, restore: true }
 export async function PATCH(req: NextRequest) {
-  if (!isAdminRequest(req)) {
-    return NextResponse.json({ error: "Not authorized." }, { status: 401 });
+  // Incremento 11: service_records cuenta como "registros" dentro de
+  // "assets" (Content Moderator + Super Admin), per el pedido original.
+  if (!adminHasCapability(req, "assets")) {
+    return NextResponse.json({ error: "Not authorized." }, { status: 403 });
   }
 
   const body = await req.json().catch(() => ({}));
@@ -52,14 +54,19 @@ export async function PATCH(req: NextRequest) {
 // removal, only once the record is already soft-deleted (see accounts/
 // route.ts for the same "papelera first, then permanent" gating and why).
 export async function DELETE(req: NextRequest) {
-  if (!isAdminRequest(req)) {
-    return NextResponse.json({ error: "Not authorized." }, { status: 401 });
+  if (!adminHasCapability(req, "assets")) {
+    return NextResponse.json({ error: "Not authorized." }, { status: 403 });
   }
 
   const body = await req.json().catch(() => ({}));
   const { id, permanent } = body ?? {};
   if (!id || typeof id !== "string") {
     return NextResponse.json({ error: "Missing service id." }, { status: 400 });
+  }
+
+  // Incremento 11 / item 14: eliminación permanente exige "critical_actions".
+  if (permanent === true && !adminHasCapability(req, "critical_actions")) {
+    return NextResponse.json({ error: "Only a Super Admin can permanently delete a service record." }, { status: 403 });
   }
 
   const admin = getSupabaseAdmin();

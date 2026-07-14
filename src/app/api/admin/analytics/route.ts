@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { isAdminRequest } from "@/lib/adminAuth";
+import { adminHasCapability } from "@/lib/adminAuth";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 
 // GET: item 8 del pedido de Facu ("Analytics avanzados") + la parte de
@@ -27,8 +27,9 @@ const SCAN_SAMPLE_CAP = 5000;
 const SERVICE_SAMPLE_CAP = 5000;
 
 export async function GET(req: NextRequest) {
-  if (!isAdminRequest(req)) {
-    return NextResponse.json({ error: "Not authorized." }, { status: 401 });
+  // Incremento 11: "analytics" (Analytics Viewer + Super Admin).
+  if (!adminHasCapability(req, "analytics")) {
+    return NextResponse.json({ error: "Not authorized." }, { status: 403 });
   }
 
   const url = new URL(req.url);

@@ -142,7 +142,55 @@ type UsageMetrics = {
   checkedAt: string;
 };
 
-type Section = "dashboard" | "accounts" | "mechanics" | "verifications" | "assets" | "services" | "qr" | "support" | "team-chat" | "moderation" | "analytics" | "audit-log" | "trash";
+type Section = "dashboard" | "accounts" | "mechanics" | "verifications" | "assets" | "services" | "qr" | "support" | "team-chat" | "moderation" | "analytics" | "audit-log" | "trash" | "admins";
+
+// Incremento 11 (14 jul 2026, roles y permisos): rol de un admin del panel
+// y las capacidades que devuelve /api/admin/session — mismo tipo/nombres
+// que src/lib/adminRoles.ts, duplicado acá a propósito (un componente
+// "use client" no debería importar nada del lado del servidor, aunque este
+// archivo en particular no toca crypto/env — es más simple mantener este
+// tipo como fuente de verdad del lado del cliente).
+type AdminRole = "super_admin" | "support_admin" | "content_moderator" | "analytics_viewer";
+type AdminUserRow = {
+  id: string;
+  username: string;
+  role: AdminRole;
+  active: boolean;
+  created_at: string;
+  created_by: string | null;
+  last_login_at: string | null;
+};
+
+// Mapeo sección → capacidad requerida (ver src/lib/adminRoles.ts para el
+// mismo mapeo del lado del servidor — cada ruta de API vuelve a chequear
+// esto por su cuenta, este mapeo del lado del cliente es solo para decidir
+// qué mostrar en el sidebar, nunca la única barrera de seguridad).
+// "dashboard" no está en el mapa a propósito: cualquier admin autenticado
+// puede verlo (aunque el bulk-data que lo alimenta pueda devolver 403 para
+// Analytics Viewer — ver nota en loadData/bulk-data).
+const SECTION_CAPABILITY: Partial<Record<Section, string>> = {
+  accounts: "accounts",
+  mechanics: "accounts",
+  verifications: "accounts",
+  assets: "assets",
+  services: "assets",
+  qr: "qr",
+  support: "support",
+  "team-chat": "reports",
+  moderation: "reports",
+  analytics: "analytics",
+  "audit-log": "audit_logs",
+  admins: "admin_management",
+};
+
+function canSeeSection(id: Section, capabilities: string[]): boolean {
+  if (id === "dashboard") return true;
+  // trash lee de 3 dominios a la vez (accounts + assets + services) — ver
+  // /api/admin/trash/route.ts, que exige "accounts" O "assets".
+  if (id === "trash") return capabilities.includes("accounts") || capabilities.includes("assets");
+  const cap = SECTION_CAPABILITY[id];
+  return !cap || capabilities.includes(cap);
+}
 
 type SupportMessageRow = {
   id: string;
@@ -566,6 +614,24 @@ export default function AdminPage() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [section, setSection] = useState<Section>("dashboard");
   const [actionMsg, setActionMsg] = useState<{ text: string; tone: "ok" | "error" } | null>(null);
+
+  // Incremento 11 (14 jul 2026, roles y permisos — item 12 del pedido
+  // original): rol/capacidades del admin logueado, devueltos por
+  // /api/admin/session (ver ese route.ts). adminCapabilities maneja qué
+  // secciones del sidebar se muestran (ver canSeeSection más abajo) y
+  // adminReadOnly bloquea acciones de escritura para Analytics Viewer en
+  // las secciones que sí puede ver (Reportes).
+  const [adminRole, setAdminRole] = useState<AdminRole | null>(null);
+  const [adminCapabilities, setAdminCapabilities] = useState<string[]>([]);
+  const [adminReadOnly, setAdminReadOnly] = useState(false);
+
+  // ── Administradores (incremento 11) ──
+  const [adminsList, setAdminsList] = useState<AdminUserRow[]>([]);
+  const [adminsLoading, setAdminsLoading] = useState(false);
+  const [newAdminUsername, setNewAdminUsername] = useState("");
+  const [newAdminPassword, setNewAdminPassword] = useState("");
+  const [newAdminRole, setNewAdminRole] = useState<AdminRole>("support_admin");
+  const [creatingAdmin, setCreatingAdmin] = useState(false);
 
   // ── Raw data ──
   const [accounts, setAccounts]     = useState<AccountRow[]>([]);
@@ -1251,11 +1317,41 @@ export default function AdminPage() {
       .then((data) => {
         setAdminAuthed(!!data.ok);
         setLoginChecked(true);
-        if (data.ok) loadData().then(() => setLoading(false));
+        // Incremento 11: rol/capacidades del admin logueado (ver
+        // /api/admin/session/route.ts) — alimentan qué secciones del
+        // sidebar se muestran y si las acciones de escritura están
+        // habilitadas para este rol.
+        if (data.ok) {
+          setAdminRole(data.role ?? null);
+          setAdminCapabilities(Array.isArray(data.capabilities) ? data.capabilities : []);
+          setAdminReadOnly(!!data.readOnly);
+          loadData().then(() => setLoading(false));
+        }
       })
       .catch(() => setLoginChecked(true));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Si la sección abierta no está entre las que el rol logueado puede ver
+  // (ej. cambió de rol, o quedó una sección vieja en el estado de una
+  // sesión anterior con otro rol), vuelve al Dashboard — que cualquier
+  // admin autenticado puede ver — en vez de dejar una pantalla a medio
+  // cargar pidiendo datos que van a volver 403.
+  useEffect(() => {
+    if (!adminAuthed) return;
+    if (!canSeeSection(section, adminCapabilities)) setSection("dashboard");
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [adminAuthed, adminCapabilities, section]);
+
+  // Sección "Administradores" (incremento 11) — mismo patrón de lazy-load
+  // que el resto de las secciones (support/team-chat/audit-log/etc.): se
+  // trae la lista recién cuando se abre la sección, no de entrada.
+  useEffect(() => {
+    if (section === "admins" && adminAuthed && adminCapabilities.includes("admin_management")) {
+      loadAdmins();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [section, adminAuthed]);
 
   // Auto-refresco global (incremento 10, 14 jul 2026 — pedido explícito de
   // Facu: "el boton de actualizar ese que tengo no deberia existir y la
@@ -1392,6 +1488,44 @@ export default function AdminPage() {
     setAccounts((prev) => prev.map((a) => (a.id === id ? { ...a, ...patch } as AccountRow : a)));
     setDetailAccount((prev) => (prev && prev.id === id ? { ...prev, ...patch } as AccountRow : prev));
     return true;
+  }
+
+  // ── Administradores (incremento 11, "admin_management" — solo Super
+  // Admin) ── Crear/desactivar/reactivar otros admins y asignarles rol.
+  async function loadAdmins() {
+    setAdminsLoading(true);
+    try {
+      const res = await fetch("/api/admin/admins");
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) setAdminsList((data.admins as AdminUserRow[]) ?? []);
+      else flash(data.error || t("errorLoadAdmins"), "error");
+    } catch {
+      flash(t("errorLoadAdmins"), "error");
+    }
+    setAdminsLoading(false);
+  }
+
+  async function createAdmin() {
+    if (!newAdminUsername.trim() || newAdminPassword.length < 8) return;
+    setCreatingAdmin(true);
+    const res = await adminFetch("/api/admin/admins", "POST", {
+      username: newAdminUsername.trim(),
+      password: newAdminPassword,
+      role: newAdminRole,
+    });
+    setCreatingAdmin(false);
+    if (!res.ok) { flash(res.error, "error"); return; }
+    setAdminsList((prev) => [...prev, res.data.admin as AdminUserRow]);
+    setNewAdminUsername("");
+    setNewAdminPassword("");
+    setNewAdminRole("support_admin");
+    flash(t("adminCreated"));
+  }
+
+  async function updateAdmin(id: string, patch: { role?: AdminRole; active?: boolean }) {
+    const res = await adminFetch("/api/admin/admins", "PATCH", { id, ...patch });
+    if (!res.ok) { flash(res.error, "error"); return; }
+    setAdminsList((prev) => prev.map((a) => (a.id === id ? { ...a, ...patch } : a)));
   }
 
   const [verificationBusyId, setVerificationBusyId] = useState<string | null>(null);
@@ -1941,6 +2075,10 @@ export default function AdminPage() {
 
   const maxAssetCount = Math.max(...assetTypes.map(a => a.count), 1);
   const qrPct = totalQR > 0 ? Math.round((assignedQR / totalQR) * 100) : 0;
+  // Incremento 11: navItems se filtra por canSeeSection antes de
+  // renderizar el sidebar — un rol limitado (Support Admin, Content
+  // Moderator, Analytics Viewer) directamente no ve las secciones que no
+  // puede tocar, en vez de verlas y chocar con un 403 al abrirlas.
   const navItems: { id: Section; label: string; icon: React.ElementType }[] = [
     { id: "dashboard", label: t("navDashboard"), icon: BarChart3 },
     { id: "accounts",  label: t("navAccounts"),  icon: Users     },
@@ -1955,11 +2093,13 @@ export default function AdminPage() {
     { id: "analytics", label: t("navAnalytics"), icon: TrendingUp },
     { id: "audit-log", label: t("navAuditLog"), icon: History },
     { id: "trash",     label: t("navTrash"),     icon: Trash    },
-  ];
+    { id: "admins",    label: t("navAdmins"),    icon: UserCog  },
+  ].filter(({ id }) => canSeeSection(id, adminCapabilities));
   const sectionLabels: Record<Section, string> = {
     dashboard: t("navDashboard"), accounts: t("navAccounts"), mechanics: t("navMechanics"), verifications: t("navVerifications"),
     assets: t("navAssets"), services: t("navServices"), qr: t("navQr"), support: t("navSupport"), "team-chat": t("navTeamChat"),
     moderation: t("navModeration"), analytics: t("navAnalytics"), "audit-log": t("navAuditLog"), trash: t("navTrash"),
+    admins: t("navAdmins"),
   };
   const REPORT_TYPE_LABEL: Record<string, string> = {
     incorrect_info: t("reportTypeIncorrectInfo"),
@@ -3839,6 +3979,117 @@ export default function AdminPage() {
                                   <Trash2 size={14} />
                                 </button>
                               </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* ── ADMINISTRADORES (incremento 11, 14 jul 2026 — solo Super
+               Admin, capacidad "admin_management") ──────────────────── */}
+          {section === "admins" && (
+            <div className="space-y-4">
+              <p className="text-[12px] text-zinc-400">{t("adminsIntro")}</p>
+
+              <div className="bg-white rounded-2xl border border-zinc-200/80 shadow-sm p-5 space-y-3">
+                <p className="text-[11px] font-bold text-zinc-400 uppercase tracking-widest">{t("adminsCreateTitle")}</p>
+                <div className="flex flex-wrap items-end gap-3">
+                  <div>
+                    <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1">{t("adminsUsername")}</label>
+                    <input
+                      type="text" value={newAdminUsername}
+                      onChange={(e) => setNewAdminUsername(e.target.value)}
+                      className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-[12px] outline-none focus:border-red-400 w-40"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1">{t("adminsPassword")}</label>
+                    <input
+                      type="password" value={newAdminPassword}
+                      onChange={(e) => setNewAdminPassword(e.target.value)}
+                      className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-[12px] outline-none focus:border-red-400 w-40"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1">{t("adminsRole")}</label>
+                    <select
+                      value={newAdminRole}
+                      onChange={(e) => setNewAdminRole(e.target.value as AdminRole)}
+                      className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-[12px] outline-none focus:border-red-400"
+                    >
+                      <option value="support_admin">{t("roleSupportAdmin")}</option>
+                      <option value="content_moderator">{t("roleContentModerator")}</option>
+                      <option value="analytics_viewer">{t("roleAnalyticsViewer")}</option>
+                      <option value="super_admin">{t("roleSuperAdmin")}</option>
+                    </select>
+                  </div>
+                  <button
+                    onClick={createAdmin}
+                    disabled={creatingAdmin || !newAdminUsername.trim() || newAdminPassword.length < 8}
+                    className="text-[11px] font-bold px-4 py-2.5 rounded-xl bg-zinc-900 text-white hover:bg-zinc-800 transition-colors disabled:opacity-40"
+                  >
+                    {creatingAdmin ? t("creating") : t("adminsCreateButton")}
+                  </button>
+                </div>
+                {newAdminPassword.length > 0 && newAdminPassword.length < 8 && (
+                  <p className="text-[11px] text-amber-600">{t("adminsPasswordTooShort")}</p>
+                )}
+              </div>
+
+              <div className="bg-white rounded-2xl border border-zinc-200/80 shadow-sm overflow-hidden">
+                {adminsLoading ? (
+                  <p className="text-[13px] text-zinc-400 text-center py-16">{t("loading")}</p>
+                ) : adminsList.length === 0 ? (
+                  <div className="text-center py-16">
+                    <UserCog size={28} className="mx-auto text-zinc-200 mb-2" />
+                    <p className="text-[13px] text-zinc-300 font-medium">{t("adminsEmpty")}</p>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full min-w-[720px]">
+                      <thead>
+                        <tr className="bg-zinc-50 border-b border-zinc-100">
+                          {[t("adminsUsername"), t("adminsRole"), t("colStatus"), t("adminsLastLogin"), ""].map((h) => (
+                            <th key={h} className="px-7 py-3 text-left text-[9px] font-bold text-zinc-400 uppercase tracking-widest">{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-zinc-50">
+                        {adminsList.map((a) => (
+                          <tr key={a.id} className="hover:bg-zinc-50/80 transition-colors">
+                            <td className="px-7 py-4 text-[13px] font-bold text-zinc-900">{a.username}</td>
+                            <td className="px-7 py-4">
+                              <select
+                                value={a.role}
+                                onChange={(e) => updateAdmin(a.id, { role: e.target.value as AdminRole })}
+                                className="rounded-lg border border-zinc-200 bg-white px-2 py-1 text-[12px] outline-none focus:border-red-400"
+                              >
+                                <option value="support_admin">{t("roleSupportAdmin")}</option>
+                                <option value="content_moderator">{t("roleContentModerator")}</option>
+                                <option value="analytics_viewer">{t("roleAnalyticsViewer")}</option>
+                                <option value="super_admin">{t("roleSuperAdmin")}</option>
+                              </select>
+                            </td>
+                            <td className="px-7 py-4">
+                              {a.active ? <Pill tone="emerald">{t("adminActive")}</Pill> : <Pill tone="zinc">{t("adminInactive")}</Pill>}
+                            </td>
+                            <td className="px-7 py-4 text-[12px] text-zinc-400">
+                              {a.last_login_at ? formatDateDMY(a.last_login_at) : <span className="text-zinc-300">{t("adminsNeverLoggedIn")}</span>}
+                            </td>
+                            <td className="px-7 py-4">
+                              <button
+                                onClick={() => updateAdmin(a.id, { active: !a.active })}
+                                className={`text-[11px] font-bold px-2.5 py-1.5 rounded-lg border transition-colors ${
+                                  a.active ? "border-red-200 text-red-600 hover:bg-red-50" : "border-emerald-200 text-emerald-700 hover:bg-emerald-50"
+                                }`}
+                              >
+                                {a.active ? t("deactivate") : t("reactivate")}
+                              </button>
                             </td>
                           </tr>
                         ))}

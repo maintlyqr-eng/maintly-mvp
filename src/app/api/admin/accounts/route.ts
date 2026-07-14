@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { isAdminRequest, getAdminUsername } from "@/lib/adminAuth";
+import { adminHasCapability, getAdminUsername } from "@/lib/adminAuth";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 import { logAdminAction, getRequestIp, pick } from "@/lib/auditLog";
 
@@ -15,8 +15,11 @@ import { logAdminAction, getRequestIp, pick } from "@/lib/auditLog";
 const VERIFICATION_STATUSES = ["none", "pending", "verified", "rejected"];
 
 export async function PATCH(req: NextRequest) {
-  if (!isAdminRequest(req)) {
-    return NextResponse.json({ error: "Not authorized." }, { status: 401 });
+  // Incremento 11: "accounts" cubre tanto restore como los demás campos —
+  // ninguno de los dos es una acción crítica/irreversible (a diferencia del
+  // DELETE permanente de más abajo, que exige además "critical_actions").
+  if (!adminHasCapability(req, "accounts")) {
+    return NextResponse.json({ error: "Not authorized." }, { status: 403 });
   }
 
   const body = await req.json().catch(() => ({}));
@@ -120,8 +123,8 @@ export async function PATCH(req: NextRequest) {
 // the main Accounts list. This matches Facu's own spec (item 14): "soft
 // delete ... restaurable; eliminación permanente ... + confirmación especial."
 export async function DELETE(req: NextRequest) {
-  if (!isAdminRequest(req)) {
-    return NextResponse.json({ error: "Not authorized." }, { status: 401 });
+  if (!adminHasCapability(req, "accounts")) {
+    return NextResponse.json({ error: "Not authorized." }, { status: 403 });
   }
 
   const body = await req.json().catch(() => ({}));
@@ -129,6 +132,14 @@ export async function DELETE(req: NextRequest) {
 
   if (!id || typeof id !== "string") {
     return NextResponse.json({ error: "Missing account id." }, { status: 400 });
+  }
+
+  // Incremento 11 / item 14 del pedido original ("eliminación permanente
+  // limitada a Super Admin"): un rol con "accounts" (ej. Support Admin)
+  // puede soft-delete y restaurar, pero solo "critical_actions"
+  // (hoy: únicamente Super Admin) puede pasar por acá.
+  if (permanent === true && !adminHasCapability(req, "critical_actions")) {
+    return NextResponse.json({ error: "Only a Super Admin can permanently delete an account." }, { status: 403 });
   }
 
   const admin = getSupabaseAdmin();

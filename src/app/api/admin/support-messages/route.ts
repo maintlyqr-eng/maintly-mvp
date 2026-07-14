@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { isAdminRequest, getAdminUsername } from "@/lib/adminAuth";
+import { adminHasCapability, getAdminUsername } from "@/lib/adminAuth";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 import { logAdminAction, getRequestIp } from "@/lib/auditLog";
 
@@ -10,8 +10,9 @@ import { logAdminAction, getRequestIp } from "@/lib/auditLog";
 // Both come back in one request since the admin UI always needs both
 // together to render the case list.
 export async function GET(req: NextRequest) {
-  if (!isAdminRequest(req)) {
-    return NextResponse.json({ error: "Not authorized." }, { status: 401 });
+  // Incremento 11: "support" (Support Admin + Super Admin).
+  if (!adminHasCapability(req, "support")) {
+    return NextResponse.json({ error: "Not authorized." }, { status: 403 });
   }
 
   const admin = getSupabaseAdmin();
@@ -37,8 +38,9 @@ export async function GET(req: NextRequest) {
 // POST: send a message from the Control Center into a mechanic's support
 // thread. Body: { mechanicId, body }
 export async function POST(req: NextRequest) {
-  if (!isAdminRequest(req)) {
-    return NextResponse.json({ error: "Not authorized." }, { status: 401 });
+  // Incremento 11: "support" (Support Admin + Super Admin).
+  if (!adminHasCapability(req, "support")) {
+    return NextResponse.json({ error: "Not authorized." }, { status: 403 });
   }
 
   const payload = await req.json().catch(() => ({}));
@@ -69,8 +71,9 @@ export async function POST(req: NextRequest) {
 // (called when the admin opens that mechanic's conversation).
 // Body: { mechanicId }
 export async function PATCH(req: NextRequest) {
-  if (!isAdminRequest(req)) {
-    return NextResponse.json({ error: "Not authorized." }, { status: 401 });
+  // Incremento 11: "support" (Support Admin + Super Admin).
+  if (!adminHasCapability(req, "support")) {
+    return NextResponse.json({ error: "Not authorized." }, { status: 403 });
   }
 
   const payload = await req.json().catch(() => ({}));
@@ -100,8 +103,9 @@ export async function PATCH(req: NextRequest) {
 // delete, so one side clearing a thread can't hide anything from the other.
 // Body: { mechanicId }
 export async function DELETE(req: NextRequest) {
-  if (!isAdminRequest(req)) {
-    return NextResponse.json({ error: "Not authorized." }, { status: 401 });
+  // Incremento 11: "support" (Support Admin + Super Admin).
+  if (!adminHasCapability(req, "support")) {
+    return NextResponse.json({ error: "Not authorized." }, { status: 403 });
   }
 
   const payload = await req.json().catch(() => ({}));

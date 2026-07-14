@@ -1,6 +1,6 @@
 import crypto from "crypto";
 import { NextRequest, NextResponse } from "next/server";
-import { isAdminRequest, getAdminUsername } from "@/lib/adminAuth";
+import { adminHasCapability, getAdminUsername } from "@/lib/adminAuth";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 import { logAdminAction, getRequestIp } from "@/lib/auditLog";
 
@@ -10,8 +10,9 @@ function genCode() {
 
 // POST: generate a new batch of unassigned QR codes. Body: { count }
 export async function POST(req: NextRequest) {
-  if (!isAdminRequest(req)) {
-    return NextResponse.json({ error: "Not authorized." }, { status: 401 });
+  // Incremento 11: "qr" (Content Moderator + Super Admin).
+  if (!adminHasCapability(req, "qr")) {
+    return NextResponse.json({ error: "Not authorized." }, { status: 403 });
   }
 
   const body = await req.json().catch(() => ({}));
@@ -46,8 +47,8 @@ export async function POST(req: NextRequest) {
 
 // PATCH: free up a QR code from whatever asset it's linked to. Body: { code }
 export async function PATCH(req: NextRequest) {
-  if (!isAdminRequest(req)) {
-    return NextResponse.json({ error: "Not authorized." }, { status: 401 });
+  if (!adminHasCapability(req, "qr")) {
+    return NextResponse.json({ error: "Not authorized." }, { status: 403 });
   }
 
   const body = await req.json().catch(() => ({}));

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { isAdminRequest, getAdminUsername } from "@/lib/adminAuth";
+import { adminHasCapability, isAdminReadOnly, getAdminUsername } from "@/lib/adminAuth";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 import { logAdminAction, getRequestIp } from "@/lib/auditLog";
 import { toCsv, csvResponse } from "@/lib/csv";
@@ -51,8 +51,11 @@ export type ContentReportRow = {
 const EXPORT_ROW_CAP = 5000;
 
 export async function GET(req: NextRequest) {
-  if (!isAdminRequest(req)) {
-    return NextResponse.json({ error: "Not authorized." }, { status: 401 });
+  // Incremento 11: "reports" lo tienen Support Admin, Content Moderator,
+  // Analytics Viewer y Super Admin — los 4 roles del pedido original
+  // incluyen "reportes" en su alcance.
+  if (!adminHasCapability(req, "reports")) {
+    return NextResponse.json({ error: "Not authorized." }, { status: 403 });
   }
 
   const url = new URL(req.url);
@@ -150,8 +153,10 @@ export async function GET(req: NextRequest) {
 // fields always reflect the most recent resolution rather than a stale one
 // from a prior status change.
 export async function PATCH(req: NextRequest) {
-  if (!isAdminRequest(req)) {
-    return NextResponse.json({ error: "Not authorized." }, { status: 401 });
+  // Analytics Viewer tiene "reports" pero es de solo lectura (ver
+  // src/lib/adminRoles.ts) — puede ver reportes, no resolverlos.
+  if (!adminHasCapability(req, "reports") || isAdminReadOnly(req)) {
+    return NextResponse.json({ error: "Not authorized." }, { status: 403 });
   }
 
   const body = await req.json().catch(() => ({}));

@@ -28,9 +28,11 @@ export type AdminAuditAction =
   | "qr.unlink"
   | "support_thread.clear"
   | "support_thread.update_state"
-  | "report.update_status";
+  | "report.update_status"
+  | "admin_user.create"
+  | "admin_user.update";
 
-export type AdminAuditEntityType = "mechanic" | "asset" | "service_record" | "qr_code" | "qr_batch" | "support_thread" | "content_report";
+export type AdminAuditEntityType = "mechanic" | "asset" | "service_record" | "qr_code" | "qr_batch" | "support_thread" | "content_report" | "admin_user";
 
 export async function logAdminAction(params: {
   adminUsername: string;

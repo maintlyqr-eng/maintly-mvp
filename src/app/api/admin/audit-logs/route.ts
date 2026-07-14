@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { isAdminRequest } from "@/lib/adminAuth";
+import { adminHasCapability } from "@/lib/adminAuth";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 import type { AdminAuditAction, AdminAuditEntityType } from "@/lib/auditLog";
 import { toCsv, csvResponse } from "@/lib/csv";
@@ -41,8 +41,9 @@ export type AdminAuditLogRow = {
 const EXPORT_ROW_CAP = 5000;
 
 export async function GET(req: NextRequest) {
-  if (!isAdminRequest(req)) {
-    return NextResponse.json({ error: "Not authorized." }, { status: 401 });
+  // Incremento 11: "audit_logs" (hoy: solo Super Admin) — expone acciones de TODOS los admins.
+  if (!adminHasCapability(req, "audit_logs")) {
+    return NextResponse.json({ error: "Not authorized." }, { status: 403 });
   }
 
   const url = new URL(req.url);

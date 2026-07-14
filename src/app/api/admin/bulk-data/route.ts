@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { isAdminRequest } from "@/lib/adminAuth";
+import { adminHasAnyCapability } from "@/lib/adminAuth";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 
 // GET: the handful of platform-wide tables the Admin dashboard needs
@@ -18,8 +18,14 @@ import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 // than fully unbounded, and the response says whether it was truncated so
 // the UI can show that honestly instead of silently dropping older rows.
 export async function GET(req: NextRequest) {
-  if (!isAdminRequest(req)) {
-    return NextResponse.json({ error: "Not authorized." }, { status: 401 });
+  // Incremento 11: bulk-data / trash mezclan mechanics + assets +
+  // service_records + qr_codes en una sola lectura — se permite si el rol
+  // tiene "accounts" O "assets" (Support Admin, Content Moderator, Super
+  // Admin). Analytics Viewer ("solo estadísticas/reportes" en el pedido
+  // original) queda afuera a propósito: esta ruta no es "estadísticas", es
+  // el dato crudo detrás de las tablas de gestión.
+  if (!adminHasAnyCapability(req, ["accounts", "assets"])) {
+    return NextResponse.json({ error: "Not authorized." }, { status: 403 });
   }
 
   const admin = getSupabaseAdmin();

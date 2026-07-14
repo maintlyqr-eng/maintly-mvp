@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { isAdminRequest } from "@/lib/adminAuth";
+import { adminHasCapability } from "@/lib/adminAuth";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 
 // GET: real usage numbers (DB size, Storage size) compared against Supabase's
@@ -9,7 +9,8 @@ import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 //
 // Two ways in, on purpose:
 //   1. The Admin panel UI calls this with the normal admin session cookie
-//      (isAdminRequest) so Facu can see the numbers any time in the panel.
+//      (Super Admin only as of incremento 11, see isAuthorized below) so
+//      Facu can see the numbers any time in the panel.
 //   2. The weekly automated check (a scheduled task, no browser/cookie
 //      available) calls this with a bearer secret instead. The secret only
 //      gates this one read-only, non-sensitive stats endpoint — it is NOT
@@ -28,7 +29,10 @@ type UsageMetricsRow = {
 };
 
 function isAuthorized(req: NextRequest): boolean {
-  if (isAdminRequest(req)) return true;
+  // Incremento 11: uso/límites de infraestructura es "config del sistema" —
+  // se trata como "critical_actions" (hoy: solo Super Admin), consistente
+  // con "Support Admin: ... sin config crítica" del pedido original.
+  if (adminHasCapability(req, "critical_actions")) return true;
 
   const authHeader = req.headers.get("authorization") ?? "";
   const secret = process.env.USAGE_CHECK_SECRET;

@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
-import { isAdminRequest } from "@/lib/adminAuth";
+import { adminHasCapability } from "@/lib/adminAuth";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 
 // POST: returns a short-lived signed URL for a mechanic's uploaded
 // verification certificate, stored in the private "certificates" bucket.
 // Body: { id } — the mechanic's id.
 export async function POST(req: NextRequest) {
-  if (!isAdminRequest(req)) {
-    return NextResponse.json({ error: "Not authorized." }, { status: 401 });
+  // Incremento 11: "accounts" — certificado de verificación de un Maintler.
+  if (!adminHasCapability(req, "accounts")) {
+    return NextResponse.json({ error: "Not authorized." }, { status: 403 });
   }
 
   const body = await req.json().catch(() => ({}));

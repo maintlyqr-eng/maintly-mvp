@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { isAdminRequest, getAdminUsername } from "@/lib/adminAuth";
+import { adminHasCapability, getAdminUsername } from "@/lib/adminAuth";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 import { logAdminAction, getRequestIp } from "@/lib/auditLog";
 
@@ -19,8 +19,9 @@ type EditableField = (typeof EDITABLE_FIELDS)[number];
 // PATCH: either restore a soft-deleted asset ({ id, restore: true }), or
 // edit one or more of EDITABLE_FIELDS ({ id, updates: { ... } }).
 export async function PATCH(req: NextRequest) {
-  if (!isAdminRequest(req)) {
-    return NextResponse.json({ error: "Not authorized." }, { status: 401 });
+  // Incremento 11: "assets" (Content Moderator + Super Admin).
+  if (!adminHasCapability(req, "assets")) {
+    return NextResponse.json({ error: "Not authorized." }, { status: 403 });
   }
 
   const body = await req.json().catch(() => ({}));
@@ -125,14 +126,19 @@ export async function PATCH(req: NextRequest) {
 // filter deleted_at is null) while soft-deleted; its history and QR link
 // come back untouched on restore.
 export async function DELETE(req: NextRequest) {
-  if (!isAdminRequest(req)) {
-    return NextResponse.json({ error: "Not authorized." }, { status: 401 });
+  if (!adminHasCapability(req, "assets")) {
+    return NextResponse.json({ error: "Not authorized." }, { status: 403 });
   }
 
   const body = await req.json().catch(() => ({}));
   const { id, permanent } = body ?? {};
   if (!id || typeof id !== "string") {
     return NextResponse.json({ error: "Missing asset id." }, { status: 400 });
+  }
+
+  // Incremento 11 / item 14: eliminación permanente exige "critical_actions".
+  if (permanent === true && !adminHasCapability(req, "critical_actions")) {
+    return NextResponse.json({ error: "Only a Super Admin can permanently delete an asset." }, { status: 403 });
   }
 
   const admin = getSupabaseAdmin();

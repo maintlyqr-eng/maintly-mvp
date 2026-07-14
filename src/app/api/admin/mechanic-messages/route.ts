@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { isAdminRequest } from "@/lib/adminAuth";
+import { adminHasCapability } from "@/lib/adminAuth";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 
 // GET: every mechanic-to-mechanic Team Chat message, full stop — including
@@ -20,8 +20,9 @@ import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 // in-memory is more robust and doesn't depend on guessing a constraint
 // name right.
 export async function GET(req: NextRequest) {
-  if (!isAdminRequest(req)) {
-    return NextResponse.json({ error: "Not authorized." }, { status: 401 });
+  // Incremento 11: "reports" — oversight de Team Chat, dominio de moderación.
+  if (!adminHasCapability(req, "reports")) {
+    return NextResponse.json({ error: "Not authorized." }, { status: 403 });
   }
 
   const admin = getSupabaseAdmin();

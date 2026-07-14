@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { isAdminRequest } from "@/lib/adminAuth";
+import { adminHasCapability } from "@/lib/adminAuth";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 
 // GET: every report a Maintler has filed against another Maintler from
@@ -8,8 +8,9 @@ import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 // flagged and go look at the actual conversation in the Team Chat
 // oversight view (same admin section, different tab).
 export async function GET(req: NextRequest) {
-  if (!isAdminRequest(req)) {
-    return NextResponse.json({ error: "Not authorized." }, { status: 401 });
+  // Incremento 11: "reports" — reportes entre Maintlers, mismo dominio que content_reports.
+  if (!adminHasCapability(req, "reports")) {
+    return NextResponse.json({ error: "Not authorized." }, { status: 403 });
   }
 
   const admin = getSupabaseAdmin();
