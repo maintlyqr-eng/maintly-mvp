@@ -842,8 +842,23 @@ export default function AdminPage() {
     setTimeout(() => setActionMsg((m) => (m?.text === text ? null : m)), 4000);
   }
 
-  async function loadData() {
+  // Incremento 14 (15 jul 2026, bug reportado por Facu: "no me muestra el
+  // panel de la izquierda", "los datos tardan en llegar, a veces estan en
+  // 0", "cambié de usuario ... me muestra datos distintos"): loadData()
+  // leía `adminCapabilities` del estado del componente, pero la primerísima
+  // vez que se llama (justo después de setAdminCapabilities(...) en el
+  // mismo tick, tanto en el useEffect de sesión como en handleAdminLogin)
+  // esa lectura caía sobre el closure de la versión de loadData creada
+  // ANTES de que el nuevo estado existiera — React no muta ese binding
+  // retroactivamente. Resultado: canLoadBulkData evaluaba siempre `false`
+  // en la primera carga, sin importar el rol real, y el panel entero
+  // quedaba en 0 hasta el próximo loadData() con closure fresco (el
+  // auto-refresco de 60s). Se soluciona aceptando las capacidades como
+  // parámetro opcional, para que los llamados desde esos dos lugares las
+  // pasen explícitamente en vez de depender del estado.
+  async function loadData(capsOverride?: string[]) {
     setRefreshing(true);
+    const caps = capsOverride ?? adminCapabilities;
 
     // Incremento 12: Analytics Viewer no tiene "accounts" ni "assets" — sin
     // este chequeo, loadData() pedía /api/admin/bulk-data igual, se comía un
@@ -853,7 +868,7 @@ export default function AdminPage() {
     // el gap que había quedado documentado como "fuera de alcance" en el
     // incremento 11. Ahora, si el rol no tiene ninguna de las dos
     // capacidades que bulk-data exige, directamente no se pide.
-    const canLoadBulkData = adminCapabilities.includes("accounts") || adminCapabilities.includes("assets");
+    const canLoadBulkData = caps.includes("accounts") || caps.includes("assets");
 
     if (canLoadBulkData) {
     // mechanics/assets/qr_codes/service_records/mechanic_assets are read
@@ -1010,7 +1025,7 @@ export default function AdminPage() {
     // saltearlo acá si el rol no la tiene evita un 403 innecesario cada
     // 60s (mismo motivo que canLoadBulkData arriba). Content Moderator y
     // Analytics Viewer caen acá.
-    if (adminCapabilities.includes("support")) {
+    if (caps.includes("support")) {
       await loadSupportMessages();
     } else {
       setSupportMessages([]);
@@ -1393,22 +1408,33 @@ export default function AdminPage() {
     }
   }
 
+  // Incremento 11: rol/capacidades del admin logueado (ver
+  // /api/admin/session/route.ts) — alimentan qué secciones del sidebar se
+  // muestran y si las acciones de escritura están habilitadas para este rol.
+  // Extraído a una función propia en el incremento 14 para que tanto el
+  // chequeo de sesión al montar como handleAdminLogin (ver más abajo) usen
+  // exactamente la misma lógica — antes handleAdminLogin nunca la llamaba,
+  // así que después de tipear usuario/contraseña el admin quedaba con
+  // adminCapabilities en su valor inicial ([]), el sidebar prácticamente
+  // vacío, y solo un refresh manual de la página (que sí dispara este
+  // useEffect) lo arreglaba. Devuelve las capacidades para que el que la
+  // llama pueda pasárselas a loadData() sin depender del estado.
+  async function fetchAdminSession(): Promise<{ ok: boolean; capabilities: string[] }> {
+    const data = await fetch("/api/admin/session").then((r) => r.json()).catch(() => ({ ok: false }));
+    const ok = !!data.ok;
+    setAdminAuthed(ok);
+    setAdminRole(ok ? (data.role ?? null) : null);
+    const capabilities = ok && Array.isArray(data.capabilities) ? data.capabilities : [];
+    setAdminCapabilities(capabilities);
+    setAdminReadOnly(ok ? !!data.readOnly : false);
+    return { ok, capabilities };
+  }
+
   useEffect(() => {
-    fetch("/api/admin/session")
-      .then((r) => r.json())
-      .then((data) => {
-        setAdminAuthed(!!data.ok);
+    fetchAdminSession()
+      .then(({ ok, capabilities }) => {
         setLoginChecked(true);
-        // Incremento 11: rol/capacidades del admin logueado (ver
-        // /api/admin/session/route.ts) — alimentan qué secciones del
-        // sidebar se muestran y si las acciones de escritura están
-        // habilitadas para este rol.
-        if (data.ok) {
-          setAdminRole(data.role ?? null);
-          setAdminCapabilities(Array.isArray(data.capabilities) ? data.capabilities : []);
-          setAdminReadOnly(!!data.readOnly);
-          loadData().then(() => setLoading(false));
-        }
+        if (ok) loadData(capabilities).then(() => setLoading(false));
       })
       .catch(() => setLoginChecked(true));
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1543,8 +1569,14 @@ export default function AdminPage() {
         setLoginError(data.error || "Incorrect credentials. Please try again.");
         return;
       }
-      setAdminAuthed(true);
-      await loadData();
+      // Incremento 14: /api/admin/login solo confirma la contraseña y pone
+      // la cookie — el rol/capacidades hay que pedirlos aparte, con la misma
+      // fetchAdminSession() que usa el chequeo de sesión al montar. Antes
+      // este paso faltaba directamente acá, así que un login manual (a
+      // diferencia de refrescar la página con la cookie ya puesta) dejaba
+      // adminCapabilities en [] — sidebar casi vacío hasta refrescar.
+      const { capabilities } = await fetchAdminSession();
+      await loadData(capabilities);
       setLoading(false);
     } finally {
       setLoginSubmitting(false);
@@ -1553,6 +1585,12 @@ export default function AdminPage() {
   async function handleAdminLogout() {
     await fetch("/api/admin/logout", { method: "POST" });
     setAdminAuthed(false);
+    // Incremento 14: limpiar rol/capacidades al salir — si el próximo login
+    // en esta misma pestaña es de otro admin con otro rol, no debe arrancar
+    // con las capacidades del admin anterior ni por un instante.
+    setAdminRole(null);
+    setAdminCapabilities([]);
+    setAdminReadOnly(false);
   }
 
   // ── Account actions ──
@@ -2097,7 +2135,14 @@ export default function AdminPage() {
               <Shield size={28} className="text-white" />
             </div>
             <div className="flex justify-center mb-2">
-              <Image src="/images/Maintly.png" alt="Maintly" width={36} height={24} priority style={{ objectFit: "contain" }} />
+              {/* Incremento 14: Maintly.png (1536x1024) es una imagen con
+                  mucho fondo vacío/degradado alrededor del isologo — a este
+                  tamaño se veía como una mancha borrosa apenas visible.
+                  Maintly_crop.png es el mismo isologo pero recortado justo
+                  al contenido (1081x207, fondo transparente), así que se ve
+                  nítido incluso chico. El width/height respeta su relación
+                  de aspecto real (~5.22:1) en vez de la 1.5:1 de antes. */}
+              <Image src="/images/Maintly_crop.png" alt="Maintly" width={136} height={26} priority style={{ objectFit: "contain" }} />
             </div>
             <p className="text-[12px] text-zinc-400 font-semibold tracking-widest uppercase">{t("controlCenterLabel")}</p>
           </div>
@@ -2246,7 +2291,9 @@ export default function AdminPage() {
               <Shield size={15} className="text-white" />
             </div>
             <div>
-              <Image src="/images/Maintly.png" alt="Maintly" width={26} height={17} priority style={{ objectFit: "contain" }} />
+              {/* Incremento 14: mismo cambio que el logo del login — usar
+                  el recorte nítido en vez de Maintly.png a tamaño chico. */}
+              <Image src="/images/Maintly_crop.png" alt="Maintly" width={84} height={16} priority style={{ objectFit: "contain" }} />
               <p className="text-[9px] font-bold text-red-500 tracking-[0.12em] uppercase leading-none mt-0.5">{t("controlCenterLabel")}</p>
             </div>
           </div>
