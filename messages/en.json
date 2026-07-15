@@ -1974,7 +1974,22 @@
     "systemChangelogVersionLabel": "Version",
     "systemChangelogNotesLabel": "Notes",
     "systemChangelogCreateButton": "Add entry",
-    "systemChangelogDeleteButton": "Delete"
+    "systemChangelogDeleteButton": "Delete",
+    "moderationTabReports": "Reports",
+    "moderationTabSuspicious": "Suspicious activity",
+    "suspiciousIntro": "Maintlers flagged automatically by usage patterns (creation bursts, duplicate content, reports received). This doesn't suspend anyone — review and act manually from the account detail.",
+    "suspiciousScanSummary": "{flagged} flagged out of {scanned} Maintlers scanned.",
+    "suspiciousEmpty": "No suspicious activity detected right now.",
+    "suspiciousColMaintler": "Maintler",
+    "suspiciousColScore": "Score",
+    "suspiciousColReasons": "Reasons",
+    "suspiciousColSince": "Member since",
+    "suspiciousReason_burst_assets": "{count} assets in <1h",
+    "suspiciousReason_burst_services": "{count} service records in <1h",
+    "suspiciousReason_duplicate_notes": "{count} identical notes",
+    "suspiciousReason_reported": "{count} report(s) received",
+    "suspiciousReason_new_account_volume": "{count} items in first 48h",
+    "errorLoadSuspicious": "Couldn't load suspicious activity."
   },
   "ReportIssueModal": {
     "title": "Report an issue",

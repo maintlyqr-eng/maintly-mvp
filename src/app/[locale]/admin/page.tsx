@@ -11,7 +11,7 @@ import {
   Ban, ShieldCheck, ShieldOff, Trash2, KeyRound, UserCog,
   UserPlus, UserMinus, Plus, Link2Off, ScanLine, ClipboardList,
   LifeBuoy, Send, MessageCircle, Flag, History, ChevronDown, ChevronRight,
-  Trash, RotateCcw, TrendingUp, MapPin, Calendar, Pencil, Download, Settings,
+  Trash, RotateCcw, TrendingUp, MapPin, Calendar, Pencil, Download, Settings, AlertTriangle,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { formatDateDMY } from "@/lib/date";
@@ -368,6 +368,26 @@ type ContentReportRow = {
   resolved_by: string | null;
   asset: { brand: string | null; model: string | null; nickname: string | null } | null;
   mechanic: { name: string; email: string } | null;
+};
+
+// Incremento 18 (Fase 3, ítem 2 — "detección de spam o actividad
+// sospechosa"), leído desde /api/admin/suspicious-activity. Ver ese
+// route.ts para el detalle de cada heurística y sus umbrales.
+type SuspiciousReason =
+  | { key: "burst_assets"; count: number }
+  | { key: "burst_services"; count: number }
+  | { key: "duplicate_notes"; count: number }
+  | { key: "reported"; count: number }
+  | { key: "new_account_volume"; count: number };
+
+type FlaggedMechanicRow = {
+  mechanicId: string;
+  name: string;
+  email: string;
+  createdAt: string;
+  suspended: boolean;
+  score: number;
+  reasons: SuspiciousReason[];
 };
 
 // Item 8 del pedido de Facu ("Analytics avanzados") + la parte de item 9
@@ -842,6 +862,20 @@ export default function AdminPage() {
   // server-side, así que pega contra /api/admin/reports?export=csv con los
   // filtros vigentes en vez de exportar solo la página cargada en memoria.
   const [reportsExportBusy, setReportsExportBusy] = useState(false);
+
+  // Incremento 18 (Fase 3, ítem 2: "detección de spam o actividad
+  // sospechosa"): "Reportes y Moderación" ganó una segunda pestaña interna,
+  // mismo patrón que las pestañas de "Maintlers" del incremento 15.
+  // moderationTab por sí solo no dispara ningún fetch — moderationTab hace
+  // que se dispare loadSuspiciousActivity() la primera vez que se abre esa
+  // pestaña (ver el useEffect correspondiente más abajo).
+  const [moderationTab, setModerationTab] = useState<"reports" | "suspicious">("reports");
+  const [suspiciousActivity, setSuspiciousActivity] = useState<FlaggedMechanicRow[]>([]);
+  const [suspiciousActivityLoading, setSuspiciousActivityLoading] = useState(false);
+  const [suspiciousActivitySummary, setSuspiciousActivitySummary] = useState<{
+    flaggedTotal: number;
+    scannedMechanics: number;
+  } | null>(null);
 
   // ── Papelera (Trash — soft delete + restauración, item 14 del pedido) ──
   const [trashMechanics, setTrashMechanics] = useState<TrashMechanicRow[]>([]);
@@ -1328,6 +1362,41 @@ export default function AdminPage() {
     flash(t("reportNotesSaved"));
   }
 
+  // Incremento 18: la pestaña "Actividad sospechosa" de Reportes y
+  // Moderación. Sin paginación server-side (a diferencia de Reportes) —
+  // /api/admin/suspicious-activity ya devuelve como mucho 100 filas,
+  // ordenadas por score. Se recalcula entero cada vez que se abre la
+  // pestaña (ver el useEffect más abajo) — no hay estado que persista
+  // entre cargas, así que no hay nada que quede desactualizado.
+  async function loadSuspiciousActivity() {
+    setSuspiciousActivityLoading(true);
+    try {
+      const res = await fetch("/api/admin/suspicious-activity");
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) {
+        setSuspiciousActivity((data.flagged as FlaggedMechanicRow[]) ?? []);
+        setSuspiciousActivitySummary({
+          flaggedTotal: (data.flaggedTotal as number) ?? 0,
+          scannedMechanics: (data.scannedMechanics as number) ?? 0,
+        });
+      } else {
+        flash(data.error || t("errorLoadSuspicious"), "error");
+      }
+    } catch {
+      flash(t("errorLoadSuspicious"), "error");
+    }
+    setSuspiciousActivityLoading(false);
+  }
+
+  // Abre el mismo modal de detalle de cuenta que usa la sección Maintlers —
+  // busca la fila completa en `accounts` (ya cargada por loadData()/
+  // bulk-data) en vez de duplicar todos sus campos en la respuesta de
+  // suspicious-activity, que solo trae lo mínimo para la lista.
+  function openSuspiciousMechanicDetail(mechanicId: string) {
+    const account = accounts.find((a) => a.id === mechanicId);
+    if (account) setDetailAccount(account);
+  }
+
   // Papelera: small capped lists (see /api/admin/trash's own comment on why
   // this doesn't need real pagination the way the audit log does), so a
   // simple lazy-refetch-on-open is enough — same pattern as Support/Team Chat.
@@ -1593,6 +1662,17 @@ export default function AdminPage() {
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [section, adminAuthed, reportsPage, reportStatusFilter, reportTypeFilter]);
+
+  // Incremento 18: la pestaña "Actividad sospechosa" recalcula cada vez que
+  // se abre — es una consulta más pesada que Reportes (escanea hasta miles
+  // de assets/service_records), así que no se dispara junto con Reportes,
+  // solo cuando el admin efectivamente hace click en esa pestaña.
+  useEffect(() => {
+    if (section === "moderation" && moderationTab === "suspicious" && adminAuthed) {
+      loadSuspiciousActivity();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [section, moderationTab, adminAuthed]);
 
   // Analytics: refetch on open and whenever the date range changes.
   useEffect(() => {
@@ -3788,7 +3868,35 @@ export default function AdminPage() {
           )}
 
           {/* ── REPORTES Y MODERACIÓN (item 6 del pedido de Facu) ──────────── */}
+          {/* ── REPORTES Y MODERACIÓN (incremento 18: ganó una segunda
+               pestaña interna "Actividad sospechosa" — mismo patrón de
+               pestañas que "Maintlers" del incremento 15) ──────────────── */}
           {section === "moderation" && (
+            <div className="space-y-4">
+              <div className="flex items-center gap-1 border-b border-zinc-200/80">
+                {([
+                  { id: "reports" as const, label: t("moderationTabReports") },
+                  { id: "suspicious" as const, label: t("moderationTabSuspicious") },
+                ]).map((tab) => (
+                  <button
+                    key={tab.id}
+                    onClick={() => setModerationTab(tab.id)}
+                    className={`relative flex items-center gap-1.5 px-3.5 py-2.5 text-[12px] font-bold transition-colors ${
+                      moderationTab === tab.id ? "text-red-600" : "text-zinc-400 hover:text-zinc-600"
+                    }`}
+                  >
+                    {tab.label}
+                    {tab.id === "suspicious" && suspiciousActivitySummary && suspiciousActivitySummary.flaggedTotal > 0 && (
+                      <span className="text-[10px] font-black px-1.5 py-0.5 rounded-full bg-amber-500 text-white leading-none">
+                        {suspiciousActivitySummary.flaggedTotal}
+                      </span>
+                    )}
+                    {moderationTab === tab.id && <span className="absolute left-0 right-0 -bottom-px h-[2px] bg-red-600 rounded-full" />}
+                  </button>
+                ))}
+              </div>
+
+              {moderationTab === "reports" && (
             <div className="space-y-4">
               <p className="text-[12px] text-zinc-400">{t("moderationIntro")}</p>
 
@@ -3968,6 +4076,80 @@ export default function AdminPage() {
                   </>
                 )}
               </div>
+            </div>
+              )}
+
+              {moderationTab === "suspicious" && (
+                <div className="space-y-4">
+                  <p className="text-[12px] text-zinc-400">{t("suspiciousIntro")}</p>
+
+                  {suspiciousActivitySummary && (
+                    <p className="text-[11px] text-zinc-400">
+                      {t("suspiciousScanSummary", {
+                        flagged: suspiciousActivitySummary.flaggedTotal,
+                        scanned: suspiciousActivitySummary.scannedMechanics,
+                      })}
+                    </p>
+                  )}
+
+                  <div className="bg-white rounded-2xl border border-zinc-200/80 shadow-sm overflow-hidden">
+                    {suspiciousActivityLoading ? (
+                      <p className="text-[13px] text-zinc-400 text-center py-16">{t("loading")}</p>
+                    ) : suspiciousActivity.length === 0 ? (
+                      <div className="text-center py-16">
+                        <ShieldCheck size={28} className="mx-auto text-zinc-200 mb-2" />
+                        <p className="text-[13px] text-zinc-300 font-medium">{t("suspiciousEmpty")}</p>
+                      </div>
+                    ) : (
+                      <div className="overflow-x-auto">
+                        <table className="w-full min-w-[760px]">
+                          <thead>
+                            <tr className="bg-zinc-50 border-b border-zinc-100">
+                              {[t("suspiciousColMaintler"), t("suspiciousColScore"), t("suspiciousColReasons"), t("suspiciousColSince"), ""].map((h) => (
+                                <th key={h} className="px-7 py-3 text-left text-[9px] font-bold text-zinc-400 uppercase tracking-widest">{h}</th>
+                              ))}
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-zinc-50">
+                            {suspiciousActivity.map((entry) => (
+                              <tr
+                                key={entry.mechanicId}
+                                className="hover:bg-zinc-50/80 transition-colors cursor-pointer"
+                                onClick={() => openSuspiciousMechanicDetail(entry.mechanicId)}
+                              >
+                                <td className="px-7 py-4">
+                                  <p className="text-[13px] font-bold text-zinc-900">{entry.name || entry.email}</p>
+                                  <p className="text-[11px] text-zinc-400">{entry.email}</p>
+                                </td>
+                                <td className="px-7 py-4">
+                                  <span className="inline-flex items-center gap-1.5 text-[12px] font-black text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-1">
+                                    <AlertTriangle size={12} /> {entry.score}
+                                  </span>
+                                </td>
+                                <td className="px-7 py-4">
+                                  <div className="flex flex-wrap gap-1.5 max-w-[320px]">
+                                    {entry.reasons.map((reason, i) => (
+                                      <span key={i} className="text-[10.5px] font-semibold text-zinc-600 bg-zinc-100 rounded-full px-2 py-1 whitespace-nowrap">
+                                        {t(`suspiciousReason_${reason.key}`, { count: reason.count })}
+                                      </span>
+                                    ))}
+                                  </div>
+                                </td>
+                                <td className="px-7 py-4 text-[12px] text-zinc-400 whitespace-nowrap">{formatDate(entry.createdAt)}</td>
+                                <td className="px-7 py-4">
+                                  {entry.suspended
+                                    ? <Pill tone="red">{t("suspendedPill")}</Pill>
+                                    : <Pill tone="emerald">{t("activePill")}</Pill>}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 

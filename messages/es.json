@@ -1974,7 +1974,22 @@
     "systemChangelogVersionLabel": "Versión",
     "systemChangelogNotesLabel": "Notas",
     "systemChangelogCreateButton": "Agregar entrada",
-    "systemChangelogDeleteButton": "Eliminar"
+    "systemChangelogDeleteButton": "Eliminar",
+    "moderationTabReports": "Reportes",
+    "moderationTabSuspicious": "Actividad sospechosa",
+    "suspiciousIntro": "Maintlers marcados automáticamente por patrones de uso (ráfagas de creación, contenido duplicado, reportes recibidos). Esto no suspende a nadie — revisá y actuá manualmente desde el detalle de la cuenta.",
+    "suspiciousScanSummary": "{flagged} marcados de {scanned} Maintlers escaneados.",
+    "suspiciousEmpty": "No se detectó actividad sospechosa por ahora.",
+    "suspiciousColMaintler": "Maintler",
+    "suspiciousColScore": "Score",
+    "suspiciousColReasons": "Motivos",
+    "suspiciousColSince": "Miembro desde",
+    "suspiciousReason_burst_assets": "{count} activos en <1h",
+    "suspiciousReason_burst_services": "{count} registros de servicio en <1h",
+    "suspiciousReason_duplicate_notes": "{count} notas idénticas",
+    "suspiciousReason_reported": "{count} reporte(s) recibidos",
+    "suspiciousReason_new_account_volume": "{count} elementos en las primeras 48h",
+    "errorLoadSuspicious": "No se pudo cargar la actividad sospechosa."
   },
   "ReportIssueModal": {
     "title": "Reportar un problema",
