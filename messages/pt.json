@@ -1774,6 +1774,8 @@
     "auditActionServiceDeletePermanent": "Registro de serviço excluído definitivamente",
     "auditEntityAsset": "Asset",
     "typeToConfirmLabel": "Digite \"{word}\" para confirmar",
+    "reasonOptionalLabel": "Motivo (opcional)",
+    "reasonPlaceholder": "Por que está sendo excluído?",
     "permanentDeleteConfirmWord": "EXCLUIR",
     "accountMovedToTrash": "Conta movida para a lixeira.",
     "restoreAccountConfirmTitle": "Restaurar conta",

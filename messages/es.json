@@ -1774,6 +1774,8 @@
     "auditActionServiceDeletePermanent": "Registro de servicio eliminado definitivamente",
     "auditEntityAsset": "Asset",
     "typeToConfirmLabel": "Escribí \"{word}\" para confirmar",
+    "reasonOptionalLabel": "Motivo (opcional)",
+    "reasonPlaceholder": "¿Por qué se está eliminando?",
     "permanentDeleteConfirmWord": "ELIMINAR",
     "accountMovedToTrash": "Cuenta movida a la papelera.",
     "restoreAccountConfirmTitle": "Restaurar cuenta",

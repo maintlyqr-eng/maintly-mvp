@@ -59,7 +59,9 @@ export async function DELETE(req: NextRequest) {
   }
 
   const body = await req.json().catch(() => ({}));
-  const { id, permanent } = body ?? {};
+  const { id, permanent, reason } = body ?? {};
+  // Incremento 13: "motivo" opcional, mismo criterio que accounts/route.ts.
+  const reasonText = typeof reason === "string" && reason.trim() ? reason.trim() : null;
   if (!id || typeof id !== "string") {
     return NextResponse.json({ error: "Missing service id." }, { status: 400 });
   }
@@ -94,6 +96,7 @@ export async function DELETE(req: NextRequest) {
         entityType: "service_record",
         entityId: id,
         oldValue: existing ? { service_type: existing.service_type, service_date: existing.service_date, mechanic_id: existing.mechanic_id, asset_id: existing.asset_id, customer_id: existing.customer_id } : null,
+        reason: reasonText,
         ipAddress: getRequestIp(req),
       });
     }
@@ -129,6 +132,7 @@ export async function DELETE(req: NextRequest) {
       entityType: "service_record",
       entityId: id,
       oldValue: beforeRow ?? null,
+      reason: reasonText,
       ipAddress: getRequestIp(req),
     });
   }

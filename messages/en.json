@@ -1774,6 +1774,8 @@
     "auditActionServiceDeletePermanent": "Service record permanently deleted",
     "auditEntityAsset": "Asset",
     "typeToConfirmLabel": "Type \"{word}\" to confirm",
+    "reasonOptionalLabel": "Reason (optional)",
+    "reasonPlaceholder": "Why is this being deleted?",
     "permanentDeleteConfirmWord": "DELETE",
     "accountMovedToTrash": "Account moved to the trash.",
     "restoreAccountConfirmTitle": "Restore account",

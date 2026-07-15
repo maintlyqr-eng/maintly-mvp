@@ -131,7 +131,9 @@ export async function DELETE(req: NextRequest) {
   }
 
   const body = await req.json().catch(() => ({}));
-  const { id, permanent } = body ?? {};
+  const { id, permanent, reason } = body ?? {};
+  // Incremento 13: "motivo" opcional, mismo criterio que accounts/route.ts.
+  const reasonText = typeof reason === "string" && reason.trim() ? reason.trim() : null;
   if (!id || typeof id !== "string") {
     return NextResponse.json({ error: "Missing asset id." }, { status: 400 });
   }
@@ -172,6 +174,7 @@ export async function DELETE(req: NextRequest) {
         entityType: "asset",
         entityId: id,
         oldValue: existing ? { asset_type: existing.asset_type, brand: existing.brand, model: existing.model, nickname: existing.nickname, vin_serial: existing.vin_serial, plate: existing.plate, created_by: existing.created_by } : null,
+        reason: reasonText,
         ipAddress: getRequestIp(req),
       });
     }
@@ -207,6 +210,7 @@ export async function DELETE(req: NextRequest) {
       entityType: "asset",
       entityId: id,
       oldValue: beforeRow ?? null,
+      reason: reasonText,
       ipAddress: getRequestIp(req),
     });
   }

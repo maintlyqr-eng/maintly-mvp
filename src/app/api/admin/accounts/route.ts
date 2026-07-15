@@ -128,7 +128,11 @@ export async function DELETE(req: NextRequest) {
   }
 
   const body = await req.json().catch(() => ({}));
-  const { id, permanent } = body ?? {};
+  const { id, permanent, reason } = body ?? {};
+  // Incremento 13: "motivo" opcional (item 3/13 del pedido: "eliminar con
+  // confirmación + registro de quién/cuándo/por qué") — el frontend solo lo
+  // manda para las acciones de eliminar, nunca obligatorio.
+  const reasonText = typeof reason === "string" && reason.trim() ? reason.trim() : null;
 
   if (!id || typeof id !== "string") {
     return NextResponse.json({ error: "Missing account id." }, { status: 400 });
@@ -171,6 +175,7 @@ export async function DELETE(req: NextRequest) {
         entityType: "mechanic",
         entityId: id,
         oldValue: existing ? { name: existing.name, email: existing.email, workshop_name: existing.workshop_name, is_mechanic: existing.is_mechanic } : null,
+        reason: reasonText,
         ipAddress: getRequestIp(req),
       });
     }
@@ -207,6 +212,7 @@ export async function DELETE(req: NextRequest) {
       entityType: "mechanic",
       entityId: id,
       oldValue: beforeRow ?? null,
+      reason: reasonText,
       ipAddress: getRequestIp(req),
     });
   }

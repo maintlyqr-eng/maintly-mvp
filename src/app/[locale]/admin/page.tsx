@@ -824,10 +824,18 @@ export default function AdminPage() {
   // de Facu: "acciones críticas no deben ejecutarse con un solo clic"). Soft
   // deletes (restorable from the Papelera) use the plain one-click confirm.
   const [confirmAction, setConfirmAction] = useState<null | {
-    title: string; body: string; danger?: boolean; requireTypeToConfirm?: string; onConfirm: () => Promise<void>;
+    title: string; body: string; danger?: boolean; requireTypeToConfirm?: string;
+    // Incremento 13: "motivo" opcional (item 3/13 del pedido: "eliminar con
+    // confirmación + registro de quién/cuándo/por qué") — solo se pide en
+    // las 6 acciones de "eliminar" (soft-delete + permanent-delete de
+    // cuentas/assets/servicios), nunca en restaurar ni en el resto de las
+    // acciones que ya usan este mismo modal compartido.
+    collectReason?: boolean;
+    onConfirm: (reason?: string) => Promise<void>;
   }>(null);
   const [confirmBusy, setConfirmBusy] = useState(false);
   const [confirmTypedText, setConfirmTypedText] = useState("");
+  const [confirmReasonText, setConfirmReasonText] = useState("");
 
   function flash(text: string, tone: "ok" | "error" = "ok") {
     setActionMsg({ text, tone });
@@ -1660,8 +1668,9 @@ export default function AdminPage() {
       title: t("deleteAccountConfirmTitle"),
       body: t("deleteAccountConfirmBody", { name: a.name, email: a.email }),
       danger: true,
-      onConfirm: async () => {
-        const res = await adminFetch("/api/admin/accounts", "DELETE", { id: a.id });
+      collectReason: true,
+      onConfirm: async (reason) => {
+        const res = await adminFetch("/api/admin/accounts", "DELETE", { id: a.id, reason });
         if (!res.ok) { flash(res.error, "error"); return; }
         setAccounts((prev) => prev.filter((x) => x.id !== a.id));
         setDetailAccount(null);
@@ -1690,8 +1699,9 @@ export default function AdminPage() {
       body: t("permanentDeleteAccountConfirmBody", { name: row.name, email: row.email }),
       danger: true,
       requireTypeToConfirm: t("permanentDeleteConfirmWord"),
-      onConfirm: async () => {
-        const res = await adminFetch("/api/admin/accounts", "DELETE", { id: row.id, permanent: true });
+      collectReason: true,
+      onConfirm: async (reason) => {
+        const res = await adminFetch("/api/admin/accounts", "DELETE", { id: row.id, permanent: true, reason });
         if (!res.ok) { flash(res.error, "error"); return; }
         setTrashMechanics((prev) => prev.filter((x) => x.id !== row.id));
         flash(t("accountPermanentlyDeleted"));
@@ -1712,8 +1722,9 @@ export default function AdminPage() {
       title: t("deleteAssetConfirmTitle"),
       body: t("deleteAssetConfirmBody", { asset: assetLabel(a) }),
       danger: true,
-      onConfirm: async () => {
-        const res = await adminFetch("/api/admin/assets", "DELETE", { id: a.id });
+      collectReason: true,
+      onConfirm: async (reason) => {
+        const res = await adminFetch("/api/admin/assets", "DELETE", { id: a.id, reason });
         if (!res.ok) { flash(res.error, "error"); return; }
         setAssets((prev) => prev.filter((x) => x.id !== a.id));
         flash(t("assetMovedToTrash"));
@@ -1741,8 +1752,9 @@ export default function AdminPage() {
       body: t("permanentDeleteAssetConfirmBody", { asset: assetLabel(row) }),
       danger: true,
       requireTypeToConfirm: t("permanentDeleteConfirmWord"),
-      onConfirm: async () => {
-        const res = await adminFetch("/api/admin/assets", "DELETE", { id: row.id, permanent: true });
+      collectReason: true,
+      onConfirm: async (reason) => {
+        const res = await adminFetch("/api/admin/assets", "DELETE", { id: row.id, permanent: true, reason });
         if (!res.ok) { flash(res.error, "error"); return; }
         setTrashAssets((prev) => prev.filter((x) => x.id !== row.id));
         flash(t("assetPermanentlyDeleted"));
@@ -1804,8 +1816,9 @@ export default function AdminPage() {
       title: t("deleteServiceConfirmTitle"),
       body: t("deleteServiceConfirmBody", { type: s.service_type, asset: s.asset_label, date: formatDate(s.service_date) }),
       danger: true,
-      onConfirm: async () => {
-        const res = await adminFetch("/api/admin/services", "DELETE", { id: s.id });
+      collectReason: true,
+      onConfirm: async (reason) => {
+        const res = await adminFetch("/api/admin/services", "DELETE", { id: s.id, reason });
         if (!res.ok) { flash(res.error, "error"); return; }
         setServices((prev) => prev.filter((x) => x.id !== s.id));
         flash(t("serviceRecordMovedToTrash"));
@@ -1833,8 +1846,9 @@ export default function AdminPage() {
       body: t("permanentDeleteServiceConfirmBody", { type: row.service_type, date: formatDate(row.service_date) }),
       danger: true,
       requireTypeToConfirm: t("permanentDeleteConfirmWord"),
-      onConfirm: async () => {
-        const res = await adminFetch("/api/admin/services", "DELETE", { id: row.id, permanent: true });
+      collectReason: true,
+      onConfirm: async (reason) => {
+        const res = await adminFetch("/api/admin/services", "DELETE", { id: row.id, permanent: true, reason });
         if (!res.ok) { flash(res.error, "error"); return; }
         setTrashServices((prev) => prev.filter((x) => x.id !== row.id));
         flash(t("serviceRecordPermanentlyDeleted"));
@@ -2860,9 +2874,14 @@ export default function AdminPage() {
                           <td className="px-7 py-4 text-[12px] text-zinc-500">{s.customer_name}</td>
                           <td className="px-7 py-4 text-[12px] text-zinc-400">{formatDate(s.service_date)}</td>
                           <td className="px-7 py-4 text-right">
-                            <button onClick={() => confirmDeleteService(s)} className="text-zinc-300 hover:text-red-600 transition-colors" title={t("deleteTitle")}>
-                              <Trash2 size={14} />
-                            </button>
+                            <div className="flex items-center justify-end gap-3">
+                              <button onClick={() => viewHistory("service_record", s.id)} className="text-zinc-300 hover:text-blue-600 transition-colors" title={t("viewHistoryTitle")}>
+                                <History size={14} />
+                              </button>
+                              <button onClick={() => confirmDeleteService(s)} className="text-zinc-300 hover:text-red-600 transition-colors" title={t("deleteTitle")}>
+                                <Trash2 size={14} />
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       ))}
@@ -4445,6 +4464,20 @@ export default function AdminPage() {
             </div>
             <h3 className="text-[16px] font-black text-zinc-900 mb-2">{confirmAction.title}</h3>
             <p className="text-[13px] text-zinc-500 mb-5">{confirmAction.body}</p>
+            {confirmAction.collectReason && (
+              <div className="mb-5 text-left">
+                <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1.5">
+                  {t("reasonOptionalLabel")}
+                </label>
+                <textarea
+                  value={confirmReasonText}
+                  onChange={(e) => setConfirmReasonText(e.target.value)}
+                  rows={2}
+                  className="w-full rounded-xl border border-zinc-200 bg-white px-3 py-[9px] text-[13px] outline-none focus:border-red-400 transition-colors resize-none"
+                  placeholder={t("reasonPlaceholder")}
+                />
+              </div>
+            )}
             {confirmAction.requireTypeToConfirm && (
               <div className="mb-5 text-left">
                 <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1.5">
@@ -4461,17 +4494,18 @@ export default function AdminPage() {
               </div>
             )}
             <div className="flex gap-3">
-              <button onClick={() => { setConfirmAction(null); setConfirmTypedText(""); }} disabled={confirmBusy}
+              <button onClick={() => { setConfirmAction(null); setConfirmTypedText(""); setConfirmReasonText(""); }} disabled={confirmBusy}
                 className="flex-1 border border-zinc-200 text-zinc-700 font-bold py-3 rounded-xl text-[13px] hover:bg-zinc-50 transition-colors">
                 {t("cancel")}
               </button>
               <button
                 onClick={async () => {
                   setConfirmBusy(true);
-                  await confirmAction.onConfirm();
+                  await confirmAction.onConfirm(confirmReasonText.trim() || undefined);
                   setConfirmBusy(false);
                   setConfirmAction(null);
                   setConfirmTypedText("");
+                  setConfirmReasonText("");
                 }}
                 disabled={confirmBusy || (!!confirmAction.requireTypeToConfirm && confirmTypedText !== confirmAction.requireTypeToConfirm)}
                 className={`flex-1 disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold py-3 rounded-xl text-[13px] transition-all ${
