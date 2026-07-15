@@ -30,9 +30,12 @@ export type AdminAuditAction =
   | "support_thread.update_state"
   | "report.update_status"
   | "admin_user.create"
-  | "admin_user.update";
+  | "admin_user.update"
+  | "system.update_settings"
+  | "system.changelog_create"
+  | "system.changelog_delete";
 
-export type AdminAuditEntityType = "mechanic" | "asset" | "service_record" | "qr_code" | "qr_batch" | "support_thread" | "content_report" | "admin_user";
+export type AdminAuditEntityType = "mechanic" | "asset" | "service_record" | "qr_code" | "qr_batch" | "support_thread" | "content_report" | "admin_user" | "platform_settings" | "platform_changelog";
 
 export async function logAdminAction(params: {
   adminUsername: string;

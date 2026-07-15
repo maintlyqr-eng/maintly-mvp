@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { ShieldCheck, Upload, FileText, AlertCircle, CheckCircle2 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { fetchPlatformSettings } from "@/lib/platformSettings";
 
 export const MAINTLER_ROLES = [
   "Owner",
@@ -14,7 +15,13 @@ export const MAINTLER_ROLES = [
   "Inspector",
 ];
 
+// Default/fallback until the configurable limit (incremento 17 de Item 6,
+// `platform_settings.max_certificate_mb`) loads.
 const MAX_FILE_BYTES = 10 * 1024 * 1024; // 10MB
+let currentMaxFileBytes = MAX_FILE_BYTES;
+fetchPlatformSettings().then((settings) => {
+  currentMaxFileBytes = settings.maxCertificateMb * 1024 * 1024;
+});
 
 type Props = {
   mechanicId: string;
@@ -47,8 +54,8 @@ export default function ProfessionVerificationForm({ mechanicId, initialProfessi
       setFile(null);
       return;
     }
-    if (f.size > MAX_FILE_BYTES) {
-      setFileError("File is too large. Max size is 10MB.");
+    if (f.size > currentMaxFileBytes) {
+      setFileError(`File is too large. Max size is ${currentMaxFileBytes / (1024 * 1024)}MB.`);
       setFile(null);
       return;
     }

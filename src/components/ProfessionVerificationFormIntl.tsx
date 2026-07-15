@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useTranslations } from "next-intl";
 import { ShieldCheck, Upload, FileText, AlertCircle, CheckCircle2 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { fetchPlatformSettings } from "@/lib/platformSettings";
 
 // Localized twin of ProfessionVerificationForm.tsx. The Settings page is
 // migrated and uses this Intl copy; the plain (non-Intl) original is kept
@@ -35,7 +36,14 @@ const PROFESSION_KEYS: Record<string, string> = {
   "Inspector": "inspector",
 };
 
+// Default/fallback until the configurable limit (incremento 17 de Item 6,
+// `platform_settings.max_certificate_mb`) loads — same value this
+// constant always had before this incremento.
 const MAX_FILE_BYTES = 10 * 1024 * 1024; // 10MB
+let currentMaxFileBytes = MAX_FILE_BYTES;
+fetchPlatformSettings().then((settings) => {
+  currentMaxFileBytes = settings.maxCertificateMb * 1024 * 1024;
+});
 
 type Props = {
   mechanicId: string;
@@ -74,7 +82,7 @@ export default function ProfessionVerificationFormIntl({ mechanicId, initialProf
       setFile(null);
       return;
     }
-    if (f.size > MAX_FILE_BYTES) {
+    if (f.size > currentMaxFileBytes) {
       setFileError(t("errorFileTooLarge"));
       setFile(null);
       return;

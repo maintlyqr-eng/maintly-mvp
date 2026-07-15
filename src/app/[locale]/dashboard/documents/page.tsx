@@ -16,8 +16,16 @@ import DashboardHeaderIntl from "@/components/DashboardHeaderIntl";
 import { useUnreadMessagesCount } from "@/lib/useUnreadMessages";
 import { useUnreadMechanicMessages } from "@/lib/useUnreadMechanicMessages";
 import { formatDateDMY } from "@/lib/date";
+import { fetchPlatformSettings } from "@/lib/platformSettings";
 
+// Default/fallback until the configurable limit (incremento 17 de Item 6,
+// `platform_settings.max_document_mb`) loads — same value this constant
+// always had before this incremento.
 const MAX_FILE_BYTES = 25 * 1024 * 1024; // 25MB — generous for invoices/manuals/photos, cheap to keep sane
+let currentMaxFileBytes = MAX_FILE_BYTES;
+fetchPlatformSettings().then((settings) => {
+  currentMaxFileBytes = settings.maxDocumentMb * 1024 * 1024;
+});
 
 type DocumentRow = {
   id: string;
@@ -163,7 +171,7 @@ export default function DocumentsPage() {
   async function handleUpload(e: React.FormEvent) {
     e.preventDefault();
     if (!uploadFile) { setUploadError(t("chooseFileFirst")); return; }
-    if (uploadFile.size > MAX_FILE_BYTES) { setUploadError(t("fileTooLarge")); return; }
+    if (uploadFile.size > currentMaxFileBytes) { setUploadError(t("fileTooLarge")); return; }
 
     setUploading(true);
     setUploadError("");
