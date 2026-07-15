@@ -142,7 +142,19 @@ type UsageMetrics = {
   checkedAt: string;
 };
 
-type Section = "dashboard" | "accounts" | "mechanics" | "verifications" | "assets" | "services" | "qr" | "support" | "team-chat" | "moderation" | "analytics" | "audit-log" | "trash" | "admins";
+// Incremento 15 (15 jul 2026, pedido de Facu: "tengo por un lado cuentas y
+// por otro mecanicos, eso no me gusta... al final son todos Maintlers y
+// habra subclases dependiendo de la funcion que cada uno elija"): "mechanics"
+// y "verifications" dejaron de ser Section propias — la tabla `mechanics` ya
+// era, desde el incremento 5 de i18n Fase 2 en adelante, una única tabla de
+// usuarios (dueños, mecánicos, electricistas, todos la misma fila; "Owner",
+// "Mechanic", etc. son solo el valor de `profession`). El sidebar mostraba
+// esa única tabla en 3 secciones separadas (Cuentas = todas las filas,
+// Mecánicos = filtro is_mechanic, Verificaciones = filtro de estado de
+// verificación pendiente) — ahora es una sola sección "accounts" (label
+// "Maintlers" en el sidebar) con pestañas internas, ver `maintlersTab` más
+// abajo.
+type Section = "dashboard" | "accounts" | "assets" | "services" | "qr" | "support" | "team-chat" | "moderation" | "analytics" | "audit-log" | "trash" | "admins";
 
 // Incremento 11 (14 jul 2026, roles y permisos): rol de un admin del panel
 // y las capacidades que devuelve /api/admin/session — mismo tipo/nombres
@@ -170,8 +182,6 @@ type AdminUserRow = {
 // canSeeSection() más abajo.
 const SECTION_CAPABILITY: Partial<Record<Section, string>> = {
   accounts: "accounts",
-  mechanics: "accounts",
-  verifications: "accounts",
   assets: "assets",
   services: "assets",
   qr: "qr",
@@ -206,7 +216,7 @@ function canSeeSection(id: Section, capabilities: string[]): boolean {
 // sección visible en el orden del sidebar — este último caso es un
 // fallback defensivo, no debería activarse con los 4 roles actuales.
 const SECTION_LANDING_ORDER: Section[] = [
-  "dashboard", "accounts", "mechanics", "verifications", "assets", "services",
+  "dashboard", "accounts", "assets", "services",
   "qr", "support", "team-chat", "moderation", "analytics", "audit-log", "trash", "admins",
 ];
 
@@ -357,6 +367,11 @@ type AnalyticsData = {
   topLocations: { location: string; count: number }[];
   assetsWithoutRecords: number;
   qrNeverScanned: number;
+  // Incremento 15 (pedido de Facu: "cuantos maintlers tengo y de esos
+  // quienes son mecanicos quienes son electricos, etc."):
+  totalMaintlers: number;
+  professionBreakdown: { profession: string; count: number }[];
+  noProfessionCount: number;
 };
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -695,7 +710,12 @@ export default function AdminPage() {
 
   // ── Accounts / Mechanics UI state ──
   const [accountSearch, setAccountSearch] = useState("");
-  const [mechanicPendingOnly, setMechanicPendingOnly] = useState(false);
+  // Incremento 15: reemplaza el viejo toggle "solo pendientes" de la
+  // sección "Mecánicos" (que ya no existe como sección propia, ver el tipo
+  // Section más arriba) — pestaña activa dentro de la sección unificada
+  // "Maintlers", y filtro de profesión para la pestaña "Por profesión".
+  const [maintlersTab, setMaintlersTab] = useState<"all" | "profession" | "verifications">("all");
+  const [professionFilter, setProfessionFilter] = useState<string>("all");
   const [detailAccount, setDetailAccount] = useState<AccountRow | null>(null);
   const [detailName, setDetailName] = useState("");
   const [detailWorkshop, setDetailWorkshop] = useState("");
@@ -1946,11 +1966,26 @@ export default function AdminPage() {
     return accounts.filter((a) => [a.name, a.email, a.workshop_name].filter(Boolean).join(" ").toLowerCase().includes(q));
   }, [accounts, accountSearch]);
 
-  const visibleMechanics = useMemo(() => {
-    return accounts
-      .filter((a) => a.is_mechanic)
-      .filter((a) => (mechanicPendingOnly ? !a.verified : true));
-  }, [accounts, mechanicPendingOnly]);
+  // Incremento 15 (pedido de Facu: "son todos Maintlers y habra subclases
+  // dependiendo de la funcion que cada uno elija"): conteo por profesión
+  // para los chips de la pestaña "Por profesión" — sobre TODAS las cuentas,
+  // no `visibleAccounts` (que ya viene filtrado por búsqueda), para que los
+  // números de los chips sean siempre el total real, independiente de si
+  // hay algo tipeado en el buscador de la pestaña "Todos".
+  const professionCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const a of accounts) {
+      if (!a.profession) continue;
+      counts[a.profession] = (counts[a.profession] ?? 0) + 1;
+    }
+    return counts;
+  }, [accounts]);
+
+  const professionFilteredAccounts = useMemo(() => {
+    if (professionFilter === "all") return accounts;
+    if (professionFilter === "none") return accounts.filter((a) => !a.profession);
+    return accounts.filter((a) => a.profession === professionFilter);
+  }, [accounts, professionFilter]);
 
   const pendingVerifications = useMemo(() => {
     return accounts
@@ -2223,9 +2258,10 @@ export default function AdminPage() {
   // aislado) — detectado recién en el build real de Vercel.
   const ALL_NAV_ITEMS: { id: Section; label: string; icon: React.ElementType }[] = [
     { id: "dashboard", label: t("navDashboard"), icon: BarChart3 },
-    { id: "accounts",  label: t("navAccounts"),  icon: Users     },
-    { id: "mechanics", label: t("navMechanics"), icon: Wrench    },
-    { id: "verifications", label: t("navVerifications"), icon: ShieldCheck },
+    // Incremento 15: "Cuentas" + "Mecánicos" + "Verificaciones" eran 3 vistas
+    // filtradas de la misma tabla `mechanics` — se unificaron en un solo
+    // ítem "Maintlers" con pestañas internas (ver maintlersTab más abajo).
+    { id: "accounts",  label: t("navMaintlers"),  icon: Users     },
     { id: "assets",    label: t("navAssets"),    icon: Box       },
     { id: "services",  label: t("navServices"),  icon: ClipboardList },
     { id: "qr",        label: t("navQr"), icon: QrCode   },
@@ -2239,7 +2275,7 @@ export default function AdminPage() {
   ];
   const navItems = ALL_NAV_ITEMS.filter(({ id }) => canSeeSection(id, adminCapabilities));
   const sectionLabels: Record<Section, string> = {
-    dashboard: t("navDashboard"), accounts: t("navAccounts"), mechanics: t("navMechanics"), verifications: t("navVerifications"),
+    dashboard: t("navDashboard"), accounts: t("navMaintlers"),
     assets: t("navAssets"), services: t("navServices"), qr: t("navQr"), support: t("navSupport"), "team-chat": t("navTeamChat"),
     moderation: t("navModeration"), analytics: t("navAnalytics"), "audit-log": t("navAuditLog"), trash: t("navTrash"),
     admins: t("navAdmins"),
@@ -2275,6 +2311,89 @@ export default function AdminPage() {
   const auditLogTotalPages = Math.max(1, Math.ceil(auditLogsTotal / AUDIT_LOG_PAGE_SIZE));
   const reportsTotalPages = Math.max(1, Math.ceil(reportsTotal / REPORTS_PAGE_SIZE));
   const unreadSupportCount = supportMessages.filter((m) => !m.from_admin && !m.read).length;
+
+  // Incremento 15: tabla compartida entre las pestañas "Todos" y "Por
+  // profesión" de la sección Maintlers (antes eran 2 secciones separadas
+  // con tablas casi idénticas, "Cuentas" y "Mecánicos" — ver el tipo
+  // Section más arriba) — evita duplicar ~60 líneas de JSX por una
+  // diferencia real de una sola cosa: qué array de filas le llega.
+  function renderMaintlersTable(rows: AccountRow[], emptyMessage: string, countLabel: string) {
+    return (
+      <div className="bg-white rounded-2xl border border-zinc-200/80 shadow-sm overflow-hidden">
+        <div className="px-7 py-5 border-b border-zinc-100">
+          <SectionTitle>{countLabel}</SectionTitle>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[980px]">
+            <thead>
+              <tr className="bg-zinc-50 border-b border-zinc-100">
+                {[t("colAccount"), t("colProfession"), t("colRoles"), t("colStatus"), t("colLastActive"), t("colJoined"), ""].map((h) => (
+                  <th key={h} className="px-7 py-3 text-left text-[9px] font-bold text-zinc-400 uppercase tracking-widest">{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-zinc-50">
+              {rows.map((a) => {
+                const owner = (assetsByMechanic[a.id] ?? 0) > 0;
+                return (
+                  <tr key={a.id} className="hover:bg-zinc-50/80 transition-colors cursor-pointer" onClick={() => openDetail(a)}>
+                    <td className="px-7 py-4">
+                      <div className="flex items-center gap-3">
+                        {a.photo_url ? (
+                          <HoverAvatar src={a.photo_url} size={36} className="shrink-0" />
+                        ) : (
+                          <div className={`w-9 h-9 rounded-full flex items-center justify-center text-[12px] font-black shrink-0 ${getAvatarColor(a.name)}`}>
+                            {getInitials(a.name)}
+                          </div>
+                        )}
+                        <div className="min-w-0">
+                          <p className="text-[13px] font-bold text-zinc-900 truncate">{a.name}</p>
+                          <p className="text-[11px] text-zinc-400 truncate">{a.email}</p>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-7 py-4">
+                      {a.profession
+                        ? <Pill tone="zinc">{tProfessionTypes(PROFESSION_KEYS[a.profession] ?? "owner")}</Pill>
+                        : <span className="text-zinc-300 text-[12px]">{t("notSet")}</span>}
+                    </td>
+                    <td className="px-7 py-4">
+                      <div className="flex flex-wrap gap-1.5">
+                        {owner && <Pill tone="zinc">{t("ownerPill")}</Pill>}
+                        {a.is_mechanic && <Pill tone="blue">{t("mechanicPill")}</Pill>}
+                        {a.is_mechanic && a.verified && <Pill tone="emerald">{t("verifiedPill")}</Pill>}
+                      </div>
+                    </td>
+                    <td className="px-7 py-4">
+                      {a.suspended
+                        ? <Pill tone="red">{t("suspendedPill")}</Pill>
+                        : <Pill tone="emerald">{t("activePill")}</Pill>}
+                    </td>
+                    <td className="px-7 py-4 text-[12px]">
+                      {a.last_active_at ? (
+                        <span className={isStaleActivity(a.last_active_at) ? "text-amber-600 font-semibold" : "text-zinc-400"}>
+                          {formatDate(a.last_active_at)}
+                        </span>
+                      ) : (
+                        <span className="text-zinc-300">{t("neverActive")}</span>
+                      )}
+                    </td>
+                    <td className="px-7 py-4 text-[12px] text-zinc-400">{formatDate(a.created_at)}</td>
+                    <td className="px-7 py-4 text-right">
+                      <span className="text-[11px] font-bold text-zinc-400">{t("viewArrow")}</span>
+                    </td>
+                  </tr>
+                );
+              })}
+              {rows.length === 0 && (
+                <tr><td colSpan={7} className="px-7 py-16 text-center text-[13px] text-zinc-300">{emptyMessage}</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-zinc-50/60 flex text-zinc-900 relative">
@@ -2320,7 +2439,7 @@ export default function AdminPage() {
                   {unreadSupportCount}
                 </span>
               )}
-              {id === "verifications" && pendingVerifications.length > 0 && (
+              {id === "accounts" && pendingVerifications.length > 0 && (
                 <span className={`ml-auto text-[10px] font-black px-1.5 py-0.5 rounded-full leading-none ${
                   section === id ? "bg-white text-red-600" : "bg-amber-500 text-white"
                 }`}>
@@ -2535,238 +2654,155 @@ export default function AdminPage() {
             </div>
           )}
 
-          {/* ── ACCOUNTS ──────────────────────────────────────────────────── */}
+          {/* ── MAINTLERS (incremento 15: Cuentas + Mecánicos + Verificaciones
+               unificados en una sola sección con pestañas — ver el comentario
+               del tipo Section más arriba) ──────────────────────────────── */}
           {section === "accounts" && (
             <div className="space-y-4">
-              <div className="flex flex-wrap items-center gap-3">
-                <div className="relative max-w-md flex-1 min-w-[200px]">
-                  <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
-                  <input
-                    type="text" value={accountSearch} onChange={(e) => setAccountSearch(e.target.value)}
-                    placeholder={t("searchAccountsPlaceholder")}
-                    className="w-full rounded-xl border border-zinc-200 bg-white pl-9 pr-3 py-[9px] text-[12px] outline-none focus:border-red-400 transition-colors"
-                  />
-                </div>
-                <button
-                  onClick={() => downloadCsv(
-                    `maintlyqr-maintlers-${new Date().toISOString().slice(0, 10)}.csv`,
-                    [t("colAccount"), "email", t("colRoles"), t("colStatus"), t("colLastActive"), t("colJoined")],
-                    visibleAccounts.map((a) => [
-                      a.name, a.email,
-                      [a.is_mechanic ? t("mechanicPill") : "", a.is_mechanic && a.verified ? t("verifiedPill") : ""].filter(Boolean).join(" / "),
-                      a.suspended ? t("suspendedPill") : t("activePill"),
-                      a.last_active_at ? formatDate(a.last_active_at) : t("neverActive"),
-                      formatDate(a.created_at),
-                    ])
-                  )}
-                  className="flex items-center gap-2 bg-white border border-zinc-200 hover:bg-zinc-50 text-zinc-600 text-[12px] font-bold px-3.5 py-[9px] rounded-xl transition-colors"
-                >
-                  <Download size={13} /> {t("exportCsv")}
-                </button>
+              <div className="flex items-center gap-1 border-b border-zinc-200/80">
+                {([
+                  { id: "all" as const, label: t("maintlersTabAll") },
+                  { id: "profession" as const, label: t("maintlersTabProfession") },
+                  { id: "verifications" as const, label: t("maintlersTabVerifications") },
+                ]).map((tab) => (
+                  <button
+                    key={tab.id}
+                    onClick={() => setMaintlersTab(tab.id)}
+                    className={`relative flex items-center gap-1.5 px-3.5 py-2.5 text-[12px] font-bold transition-colors ${
+                      maintlersTab === tab.id ? "text-red-600" : "text-zinc-400 hover:text-zinc-600"
+                    }`}
+                  >
+                    {tab.label}
+                    {tab.id === "verifications" && pendingVerifications.length > 0 && (
+                      <span className="text-[10px] font-black px-1.5 py-0.5 rounded-full bg-amber-500 text-white leading-none">
+                        {pendingVerifications.length}
+                      </span>
+                    )}
+                    {maintlersTab === tab.id && <span className="absolute left-0 right-0 -bottom-px h-[2px] bg-red-600 rounded-full" />}
+                  </button>
+                ))}
               </div>
 
-              <div className="bg-white rounded-2xl border border-zinc-200/80 shadow-sm overflow-hidden">
-                <div className="px-7 py-5 border-b border-zinc-100">
-                  <SectionTitle>{t("accountsCount", { count: visibleAccounts.length })}</SectionTitle>
-                </div>
-                <div className="overflow-x-auto">
-                  <table className="w-full min-w-[900px]">
-                    <thead>
-                      <tr className="bg-zinc-50 border-b border-zinc-100">
-                        {[t("colAccount"), t("colRoles"), t("colStatus"), t("colLastActive"), t("colJoined"), ""].map((h) => (
-                          <th key={h} className="px-7 py-3 text-left text-[9px] font-bold text-zinc-400 uppercase tracking-widest">{h}</th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-zinc-50">
-                      {visibleAccounts.map((a) => {
-                        const owner = (assetsByMechanic[a.id] ?? 0) > 0;
-                        return (
-                          <tr key={a.id} className="hover:bg-zinc-50/80 transition-colors cursor-pointer" onClick={() => openDetail(a)}>
-                            <td className="px-7 py-4">
-                              <div className="flex items-center gap-3">
-                                {a.photo_url ? (
-                                  <HoverAvatar src={a.photo_url} size={36} className="shrink-0" />
-                                ) : (
-                                  <div className={`w-9 h-9 rounded-full flex items-center justify-center text-[12px] font-black shrink-0 ${getAvatarColor(a.name)}`}>
-                                    {getInitials(a.name)}
-                                  </div>
-                                )}
-                                <div className="min-w-0">
-                                  <p className="text-[13px] font-bold text-zinc-900 truncate">{a.name}</p>
-                                  <p className="text-[11px] text-zinc-400 truncate">{a.email}</p>
-                                </div>
-                              </div>
-                            </td>
-                            <td className="px-7 py-4">
-                              <div className="flex flex-wrap gap-1.5">
-                                {owner && <Pill tone="zinc">{t("ownerPill")}</Pill>}
-                                {a.is_mechanic && <Pill tone="blue">{t("mechanicPill")}</Pill>}
-                                {a.is_mechanic && a.verified && <Pill tone="emerald">{t("verifiedPill")}</Pill>}
-                              </div>
-                            </td>
-                            <td className="px-7 py-4">
-                              {a.suspended
-                                ? <Pill tone="red">{t("suspendedPill")}</Pill>
-                                : <Pill tone="emerald">{t("activePill")}</Pill>}
-                            </td>
-                            <td className="px-7 py-4 text-[12px]">
-                              {a.last_active_at ? (
-                                <span className={isStaleActivity(a.last_active_at) ? "text-amber-600 font-semibold" : "text-zinc-400"}>
-                                  {formatDate(a.last_active_at)}
-                                </span>
-                              ) : (
-                                <span className="text-zinc-300">{t("neverActive")}</span>
-                              )}
-                            </td>
-                            <td className="px-7 py-4 text-[12px] text-zinc-400">{formatDate(a.created_at)}</td>
-                            <td className="px-7 py-4 text-right">
-                              <span className="text-[11px] font-bold text-zinc-400">{t("viewArrow")}</span>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                      {visibleAccounts.length === 0 && (
-                        <tr><td colSpan={6} className="px-7 py-16 text-center text-[13px] text-zinc-300">{t("noAccountsMatch")}</td></tr>
+              {maintlersTab === "all" && (
+                <>
+                  <div className="flex flex-wrap items-center gap-3">
+                    <div className="relative max-w-md flex-1 min-w-[200px]">
+                      <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
+                      <input
+                        type="text" value={accountSearch} onChange={(e) => setAccountSearch(e.target.value)}
+                        placeholder={t("searchAccountsPlaceholder")}
+                        className="w-full rounded-xl border border-zinc-200 bg-white pl-9 pr-3 py-[9px] text-[12px] outline-none focus:border-red-400 transition-colors"
+                      />
+                    </div>
+                    <button
+                      onClick={() => downloadCsv(
+                        `maintlyqr-maintlers-${new Date().toISOString().slice(0, 10)}.csv`,
+                        [t("colAccount"), "email", t("colProfession"), t("colRoles"), t("colStatus"), t("colLastActive"), t("colJoined")],
+                        visibleAccounts.map((a) => [
+                          a.name, a.email,
+                          a.profession ? tProfessionTypes(PROFESSION_KEYS[a.profession] ?? "owner") : "",
+                          [a.is_mechanic ? t("mechanicPill") : "", a.is_mechanic && a.verified ? t("verifiedPill") : ""].filter(Boolean).join(" / "),
+                          a.suspended ? t("suspendedPill") : t("activePill"),
+                          a.last_active_at ? formatDate(a.last_active_at) : t("neverActive"),
+                          formatDate(a.created_at),
+                        ])
                       )}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
-          )}
+                      className="flex items-center gap-2 bg-white border border-zinc-200 hover:bg-zinc-50 text-zinc-600 text-[12px] font-bold px-3.5 py-[9px] rounded-xl transition-colors"
+                    >
+                      <Download size={13} /> {t("exportCsv")}
+                    </button>
+                  </div>
+                  {renderMaintlersTable(visibleAccounts, t("noAccountsMatch"), t("accountsCount", { count: visibleAccounts.length }))}
+                </>
+              )}
 
-          {/* ── MECHANICS ─────────────────────────────────────────────────── */}
-          {section === "mechanics" && (
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <SectionTitle>{t("mechanicsCount", { count: visibleMechanics.length })}</SectionTitle>
-                <button
-                  onClick={() => setMechanicPendingOnly((v) => !v)}
-                  className={`text-[11px] font-bold px-3 py-1.5 rounded-full border transition-colors ${
-                    mechanicPendingOnly ? "bg-amber-500 text-white border-amber-500" : "bg-white border-zinc-200 text-zinc-500 hover:bg-zinc-50"
-                  }`}
-                >
-                  {t("pendingOnlyToggle")}
-                </button>
-              </div>
+              {maintlersTab === "profession" && (
+                <>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      onClick={() => setProfessionFilter("all")}
+                      className={`text-[11px] font-bold px-3 py-1.5 rounded-full border transition-colors ${
+                        professionFilter === "all" ? "bg-red-600 text-white border-red-600" : "bg-white border-zinc-200 text-zinc-500 hover:bg-zinc-50"
+                      }`}
+                    >
+                      {t("professionFilterAll")} · {accounts.length}
+                    </button>
+                    {Object.keys(PROFESSION_KEYS).map((profession) => (
+                      <button
+                        key={profession}
+                        onClick={() => setProfessionFilter(profession)}
+                        className={`text-[11px] font-bold px-3 py-1.5 rounded-full border transition-colors ${
+                          professionFilter === profession ? "bg-red-600 text-white border-red-600" : "bg-white border-zinc-200 text-zinc-500 hover:bg-zinc-50"
+                        }`}
+                      >
+                        {tProfessionTypes(PROFESSION_KEYS[profession])} · {professionCounts[profession] ?? 0}
+                      </button>
+                    ))}
+                  </div>
+                  {renderMaintlersTable(professionFilteredAccounts, t("noAccountsMatch"), t("accountsCount", { count: professionFilteredAccounts.length }))}
+                </>
+              )}
 
-              <div className="bg-white rounded-2xl border border-zinc-200/80 shadow-sm overflow-hidden">
-                <div className="overflow-x-auto">
-                  <table className="w-full min-w-[820px]">
-                    <thead>
-                      <tr className="bg-zinc-50 border-b border-zinc-100">
-                        {[t("colMechanic"), t("colWorkshop"), t("colVerification"), t("colServices"), t("colJoined"), t("colActions")].map((h) => (
-                          <th key={h} className="px-7 py-3 text-left text-[9px] font-bold text-zinc-400 uppercase tracking-widest">{h}</th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-zinc-50">
-                      {visibleMechanics.map((m) => (
-                        <tr key={m.id} className="hover:bg-zinc-50/80 transition-colors">
-                          <td className="px-7 py-4 cursor-pointer" onClick={() => openDetail(m)}>
-                            <div className="flex items-center gap-3">
-                              {m.photo_url ? (
-                                <HoverAvatar src={m.photo_url} size={36} className="shrink-0" />
-                              ) : (
-                                <div className={`w-9 h-9 rounded-full flex items-center justify-center text-[12px] font-black shrink-0 ${getAvatarColor(m.name)}`}>
-                                  {getInitials(m.name)}
-                                </div>
-                              )}
-                              <span className="text-[13px] font-bold text-zinc-900">{m.name}</span>
-                            </div>
-                          </td>
-                          <td className="px-7 py-4 text-[12px] text-zinc-500">{m.workshop_name ?? <span className="text-zinc-300">{t("notSet")}</span>}</td>
-                          <td className="px-7 py-4">
-                            {m.verified
-                              ? <Pill tone="emerald">{t("verifiedCheck")}</Pill>
-                              : <Pill tone="amber">{t("pending")}</Pill>}
-                          </td>
-                          <td className="px-7 py-4 text-[12px] text-zinc-500">{servicesByMechanic[m.id] ?? 0}</td>
-                          <td className="px-7 py-4 text-[12px] text-zinc-400">{formatDate(m.created_at)}</td>
-                          <td className="px-7 py-4">
-                            <div className="flex items-center gap-1.5">
-                              <button
-                                onClick={() => patchAccount(m.id, { verified: !m.verified }).then((ok) => ok && flash(m.verified ? t("verificationRevoked") : t("mechanicVerified")))}
-                                className={`text-[11px] font-bold px-2.5 py-1.5 rounded-lg border transition-colors ${
-                                  m.verified ? "border-zinc-200 text-zinc-500 hover:bg-zinc-50" : "border-emerald-200 text-emerald-700 hover:bg-emerald-50"
-                                }`}
-                              >
-                                {m.verified ? t("revoke") : t("approve")}
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                      {visibleMechanics.length === 0 && (
-                        <tr><td colSpan={6} className="px-7 py-16 text-center text-[13px] text-zinc-300">{mechanicPendingOnly ? t("noMechanicsPending") : t("noMechanics")}</td></tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
-          )}
+              {maintlersTab === "verifications" && (
+                <>
+                  <SectionTitle>{t("pendingRequestsCount", { count: pendingVerifications.length })}</SectionTitle>
 
-          {/* ── VERIFICATION REQUESTS ─────────────────────────────────────── */}
-          {section === "verifications" && (
-            <div className="space-y-4">
-              <SectionTitle>{t("pendingRequestsCount", { count: pendingVerifications.length })}</SectionTitle>
-
-              {pendingVerifications.length === 0 ? (
-                <div className="bg-white rounded-2xl border border-zinc-200/80 shadow-sm py-16 text-center">
-                  <ShieldCheck size={28} className="text-zinc-200 mx-auto mb-3" />
-                  <p className="text-[13px] text-zinc-300">{t("noPendingRequests")}</p>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {pendingVerifications.map((a) => (
-                    <div key={a.id} className="bg-white rounded-2xl border border-zinc-200/80 shadow-sm p-5 flex flex-col sm:flex-row sm:items-center gap-4">
-                      <div className="flex items-center gap-3 flex-1 min-w-0">
-                        {a.photo_url ? (
-                          <HoverAvatar src={a.photo_url} size={40} className="shrink-0" />
-                        ) : (
-                          <div className={`w-10 h-10 rounded-full flex items-center justify-center text-[13px] font-black shrink-0 ${getAvatarColor(a.name)}`}>
-                            {getInitials(a.name)}
-                          </div>
-                        )}
-                        <div className="min-w-0">
-                          <p className="text-[13px] font-bold text-zinc-900 truncate">{a.name}</p>
-                          <p className="text-[11px] text-zinc-400 truncate">{a.email}</p>
-                          <div className="flex items-center gap-2 mt-1">
-                            <Pill tone="amber">{a.profession ? tProfessionTypes(PROFESSION_KEYS[a.profession] ?? "owner") : ""}</Pill>
-                            {a.verification_requested_at && (
-                              <span className="text-[10px] text-zinc-400">{t("requestedOn", { date: formatDate(a.verification_requested_at) })}</span>
+                  {pendingVerifications.length === 0 ? (
+                    <div className="bg-white rounded-2xl border border-zinc-200/80 shadow-sm py-16 text-center">
+                      <ShieldCheck size={28} className="text-zinc-200 mx-auto mb-3" />
+                      <p className="text-[13px] text-zinc-300">{t("noPendingRequests")}</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {pendingVerifications.map((a) => (
+                        <div key={a.id} className="bg-white rounded-2xl border border-zinc-200/80 shadow-sm p-5 flex flex-col sm:flex-row sm:items-center gap-4">
+                          <div className="flex items-center gap-3 flex-1 min-w-0">
+                            {a.photo_url ? (
+                              <HoverAvatar src={a.photo_url} size={40} className="shrink-0" />
+                            ) : (
+                              <div className={`w-10 h-10 rounded-full flex items-center justify-center text-[13px] font-black shrink-0 ${getAvatarColor(a.name)}`}>
+                                {getInitials(a.name)}
+                              </div>
                             )}
+                            <div className="min-w-0">
+                              <p className="text-[13px] font-bold text-zinc-900 truncate">{a.name}</p>
+                              <p className="text-[11px] text-zinc-400 truncate">{a.email}</p>
+                              <div className="flex items-center gap-2 mt-1">
+                                <Pill tone="amber">{a.profession ? tProfessionTypes(PROFESSION_KEYS[a.profession] ?? "owner") : ""}</Pill>
+                                {a.verification_requested_at && (
+                                  <span className="text-[10px] text-zinc-400">{t("requestedOn", { date: formatDate(a.verification_requested_at) })}</span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0">
+                            <button
+                              onClick={() => handleViewCertificate(a)}
+                              disabled={!a.certificate_path}
+                              className="text-[11px] font-bold px-3 py-2 rounded-lg border border-zinc-200 text-zinc-600 hover:bg-zinc-50 transition-colors disabled:opacity-40"
+                            >
+                              {t("viewCertificate")}
+                            </button>
+                            <button
+                              onClick={() => handleRejectVerification(a)}
+                              disabled={verificationBusyId === a.id}
+                              className="text-[11px] font-bold px-3 py-2 rounded-lg border border-red-200 text-red-600 hover:bg-red-50 transition-colors disabled:opacity-40"
+                            >
+                              {t("reject")}
+                            </button>
+                            <button
+                              onClick={() => handleApproveVerification(a)}
+                              disabled={verificationBusyId === a.id}
+                              className="text-[11px] font-bold px-3 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white transition-colors disabled:opacity-40"
+                            >
+                              {verificationBusyId === a.id ? t("working") : t("approve")}
+                            </button>
                           </div>
                         </div>
-                      </div>
-                      <div className="flex items-center gap-2 shrink-0">
-                        <button
-                          onClick={() => handleViewCertificate(a)}
-                          disabled={!a.certificate_path}
-                          className="text-[11px] font-bold px-3 py-2 rounded-lg border border-zinc-200 text-zinc-600 hover:bg-zinc-50 transition-colors disabled:opacity-40"
-                        >
-                          {t("viewCertificate")}
-                        </button>
-                        <button
-                          onClick={() => handleRejectVerification(a)}
-                          disabled={verificationBusyId === a.id}
-                          className="text-[11px] font-bold px-3 py-2 rounded-lg border border-red-200 text-red-600 hover:bg-red-50 transition-colors disabled:opacity-40"
-                        >
-                          {t("reject")}
-                        </button>
-                        <button
-                          onClick={() => handleApproveVerification(a)}
-                          disabled={verificationBusyId === a.id}
-                          className="text-[11px] font-bold px-3 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white transition-colors disabled:opacity-40"
-                        >
-                          {verificationBusyId === a.id ? t("working") : t("approve")}
-                        </button>
-                      </div>
+                      ))}
                     </div>
-                  ))}
-                </div>
+                  )}
+                </>
               )}
             </div>
           )}
@@ -3841,6 +3877,46 @@ export default function AdminPage() {
                 <p className="text-[13px] text-zinc-400 text-center py-16">{t("loading")}</p>
               ) : (
                 <>
+                  {/* Incremento 15: cuántos Maintlers hay en total y de qué
+                      profesión — lo primero que Facu pidió poder ver acá,
+                      antes de "usuarios activos" (que mide otra cosa:
+                      actividad reciente, no composición de la base). */}
+                  <div className="bg-white rounded-2xl border border-zinc-200/80 p-6 shadow-sm">
+                    <div className="flex items-center justify-between mb-1">
+                      <SectionTitle>{t("analyticsMaintlersTitle")}</SectionTitle>
+                      <span className="text-[22px] font-black text-zinc-900">{analyticsData.totalMaintlers.toLocaleString()}</span>
+                    </div>
+                    <p className="text-[10.5px] text-zinc-300 mb-4">{t("analyticsMaintlersSub")}</p>
+                    {analyticsData.professionBreakdown.length === 0 ? (
+                      <p className="text-[13px] text-zinc-300">{t("analyticsNoData")}</p>
+                    ) : (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-2.5">
+                        {analyticsData.professionBreakdown.map((row) => {
+                          const max = analyticsData.professionBreakdown[0].count;
+                          const pct = max > 0 ? Math.round((row.count / max) * 100) : 0;
+                          return (
+                            <div key={row.profession} className="flex items-center gap-3">
+                              <span className="text-[12px] font-semibold text-zinc-700 truncate flex-1">
+                                {tProfessionTypes(PROFESSION_KEYS[row.profession] ?? "owner")}
+                              </span>
+                              <div className="w-20 h-1.5 bg-zinc-100 rounded-full overflow-hidden shrink-0">
+                                <div className="h-full bg-red-500 rounded-full" style={{ width: `${pct}%` }} />
+                              </div>
+                              <span className="text-[11px] font-black text-zinc-900 w-8 text-right shrink-0">{row.count}</span>
+                            </div>
+                          );
+                        })}
+                        {analyticsData.noProfessionCount > 0 && (
+                          <div className="flex items-center gap-3">
+                            <span className="text-[12px] font-semibold text-zinc-400 truncate flex-1">{t("analyticsNoProfession")}</span>
+                            <div className="w-20 h-1.5 bg-zinc-100 rounded-full overflow-hidden shrink-0" />
+                            <span className="text-[11px] font-black text-zinc-400 w-8 text-right shrink-0">{analyticsData.noProfessionCount}</span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
                   <div>
                     <SectionTitle>{t("analyticsActiveUsersTitle")}</SectionTitle>
                     <div className="grid grid-cols-2 xl:grid-cols-5 gap-4 mt-3">

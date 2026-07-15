@@ -56,6 +56,8 @@ export async function GET(req: NextRequest) {
     locationsRes,
     firstServicePerAssetRes,
     assetsCreatedRes,
+    totalMaintlersRes,
+    professionRowsRes,
   ] = await Promise.all([
     admin.from("mechanics").select("*", { count: "exact", head: true }).is("deleted_at", null).gte("last_active_at", dayAgo),
     admin.from("mechanics").select("*", { count: "exact", head: true }).is("deleted_at", null).gte("last_active_at", weekAgo),
@@ -99,6 +101,22 @@ export async function GET(req: NextRequest) {
     admin.from("service_records").select("asset_id, service_date").is("deleted_at", null).order("service_date", { ascending: true }).limit(SERVICE_SAMPLE_CAP),
 
     admin.from("assets").select("id, created_at").is("deleted_at", null).limit(20000),
+
+    // Incremento 15 (pedido de Facu: "quiero poder saber cuantos maintlers
+    // tengo y de esos quienes son mecanicos quienes son electricos, etc."):
+    // `totalMechanicsRes` de arriba ya filtraba is_mechanic=true (mide otra
+    // cosa: cuentas con permiso de cargar servicios) — este es el conteo
+    // real de TODA la tabla `mechanics` (dueños, mecánicos, electricistas,
+    // todos), sin ese filtro.
+    admin.from("mechanics").select("*", { count: "exact", head: true }).is("deleted_at", null),
+
+    // Filas crudas de `profession` para agrupar en JS (mismo patrón que
+    // topByCount/topLocations más abajo — no hay una función de Postgres
+    // para esto en el repo, y este sandbox no puede probar una nueva
+    // contra una base real). `profession` es un campo de texto libre (ver
+    // PROFESSION_KEYS en admin/page.tsx) poblado desde /register/profession,
+    // así que puede venir null en cuentas viejas que nunca pasaron por ahí.
+    admin.from("mechanics").select("profession").is("deleted_at", null).limit(20000),
   ]);
 
   const firstError = [
@@ -109,6 +127,7 @@ export async function GET(req: NextRequest) {
     scansInRangeRes.error, servicesInRangeRes.error,
     allServiceAssetIdsRes.error, allScannedCodesRes.error,
     locationsRes.error, firstServicePerAssetRes.error, assetsCreatedRes.error,
+    totalMaintlersRes.error, professionRowsRes.error,
   ].find(Boolean);
 
   if (firstError) {
@@ -183,6 +202,18 @@ export async function GET(req: NextRequest) {
   }
   const avgDaysToFirstMaintenance = countedAssets > 0 ? totalDays / countedAssets : null;
 
+  // ── Breakdown de Maintlers por profesión (incremento 15) ──
+  const professionCounts = new Map<string, number>();
+  let noProfessionCount = 0;
+  for (const row of professionRowsRes.data ?? []) {
+    const p = (row.profession ?? "").trim();
+    if (!p) { noProfessionCount += 1; continue; }
+    professionCounts.set(p, (professionCounts.get(p) ?? 0) + 1);
+  }
+  const professionBreakdown = Array.from(professionCounts.entries())
+    .sort((a, b) => b[1] - a[1])
+    .map(([profession, count]) => ({ profession, count }));
+
   return NextResponse.json({
     range: { from, to },
     activeToday: activeTodayRes.count ?? 0,
@@ -191,6 +222,9 @@ export async function GET(req: NextRequest) {
     inactiveMechanics: inactiveRes.count ?? 0,
     totalMechanics: totalMechanicsRes.count ?? 0,
     returningMechanics: returningRes.count ?? 0,
+    totalMaintlers: totalMaintlersRes.count ?? 0,
+    professionBreakdown,
+    noProfessionCount,
 
     totalAssets: totalAssetsRes.count ?? 0,
     totalServices: totalServicesRes.count ?? 0,
