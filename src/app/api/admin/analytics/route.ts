@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminHasCapability } from "@/lib/adminAuth";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
+import { logServerError } from "@/lib/errorLog";
 
 // GET: item 8 del pedido de Facu ("Analytics avanzados") + la parte de
 // item 9 ("Estado y calidad de la plataforma") que es derivable de datos
@@ -131,6 +132,10 @@ export async function GET(req: NextRequest) {
   ].find(Boolean);
 
   if (firstError) {
+    // Incremento 19: Analytics es la otra lectura central que vale la pena
+    // loguear al panel técnico de errores (ver el mismo comentario en
+    // bulk-data/route.ts).
+    await logServerError({ source: "server", message: firstError.message, route: "/api/admin/analytics" });
     return NextResponse.json({ error: firstError.message }, { status: 500 });
   }
 

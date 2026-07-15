@@ -7,6 +7,7 @@ import { useTranslations } from "next-intl";
 import HoverAvatar from "@/components/HoverAvatar";
 import NotificationBellIntl from "@/components/NotificationBellIntl";
 import PlatformStatusBanner from "@/components/PlatformStatusBanner";
+import ErrorLogger from "@/components/ErrorLogger";
 import { getInitials } from "@/lib/initials";
 
 // Localized twin of src/components/DashboardHeader.tsx — same reasoning as
@@ -93,6 +94,7 @@ export default function DashboardHeaderIntl({
         </div>
       </header>
       <PlatformStatusBanner />
+      <ErrorLogger />
     </Fragment>
   );
 }

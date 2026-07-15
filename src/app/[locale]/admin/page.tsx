@@ -11,11 +11,12 @@ import {
   Ban, ShieldCheck, ShieldOff, Trash2, KeyRound, UserCog,
   UserPlus, UserMinus, Plus, Link2Off, ScanLine, ClipboardList,
   LifeBuoy, Send, MessageCircle, Flag, History, ChevronDown, ChevronRight,
-  Trash, RotateCcw, TrendingUp, MapPin, Calendar, Pencil, Download, Settings, AlertTriangle,
+  Trash, RotateCcw, TrendingUp, MapPin, Calendar, Pencil, Download, Settings, AlertTriangle, Bug,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { formatDateDMY } from "@/lib/date";
 import HoverAvatar from "@/components/HoverAvatar";
+import ErrorLogger from "@/components/ErrorLogger";
 
 // Local enum-key maps, same pattern as ShareAssetModal.tsx / the Settings
 // and Assets [locale] pages — raw DB values (English) map to translation
@@ -154,7 +155,7 @@ type UsageMetrics = {
 // verificación pendiente) — ahora es una sola sección "accounts" (label
 // "Maintlers" en el sidebar) con pestañas internas, ver `maintlersTab` más
 // abajo.
-type Section = "dashboard" | "accounts" | "assets" | "services" | "qr" | "support" | "team-chat" | "moderation" | "analytics" | "audit-log" | "trash" | "admins" | "system";
+type Section = "dashboard" | "accounts" | "assets" | "services" | "qr" | "support" | "team-chat" | "moderation" | "analytics" | "audit-log" | "trash" | "admins" | "system" | "errors";
 
 // Incremento 11 (14 jul 2026, roles y permisos): rol de un admin del panel
 // y las capacidades que devuelve /api/admin/session — mismo tipo/nombres
@@ -221,6 +222,11 @@ const SECTION_CAPABILITY: Partial<Record<Section, string>> = {
   // de archivo, changelog) afecta a toda la plataforma — mismo criterio
   // de gating que la eliminación permanente y la gestión de admins.
   system: "critical_actions",
+  // Incremento 19: "Errores" (panel técnico de errores y rendimiento) usa
+  // el mismo capability que "audit-log" — es otro tipo de log de
+  // plataforma, mismo nivel de sensibilidad (solo Super Admin hoy), y
+  // evita sumar un capability nuevo a src/lib/adminRoles.ts solo para esto.
+  errors: "audit_logs",
 };
 
 function canSeeSection(id: Section, capabilities: string[]): boolean {
@@ -247,7 +253,7 @@ function canSeeSection(id: Section, capabilities: string[]): boolean {
 // fallback defensivo, no debería activarse con los 4 roles actuales.
 const SECTION_LANDING_ORDER: Section[] = [
   "dashboard", "accounts", "assets", "services",
-  "qr", "support", "team-chat", "moderation", "analytics", "audit-log", "trash", "admins", "system",
+  "qr", "support", "team-chat", "moderation", "analytics", "audit-log", "trash", "admins", "system", "errors",
 ];
 
 function landingSection(capabilities: string[]): Section {
@@ -388,6 +394,25 @@ type FlaggedMechanicRow = {
   suspended: boolean;
   score: number;
   reasons: SuspiciousReason[];
+};
+
+// Incremento 19 (Fase 3 — "Panel técnico de errores y rendimiento"),
+// leído desde /api/admin/error-logs. Ver ese route.ts y
+// src/lib/errorLog.ts para cómo se llenan estas filas.
+type PlatformErrorLogRow = {
+  id: string;
+  created_at: string;
+  source: "client" | "server";
+  severity: "error" | "warning";
+  message: string;
+  stack: string | null;
+  route: string | null;
+  user_agent: string | null;
+  ip_address: string | null;
+  context: unknown;
+  resolved: boolean;
+  resolved_at: string | null;
+  resolved_by: string | null;
 };
 
 // Item 8 del pedido de Facu ("Analytics avanzados") + la parte de item 9
@@ -834,6 +859,22 @@ export default function AdminPage() {
   // misma ruta GET con `?export=csv`, respetando los filtros vigentes.
   const [auditExportBusy, setAuditExportBusy] = useState(false);
 
+  // ── Errores (panel técnico de errores y rendimiento — incremento 19 de
+  // Item 6, Fase 3) — mismo patrón de paginación real server-side +
+  // filtros + fila expandible que el log de auditoría de arriba, ver
+  // /api/admin/error-logs. ──
+  const ERROR_LOGS_PAGE_SIZE = 25;
+  const [errorLogs, setErrorLogs] = useState<PlatformErrorLogRow[]>([]);
+  const [errorLogsLoading, setErrorLogsLoading] = useState(true);
+  const [errorLogsTotal, setErrorLogsTotal] = useState(0);
+  const [errorLogsUnresolvedCount, setErrorLogsUnresolvedCount] = useState(0);
+  const [errorLogsPage, setErrorLogsPage] = useState(1);
+  const [errorLogSourceFilter, setErrorLogSourceFilter] = useState("all");
+  const [errorLogSeverityFilter, setErrorLogSeverityFilter] = useState("all");
+  const [errorLogResolvedFilter, setErrorLogResolvedFilter] = useState<"all" | "unresolved" | "resolved">("unresolved");
+  const [expandedErrorLogId, setExpandedErrorLogId] = useState<string | null>(null);
+  const [errorLogBusyId, setErrorLogBusyId] = useState<string | null>(null);
+
   // ── Analytics (item 8 del pedido de Facu) ──
   // Rango con fecha por defecto de últimos 30 días, mismo criterio que el
   // resto del panel usa para "sin actividad" (INACTIVE_DAYS_THRESHOLD).
@@ -1264,6 +1305,46 @@ export default function AdminPage() {
     }
   }
 
+  // Incremento 19: mismo patrón de paginación real server-side que el log
+  // de auditoría de arriba, ver /api/admin/error-logs.
+  async function loadErrorLogs() {
+    setErrorLogsLoading(true);
+    try {
+      const params = new URLSearchParams();
+      if (errorLogSourceFilter !== "all") params.set("source", errorLogSourceFilter);
+      if (errorLogSeverityFilter !== "all") params.set("severity", errorLogSeverityFilter);
+      if (errorLogResolvedFilter === "resolved") params.set("resolved", "true");
+      if (errorLogResolvedFilter === "unresolved") params.set("resolved", "false");
+      params.set("page", String(errorLogsPage));
+      params.set("pageSize", String(ERROR_LOGS_PAGE_SIZE));
+
+      const res = await fetch(`/api/admin/error-logs?${params.toString()}`);
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) {
+        setErrorLogs((data.logs as PlatformErrorLogRow[]) ?? []);
+        setErrorLogsTotal((data.total as number) ?? 0);
+        setErrorLogsUnresolvedCount((data.unresolvedCount as number) ?? 0);
+      } else {
+        flash(data.error || t("errorLoadErrorLogs"), "error");
+      }
+    } catch {
+      flash(t("errorLoadErrorLogs"), "error");
+    }
+    setErrorLogsLoading(false);
+  }
+
+  async function toggleErrorLogResolved(log: PlatformErrorLogRow) {
+    setErrorLogBusyId(log.id);
+    const res = await adminFetch("/api/admin/error-logs", "PATCH", { id: log.id, resolved: !log.resolved });
+    setErrorLogBusyId(null);
+    if (!res.ok) { flash(res.error, "error"); return; }
+    setErrorLogs((prev) => prev.map((l) => (l.id === log.id
+      ? { ...l, resolved: !log.resolved, resolved_at: !log.resolved ? new Date().toISOString() : null }
+      : l)));
+    setErrorLogsUnresolvedCount((n) => Math.max(0, n + (log.resolved ? 1 : -1)));
+    flash(log.resolved ? t("errorLogReopened") : t("errorLogResolved"));
+  }
+
   async function loadAnalytics() {
     setAnalyticsLoading(true);
     try {
@@ -1652,6 +1733,16 @@ export default function AdminPage() {
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [section, adminAuthed, auditLogsPage, auditLogActionFilter, auditLogEntityFilter, auditLogEntityIdFilter, auditLogFrom, auditLogTo]);
+
+  // Incremento 19: mismo criterio que el log de auditoría — filtros/página
+  // reales del lado del servidor, así que un cambio de filtro necesita un
+  // refetch de verdad.
+  useEffect(() => {
+    if (section === "errors" && adminAuthed) {
+      loadErrorLogs();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [section, adminAuthed, errorLogsPage, errorLogSourceFilter, errorLogSeverityFilter, errorLogResolvedFilter]);
 
   // Reportes y Moderación: same reasoning as the audit log effect above —
   // server-side filters/pagination, so filter changes need a real refetch,
@@ -2365,6 +2456,7 @@ export default function AdminPage() {
   if (!adminAuthed) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-zinc-50 via-white to-red-50/30 flex items-center justify-center p-4">
+        <ErrorLogger />
         <div className="absolute inset-0 bg-[linear-gradient(rgba(0,0,0,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(0,0,0,0.03)_1px,transparent_1px)] bg-[size:40px_40px] pointer-events-none" />
         <div className="w-full max-w-[380px] relative">
           <div className="text-center mb-10">
@@ -2475,13 +2567,14 @@ export default function AdminPage() {
     { id: "trash",     label: t("navTrash"),     icon: Trash    },
     { id: "admins",    label: t("navAdmins"),    icon: UserCog  },
     { id: "system",    label: t("navSystem"),    icon: Settings },
+    { id: "errors",    label: t("navErrors"),    icon: Bug      },
   ];
   const navItems = ALL_NAV_ITEMS.filter(({ id }) => canSeeSection(id, adminCapabilities));
   const sectionLabels: Record<Section, string> = {
     dashboard: t("navDashboard"), accounts: t("navMaintlers"),
     assets: t("navAssets"), services: t("navServices"), qr: t("navQr"), support: t("navSupport"), "team-chat": t("navTeamChat"),
     moderation: t("navModeration"), analytics: t("navAnalytics"), "audit-log": t("navAuditLog"), trash: t("navTrash"),
-    admins: t("navAdmins"), system: t("navSystem"),
+    admins: t("navAdmins"), system: t("navSystem"), errors: t("navErrors"),
   };
   const REPORT_TYPE_LABEL: Record<string, string> = {
     incorrect_info: t("reportTypeIncorrectInfo"),
@@ -2600,6 +2693,7 @@ export default function AdminPage() {
 
   return (
     <div className="min-h-screen bg-zinc-50/60 flex text-zinc-900 relative">
+      <ErrorLogger />
 
       {sidebarOpen && (
         <div className="md:hidden fixed inset-0 bg-black/40 z-30" onClick={() => setSidebarOpen(false)} />
@@ -4832,6 +4926,206 @@ export default function AdminPage() {
                   </div>
                 </>
               )}
+            </div>
+          )}
+
+          {/* ── ERRORES (panel técnico de errores y rendimiento — incremento
+               19, Fase 3) ─────────────────────────────────────────────── */}
+          {section === "errors" && (
+            <div className="space-y-4">
+              <p className="text-[12px] text-zinc-400">{t("errorsIntro")}</p>
+
+              <div className="flex flex-wrap items-center gap-3">
+                <div className={`flex items-center gap-2 rounded-xl border px-3.5 py-2.5 ${
+                  errorLogsUnresolvedCount > 0 ? "bg-amber-50 border-amber-200" : "bg-emerald-50 border-emerald-200"
+                }`}>
+                  {errorLogsUnresolvedCount > 0 ? (
+                    <AlertTriangle size={14} className="text-amber-600" />
+                  ) : (
+                    <ShieldCheck size={14} className="text-emerald-600" />
+                  )}
+                  <p className={`text-[12px] font-bold ${errorLogsUnresolvedCount > 0 ? "text-amber-800" : "text-emerald-800"}`}>
+                    {t("errorsUnresolvedSummary", { count: errorLogsUnresolvedCount })}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-end gap-3">
+                <div>
+                  <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1">{t("errorsFilterSource")}</label>
+                  <select
+                    value={errorLogSourceFilter}
+                    onChange={(e) => { setErrorLogSourceFilter(e.target.value); setErrorLogsPage(1); }}
+                    className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-[12px] outline-none focus:border-red-400"
+                  >
+                    <option value="all">{t("auditFilterAll")}</option>
+                    <option value="client">{t("errorsSourceClient")}</option>
+                    <option value="server">{t("errorsSourceServer")}</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1">{t("errorsFilterSeverity")}</label>
+                  <select
+                    value={errorLogSeverityFilter}
+                    onChange={(e) => { setErrorLogSeverityFilter(e.target.value); setErrorLogsPage(1); }}
+                    className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-[12px] outline-none focus:border-red-400"
+                  >
+                    <option value="all">{t("auditFilterAll")}</option>
+                    <option value="error">{t("errorsSeverityError")}</option>
+                    <option value="warning">{t("errorsSeverityWarning")}</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1">{t("errorsFilterStatus")}</label>
+                  <select
+                    value={errorLogResolvedFilter}
+                    onChange={(e) => { setErrorLogResolvedFilter(e.target.value as "all" | "unresolved" | "resolved"); setErrorLogsPage(1); }}
+                    className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-[12px] outline-none focus:border-red-400"
+                  >
+                    <option value="unresolved">{t("errorsStatusUnresolved")}</option>
+                    <option value="resolved">{t("errorsStatusResolved")}</option>
+                    <option value="all">{t("auditFilterAll")}</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="bg-white rounded-2xl border border-zinc-200/80 shadow-sm overflow-hidden">
+                {errorLogsLoading ? (
+                  <p className="text-[13px] text-zinc-400 text-center py-16">{t("loading")}</p>
+                ) : errorLogs.length === 0 ? (
+                  <div className="text-center py-16">
+                    <Bug size={28} className="mx-auto text-zinc-200 mb-2" />
+                    <p className="text-[13px] text-zinc-300 font-medium">{t("errorsEmpty")}</p>
+                  </div>
+                ) : (
+                  <>
+                    <div className="overflow-x-auto">
+                      <table className="w-full min-w-[760px]">
+                        <thead>
+                          <tr className="bg-zinc-50 border-b border-zinc-100">
+                            {[t("auditColWhen"), t("errorsColSource"), t("errorsColSeverity"), t("errorsColMessage"), t("errorsColRoute"), t("colStatus"), ""].map((h) => (
+                              <th key={h} className="px-7 py-3 text-left text-[9px] font-bold text-zinc-400 uppercase tracking-widest">{h}</th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-zinc-50">
+                          {errorLogs.map((log) => {
+                            const isExpanded = expandedErrorLogId === log.id;
+                            return (
+                              <Fragment key={log.id}>
+                                <tr
+                                  className="hover:bg-zinc-50/80 transition-colors cursor-pointer"
+                                  onClick={() => setExpandedErrorLogId(isExpanded ? null : log.id)}
+                                >
+                                  <td className="px-7 py-4 text-[12px] text-zinc-400 whitespace-nowrap">{formatDate(log.created_at)} · {formatTime(log.created_at, locale)}</td>
+                                  <td className="px-7 py-4 text-[12px] font-semibold text-zinc-600">
+                                    {log.source === "client" ? t("errorsSourceClient") : t("errorsSourceServer")}
+                                  </td>
+                                  <td className="px-7 py-4">
+                                    {log.severity === "warning"
+                                      ? <Pill tone="amber">{t("errorsSeverityWarning")}</Pill>
+                                      : <Pill tone="red">{t("errorsSeverityError")}</Pill>}
+                                  </td>
+                                  <td className="px-7 py-4 text-[12px] text-zinc-700 max-w-[360px] truncate">{log.message}</td>
+                                  <td className="px-7 py-4 text-[12px] font-mono text-zinc-400">{log.route ?? "—"}</td>
+                                  <td className="px-7 py-4">
+                                    {log.resolved
+                                      ? <Pill tone="emerald">{t("errorsStatusResolved")}</Pill>
+                                      : <Pill tone="zinc">{t("errorsStatusUnresolved")}</Pill>}
+                                  </td>
+                                  <td className="px-7 py-4 text-right text-zinc-300">
+                                    {isExpanded ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
+                                  </td>
+                                </tr>
+                                {isExpanded && (
+                                  <tr key={`${log.id}-detail`} className="bg-zinc-50/60">
+                                    <td colSpan={7} className="px-7 py-4">
+                                      <div className="space-y-3 text-[11.5px]">
+                                        <div>
+                                          <p className="font-bold text-zinc-500 uppercase tracking-wide text-[9.5px] mb-1">{t("errorsDetailMessage")}</p>
+                                          <p className="whitespace-pre-wrap break-words bg-white border border-zinc-200 rounded-lg p-2.5 text-zinc-700">{log.message}</p>
+                                        </div>
+                                        {log.stack && (
+                                          <div>
+                                            <p className="font-bold text-zinc-500 uppercase tracking-wide text-[9.5px] mb-1">{t("errorsDetailStack")}</p>
+                                            <pre className="whitespace-pre-wrap break-words bg-white border border-zinc-200 rounded-lg p-2.5 text-zinc-600 font-mono text-[11px] max-h-64 overflow-y-auto">
+                                              {log.stack}
+                                            </pre>
+                                          </div>
+                                        )}
+                                        {log.context != null && (
+                                          <div>
+                                            <p className="font-bold text-zinc-500 uppercase tracking-wide text-[9.5px] mb-1">{t("errorsDetailContext")}</p>
+                                            <pre className="whitespace-pre-wrap break-words bg-white border border-zinc-200 rounded-lg p-2.5 text-zinc-600 font-mono text-[11px]">
+                                              {JSON.stringify(log.context, null, 2)}
+                                            </pre>
+                                          </div>
+                                        )}
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                          {log.user_agent && (
+                                            <div>
+                                              <p className="font-bold text-zinc-500 uppercase tracking-wide text-[9.5px] mb-1">{t("errorsDetailUserAgent")}</p>
+                                              <p className="text-zinc-600 break-words">{log.user_agent}</p>
+                                            </div>
+                                          )}
+                                          {log.ip_address && (
+                                            <div>
+                                              <p className="font-bold text-zinc-500 uppercase tracking-wide text-[9.5px] mb-1">{t("auditDetailIp")}</p>
+                                              <p className="text-zinc-600 font-mono">{log.ip_address}</p>
+                                            </div>
+                                          )}
+                                          {log.resolved && log.resolved_by && (
+                                            <div>
+                                              <p className="font-bold text-zinc-500 uppercase tracking-wide text-[9.5px] mb-1">{t("errorsDetailResolvedBy")}</p>
+                                              <p className="text-zinc-600">{log.resolved_by} · {log.resolved_at ? formatDate(log.resolved_at) : ""}</p>
+                                            </div>
+                                          )}
+                                        </div>
+                                        <button
+                                          onClick={(e) => { e.stopPropagation(); toggleErrorLogResolved(log); }}
+                                          disabled={errorLogBusyId === log.id}
+                                          className={`text-[11px] font-bold px-3 py-1.5 rounded-lg border transition-colors disabled:opacity-40 ${
+                                            log.resolved ? "border-zinc-200 text-zinc-600 hover:bg-zinc-50" : "border-emerald-200 text-emerald-700 hover:bg-emerald-50"
+                                          }`}
+                                        >
+                                          {log.resolved ? t("errorsReopenButton") : t("errorsResolveButton")}
+                                        </button>
+                                      </div>
+                                    </td>
+                                  </tr>
+                                )}
+                              </Fragment>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    <div className="flex items-center justify-between px-7 py-4 border-t border-zinc-100">
+                      <p className="text-[11px] text-zinc-400">{t("auditTotalCount", { count: errorLogsTotal })}</p>
+                      <div className="flex items-center gap-3">
+                        <button
+                          onClick={() => setErrorLogsPage((p) => Math.max(1, p - 1))}
+                          disabled={errorLogsPage <= 1}
+                          className="text-[11px] font-bold px-3 py-1.5 rounded-lg border border-zinc-200 text-zinc-600 hover:bg-zinc-50 transition-colors disabled:opacity-30"
+                        >
+                          {t("auditPrevPage")}
+                        </button>
+                        <span className="text-[11px] text-zinc-400">
+                          {t("auditPageOf", { page: errorLogsPage, totalPages: Math.max(1, Math.ceil(errorLogsTotal / ERROR_LOGS_PAGE_SIZE)) })}
+                        </span>
+                        <button
+                          onClick={() => setErrorLogsPage((p) => Math.min(Math.max(1, Math.ceil(errorLogsTotal / ERROR_LOGS_PAGE_SIZE)), p + 1))}
+                          disabled={errorLogsPage >= Math.max(1, Math.ceil(errorLogsTotal / ERROR_LOGS_PAGE_SIZE))}
+                          className="text-[11px] font-bold px-3 py-1.5 rounded-lg border border-zinc-200 text-zinc-600 hover:bg-zinc-50 transition-colors disabled:opacity-30"
+                        >
+                          {t("auditNextPage")}
+                        </button>
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
             </div>
           )}
 

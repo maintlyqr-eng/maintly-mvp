@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminHasAnyCapability } from "@/lib/adminAuth";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
+import { logServerError } from "@/lib/errorLog";
 
 // GET: the handful of platform-wide tables the Admin dashboard needs
 // (mechanics, assets, qr_codes, service_records, mechanic_assets), read with
@@ -91,6 +92,11 @@ export async function GET(req: NextRequest) {
   ].find(Boolean);
 
   if (firstError) {
+    // Incremento 19: bulk-data alimenta Dashboard + Papelera, la lectura
+    // más central del panel — un error real acá (no un 403 de permisos,
+    // ya se filtró arriba) vale la pena loguear para el panel técnico de
+    // errores, no solo devolverlo al cliente.
+    await logServerError({ source: "server", message: firstError.message, route: "/api/admin/bulk-data" });
     return NextResponse.json({ error: firstError.message }, { status: 500 });
   }
 
