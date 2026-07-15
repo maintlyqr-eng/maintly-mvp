@@ -165,9 +165,9 @@ type AdminUserRow = {
 // mismo mapeo del lado del servidor — cada ruta de API vuelve a chequear
 // esto por su cuenta, este mapeo del lado del cliente es solo para decidir
 // qué mostrar en el sidebar, nunca la única barrera de seguridad).
-// "dashboard" no está en el mapa a propósito: cualquier admin autenticado
-// puede verlo (aunque el bulk-data que lo alimenta pueda devolver 403 para
-// Analytics Viewer — ver nota en loadData/bulk-data).
+// "dashboard" y "trash" no están acá porque su regla no es "una capacidad
+// puntual" sino "accounts O assets" — ver el caso especial en
+// canSeeSection() más abajo.
 const SECTION_CAPABILITY: Partial<Record<Section, string>> = {
   accounts: "accounts",
   mechanics: "accounts",
@@ -184,12 +184,36 @@ const SECTION_CAPABILITY: Partial<Record<Section, string>> = {
 };
 
 function canSeeSection(id: Section, capabilities: string[]): boolean {
-  if (id === "dashboard") return true;
-  // trash lee de 3 dominios a la vez (accounts + assets + services) — ver
-  // /api/admin/trash/route.ts, que exige "accounts" O "assets".
-  if (id === "trash") return capabilities.includes("accounts") || capabilities.includes("assets");
+  // Incremento 12: Dashboard y Papelera dependen los dos de
+  // /api/admin/bulk-data (mechanics + assets + service_records + qr_codes
+  // de una sola lectura) — visibles solo si el rol tiene "accounts" o
+  // "assets". Antes, "dashboard" estaba marcado como visible para
+  // cualquier admin autenticado, pero eso dejaba a Analytics Viewer
+  // (solo "analytics"+"reports", el único rol sin ninguna de las dos)
+  // aterrizando en una pantalla que le tiraba 403 en loop — ver
+  // landingSection() más abajo para el aterrizaje correcto de ese rol.
+  if (id === "dashboard" || id === "trash") {
+    return capabilities.includes("accounts") || capabilities.includes("assets");
+  }
   const cap = SECTION_CAPABILITY[id];
   return !cap || capabilities.includes(cap);
+}
+
+// Orden de aterrizaje al loguearse o al perder acceso a la sección abierta
+// (ej. cambio de rol). Preferencia: Dashboard (la vista más completa) si el
+// rol puede verla; si no (hoy: solo Analytics Viewer), Analytics (la
+// sección pensada para ese rol, ver adminRoles.ts); si tampoco, la primera
+// sección visible en el orden del sidebar — este último caso es un
+// fallback defensivo, no debería activarse con los 4 roles actuales.
+const SECTION_LANDING_ORDER: Section[] = [
+  "dashboard", "accounts", "mechanics", "verifications", "assets", "services",
+  "qr", "support", "team-chat", "moderation", "analytics", "audit-log", "trash", "admins",
+];
+
+function landingSection(capabilities: string[]): Section {
+  if (canSeeSection("dashboard", capabilities)) return "dashboard";
+  if (canSeeSection("analytics", capabilities)) return "analytics";
+  return SECTION_LANDING_ORDER.find((id) => canSeeSection(id, capabilities)) ?? "dashboard";
 }
 
 type SupportMessageRow = {
@@ -813,6 +837,17 @@ export default function AdminPage() {
   async function loadData() {
     setRefreshing(true);
 
+    // Incremento 12: Analytics Viewer no tiene "accounts" ni "assets" — sin
+    // este chequeo, loadData() pedía /api/admin/bulk-data igual, se comía un
+    // 403 ("Not authorized.") y caía en el branch de error de más abajo,
+    // mostrando un toast de error cada vez que corre el auto-refresco de
+    // 60s (incremento 10), sin ninguna forma de que ese rol lo silencie —
+    // el gap que había quedado documentado como "fuera de alcance" en el
+    // incremento 11. Ahora, si el rol no tiene ninguna de las dos
+    // capacidades que bulk-data exige, directamente no se pide.
+    const canLoadBulkData = adminCapabilities.includes("accounts") || adminCapabilities.includes("assets");
+
+    if (canLoadBulkData) {
     // mechanics/assets/qr_codes/service_records/mechanic_assets are read
     // through a service-role API route rather than the browser's anon-key
     // client — see /api/admin/bulk-data for why. The two qr_scans queries
@@ -832,23 +867,6 @@ export default function AdminPage() {
       setLoading(false);
       return;
     }
-
-    // Non-critical: platform usage vs. Supabase Free plan limits (DB size,
-    // Storage size). Fails silently until the get_usage_metrics() SQL
-    // function is created — the rest of the panel shouldn't break over this.
-    fetch("/api/admin/usage-check")
-      .then((r) => (r.ok ? r.json() : null))
-      .then((data) => { if (data && !data.error) setUsageMetrics(data as UsageMetrics); })
-      .catch(() => {});
-
-    // Non-critical: just the "new reports" badge count for the sidebar, so
-    // it's visible without having to open the Moderación tab first (same
-    // lightweight, best-effort pattern as usage-check above). The full
-    // list itself still lazy-loads on open, same as every other tab.
-    fetch("/api/admin/reports?pageSize=1")
-      .then((r) => (r.ok ? r.json() : null))
-      .then((data) => { if (data && typeof data.newCount === "number") setReportsNewCount(data.newCount); })
-      .catch(() => {});
 
     const mechRows = bulkRes.mechanics;
     const svcRows = bulkRes.serviceRecords;
@@ -932,8 +950,64 @@ export default function AdminPage() {
     setNewAssetDays(bucketDaily(assetRowsTyped.map((a) => a.created_at), 14));
     setNewQrDays(bucketDaily(qrRowsTyped.filter((q) => q.asset_id).map((q) => q.created_at), 14));
     setNewServiceDays(bucketDaily(svcMapped.map((s) => s.service_date), 14));
+    } else {
+      // Rol sin "accounts" ni "assets" (hoy: solo Analytics Viewer) — ninguna
+      // de las tablas de bulk-data aplica. El sidebar ya oculta Dashboard,
+      // Papelera, Maintlers, Assets, Servicios y QR para este rol (ver
+      // canSeeSection/landingSection más abajo), así que estos valores por
+      // default nunca llegan a renderizarse — solo evitan dejar el estado
+      // "pegado" con datos de una sesión anterior si el rol cambió en caliente.
+      setAccounts([]);
+      setServices([]);
+      setAssets([]);
+      setAssetTypes([]);
+      setQrCodes([]);
+      setAssetsByMechanic({});
+      setServicesByMechanic({});
+      setServicesByAsset({});
+      setQrByMechanic({});
+      setScansToday(0);
+      setScansWeek(0);
+      setNewUserDays(bucketDaily([], 14));
+      setNewMechanicDays(bucketDaily([], 14));
+      setNewAssetDays(bucketDaily([], 14));
+      setNewQrDays(bucketDaily([], 14));
+      setNewServiceDays(bucketDaily([], 14));
+      setDataTruncatedNotice(null);
+      setMechanicsTotalCount(null);
+    }
 
-    await loadSupportMessages();
+    // Non-critical: platform usage vs. Supabase Free plan limits (DB size,
+    // Storage size). Fails silently until the get_usage_metrics() SQL
+    // function is created — the rest of the panel shouldn't break over this.
+    // Gateada del lado del servidor por "critical_actions" (solo Super
+    // Admin) — para cualquier otro rol vuelve un 403 que este fetch ya
+    // ignora en silencio (mismo `if (data && !data.error)` de siempre).
+    fetch("/api/admin/usage-check")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => { if (data && !data.error) setUsageMetrics(data as UsageMetrics); })
+      .catch(() => {});
+
+    // Non-critical: just the "new reports" badge count for the sidebar, so
+    // it's visible without having to open the Moderación tab first (same
+    // lightweight, best-effort pattern as usage-check above). The full
+    // list itself still lazy-loads on open, same as every other tab. Corre
+    // para cualquier rol con "reports" (incluye Analytics Viewer).
+    fetch("/api/admin/reports?pageSize=1")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => { if (data && typeof data.newCount === "number") setReportsNewCount(data.newCount); })
+      .catch(() => {});
+
+    // support-messages exige capacidad "support" del lado del servidor —
+    // saltearlo acá si el rol no la tiene evita un 403 innecesario cada
+    // 60s (mismo motivo que canLoadBulkData arriba). Content Moderator y
+    // Analytics Viewer caen acá.
+    if (adminCapabilities.includes("support")) {
+      await loadSupportMessages();
+    } else {
+      setSupportMessages([]);
+      setSupportThreadStates({});
+    }
 
     setLastFullRefreshAt(new Date().toISOString());
     setRefreshing(false);
@@ -1334,12 +1408,13 @@ export default function AdminPage() {
 
   // Si la sección abierta no está entre las que el rol logueado puede ver
   // (ej. cambió de rol, o quedó una sección vieja en el estado de una
-  // sesión anterior con otro rol), vuelve al Dashboard — que cualquier
-  // admin autenticado puede ver — en vez de dejar una pantalla a medio
+  // sesión anterior con otro rol), vuelve a la sección de aterrizaje de
+  // ese rol — Dashboard para la mayoría, Analytics para Analytics Viewer
+  // (ver landingSection más arriba) — en vez de dejar una pantalla a medio
   // cargar pidiendo datos que van a volver 403.
   useEffect(() => {
     if (!adminAuthed) return;
-    if (!canSeeSection(section, adminCapabilities)) setSection("dashboard");
+    if (!canSeeSection(section, adminCapabilities)) setSection(landingSection(adminCapabilities));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [adminAuthed, adminCapabilities, section]);
 
