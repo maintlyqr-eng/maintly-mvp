@@ -1293,7 +1293,10 @@
     "errorFileTooLarge": "O arquivo é muito grande. O tamanho máximo é 10MB.",
     "errorSelectProfession": "Por favor selecione uma profissão.",
     "errorUploadCertificate": "Por favor envie um certificado ou comprovante da sua profissão.",
-    "errorUploadsNotSetUp": "O envio de certificados ainda não está configurado. Tente novamente mais tarde."
+    "errorUploadsNotSetUp": "O envio de certificados ainda não está configurado. Tente novamente mais tarde.",
+    "ownerNoDocumentNotice": "Donos não precisam enviar nenhum documento — só confirme e pronto.",
+    "saving": "Salvando…",
+    "continueButton": "Continuar"
   },
   "VerificationStatusCard": {
     "verifiedLabel": "Verificado",
@@ -1387,7 +1390,10 @@
     "successContactUpdated": "Informações de contato atualizadas.",
     "errorPasswordTooShort": "A senha deve ter pelo menos 6 caracteres.",
     "errorPasswordMismatch": "As senhas não coincidem.",
-    "successPasswordUpdated": "Senha atualizada."
+    "successPasswordUpdated": "Senha atualizada.",
+    "ownerNoVerificationLabel": "Dono — não precisa de verificação",
+    "ownerNoVerificationDesc": "Donos não precisam de certificado. Está tudo pronto.",
+    "changeProfession": "Mudar profissão"
   },
   "ShareAssetModal": {
     "title": "Compartilhar Equipamento",

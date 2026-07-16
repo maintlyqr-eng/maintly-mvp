@@ -50,7 +50,13 @@ type Props = {
   initialProfession?: string | null;
   /** Shown next to the submit button; when provided, renders a "Skip for now" link. */
   onSkip?: () => void;
-  onSubmitted: (profession: string) => void;
+  /**
+   * `status` mirrors exactly what got written to `verification_status` for
+   * this submission ("none" for Owner, which needs no document/review;
+   * "pending" for every other role) — callers use it to decide whether to
+   * show a "your certificate is under review" state or just move on.
+   */
+  onSubmitted: (profession: string, status: "none" | "pending") => void;
 };
 
 function sanitizeFileName(name: string) {
@@ -65,6 +71,12 @@ export default function ProfessionVerificationFormIntl({ mechanicId, initialProf
   const [fileError, setFileError] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
+
+  // Facu: an "Owner" is just tracking their own equipment, not claiming a
+  // professional trade or a business -- asking them for a certificate never
+  // made sense (there's nothing to certify). Every other role still needs
+  // proof, same as before.
+  const isOwner = profession === "Owner";
 
   function professionLabel(p: string) {
     return tProfessionTypes(PROFESSION_KEYS[p] ?? "owner");
@@ -95,33 +107,42 @@ export default function ProfessionVerificationFormIntl({ mechanicId, initialProf
     setError("");
 
     if (!profession) { setError(t("errorSelectProfession")); return; }
-    if (!file) { setError(t("errorUploadCertificate")); return; }
+    if (!isOwner && !file) { setError(t("errorUploadCertificate")); return; }
 
     setSubmitting(true);
 
-    const path = `${mechanicId}/${Date.now()}-${sanitizeFileName(file.name)}`;
-    const { error: uploadError } = await supabase.storage
-      .from("certificates")
-      .upload(path, file, { upsert: true, contentType: file.type });
+    let path: string | null = null;
+    if (!isOwner && file) {
+      path = `${mechanicId}/${Date.now()}-${sanitizeFileName(file.name)}`;
+      const { error: uploadError } = await supabase.storage
+        .from("certificates")
+        .upload(path, file, { upsert: true, contentType: file.type });
 
-    if (uploadError) {
-      setSubmitting(false);
-      setError(
-        uploadError.message.includes("Bucket not found")
-          ? t("errorUploadsNotSetUp")
-          : uploadError.message
-      );
-      return;
+      if (uploadError) {
+        setSubmitting(false);
+        setError(
+          uploadError.message.includes("Bucket not found")
+            ? t("errorUploadsNotSetUp")
+            : uploadError.message
+        );
+        return;
+      }
     }
+
+    // Owner: no certificate, so nothing to review -- goes straight to
+    // "none" instead of "pending", and clears out any certificate/review
+    // fields left over from a previous profession (e.g. someone who first
+    // signed up as Mechanic and later switches to Owner here).
+    const verificationStatus: "none" | "pending" = isOwner ? "none" : "pending";
 
     const { error: dbError } = await supabase
       .from("mechanics")
       .update({
         profession,
         certificate_path: path,
-        verification_status: "pending",
+        verification_status: verificationStatus,
         verified: false, // any new/updated submission needs a fresh admin review
-        verification_requested_at: new Date().toISOString(),
+        verification_requested_at: isOwner ? null : new Date().toISOString(),
         verification_reviewed_at: null,
         verification_note: null,
       })
@@ -131,7 +152,7 @@ export default function ProfessionVerificationFormIntl({ mechanicId, initialProf
 
     if (dbError) { setError(dbError.message); return; }
 
-    onSubmitted(profession);
+    onSubmitted(profession, verificationStatus);
   }
 
   return (
@@ -156,30 +177,34 @@ export default function ProfessionVerificationFormIntl({ mechanicId, initialProf
         </div>
       </div>
 
-      <div>
-        <label className="text-[12px] font-bold text-zinc-700 mb-2 block">{t("certificateOrProof")}</label>
-        <label
-          htmlFor="certificate-upload"
-          className="flex items-center gap-3 border border-dashed border-zinc-300 hover:border-red-400 rounded-xl px-4 py-4 cursor-pointer transition-colors bg-zinc-50"
-        >
-          <div className="w-9 h-9 rounded-full bg-white border border-zinc-200 flex items-center justify-center shrink-0">
-            {file ? <FileText size={16} className="text-red-600" /> : <Upload size={16} className="text-zinc-400" />}
-          </div>
-          <div className="min-w-0">
-            <p className="text-[12px] font-bold text-zinc-800 truncate">{file ? file.name : t("chooseFile")}</p>
-            <p className="text-[11px] text-zinc-400">{t("fileHint")}</p>
-          </div>
-        </label>
-        <input id="certificate-upload" type="file" accept="image/*,application/pdf" className="hidden" onChange={handleFileChange} />
-        {fileError && <p className="text-[11px] font-semibold text-red-600 mt-1.5">{fileError}</p>}
-      </div>
+      {!isOwner && (
+        <div>
+          <label className="text-[12px] font-bold text-zinc-700 mb-2 block">{t("certificateOrProof")}</label>
+          <label
+            htmlFor="certificate-upload"
+            className="flex items-center gap-3 border border-dashed border-zinc-300 hover:border-red-400 rounded-xl px-4 py-4 cursor-pointer transition-colors bg-zinc-50"
+          >
+            <div className="w-9 h-9 rounded-full bg-white border border-zinc-200 flex items-center justify-center shrink-0">
+              {file ? <FileText size={16} className="text-red-600" /> : <Upload size={16} className="text-zinc-400" />}
+            </div>
+            <div className="min-w-0">
+              <p className="text-[12px] font-bold text-zinc-800 truncate">{file ? file.name : t("chooseFile")}</p>
+              <p className="text-[11px] text-zinc-400">{t("fileHint")}</p>
+            </div>
+          </label>
+          <input id="certificate-upload" type="file" accept="image/*,application/pdf" className="hidden" onChange={handleFileChange} />
+          {fileError && <p className="text-[11px] font-semibold text-red-600 mt-1.5">{fileError}</p>}
+        </div>
+      )}
 
       <p className="text-[11px] text-zinc-400 leading-relaxed">
-        {t("reviewNotice", {
-          profession: profession
-            ? t("professionMaintler", { profession: professionLabel(profession) })
-            : t("professionalMaintlerFallback"),
-        })}
+        {isOwner
+          ? t("ownerNoDocumentNotice")
+          : t("reviewNotice", {
+              profession: profession
+                ? t("professionMaintler", { profession: professionLabel(profession) })
+                : t("professionalMaintlerFallback"),
+            })}
       </p>
 
       {error && (
@@ -196,8 +221,10 @@ export default function ProfessionVerificationFormIntl({ mechanicId, initialProf
           className="flex-1 sm:flex-none bg-red-600 hover:bg-red-500 disabled:opacity-60 text-white font-black py-3 px-6 rounded-xl text-[13px] transition-all flex items-center justify-center gap-2"
         >
           {submitting
-            ? <><div className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" /> {t("submitting")}</>
-            : <><ShieldCheck size={15} /> {t("submitForVerification")}</>
+            ? <><div className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" /> {isOwner ? t("saving") : t("submitting")}</>
+            : isOwner
+              ? <><ShieldCheck size={15} /> {t("continueButton")}</>
+              : <><ShieldCheck size={15} /> {t("submitForVerification")}</>
           }
         </button>
         {onSkip && (

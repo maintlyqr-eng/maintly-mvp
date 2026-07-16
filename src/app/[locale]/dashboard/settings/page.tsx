@@ -625,13 +625,43 @@ export default function SettingsPage() {
               </div>
             )}
 
-            {(verificationStatus === "none" || showVerificationForm) && (
+            {/* Owner has verificationStatus "none" (no certificate to review),
+                same as someone who never touched this section at all -- this
+                banner is what tells those two states apart, so picking Owner
+                doesn't just silently dump the user back on the same form
+                with no confirmation that anything was saved. */}
+            {verificationStatus === "none" && profession === "Owner" && !showVerificationForm && (
+              <div className="space-y-3">
+                <div className="flex items-center gap-3 bg-zinc-50 border border-zinc-200 rounded-xl px-4 py-3.5">
+                  <ShieldCheck size={18} className="text-zinc-400 shrink-0" />
+                  <div>
+                    <p className="text-[13px] font-bold text-zinc-700">{t("ownerNoVerificationLabel")}</p>
+                    <p className="text-[11px] text-zinc-400">{t("ownerNoVerificationDesc")}</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowVerificationForm(true)}
+                  className="text-[12px] font-bold text-zinc-500 hover:text-red-600 transition-colors"
+                >
+                  {t("changeProfession")}
+                </button>
+              </div>
+            )}
+
+            {((verificationStatus === "none" && profession !== "Owner") || showVerificationForm) && (
               <ProfessionVerificationFormIntl
                 mechanicId={mechanicId}
                 initialProfession={profession}
-                onSubmitted={(p) => {
+                onSubmitted={(p, status) => {
+                  // "status" is exactly what got written to the DB by the
+                  // form: "none" for Owner (no certificate, nothing to
+                  // review), "pending" for every other role -- mirroring it
+                  // here instead of hardcoding "pending" is what avoids a
+                  // wrong "pending review" card with no certificate behind
+                  // it once an Owner saves.
                   setProfession(p);
-                  setVerificationStatus("pending");
+                  setVerificationStatus(status);
                   setVerificationNote(null);
                   setVerified(false);
                   setShowVerificationForm(false);

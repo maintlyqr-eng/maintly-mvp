@@ -85,7 +85,14 @@ export default function RegisterProfessionPage() {
             <ProfessionVerificationForm
               mechanicId={mechanicId}
               onSkip={() => router.push("/dashboard")}
-              onSubmitted={(profession) => setSubmitted(profession)}
+              onSubmitted={(profession, status) => {
+                // Owner has nothing pending review (no certificate was
+                // uploaded) -- go straight to the dashboard instead of
+                // showing the "we'll review your certificate" screen below,
+                // which wouldn't make sense without one.
+                if (status === "none") { router.push("/dashboard"); return; }
+                setSubmitted(profession);
+              }}
             />
           </>
         )}

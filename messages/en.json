@@ -1293,7 +1293,10 @@
     "errorFileTooLarge": "File is too large. Max size is 10MB.",
     "errorSelectProfession": "Please select a profession.",
     "errorUploadCertificate": "Please upload a certificate or proof of your profession.",
-    "errorUploadsNotSetUp": "Certificate uploads aren't set up yet. Please try again later."
+    "errorUploadsNotSetUp": "Certificate uploads aren't set up yet. Please try again later.",
+    "ownerNoDocumentNotice": "No document needed for Owners — just confirm and you're all set.",
+    "saving": "Saving…",
+    "continueButton": "Continue"
   },
   "VerificationStatusCard": {
     "verifiedLabel": "Verified",
@@ -1387,7 +1390,10 @@
     "successContactUpdated": "Contact info updated.",
     "errorPasswordTooShort": "Password must be at least 6 characters.",
     "errorPasswordMismatch": "Passwords do not match.",
-    "successPasswordUpdated": "Password updated."
+    "successPasswordUpdated": "Password updated.",
+    "ownerNoVerificationLabel": "Owner — no verification needed",
+    "ownerNoVerificationDesc": "Owners don't need a certificate. You're all set.",
+    "changeProfession": "Change profession"
   },
   "ShareAssetModal": {
     "title": "Share Equipment",

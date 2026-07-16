@@ -1293,7 +1293,10 @@
     "errorFileTooLarge": "El archivo es demasiado grande. El tamaño máximo es 10MB.",
     "errorSelectProfession": "Por favor seleccioná una profesión.",
     "errorUploadCertificate": "Por favor subí un certificado o comprobante de tu profesión.",
-    "errorUploadsNotSetUp": "La carga de certificados todavía no está configurada. Probá de nuevo más tarde."
+    "errorUploadsNotSetUp": "La carga de certificados todavía no está configurada. Probá de nuevo más tarde.",
+    "ownerNoDocumentNotice": "Los Dueños no necesitan subir ningún documento — solo confirmá y listo.",
+    "saving": "Guardando…",
+    "continueButton": "Continuar"
   },
   "VerificationStatusCard": {
     "verifiedLabel": "Verificado",
@@ -1387,7 +1390,10 @@
     "successContactUpdated": "Información de contacto actualizada.",
     "errorPasswordTooShort": "La contraseña debe tener al menos 6 caracteres.",
     "errorPasswordMismatch": "Las contraseñas no coinciden.",
-    "successPasswordUpdated": "Contraseña actualizada."
+    "successPasswordUpdated": "Contraseña actualizada.",
+    "ownerNoVerificationLabel": "Dueño — no necesita verificación",
+    "ownerNoVerificationDesc": "Los Dueños no necesitan certificado. Ya está todo listo.",
+    "changeProfession": "Cambiar profesión"
   },
   "ShareAssetModal": {
     "title": "Compartir Equipo",
