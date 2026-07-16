@@ -350,7 +350,7 @@ export default function DashboardPage() {
         setRecentActivity(
           [...serviceActivity, ...scanActivity]
             .sort((x, y) => new Date(y.timestamp).getTime() - new Date(x.timestamp).getTime())
-            .slice(0, 6)
+            .slice(0, 4) // kept short on purpose — this card sits next to a 4-card asset grid, so it shouldn't be the tallest thing in the row
         );
       }
 
@@ -675,7 +675,7 @@ export default function DashboardPage() {
               buttons used to sit alone on their own empty row above this
               card — folded them into this card's header line instead, so
               that dead strip of whitespace is gone. */}
-          <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm p-4 mb-3">
+          <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm p-4 mb-2.5">
             <div className="flex items-center justify-between gap-3 mb-3">
               <div className="flex items-center gap-2">
                 <h2 className="text-[14px] font-black text-zinc-900">{t("todaysPriorities")}</h2>
@@ -744,7 +744,7 @@ export default function DashboardPage() {
               with a gap between each (their own border+shadow+rounded
               corners apiece). Merged into one card with thin internal
               dividers instead, so it reads as one unit, not three. */}
-          <div className="grid grid-cols-1 lg:grid-cols-[1.1fr_1fr_1fr] divide-y lg:divide-y-0 lg:divide-x divide-zinc-100 bg-white rounded-2xl border border-zinc-200 shadow-sm mb-3">
+          <div className="grid grid-cols-1 lg:grid-cols-[1.1fr_1fr_1fr] divide-y lg:divide-y-0 lg:divide-x divide-zinc-100 bg-white rounded-2xl border border-zinc-200 shadow-sm mb-2.5">
 
             <div className="p-4">
               <h3 className="text-[13px] font-black text-zinc-900 mb-3">{t("maintenanceHealth")}</h3>
@@ -777,7 +777,7 @@ export default function DashboardPage() {
                   </ul>
                 </div>
               </div>
-              <div className="mt-4 flex items-start gap-2.5 bg-zinc-50 border border-zinc-100 rounded-xl p-3">
+              <div className="mt-3 flex items-start gap-2.5 bg-zinc-50 border border-zinc-100 rounded-xl p-2.5">
                 <Lightbulb size={14} className="text-amber-500 shrink-0 mt-0.5" />
                 <p className="text-[11px] text-zinc-500 leading-relaxed">{healthTip}</p>
               </div>
@@ -807,7 +807,7 @@ export default function DashboardPage() {
                 <p className="text-[12px] text-zinc-400 text-center py-4">{t("noRemindersDueSoon")}</p>
               ) : (
                 <div className="space-y-2">
-                  {reminders.slice(0, 5).map((r) => {
+                  {reminders.slice(0, 4).map((r) => {
                     const overdue = r.status === "overdue";
                     return (
                       <div key={`${r.kind}-${r.id}`} className="flex items-center gap-2.5">
@@ -833,7 +833,7 @@ export default function DashboardPage() {
 
           {/* ── "Tus activos" carousel + "Actividad reciente" ── same
               merge-into-one-card treatment as the row above. */}
-          <div className="grid grid-cols-1 lg:grid-cols-[1.6fr_1fr] divide-y lg:divide-y-0 lg:divide-x divide-zinc-100 bg-white rounded-2xl border border-zinc-200 shadow-sm mb-3">
+          <div className="grid grid-cols-1 lg:grid-cols-[1.6fr_1fr] divide-y lg:divide-y-0 lg:divide-x divide-zinc-100 bg-white rounded-2xl border border-zinc-200 shadow-sm mb-2.5">
 
             <div className="p-4">
               <div className="flex items-center justify-between mb-3">
@@ -855,19 +855,24 @@ export default function DashboardPage() {
                         <button
                           key={a.id}
                           onClick={() => router.push(`/dashboard/assets?q=${encodeURIComponent(a.label)}`)}
-                          className="rounded-xl border border-zinc-100 hover:border-zinc-300 bg-zinc-50/50 p-2.5 text-left transition-colors"
+                          className="rounded-xl border border-zinc-100 hover:border-zinc-300 bg-zinc-50/50 p-2 text-left transition-colors"
                         >
-                          <div className="w-full aspect-square rounded-lg bg-white border border-zinc-100 flex items-center justify-center overflow-hidden mb-2">
+                          {/* Fixed height (not aspect-square) — a full-width
+                              square image scaled to whatever this card's
+                              column happens to be, which on a wide screen
+                              made the photo (and the whole card) way taller
+                              than it needed to be. */}
+                          <div className="w-full h-16 rounded-lg bg-white border border-zinc-100 flex items-center justify-center overflow-hidden mb-1.5">
                             {a.photoUrl ? (
                               // eslint-disable-next-line @next/next/no-img-element
                               <img src={img} alt={a.label} className="w-full h-full object-cover" />
                             ) : (
-                              <Image src={img} alt={a.label} width={48} height={48} className="object-contain" />
+                              <Image src={img} alt={a.label} width={36} height={36} className="object-contain" />
                             )}
                           </div>
-                          <p className="text-[11.5px] font-bold text-zinc-800 truncate">{a.label}</p>
+                          <p className="text-[11px] font-bold text-zinc-800 truncate">{a.label}</p>
                           <span className={`inline-block mt-1 text-[9px] font-bold px-1.5 py-[2px] rounded-full ${badgeColor}`}>{badgeLabel}</span>
-                          <p className="text-[9.5px] text-zinc-400 mt-1">
+                          <p className="text-[9px] text-zinc-400 mt-1 truncate">
                             {a.lastServiceDate ? t("lastServiceOn", { date: formatDateDMY(a.lastServiceDate) }) : t("noServiceLoggedYet")}
                           </p>
                         </button>
@@ -897,7 +902,7 @@ export default function DashboardPage() {
               {recentActivity.length === 0 ? (
                 <p className="text-[12px] text-zinc-400 text-center py-6">{t("noActivityYet")}</p>
               ) : (
-                <div className="space-y-3">
+                <div className="space-y-2.5">
                   {recentActivity.map((act) => (
                     <div key={act.id} className="flex items-start gap-2.5">
                       <div className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 mt-0.5 ${act.kind === "service" ? "bg-green-50 text-green-600" : "bg-blue-50 text-blue-600"}`}>
@@ -928,7 +933,7 @@ export default function DashboardPage() {
               design that separately later since it needs real unlock
               rules, not just a restyle. This banner is just the warm,
               values-oriented copy from the same mockup, on its own. */}
-          <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm p-4 mb-2 flex items-center gap-3">
+          <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm p-3 mb-2 flex items-center gap-3">
             <Heart size={18} className="text-red-500 shrink-0" />
             <div>
               <p className="text-[12.5px] font-bold text-zinc-800">{t("valuePropTitle")}</p>
@@ -936,7 +941,7 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          <p className="text-center text-[11px] text-zinc-400 mt-6">{t("copyright")}</p>
+          <p className="text-center text-[10px] text-zinc-400 mt-3">{t("copyright")}</p>
         </div>
       </div>
 
