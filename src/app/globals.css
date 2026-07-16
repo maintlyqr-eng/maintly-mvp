@@ -24,3 +24,21 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* Incremento 20: Tailwind (a partir de v3) dejó de poner cursor:pointer en
+   <button> por default -- el navegador solo lo hace solo para <a href>. Eso
+   dejaba la manito del mouse dependiendo de si cada botón, uno por uno en
+   todo el proyecto, tenía la clase "cursor-pointer" puesta a mano -- lo que
+   explica por qué a Facu le pasaba en algunos botones sí y en otros no. En
+   vez de salir a parchear botón por botón (cientos, entre Dashboard, Admin
+   y páginas públicas), esta regla lo arregla una sola vez para toda la app.
+   Los botones deshabilitados quedan afuera a propósito (:not(:disabled)),
+   y donde ya existe "disabled:cursor-not-allowed" en Tailwind eso sigue
+   ganando igual, porque las utilidades de Tailwind tienen más prioridad
+   que @layer base. */
+@layer base {
+  button:not(:disabled),
+  [role="button"]:not(:disabled) {
+    cursor: pointer;
+  }
+}
