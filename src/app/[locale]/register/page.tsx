@@ -4,7 +4,7 @@ import Image from "next/image";
 import { Link } from "@/i18n/navigation";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { useTranslations } from "next-intl";
+import { useTranslations, useLocale } from "next-intl";
 import { Mail, Lock, Eye, EyeOff, User, Wrench } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 
@@ -16,6 +16,7 @@ import { supabase } from "@/lib/supabase";
 export default function RegisterPage() {
   const router = useRouter();
   const t = useTranslations("RegisterPage");
+  const locale = useLocale();
 
   const [showPassword, setShowPassword] = useState(false);
   const [name, setName] = useState("");
@@ -94,7 +95,10 @@ export default function RegisterPage() {
       email,
       password,
       options: {
-        data: { name },
+        // Incremento 20: "locale" acá es lo que permite que el trigger de
+        // bienvenida (migración 039) mande el mensaje de "Messages" en el
+        // idioma correcto -- sin esto, siempre caía a inglés por default.
+        data: { name, locale },
       },
     });
 
@@ -279,7 +283,7 @@ export default function RegisterPage() {
             type="button"
             onClick={handleGoogleSignIn}
             disabled={googleLoading}
-            className="w-full flex items-center justify-center gap-3 border border-zinc-200 hover:bg-zinc-50 active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed transition-all py-[12px] rounded-xl text-[13px] font-semibold text-zinc-700"
+            className="w-full flex items-center justify-center gap-3 border border-zinc-200 bg-white hover:bg-zinc-50 hover:border-zinc-300 hover:shadow-sm active:scale-[0.98] active:shadow-none disabled:opacity-60 disabled:cursor-not-allowed transition-all duration-150 py-[12px] rounded-xl text-[13px] font-semibold text-zinc-700"
           >
             {googleLoading ? (
               <div className="w-[18px] h-[18px] border-2 border-zinc-300 border-t-zinc-600 rounded-full animate-spin" />

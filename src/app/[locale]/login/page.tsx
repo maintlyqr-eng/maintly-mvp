@@ -217,7 +217,7 @@ function LoginForm() {
             type="button"
             onClick={handleGoogleSignIn}
             disabled={googleLoading}
-            className="w-full flex items-center justify-center gap-3 border border-zinc-200 hover:bg-zinc-50 active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed transition-all py-[12px] rounded-xl text-[13px] font-semibold text-zinc-700"
+            className="w-full flex items-center justify-center gap-3 border border-zinc-200 bg-white hover:bg-zinc-50 hover:border-zinc-300 hover:shadow-sm active:scale-[0.98] active:shadow-none disabled:opacity-60 disabled:cursor-not-allowed transition-all duration-150 py-[12px] rounded-xl text-[13px] font-semibold text-zinc-700"
           >
             {googleLoading ? (
               <div className="w-[18px] h-[18px] border-2 border-zinc-300 border-t-zinc-600 rounded-full animate-spin" />

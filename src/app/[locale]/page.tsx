@@ -27,7 +27,7 @@ export default function HomePage() {
   const [showCamera, setShowCamera] = useState(false);
 
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (session) {
         setLoggedIn(true);
         const name = session.user.user_metadata?.name || session.user.email || "User";
@@ -36,8 +36,26 @@ export default function HomePage() {
         setLoggedIn(false);
         setUserName("");
       }
+
+      // Incremento 20: red de contención para el login con Google. Login y
+      // Register ya tienen su propio listener que manda a /dashboard o
+      // /register/profession apenas se establece la sesión — pero ese
+      // listener solo corre si Supabase efectivamente redirige de vuelta a
+      // esa misma página. Si por lo que sea (redirect_to no coincide con
+      // la lista de "Redirect URLs" configurada en Supabase, typo de
+      // www/no-www, etc.) Supabase termina mandando al usuario acá a Home
+      // en cambio, sin esto se quedaría logueado pero mirando la landing
+      // pública. Se filtra específicamente por el evento "SIGNED_IN" (no
+      // "INITIAL_SESSION") para no redirigir a alguien que ya estaba
+      // logueado y simplemente entró a mirar la home a propósito.
+      if (event === "SIGNED_IN" && session) {
+        const { data: m } = await supabase.from("mechanics").select("suspended, deleted_at, profession").eq("id", session.user.id).single();
+        if (m?.deleted_at || m?.suspended) return; // el listener de Login ya muestra el error si vino de ahí; acá no hay dónde mostrarlo, así que no forzamos nada más.
+        router.push(m?.profession ? "/dashboard" : "/register/profession");
+      }
     });
     return () => subscription.unsubscribe();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Real, live platform stats for the trust bar — no made-up numbers.
