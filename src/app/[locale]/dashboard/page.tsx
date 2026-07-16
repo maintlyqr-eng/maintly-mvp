@@ -141,6 +141,17 @@ export default function DashboardPage() {
   const [calServices, setCalServices] = useState<{ date: string; label: string; type: string }[]>([]);
   const [calReminders, setCalReminders] = useState<{ date: string; status: ReminderStatus; label: string; type: string }[]>([]);
   const [calTasks, setCalTasks] = useState<{ date: string; done: boolean; title: string }[]>([]);
+  // Facu (16 jul 2026): "el calendario no hace nada cuando le paso el
+  // mouse por encima" — the popover was originally pure CSS
+  // (`hidden group-hover:block`), the same show/hide-on-hover trick used
+  // elsewhere in this file, but it never showed on the live deploy. Rather
+  // than keep guessing at a possible Tailwind/production-build quirk with
+  // that specific class combo, switched to explicit JS hover state driven
+  // by onMouseEnter/onMouseLeave — the exact same reliable pattern
+  // CalendarDayCellIntl.tsx already uses for its own per-day tooltip, so
+  // it's proven to work in this codebase regardless of any CSS build
+  // subtlety.
+  const [calHover, setCalHover] = useState(false);
 
   // ── Top search bar ──
   const [searchQuery, setSearchQuery] = useState("");
@@ -869,12 +880,20 @@ export default function DashboardPage() {
                   Facu (16 jul 2026): "hay forma de q se abra como ventana
                   tipo burbuja cuando uno le apoya el mouse ahi mismo" —
                   hovering this card now pops open a mini month calendar
-                  instead of only linking through. `group` + `pt-2` (padding,
-                  not margin) on the popover keeps the gap between card and
-                  bubble inside the hoverable box — a margin gap there would
-                  let the mouse pass through un-hoverable empty space and
-                  close the popover before it's reached. */}
-              <div className="relative group lg:col-start-4">
+                  instead of only linking through. Driven by explicit
+                  onMouseEnter/onMouseLeave state (calHover) rather than a
+                  pure-CSS `group-hover` toggle — same reliable pattern
+                  CalendarDayCellIntl already uses for its own per-day
+                  tooltip. `pt-2` (padding, not margin) on the popover keeps
+                  the gap between card and bubble inside the hoverable box —
+                  a margin gap there would let the mouse pass through
+                  un-hoverable empty space and close the popover before it's
+                  reached. */}
+              <div
+                className="relative lg:col-start-4"
+                onMouseEnter={() => setCalHover(true)}
+                onMouseLeave={() => setCalHover(false)}
+              >
                 <Link
                   href="/dashboard/calendar"
                   className="rounded-xl border border-dashed border-zinc-300 hover:border-zinc-400 p-3 flex items-center gap-2.5 text-zinc-500 hover:text-zinc-700 transition-colors"
@@ -885,7 +904,8 @@ export default function DashboardPage() {
                   <p className="text-[12px] font-bold">{t("viewFullCalendar")}</p>
                 </Link>
 
-                <div className="hidden group-hover:block absolute z-50 top-full right-0 pt-2 w-[280px]">
+                {calHover && (
+                <div className="absolute z-50 top-full right-0 pt-2 w-[280px]">
                   <div className="bg-white rounded-2xl border border-zinc-200 shadow-2xl p-3.5">
                     <div className="flex items-center justify-between mb-2">
                       <p className="text-[12px] font-black text-zinc-900">
@@ -929,6 +949,7 @@ export default function DashboardPage() {
                     </div>
                   </div>
                 </div>
+                )}
               </div>
             </div>
             {reminders.length === 0 && (
