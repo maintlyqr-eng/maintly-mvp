@@ -126,6 +126,7 @@ export default function DashboardPage() {
   const [assetCards, setAssetCards] = useState<AssetCardInfo[]>([]);
   const [recentActivity, setRecentActivity] = useState<ActivityItem[]>([]);
   const [assetCarouselPage, setAssetCarouselPage] = useState(0);
+  const [priorityCarouselPage, setPriorityCarouselPage] = useState(0);
 
   // ── Top search bar ──
   const [searchQuery, setSearchQuery] = useState("");
@@ -490,7 +491,19 @@ export default function DashboardPage() {
     return t("dueInDays", { count: days, date: formatDateDMY(item.next_due_date) });
   }
 
-  const priorityItems = reminders.slice(0, 3);
+  // Facu (16 jul 2026): "quiero que el calendario quede fijo del lado
+  // derecho... y que si hay más de 3 tareas se scrollee igual que los
+  // activos" — paginated 3-at-a-time (like the asset carousel), with the
+  // "Ver calendario completo" card pinned to the 4th grid column via
+  // lg:col-start-4 in the JSX below, regardless of how many real items are
+  // on the current page (1, 2, or 3).
+  const priorityTotalPages = Math.max(1, Math.ceil(reminders.length / 3));
+  // Clamp instead of trusting state directly — if a task gets completed
+  // (or a page is deep-linked with fewer reminders than before) while
+  // sitting on, say, page 2 of 2, the raw state could point past the new
+  // last page and render an empty grid instead of snapping back.
+  const safePriorityPage = Math.min(priorityCarouselPage, priorityTotalPages - 1);
+  const priorityItems = reminders.slice(safePriorityPage * 3, safePriorityPage * 3 + 3);
   const assetTotalPages = Math.ceil(assetCards.length / 4);
 
   // "Actividad reciente" timestamps: service items only have a service_date
@@ -684,8 +697,28 @@ export default function DashboardPage() {
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5 sm:gap-3 mb-3">
               <div className="flex items-center gap-2">
                 <h2 className="text-[14px] font-black text-zinc-900">{t("todaysPriorities")}</h2>
-                {priorityItems.length > 0 && (
-                  <span className="bg-red-600 text-white text-[10px] font-black rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">{priorityItems.length}</span>
+                {reminders.length > 0 && (
+                  <span className="bg-red-600 text-white text-[10px] font-black rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">{reminders.length}</span>
+                )}
+                {/* Same prev/next affordance as "Tus activos" — shown only
+                    when there's more than one page of 3 to page through. */}
+                {priorityTotalPages > 1 && (
+                  <div className="flex items-center gap-1 ml-1">
+                    <button
+                      onClick={() => setPriorityCarouselPage((p) => (p - 1 + priorityTotalPages) % priorityTotalPages)}
+                      aria-label={t("previousPage")}
+                      className="w-6 h-6 rounded-full border border-zinc-200 text-zinc-400 hover:text-zinc-700 hover:border-zinc-300 flex items-center justify-center transition-colors"
+                    >
+                      <ChevronLeft size={13} />
+                    </button>
+                    <button
+                      onClick={() => setPriorityCarouselPage((p) => (p + 1) % priorityTotalPages)}
+                      aria-label={t("nextPage")}
+                      className="w-6 h-6 rounded-full border border-zinc-200 text-zinc-400 hover:text-zinc-700 hover:border-zinc-300 flex items-center justify-center transition-colors"
+                    >
+                      <ChevronRight size={13} />
+                    </button>
+                  </div>
                 )}
               </div>
               <div className="flex items-center gap-2 sm:gap-2.5 shrink-0">
@@ -743,9 +776,15 @@ export default function DashboardPage() {
                   </Link>
                 );
               })}
+              {/* lg:col-start-4 pins this to the last column always — with
+                  1 or 2 real priority items on a page it used to just slot
+                  in right after them (3rd column), leaving an empty 4th
+                  column and making the card jump around depending on the
+                  count. Fixed position now, same as "where it was when
+                  there were three tasks". */}
               <Link
                 href="/dashboard/calendar"
-                className="rounded-xl border border-dashed border-zinc-300 hover:border-zinc-400 p-3 flex items-center gap-2.5 text-zinc-500 hover:text-zinc-700 transition-colors"
+                className="lg:col-start-4 rounded-xl border border-dashed border-zinc-300 hover:border-zinc-400 p-3 flex items-center gap-2.5 text-zinc-500 hover:text-zinc-700 transition-colors"
               >
                 <div className="w-8 h-8 rounded-full bg-zinc-100 flex items-center justify-center shrink-0">
                   <CalendarClock size={15} />
@@ -753,8 +792,20 @@ export default function DashboardPage() {
                 <p className="text-[12px] font-bold">{t("viewFullCalendar")}</p>
               </Link>
             </div>
-            {priorityItems.length === 0 && (
+            {reminders.length === 0 && (
               <p className="text-[12px] text-zinc-400 mt-1">{t("noRemindersDueSoon")}</p>
+            )}
+            {priorityTotalPages > 1 && (
+              <div className="flex items-center justify-center gap-1.5 mt-3">
+                {Array.from({ length: priorityTotalPages }).map((_, i) => (
+                  <button
+                    key={i}
+                    onClick={() => setPriorityCarouselPage(i)}
+                    aria-label={`page ${i + 1}`}
+                    className={`w-1.5 h-1.5 rounded-full transition-colors ${i === safePriorityPage ? "bg-red-600" : "bg-zinc-200"}`}
+                  />
+                ))}
+              </div>
             )}
           </div>
 
