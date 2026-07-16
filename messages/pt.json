@@ -2059,5 +2059,13 @@
     "successTitle": "Obrigado por nos avisar!",
     "successDesc": "Seu reporte foi enviado para a equipe da Maintly. Vamos analisar em breve.",
     "done": "Concluído"
+  },
+  "RegisterProfessionPage": {
+    "pageTitle": "Quer ser um Maintler Verificado?",
+    "pageSubtitle": "Totalmente opcional. Declare sua profissão e envie um certificado para ganhar um selo de verificado em cada serviço que você registrar — ou pule e faça isso depois em Configurações.",
+    "loading": "Carregando...",
+    "submittedTitle": "Enviado para revisão",
+    "submittedDesc": "Vamos revisar seu certificado de {profession} e avisar assim que você for um Maintler {profession} verificado. Enquanto isso, você pode continuar usando o Maintly normalmente.",
+    "goToDashboard": "Ir para o Dashboard"
   }
 }

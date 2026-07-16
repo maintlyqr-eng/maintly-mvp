@@ -6,11 +6,13 @@ import { ShieldCheck, Upload, FileText, AlertCircle, CheckCircle2 } from "lucide
 import { supabase } from "@/lib/supabase";
 import { fetchPlatformSettings } from "@/lib/platformSettings";
 
-// Localized twin of ProfessionVerificationForm.tsx. The Settings page is
-// migrated and uses this Intl copy; the plain (non-Intl) original is kept
-// alive and untouched because src/app/register/profession/page.tsx (out of
-// Phase 2's dashboard/admin scope) still depends on it and has no [locale]
-// version yet.
+// Localized twin of ProfessionVerificationForm.tsx. The Settings page and
+// the localized src/app/[locale]/register/profession/page.tsx both use this
+// Intl copy; the plain (non-Intl) original is kept alive and untouched only
+// because the OLD, un-migrated src/app/register/profession/page.tsx (dead
+// code, unreachable now that "/register/profession" is in middleware.ts's
+// matcher — same fate as the old plain login/register pages) still
+// references it.
 //
 // MAINTLER_ROLES stays as the raw English enum values written to the
 // `profession` DB column (unchanged, still exported for that page to use)
@@ -26,7 +28,11 @@ export const MAINTLER_ROLES = [
   "Inspector",
 ];
 
-const PROFESSION_KEYS: Record<string, string> = {
+// Exported so other pages that need to show a translated profession label
+// outside this form (e.g. the localized register/profession page's
+// "submitted for review" screen) can reuse the exact same mapping instead
+// of re-declaring it and risking it drifting out of sync.
+export const PROFESSION_KEYS: Record<string, string> = {
   "Owner": "owner",
   "Mechanic": "mechanic",
   "Electrician": "electrician",

@@ -44,6 +44,8 @@ export const config = {
     "/(es|pt)/login",
     "/register",
     "/(es|pt)/register",
+    "/register/profession",
+    "/(es|pt)/register/profession",
     "/product",
     "/(es|pt)/product",
     "/how-it-works",

@@ -2059,5 +2059,13 @@
     "successTitle": "Thanks for letting us know!",
     "successDesc": "Your report was sent to the Maintly team. We'll review it shortly.",
     "done": "Done"
+  },
+  "RegisterProfessionPage": {
+    "pageTitle": "Want to be a Verified Maintler?",
+    "pageSubtitle": "Totally optional. Declare your profession and upload a certificate to earn a verified badge on every service you log — or skip and do this later from Settings.",
+    "loading": "Loading...",
+    "submittedTitle": "Submitted for review",
+    "submittedDesc": "We'll review your {profession} certificate and let you know once you're a verified {profession} Maintler. You can keep using Maintly in the meantime.",
+    "goToDashboard": "Go to Dashboard"
   }
 }
