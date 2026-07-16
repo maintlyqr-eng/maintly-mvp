@@ -665,7 +665,7 @@ export default function DashboardPage() {
           extraHeaderContent={dashboardSearchBar}
         />
 
-        <div className="flex-1 overflow-y-auto p-4 md:p-5">
+        <div className="flex-1 overflow-y-auto p-3 md:p-4">
 
           {/* ── "Tus prioridades de hoy" ── the most urgent 3 reminders
               (overdue first, then soonest-due), same merged services+tasks
@@ -675,24 +675,28 @@ export default function DashboardPage() {
               buttons used to sit alone on their own empty row above this
               card — folded them into this card's header line instead, so
               that dead strip of whitespace is gone. */}
-          <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm p-4 mb-2.5">
-            <div className="flex items-center justify-between gap-3 mb-3">
+          <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm p-3.5 mb-2">
+            {/* flex-col on phones, side-by-side from sm: up — on a narrow
+                screen, a title + 2 buttons on one "justify-between" row
+                either overflowed the card or squished the buttons down to
+                unreadable. Stacking avoids both. */}
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5 sm:gap-3 mb-3">
               <div className="flex items-center gap-2">
                 <h2 className="text-[14px] font-black text-zinc-900">{t("todaysPriorities")}</h2>
                 {priorityItems.length > 0 && (
                   <span className="bg-red-600 text-white text-[10px] font-black rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">{priorityItems.length}</span>
                 )}
               </div>
-              <div className="flex items-center gap-2.5 shrink-0">
+              <div className="flex items-center gap-2 sm:gap-2.5 shrink-0">
                 <Link
                   href="/dashboard/services?new=1"
-                  className="flex items-center gap-1.5 border border-red-200 bg-white hover:bg-red-50 active:scale-[0.98] transition-all text-red-600 text-[12px] font-bold px-3 py-[7px] rounded-xl shadow-sm"
+                  className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 border border-red-200 bg-white hover:bg-red-50 active:scale-[0.98] transition-all text-red-600 text-[12px] font-bold px-3 py-[7px] rounded-xl shadow-sm"
                 >
                   <Wrench size={13} /> {t("addService")} <ChevronDown size={11} className="opacity-60" />
                 </Link>
                 <button
                   onClick={() => setAddStep("choose")}
-                  className="flex items-center gap-1.5 bg-red-600 hover:bg-red-500 active:scale-[0.98] transition-all text-white text-[12px] font-bold px-3 py-[7px] rounded-xl shadow-sm"
+                  className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 bg-red-600 hover:bg-red-500 active:scale-[0.98] transition-all text-white text-[12px] font-bold px-3 py-[7px] rounded-xl shadow-sm"
                 >
                   <Box size={13} /> {t("addEquipment")} <ChevronDown size={11} className="opacity-70" />
                 </button>
@@ -704,7 +708,7 @@ export default function DashboardPage() {
                 return (
                   <div
                     key={`${item.kind}-${item.id}`}
-                    className={`rounded-xl border p-3.5 flex items-center gap-3 ${overdue ? "bg-red-50 border-red-200" : "bg-amber-50 border-amber-200"}`}
+                    className={`rounded-xl border p-3 flex items-center gap-2.5 ${overdue ? "bg-red-50 border-red-200" : "bg-amber-50 border-amber-200"}`}
                   >
                     <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${overdue ? "bg-red-100 text-red-600" : "bg-amber-100 text-amber-600"}`}>
                       {overdue ? <AlertCircle size={15} /> : <Clock size={15} />}
@@ -725,7 +729,7 @@ export default function DashboardPage() {
               })}
               <Link
                 href="/dashboard/calendar"
-                className="rounded-xl border border-dashed border-zinc-300 hover:border-zinc-400 p-3.5 flex items-center gap-3 text-zinc-500 hover:text-zinc-700 transition-colors"
+                className="rounded-xl border border-dashed border-zinc-300 hover:border-zinc-400 p-3 flex items-center gap-2.5 text-zinc-500 hover:text-zinc-700 transition-colors"
               >
                 <div className="w-8 h-8 rounded-full bg-zinc-100 flex items-center justify-center shrink-0">
                   <CalendarClock size={15} />
@@ -744,9 +748,9 @@ export default function DashboardPage() {
               with a gap between each (their own border+shadow+rounded
               corners apiece). Merged into one card with thin internal
               dividers instead, so it reads as one unit, not three. */}
-          <div className="grid grid-cols-1 lg:grid-cols-[1.1fr_1fr_1fr] divide-y lg:divide-y-0 lg:divide-x divide-zinc-100 bg-white rounded-2xl border border-zinc-200 shadow-sm mb-2.5">
+          <div className="grid grid-cols-1 lg:grid-cols-[1.1fr_1fr_1fr] divide-y lg:divide-y-0 lg:divide-x divide-zinc-100 bg-white rounded-2xl border border-zinc-200 shadow-sm mb-2">
 
-            <div className="p-4">
+            <div className="p-3.5">
               <h3 className="text-[13px] font-black text-zinc-900 mb-3">{t("maintenanceHealth")}</h3>
               <div className="flex items-center gap-4">
                 <div className="relative w-[96px] h-[96px] shrink-0">
@@ -783,7 +787,7 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            <div className="p-4">
+            <div className="p-3.5">
               <h3 className="text-[13px] font-black text-zinc-900 mb-3">{t("quickSummary")}</h3>
               <div className="grid grid-cols-2 gap-3">
                 {resumenTiles.map(({ id, value, caption, icon: Icon, color }) => (
@@ -798,7 +802,7 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            <div className="p-4">
+            <div className="p-3.5">
               <div className="flex items-center justify-between mb-3">
                 <h3 className="text-[13px] font-black text-zinc-900">{t("upcomingReminders")}</h3>
                 <Link href="/dashboard/services" className="text-[11px] font-semibold text-red-600 hover:text-red-700">{t("viewAll")}</Link>
@@ -833,9 +837,9 @@ export default function DashboardPage() {
 
           {/* ── "Tus activos" carousel + "Actividad reciente" ── same
               merge-into-one-card treatment as the row above. */}
-          <div className="grid grid-cols-1 lg:grid-cols-[1.6fr_1fr] divide-y lg:divide-y-0 lg:divide-x divide-zinc-100 bg-white rounded-2xl border border-zinc-200 shadow-sm mb-2.5">
+          <div className="grid grid-cols-1 lg:grid-cols-[1.6fr_1fr] divide-y lg:divide-y-0 lg:divide-x divide-zinc-100 bg-white rounded-2xl border border-zinc-200 shadow-sm mb-2">
 
-            <div className="p-4">
+            <div className="p-3.5">
               <div className="flex items-center justify-between mb-3">
                 <h3 className="text-[13px] font-black text-zinc-900">{t("yourAssets")}</h3>
                 <Link href="/dashboard/assets" className="text-[11px] font-semibold text-red-600 hover:text-red-700">{t("viewAll")}</Link>
@@ -895,7 +899,7 @@ export default function DashboardPage() {
               )}
             </div>
 
-            <div className="p-4">
+            <div className="p-3.5">
               <div className="flex items-center justify-between mb-3">
                 <h3 className="text-[13px] font-black text-zinc-900">{t("recentActivity")}</h3>
               </div>
@@ -941,7 +945,7 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          <p className="text-center text-[10px] text-zinc-400 mt-3">{t("copyright")}</p>
+          <p className="text-center text-[10px] text-zinc-400 mt-2">{t("copyright")}</p>
         </div>
       </div>
 
