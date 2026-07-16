@@ -70,14 +70,25 @@ type RealService = {
   assets: AssetInfo | AssetInfo[] | null;
 };
 
+// "kind" distinguishes the two very different things that both end up in
+// the "Próximos Recordatorios" list: an asset's maintenance due date
+// ("service", from service_records.next_due_date/next_due_km_hours) and a
+// manually-added Calendar task ("task", from calendar_tasks — e.g. "ir a ver
+// a doña ana"). Facu reported that a task he added to the Calendar showed
+// up there (as a dot on the mini calendar) but never in this reminders
+// list — that's because this list used to be built exclusively from
+// service reminders, silently ignoring calendar_tasks entirely even though
+// the Calendar feature (migración 008) was explicitly designed for tasks to
+// show "alongside services already logged and reminders already due".
 type ReminderItem = {
   id: string;
-  assetLabel: string;
+  kind: "service" | "task";
+  assetLabel: string; // doubles as the task title when kind === "task"
   assetType: string | null;
   status: ReminderStatus;
   next_due_date: string | null;
   next_due_km_hours: number | null;
-  serviceType: string;
+  serviceType: string | null;
 };
 
 type SearchAsset = {
@@ -226,7 +237,7 @@ export default function DashboardPage() {
           .limit(3000), // dashboard calendar dots only — bounds payload for very long-tenured accounts
         supabase
           .from("calendar_tasks")
-          .select("task_date, done, title")
+          .select("id, task_date, done, title")
           .eq("mechanic_id", session.user.id),
         supabase
           .from("mechanic_assets")
@@ -257,10 +268,27 @@ export default function DashboardPage() {
           nextDueKmHours: r.next_due_km_hours,
           currentKmHours: maxKmByAsset[r.asset_id] ?? null,
         });
-        return { id: r.id, assetLabel: label, assetType: a?.asset_type ?? null, status, next_due_date: r.next_due_date, next_due_km_hours: r.next_due_km_hours, serviceType: r.service_type };
+        return { id: r.id, kind: "service" as const, assetLabel: label, assetType: a?.asset_type ?? null, status, next_due_date: r.next_due_date, next_due_km_hours: r.next_due_km_hours, serviceType: r.service_type };
       });
 
-      const reminderItems = allReminderItems
+      // Calendar tasks (migración 008) that aren't done yet also count as
+      // "upcoming reminders" — same due-date math as a service reminder
+      // (computeReminderStatus doesn't care where the date came from), just
+      // with no km/hours component and no asset attached to it.
+      const taskReminderItems: ReminderItem[] = ((taskRowsForCal ?? []) as any[])
+        .filter((r) => !r.done)
+        .map((r) => ({
+          id: r.id,
+          kind: "task" as const,
+          assetLabel: r.title,
+          assetType: null,
+          status: computeReminderStatus({ nextDueDate: r.task_date }),
+          next_due_date: r.task_date,
+          next_due_km_hours: null,
+          serviceType: null,
+        }));
+
+      const reminderItems = [...allReminderItems, ...taskReminderItems]
         .filter((i) => i.status === "overdue" || i.status === "due_soon")
         .sort((a, b) => (a.status === "overdue" ? 0 : 1) - (b.status === "overdue" ? 0 : 1));
 
@@ -268,11 +296,15 @@ export default function DashboardPage() {
 
       // ── Mini calendar widget: full detail for every date-based reminder
       // (any status), every service's date, and every planned task — so
-      // hovering a day shows exactly what's going on, not just a count. ──
+      // hovering a day shows exactly what's going on, not just a count.
+      // Tasks are NOT included here on purpose: they're already tracked
+      // separately below via setCalTasks and rendered with their own dot by
+      // CalendarDayCellIntl, so adding them here too would double them up
+      // on the mini calendar. ──
       setCalReminders(
         allReminderItems
           .filter((i): i is ReminderItem & { next_due_date: string } => !!i.next_due_date)
-          .map((i) => ({ date: i.next_due_date, status: i.status, label: i.assetLabel, type: i.serviceType }))
+          .map((i) => ({ date: i.next_due_date, status: i.status, label: i.assetLabel, type: i.serviceType ?? "" }))
       );
 
       setCalServices(
@@ -679,7 +711,7 @@ export default function DashboardPage() {
                     {reminders.slice(0, 5).map((r) => {
                       const rc = REMINDER_STATUS_COLOR[r.status];
                       return (
-                        <div key={r.id} className="flex items-center gap-2.5 p-2.5 rounded-xl bg-zinc-50 border border-zinc-100">
+                        <div key={`${r.kind}-${r.id}`} className="flex items-center gap-2.5 p-2.5 rounded-xl bg-zinc-50 border border-zinc-100">
                           <span className={`w-2 h-2 rounded-full shrink-0 ${rc.dot}`} />
                           <div className="flex-1 min-w-0">
                             <p className="text-[12px] font-bold text-zinc-800 truncate">{r.assetLabel}</p>
