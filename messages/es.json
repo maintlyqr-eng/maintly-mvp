@@ -698,9 +698,6 @@
     "settings": "Configuración"
   },
   "DashboardSidebar": {
-    "goPremium": "Hazte Premium",
-    "goPremiumDesc": "Desbloqueá reportes avanzados, marca personalizada y más.",
-    "upgradeNow": "Mejorar Ahora",
     "maintlyMaintler": "Maintler de Maintly"
   },
   "DashboardHeader": {

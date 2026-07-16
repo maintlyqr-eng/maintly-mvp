@@ -698,9 +698,6 @@
     "settings": "Settings"
   },
   "DashboardSidebar": {
-    "goPremium": "Go Premium",
-    "goPremiumDesc": "Unlock advanced reports, custom branding and more.",
-    "upgradeNow": "Upgrade Now",
     "maintlyMaintler": "Maintly Maintler"
   },
   "DashboardHeader": {

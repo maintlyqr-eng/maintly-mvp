@@ -3,7 +3,7 @@
 import { Link } from "@/i18n/navigation";
 import Image from "next/image";
 import { useEffect } from "react";
-import { X, Crown } from "lucide-react";
+import { X } from "lucide-react";
 import { useTranslations } from "next-intl";
 import HoverAvatar from "@/components/HoverAvatar";
 import ContactSupportWidgetIntl from "@/components/ContactSupportWidgetIntl";
@@ -116,14 +116,12 @@ export default function DashboardSidebarIntl({
 
         {!hideSupportWidget && <ContactSupportWidgetIntl mechanicId={mechanicId} />}
 
-        <div className="mx-3 mb-3 p-4 rounded-xl bg-gradient-to-br from-zinc-50 to-zinc-100 border border-zinc-200">
-          <div className="flex items-center gap-1.5 text-amber-500 mb-1">
-            <Crown size={14} />
-            <span className="text-[12px] font-bold text-zinc-800">{t("goPremium")}</span>
-          </div>
-          <p className="text-[10px] text-zinc-500 leading-relaxed mb-3">{t("goPremiumDesc")}</p>
-          <button className="w-full bg-zinc-900 hover:bg-zinc-800 text-white text-[11px] font-bold py-2 rounded-lg transition-colors">{t("upgradeNow")}</button>
-        </div>
+        {/* Facu (jul 2026): MaintlyQR is free for everyone, always -- no
+            paid tier, ever. This used to be a "Go Premium / Upgrade Now"
+            promo card here (never actually wired to anything -- the button
+            had no onClick at all, it was pure mockup). Same call as the
+            /pricing page rewrite: no UI anywhere should imply a future
+            paywall. */}
 
         <Link href="/dashboard/settings" className="flex items-center gap-2.5 px-4 py-3 border-t border-zinc-200 hover:bg-zinc-50 transition-colors">
           {photoUrl ? (
