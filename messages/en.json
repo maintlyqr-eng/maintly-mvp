@@ -1187,7 +1187,6 @@
     "statTotalAssets": "TOTAL ASSETS",
     "statCompleted": "COMPLETED",
     "statPending": "PENDING",
-    "yourTotals": "Your totals",
     "searchPlaceholder": "Search assets, QR codes, services...",
     "searchAssets": "Assets",
     "searchServices": "Services",
@@ -1251,7 +1250,14 @@
     "statusOk": "OK",
     "statusNone": "No reminder",
     "unitShortHours": "hrs",
-    "unitShortKm": "km"
+    "unitShortKm": "km",
+    "captionServicesSome": "Your full history, always at hand.",
+    "captionServicesNone": "Log your first service to get started.",
+    "captionAssetsSome": "All under your care.",
+    "captionAssetsNone": "Add your first piece of equipment.",
+    "captionCompleted": "Every single one, done right.",
+    "captionPendingSome": "Waiting on you this week.",
+    "captionPendingNone": "All clear — nothing pending."
   },
   "AvatarCropModal": {
     "title": "Adjust your photo",

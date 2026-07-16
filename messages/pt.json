@@ -1187,7 +1187,6 @@
     "statTotalAssets": "TOTAL DE ATIVOS",
     "statCompleted": "CONCLUÍDOS",
     "statPending": "PENDENTES",
-    "yourTotals": "Seus totais",
     "searchPlaceholder": "Buscar ativos, códigos QR, serviços...",
     "searchAssets": "Ativos",
     "searchServices": "Serviços",
@@ -1251,7 +1250,14 @@
     "statusOk": "OK",
     "statusNone": "Sem lembrete",
     "unitShortHours": "h",
-    "unitShortKm": "km"
+    "unitShortKm": "km",
+    "captionServicesSome": "Todo o seu histórico, sempre à mão.",
+    "captionServicesNone": "Registre seu primeiro serviço para começar.",
+    "captionAssetsSome": "Todos sob seu cuidado.",
+    "captionAssetsNone": "Adicione seu primeiro equipamento.",
+    "captionCompleted": "Cada um, feito como deve ser.",
+    "captionPendingSome": "Esperando por você esta semana.",
+    "captionPendingNone": "Tudo tranquilo — nada pendente."
   },
   "AvatarCropModal": {
     "title": "Ajuste sua foto",

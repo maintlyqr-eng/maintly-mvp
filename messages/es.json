@@ -1187,7 +1187,6 @@
     "statTotalAssets": "TOTAL ACTIVOS",
     "statCompleted": "COMPLETADOS",
     "statPending": "PENDIENTES",
-    "yourTotals": "Tus totales",
     "searchPlaceholder": "Buscar activos, códigos QR, servicios...",
     "searchAssets": "Activos",
     "searchServices": "Servicios",
@@ -1251,7 +1250,14 @@
     "statusOk": "OK",
     "statusNone": "Sin recordatorio",
     "unitShortHours": "hs",
-    "unitShortKm": "km"
+    "unitShortKm": "km",
+    "captionServicesSome": "Todo tu historial, siempre a mano.",
+    "captionServicesNone": "Cargá tu primer servicio para arrancar.",
+    "captionAssetsSome": "Todos bajo tu cuidado.",
+    "captionAssetsNone": "Sumá tu primer equipo.",
+    "captionCompleted": "Cada uno, hecho como corresponde.",
+    "captionPendingSome": "Te están esperando esta semana.",
+    "captionPendingNone": "Todo tranquilo — nada pendiente."
   },
   "AvatarCropModal": {
     "title": "Ajustá tu foto",

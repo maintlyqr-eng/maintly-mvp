@@ -7,7 +7,7 @@ import { useRouter } from "next/navigation";
 import { useTranslations, useLocale } from "next-intl";
 import {
   Box, QrCode, Search, Plus, MoreVertical,
-  CheckCircle2, Clock, TrendingUp, TrendingDown, ChevronLeft, ChevronRight,
+  CheckCircle2, Clock, ChevronLeft, ChevronRight,
   Wrench, FileText, Calendar as CalendarIcon,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
@@ -430,14 +430,41 @@ export default function DashboardPage() {
     router.push(`/dashboard/assets?q=${encodeURIComponent(searchQuery.trim())}`);
   }
 
+  // Facu (jul 2026): the dashboard felt "cold" — every one of these 4 cards
+  // showed the exact same generic "↗ Tus totales" caption under a trend
+  // arrow that was always green/up regardless of the real number (it was
+  // hardcoded `up: true` on all four, so it never actually meant anything).
+  // Replaced with a real, per-card caption that reacts to the actual data
+  // instead of a fake trend indicator.
   const statsCards = [
-    { label: t("statTotalServices"), value: String(totalServices), up: true,  icon: CalendarIcon, color: "bg-red-50 text-red-500"   },
-    { label: t("statTotalAssets"),   value: String(totalAssets),   up: true,  icon: Box,          color: "bg-blue-50 text-blue-500"  },
-    { label: t("statCompleted"),     value: String(totalServices), up: true,  icon: CheckCircle2, color: "bg-green-50 text-green-500" },
-    // Was hardcoded to "0" -- never wired to anything. Now it's the same
-    // count shown in "Próximos Recordatorios" right below: reminders +
-    // calendar tasks that are due soon or already overdue.
-    { label: t("statPending"),       value: String(reminders.length), up: true,  icon: Clock,        color: "bg-amber-50 text-amber-500" },
+    {
+      label: t("statTotalServices"),
+      value: String(totalServices),
+      caption: totalServices > 0 ? t("captionServicesSome") : t("captionServicesNone"),
+      icon: CalendarIcon,
+      color: "bg-red-50 text-red-500",
+    },
+    {
+      label: t("statTotalAssets"),
+      value: String(totalAssets),
+      caption: totalAssets > 0 ? t("captionAssetsSome") : t("captionAssetsNone"),
+      icon: Box,
+      color: "bg-blue-50 text-blue-500",
+    },
+    {
+      label: t("statCompleted"),
+      value: String(totalServices),
+      caption: t("captionCompleted"),
+      icon: CheckCircle2,
+      color: "bg-green-50 text-green-500",
+    },
+    {
+      label: t("statPending"),
+      value: String(reminders.length),
+      caption: reminders.length > 0 ? t("captionPendingSome") : t("captionPendingNone"),
+      icon: Clock,
+      color: "bg-amber-50 text-amber-500",
+    },
   ];
 
   const CAL_MONTH_LABELS = [
@@ -473,10 +500,12 @@ export default function DashboardPage() {
   }
 
   const miniStats = [
-    { label: t("miniServices"),  value: String(totalServices), color: "#16a34a" },
-    { label: t("miniAssets"),    value: String(totalAssets),   color: "#2563eb" },
-    { label: t("miniCompleted"), value: String(totalServices), color: "#7c3aed" },
-    { label: t("miniPending"),   value: "0",                   color: "#ea580c" },
+    { label: t("miniServices"),  value: String(totalServices),    color: "#16a34a" },
+    { label: t("miniAssets"),    value: String(totalAssets),      color: "#2563eb" },
+    { label: t("miniCompleted"), value: String(totalServices),    color: "#7c3aed" },
+    // Same fix as statsCards above: this used to be hardcoded to "0",
+    // never actually wired to the real pending count.
+    { label: t("miniPending"),   value: String(reminders.length), color: "#ea580c" },
   ];
 
   // ── Top search bar, rendered inside DashboardHeaderIntl's extraHeaderContent
@@ -619,17 +648,14 @@ export default function DashboardPage() {
             {/* ── LEFT COLUMN ── */}
             <div>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-5">
-                {statsCards.map(({ label, value, up, icon: Icon, color }) => (
+                {statsCards.map(({ label, value, caption, icon: Icon, color }) => (
                   <div key={label} className="bg-white rounded-2xl border border-zinc-200 p-4 shadow-sm">
                     <div className={`w-9 h-9 rounded-xl flex items-center justify-center mb-3 ${color}`}>
                       <Icon size={16} />
                     </div>
                     <p className="text-[9px] font-bold text-zinc-400 tracking-wide">{label}</p>
                     <p className="text-[24px] font-black text-zinc-900 mt-1">{value}</p>
-                    <div className={`flex items-center gap-1 text-[10px] font-semibold mt-1 ${up ? "text-green-600" : "text-red-500"}`}>
-                      {up ? <TrendingUp size={11} /> : <TrendingDown size={11} />}
-                      {t("yourTotals")}
-                    </div>
+                    <p className="text-[10.5px] font-medium text-zinc-400 mt-1 leading-snug">{caption}</p>
                   </div>
                 ))}
               </div>
