@@ -15,8 +15,7 @@ import { supabase } from "@/lib/supabase";
 import { useUnreadMessagesCount } from "@/lib/useUnreadMessages";
 import { useUnreadMechanicMessages } from "@/lib/useUnreadMechanicMessages";
 import { formatDateDMY } from "@/lib/date";
-import { computeReminderStatus, daysUntilDate, REMINDER_STATUS_COLOR, type ReminderStatus } from "@/lib/reminders";
-import { getUnitKind } from "@/lib/units";
+import { computeReminderStatus, daysUntilDate, type ReminderStatus } from "@/lib/reminders";
 import ContactSupportWidgetIntl from "@/components/ContactSupportWidgetIntl";
 import DashboardSidebarIntl from "@/components/DashboardSidebarIntl";
 import DashboardHeaderIntl from "@/components/DashboardHeaderIntl";
@@ -128,16 +127,6 @@ export default function DashboardPage() {
   const [recentActivity, setRecentActivity] = useState<ActivityItem[]>([]);
   const [assetCarouselPage, setAssetCarouselPage] = useState(0);
 
-  const REMINDER_STATUS_LABEL: Record<ReminderStatus, string> = {
-    overdue: t("statusOverdue"),
-    due_soon: t("statusDueSoon"),
-    ok: t("statusOk"),
-    none: t("statusNone"),
-  };
-
-  function unitShort(assetType: string | null | undefined) {
-    return getUnitKind(assetType) === "horas" ? t("unitShortHours") : t("unitShortKm");
-  }
 
 
   // ── Top search bar ──
@@ -678,10 +667,10 @@ export default function DashboardPage() {
           extraHeaderContent={dashboardSearchBar}
         />
 
-        <div className="flex-1 overflow-y-auto p-4 md:p-7">
+        <div className="flex-1 overflow-y-auto p-4 md:p-5">
 
           {/* ── Action buttons ── */}
-          <div className="flex justify-end items-center gap-3 mb-5 -mt-2">
+          <div className="flex justify-end items-center gap-3 mb-4 -mt-2">
             <Link
               href="/dashboard/services?new=1"
               className="flex items-center gap-2 border border-red-200 bg-white hover:bg-red-50 active:scale-[0.98] transition-all text-red-600 text-[13px] font-bold px-4 py-[10px] rounded-xl shadow-sm"
@@ -700,7 +689,7 @@ export default function DashboardPage() {
               (overdue first, then soonest-due), same merged services+tasks
               list already powering "Próximos Recordatorios" below — plus a
               permanent 4th card linking straight to the full calendar. */}
-          <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm p-5 mb-5">
+          <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm p-4 mb-4">
             <div className="flex items-center gap-2 mb-3">
               <h2 className="text-[14px] font-black text-zinc-900">{t("todaysPriorities")}</h2>
               {priorityItems.length > 0 && (
@@ -748,12 +737,12 @@ export default function DashboardPage() {
           </div>
 
           {/* ── "Estado de tu mantenimiento" (gauge) + "Resumen rápido" + "Próximos Recordatorios" ── */}
-          <div className="grid grid-cols-1 lg:grid-cols-[1.1fr_1fr_1fr] gap-5 mb-5">
+          <div className="grid grid-cols-1 lg:grid-cols-[1.1fr_1fr_1fr] gap-4 mb-4">
 
-            <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm p-5">
+            <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm p-4">
               <h3 className="text-[13px] font-black text-zinc-900 mb-4">{t("maintenanceHealth")}</h3>
-              <div className="flex items-center gap-5">
-                <div className="relative w-[110px] h-[110px] shrink-0">
+              <div className="flex items-center gap-4">
+                <div className="relative w-[96px] h-[96px] shrink-0">
                   <svg viewBox="0 0 120 120" className="w-full h-full -rotate-90">
                     <circle cx="60" cy="60" r="52" fill="none" stroke="#e4e4e7" strokeWidth="12" />
                     <circle
@@ -763,7 +752,7 @@ export default function DashboardPage() {
                     />
                   </svg>
                   <div className="absolute inset-0 flex items-center justify-center">
-                    <span className="text-[22px] font-black text-zinc-900">{maintenanceHealth}%</span>
+                    <span className="text-[19px] font-black text-zinc-900">{maintenanceHealth}%</span>
                   </div>
                 </div>
                 <div className="min-w-0 flex-1">
@@ -787,7 +776,7 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm p-5">
+            <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm p-4">
               <h3 className="text-[13px] font-black text-zinc-900 mb-4">{t("quickSummary")}</h3>
               <div className="grid grid-cols-2 gap-3">
                 {resumenTiles.map(({ id, value, caption, icon: Icon, color }) => (
@@ -802,7 +791,7 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm p-5">
+            <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm p-4">
               <div className="flex items-center justify-between mb-3">
                 <h3 className="text-[13px] font-black text-zinc-900">{t("upcomingReminders")}</h3>
                 <Link href="/dashboard/services" className="text-[11px] font-semibold text-red-600 hover:text-red-700">{t("viewAll")}</Link>
@@ -812,19 +801,21 @@ export default function DashboardPage() {
               ) : (
                 <div className="space-y-2">
                   {reminders.slice(0, 5).map((r) => {
-                    const rc = REMINDER_STATUS_COLOR[r.status];
+                    const overdue = r.status === "overdue";
                     return (
-                      <div key={`${r.kind}-${r.id}`} className="flex items-center gap-2.5 p-2.5 rounded-xl bg-zinc-50 border border-zinc-100">
-                        <span className={`w-2 h-2 rounded-full shrink-0 ${rc.dot}`} />
+                      <div key={`${r.kind}-${r.id}`} className="flex items-center gap-2.5">
+                        <div className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 ${overdue ? "bg-red-100 text-red-600" : "bg-amber-100 text-amber-600"}`}>
+                          {overdue ? <AlertCircle size={13} /> : <Clock size={13} />}
+                        </div>
                         <div className="flex-1 min-w-0">
                           <p className="text-[12px] font-bold text-zinc-800 truncate">{r.assetLabel}</p>
-                          <p className="text-[10px] text-zinc-400">
-                            {r.next_due_date ? t("dueOn", { date: formatDateDMY(r.next_due_date) }) : ""}
-                            {r.next_due_date && r.next_due_km_hours != null ? " · " : ""}
-                            {r.next_due_km_hours != null ? `${r.next_due_km_hours.toLocaleString()} ${unitShort(r.assetType)}` : ""}
+                          <p className="text-[10px] text-zinc-400 truncate">
+                            {r.kind === "service" ? tServiceTypes(SERVICE_TYPE_KEYS[r.serviceType ?? "Other"] ?? "other") : t("scheduledTask")}
                           </p>
                         </div>
-                        <span className={`text-[9px] font-bold px-1.5 py-[2px] rounded-full shrink-0 ${rc.bg} ${rc.text}`}>{REMINDER_STATUS_LABEL[r.status]}</span>
+                        <p className={`text-[10.5px] font-bold shrink-0 whitespace-nowrap ${overdue ? "text-red-600" : "text-amber-600"}`}>
+                          {relativeDueLabel(r)}
+                        </p>
                       </div>
                     );
                   })}
@@ -834,9 +825,9 @@ export default function DashboardPage() {
           </div>
 
           {/* ── "Tus activos" carousel + "Actividad reciente" ── */}
-          <div className="grid grid-cols-1 lg:grid-cols-[1.6fr_1fr] gap-5 mb-5">
+          <div className="grid grid-cols-1 lg:grid-cols-[1.6fr_1fr] gap-4 mb-4">
 
-            <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm p-5">
+            <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm p-4">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-[13px] font-black text-zinc-900">{t("yourAssets")}</h3>
                 <Link href="/dashboard/assets" className="text-[11px] font-semibold text-red-600 hover:text-red-700">{t("viewAll")}</Link>
@@ -891,7 +882,7 @@ export default function DashboardPage() {
               )}
             </div>
 
-            <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm p-5">
+            <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm p-4">
               <div className="flex items-center justify-between mb-3">
                 <h3 className="text-[13px] font-black text-zinc-900">{t("recentActivity")}</h3>
               </div>
@@ -929,7 +920,7 @@ export default function DashboardPage() {
               design that separately later since it needs real unlock
               rules, not just a restyle. This banner is just the warm,
               values-oriented copy from the same mockup, on its own. */}
-          <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm p-5 mb-2 flex items-center gap-3">
+          <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm p-4 mb-2 flex items-center gap-3">
             <Heart size={18} className="text-red-500 shrink-0" />
             <div>
               <p className="text-[12.5px] font-bold text-zinc-800">{t("valuePropTitle")}</p>
