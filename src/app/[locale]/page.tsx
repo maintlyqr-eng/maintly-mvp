@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Link } from "@/i18n/navigation";
 import { useTranslations } from "next-intl";
@@ -25,6 +25,24 @@ export default function HomePage() {
   // Camera scanner — the actual camera/jsQR logic lives in QRScannerModal,
   // shared with the "link existing asset" flows in the dashboard.
   const [showCamera, setShowCamera] = useState(false);
+
+  // Incremento 20: cuando Google vuelve acá con la sesión en el hash de la
+  // URL (#access_token=...), pasa un par de segundos entre que la página
+  // carga y el listener de onAuthStateChange de abajo la procesa y
+  // redirige a /dashboard o /register/profession. Sin esto, en el medio
+  // se alcanza a ver la landing pública entera (Home) antes del salto --
+  // el "flash" que reportó Facu. useLayoutEffect corre sincrónicamente
+  // apenas se monta el componente, ANTES de que el navegador pinte algo
+  // en pantalla, así que el usuario nunca llega a ver ese contenido: arranca
+  // directo con el spinner. El valor inicial (false) es el mismo que ya
+  // renderizó el servidor, así que no hay mismatch de hidratación -- recién
+  // cambia del lado del cliente, después del primer render.
+  const [authRedirecting, setAuthRedirecting] = useState(false);
+  useLayoutEffect(() => {
+    if (typeof window !== "undefined" && window.location.hash.includes("access_token")) {
+      setAuthRedirecting(true);
+    }
+  }, []);
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
@@ -115,6 +133,18 @@ export default function HomePage() {
     { label: "API", href: "/api" },
     { label: tNav("about"), href: "/about" },
   ];
+
+  // Incremento 20: mientras se resuelve el redirect post-Google (ver
+  // useLayoutEffect de arriba), se muestra este spinner en vez de toda la
+  // landing -- se llega hasta acá (después de todos los hooks) para
+  // respetar las reglas de hooks, sin condicionar ninguno de ellos.
+  if (authRedirecting) {
+    return (
+      <main className="min-h-dvh flex items-center justify-center bg-white">
+        <div className="w-8 h-8 border-4 border-red-600 border-t-transparent rounded-full animate-spin" />
+      </main>
+    );
+  }
 
   return (
     <main className="relative min-h-dvh md:h-dvh overflow-x-hidden md:overflow-hidden bg-white text-zinc-900 flex flex-col">
