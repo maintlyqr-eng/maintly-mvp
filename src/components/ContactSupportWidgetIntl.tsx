@@ -20,7 +20,7 @@ type SupportMsgRow = {
   created_at: string;
 };
 
-export default function ContactSupportWidgetIntl({ mechanicId, variant = "sidebar" }: { mechanicId: string; variant?: "sidebar" | "inline" }) {
+export default function ContactSupportWidgetIntl({ mechanicId, variant = "sidebar" }: { mechanicId: string; variant?: "sidebar" | "inline" | "floating" }) {
   const t = useTranslations("ContactSupportWidget");
   const locale = useLocale();
   const [unreadCount, setUnreadCount] = useState(0);
@@ -113,25 +113,39 @@ export default function ContactSupportWidgetIntl({ mechanicId, variant = "sideba
   }
 
   const isInline = variant === "inline";
+  const isFloating = variant === "floating";
 
   return (
     <>
-      <button
-        onClick={openWidget}
-        className={
-          isInline
-            ? "relative flex items-center gap-2 border border-zinc-200 bg-gradient-to-br from-zinc-100 via-white to-zinc-200 hover:to-zinc-300 active:scale-[0.98] transition-all text-zinc-700 text-[13px] font-bold px-4 py-[10px] rounded-xl shadow-sm"
-            : "relative w-[calc(100%-24px)] mx-3 mb-3 flex items-center gap-2.5 px-3.5 py-3 rounded-xl bg-gradient-to-br from-zinc-100 via-white to-zinc-200 hover:to-zinc-300 border border-zinc-200/80 text-zinc-800 text-[13px] font-bold transition-all shadow-sm"
-        }
-      >
-        <div className={`rounded-lg bg-red-600 flex items-center justify-center shrink-0 ${isInline ? "w-5 h-5" : "w-7 h-7"}`}>
-          <LifeBuoy size={isInline ? 11 : 14} className="text-white" />
-        </div>
-        {t("contactSupport")}
-        {unreadCount > 0 && (
-          <span className={`bg-red-600 text-white text-[9px] font-black rounded-full min-w-[16px] h-4 flex items-center justify-center px-1 ${isInline ? "" : "ml-auto"}`}>{unreadCount}</span>
-        )}
-      </button>
+      {isFloating ? (
+        <button
+          onClick={openWidget}
+          title={t("contactSupport")}
+          className="relative w-14 h-14 rounded-full bg-red-600 hover:bg-red-500 active:scale-[0.96] shadow-lg shadow-red-900/20 flex items-center justify-center transition-all"
+        >
+          <LifeBuoy size={22} className="text-white" />
+          {unreadCount > 0 && (
+            <span className="absolute -top-1 -right-1 bg-white text-red-600 text-[10px] font-black rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1 border-2 border-red-600">{unreadCount}</span>
+          )}
+        </button>
+      ) : (
+        <button
+          onClick={openWidget}
+          className={
+            isInline
+              ? "relative flex items-center gap-2 border border-zinc-200 bg-gradient-to-br from-zinc-100 via-white to-zinc-200 hover:to-zinc-300 active:scale-[0.98] transition-all text-zinc-700 text-[13px] font-bold px-4 py-[10px] rounded-xl shadow-sm"
+              : "relative w-[calc(100%-24px)] mx-3 mb-3 flex items-center gap-2.5 px-3.5 py-3 rounded-xl bg-gradient-to-br from-zinc-100 via-white to-zinc-200 hover:to-zinc-300 border border-zinc-200/80 text-zinc-800 text-[13px] font-bold transition-all shadow-sm"
+          }
+        >
+          <div className={`rounded-lg bg-red-600 flex items-center justify-center shrink-0 ${isInline ? "w-5 h-5" : "w-7 h-7"}`}>
+            <LifeBuoy size={isInline ? 11 : 14} className="text-white" />
+          </div>
+          {t("contactSupport")}
+          {unreadCount > 0 && (
+            <span className={`bg-red-600 text-white text-[9px] font-black rounded-full min-w-[16px] h-4 flex items-center justify-center px-1 ${isInline ? "" : "ml-auto"}`}>{unreadCount}</span>
+          )}
+        </button>
+      )}
 
       {open && mounted && createPortal(
         <div className="fixed inset-0 z-50 bg-zinc-900/40 flex items-center justify-center p-4" onClick={() => setOpen(false)}>

@@ -28,6 +28,17 @@ function worse(a: ReminderStatus, b: ReminderStatus): ReminderStatus {
   return STATUS_RANK[a] >= STATUS_RANK[b] ? a : b;
 }
 
+// Whole-day distance from `today` to `dateStr` ("YYYY-MM-DD"), negative if
+// in the past. Extracted from computeReminderStatus's own date math (below)
+// so callers that need the actual number (not just overdue/due_soon/ok) —
+// e.g. "Vence en 5 días" copy on the dashboard's "Tus prioridades" cards —
+// don't have to reimplement it and risk drifting out of sync.
+export function daysUntilDate(dateStr: string, today: Date = new Date()): number {
+  const due = new Date(dateStr + "T00:00:00");
+  const t = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  return Math.round((due.getTime() - t.getTime()) / 86400000);
+}
+
 export function computeReminderStatus(input: ReminderInput): ReminderStatus {
   const {
     nextDueDate,
@@ -41,9 +52,7 @@ export function computeReminderStatus(input: ReminderInput): ReminderStatus {
   let status: ReminderStatus = "none";
 
   if (nextDueDate) {
-    const due = new Date(nextDueDate + "T00:00:00");
-    const t = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-    const daysUntil = Math.round((due.getTime() - t.getTime()) / 86400000);
+    const daysUntil = daysUntilDate(nextDueDate, today);
     const dateStatus: ReminderStatus = daysUntil < 0 ? "overdue" : daysUntil <= dueSoonDays ? "due_soon" : "ok";
     status = worse(status, dateStatus);
   }
