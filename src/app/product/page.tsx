@@ -41,7 +41,7 @@ export default function ProductPage() {
         <div>
           <p className="text-[11px] font-black tracking-[0.2em] uppercase text-red-500 mb-2">See it in action</p>
           <h3 className="text-xl md:text-2xl font-black mb-1">This isn&apos;t a mockup. It&apos;s a real report.</h3>
-          <p className="text-zinc-400 text-[13px] max-w-md">Open a live example — the same page anyone gets when they scan a real Maintly QR.</p>
+          <p className="text-zinc-400 text-[13px] max-w-md">Open a live example — the same page anyone gets when they scan a real MaintlyQR.</p>
         </div>
         <a
           href="/asset/demogen001"

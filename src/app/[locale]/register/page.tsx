@@ -158,7 +158,7 @@ export default function RegisterPage() {
       <div className="hidden md:block absolute inset-0 z-0 bg-white">
         <Image
           src="/images/login-side.png"
-          alt="Maintly"
+          alt="MaintlyQR"
           fill
           priority
           className="object-contain object-center"

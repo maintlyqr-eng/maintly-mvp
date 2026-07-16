@@ -180,7 +180,7 @@ export default function AssetReportPage() {
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 24px 10px", borderBottom: "3px solid #dc2626" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/images/qr-gear-real.png" alt="Maintly" style={{ width: 44, height: 44, objectFit: "contain" }} />
+            <img src="/images/qr-gear-real.png" alt="MaintlyQR" style={{ width: 44, height: 44, objectFit: "contain" }} />
             <div>
               <div style={{ fontWeight: 900, fontSize: 17, letterSpacing: 2, lineHeight: 1 }}>
                 <span style={{ color: "#111" }}>MAIN</span><span style={{ color: "#dc2626" }}>TLY</span>
@@ -369,7 +369,7 @@ export default function AssetReportPage() {
                 ))}
               </div>
 
-              {/* Maintly seal */}
+              {/* MaintlyQR seal */}
               <div style={{
                 width: 76, height: 76, borderRadius: "50%",
                 border: "3px solid #dc2626",

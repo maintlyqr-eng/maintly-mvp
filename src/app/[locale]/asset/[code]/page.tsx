@@ -160,7 +160,7 @@ export default function AssetPublicPage() {
   const [contactSent, setContactSent] = useState(false);
 
   // Add Service form
-  // Report an issue to Maintly (item 6 del pedido de Facu: "Reportes y
+  // Report an issue to MaintlyQR (item 6 del pedido de Facu: "Reportes y
   // moderación") — a separate, lightweight concern from the "contact the
   // Maintler" form above: this goes to the admin panel's new "Reportes y
   // Moderación" section, not to the mechanic.
@@ -625,7 +625,7 @@ export default function AssetPublicPage() {
         </div>
 
         <p className="text-center text-[10px] text-zinc-400 pb-2">
-          {t("poweredByPrefix")} <span className="font-bold text-zinc-600">Maintly</span> · {t("poweredByTagline")}
+          {t("poweredByPrefix")} <span className="font-bold text-zinc-600">MaintlyQR</span> · {t("poweredByTagline")}
         </p>
 
         {!isDemo && (

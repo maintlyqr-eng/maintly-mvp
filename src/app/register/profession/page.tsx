@@ -61,7 +61,7 @@ export default function RegisterProfessionPage() {
             </div>
             <h2 className="text-[20px] font-black text-zinc-900 mb-2">Submitted for review</h2>
             <p className="text-[13px] text-zinc-500 mb-6">
-              We&apos;ll review your {submitted} certificate and let you know once you&apos;re a verified {submitted} Maintler. You can keep using Maintly in the meantime.
+              We&apos;ll review your {submitted} certificate and let you know once you&apos;re a verified {submitted} Maintler. You can keep using MaintlyQR in the meantime.
             </p>
             <button
               onClick={() => router.push("/dashboard")}

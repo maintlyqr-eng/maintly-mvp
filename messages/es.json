@@ -14,7 +14,7 @@
     "changeLanguage": "Cambiar idioma"
   },
   "HomePage": {
-    "homeAriaLabel": "Inicio de Maintly",
+    "homeAriaLabel": "Inicio de MaintlyQR",
     "heroTitleLine1": "Cada Máquina",
     "heroTitleLine2Prefix": "Tiene una ",
     "heroTitleHighlight": "Historia.",
@@ -28,7 +28,7 @@
     "or": "O",
     "enterCardTitle": "Ingresar Código QR",
     "enterCardDescriptionLine1": "Escribe o pega tu",
-    "enterCardDescriptionLine2": "código Maintly",
+    "enterCardDescriptionLine2": "código MaintlyQR",
     "enterCardPlaceholder": "Pega tu código aquí",
     "trustBarText": "Historial abierto. Sin necesidad de cuenta.",
     "viewLiveExample": "Ver Ejemplo en Vivo",
@@ -40,7 +40,7 @@
     "pillarAccess": "Acceso Desde Cualquier Lugar",
     "pillarHistory": "Historial Completo",
     "pillarGrow": "Hecho para Crecer",
-    "footerBrand": "Maintly®",
+    "footerBrand": "MaintlyQR®",
     "footerTagline": "Mantenimiento. Registrado.",
     "footerTerms": "Términos",
     "footerPrivacy": "Privacidad",
@@ -81,11 +81,11 @@
     "contactPromptQuestion": "¿Tenés una pregunta sobre este {type}?",
     "contactPromptDesc": "Enviale un mensaje al Maintler que lo administra.",
     "messageButton": "Mensaje",
-    "verifiedByMaintlyTitle": "Verificado por Maintly",
+    "verifiedByMaintlyTitle": "Verificado por MaintlyQR",
     "verifiedByMaintlyDesc": "Este registro de mantenimiento es inmutable e inalterable.",
     "poweredByPrefix": "Desarrollado por",
     "poweredByTagline": "Mantenimiento. Registrado.",
-    "demoBannerText": "Este es un ejemplo en vivo de un reporte de Maintly. Los equipos y servicios que se muestran aquí son solo para demostración.",
+    "demoBannerText": "Este es un ejemplo en vivo de un reporte de MaintlyQR. Los equipos y servicios que se muestran aquí son solo para demostración.",
     "demoCreateOwnButton": "Creá el Tuyo — Gratis",
     "loggedInAsPrefix": "Conectado como",
     "inWorkshopButton": "En el Taller",
@@ -209,7 +209,7 @@
     "professionMaintler": "Maintler {profession}",
     "verifiedMaintlerFallback": "Maintler Verificado",
     "sinceLine": "Desde {date}",
-    "maintlyScoreLabel": "Maintly Score",
+    "maintlyScoreLabel": "MaintlyQR Score",
     "maintlyScoreDesc": "Basado en verificación, actividad y experiencia registrada — no en reseñas.",
     "badgeVerified": "Verificado",
     "badge100Services": "100+ Servicios",
@@ -227,7 +227,7 @@
     "ownCardDesc": "Descargá o enviá la tarjeta de identificación imprimible de abajo — la versión completa editable también está en Configuración.",
     "downloadButton": "Descargar",
     "sendButton": "Enviar",
-    "verifiedByMaintlyLabel": "Verificado por Maintly",
+    "verifiedByMaintlyLabel": "Verificado por MaintlyQR",
     "partOfWorldLabel": "Parte del Mundo MaintlyQR.",
     "poweredByPrefix": "Desarrollado por",
     "poweredByTagline": "Mantenimiento. Registrado.",
@@ -266,7 +266,7 @@
   },
   "LoginPage": {
     "welcomeBack": "Bienvenido de nuevo",
-    "subtitle": "Iniciá sesión en tu cuenta de Maintly",
+    "subtitle": "Iniciá sesión en tu cuenta de MaintlyQR",
     "emailLabel": "Correo electrónico",
     "emailPlaceholder": "Ingresá tu correo electrónico",
     "passwordLabel": "Contraseña",
@@ -281,7 +281,7 @@
     "continueWithGoogle": "Continuar con Google",
     "connectingToGoogle": "Conectando con Google...",
     "googleSignInError": "No pudimos iniciar el inicio de sesión con Google. Probá de nuevo.",
-    "newToMaintly": "¿Nuevo en Maintly?",
+    "newToMaintly": "¿Nuevo en MaintlyQR?",
     "createAccountLink": "Creá una cuenta",
     "continueBrowsing": "Continuar navegando sin una cuenta",
     "deletedError": "Esta cuenta fue eliminada. Contactá a soporte si pensás que esto es un error."
@@ -292,7 +292,7 @@
     "checkEmailDescSuffix": "Confirmá tu cuenta y después iniciá sesión con tu correo y contraseña.",
     "goToLoginButton": "Ir a Iniciar Sesión",
     "becomeMaintler": "Convertite en Maintler",
-    "subtitle": "Creá tu cuenta gratis de Maintly",
+    "subtitle": "Creá tu cuenta gratis de MaintlyQR",
     "fullNameLabel": "Nombre completo",
     "fullNamePlaceholder": "Ingresá tu nombre completo",
     "emailLabel": "Correo electrónico",
@@ -333,16 +333,16 @@
     "feature6Sub": "Autos, generadores, HVAC, embarcaciones, aviones y más — un solo sistema para todo lo que mantenés.",
     "seeItInAction": "Vélo en acción",
     "liveExampleTitle": "Esto no es una maqueta. Es un reporte real.",
-    "liveExampleDesc": "Abrí un ejemplo en vivo — la misma página que ve cualquiera al escanear un QR real de Maintly.",
+    "liveExampleDesc": "Abrí un ejemplo en vivo — la misma página que ve cualquiera al escanear un QR real de MaintlyQR.",
     "viewLiveExample": "Ver Ejemplo en Vivo",
     "getStartedFree": "Empezá Gratis"
   },
   "HowItWorksPage": {
     "eyebrow": "Cómo Funciona",
     "title": "De la calcomanía al historial completo en segundos.",
-    "subtitle": "Sin capacitación, sin configuración, sin manuales. Si sabés escanear un código QR, ya sabés usar Maintly.",
+    "subtitle": "Sin capacitación, sin configuración, sin manuales. Si sabés escanear un código QR, ya sabés usar MaintlyQR.",
     "step1Title": "Pegá el QR",
-    "step1Sub": "Pegá un QR de Maintly a prueba de manipulación en la máquina. Toma segundos y dura toda la vida del equipo.",
+    "step1Sub": "Pegá un QR de MaintlyQR a prueba de manipulación en la máquina. Toma segundos y dura toda la vida del equipo.",
     "step2Title": "Cualquiera lo Escanea",
     "step2Sub": "Sin app, sin login. Cualquier cámara de celular abre el historial completo de la máquina al instante.",
     "step3Title": "El Historial Es Visible",
@@ -358,7 +358,7 @@
   "IndustriesPage": {
     "eyebrow": "Industrias",
     "title": "Hecho para todo profesional del mantenimiento.",
-    "subtitle": "Si requiere mantenimiento, tiene lugar en Maintly.",
+    "subtitle": "Si requiere mantenimiento, tiene lugar en MaintlyQR.",
     "industry1Title": "Automotor",
     "industry1Sub": "Autos, camiones, motos y flotas.",
     "industry2Title": "Eléctrico",
@@ -425,7 +425,7 @@
   "ApiPage": {
     "eyebrow": "Conectá tu Software",
     "title": "Tus sistemas, nuestro historial.",
-    "subtitle": "Llevá los registros de mantenimiento de Maintly a las herramientas que ya usás — sin cambiar cómo trabaja tu equipo.",
+    "subtitle": "Llevá los registros de mantenimiento de MaintlyQR a las herramientas que ya usás — sin cambiar cómo trabaja tu equipo.",
     "feature1Title": "Extraé Registros de Servicio",
     "feature1Sub": "Consultá el historial completo de cualquier máquina directamente desde tus propios sistemas.",
     "feature2Title": "Sincronizá Automáticamente",
@@ -698,7 +698,7 @@
     "settings": "Configuración"
   },
   "DashboardSidebar": {
-    "maintlyMaintler": "Maintler de Maintly"
+    "maintlyMaintler": "Maintler de MaintlyQR"
   },
   "DashboardHeader": {
     "maintler": "Maintler",
@@ -719,7 +719,7 @@
   },
   "ContactSupportWidget": {
     "contactSupport": "Contactar Soporte",
-    "maintlyTeam": "Equipo Maintly",
+    "maintlyTeam": "Equipo MaintlyQR",
     "clearConversationTitle": "Borrar conversación (solo de tu lado)",
     "clearConfirmQuestion": "¿Borrar esta conversación solo de tu lado?",
     "confirm": "Confirmar",
@@ -753,7 +753,7 @@
     "delete": "Eliminar",
     "errorMarkRead": "No pudimos marcar este mensaje como leído. Intentá de nuevo.",
     "errorDelete": "No pudimos eliminar este mensaje. Intentá de nuevo.",
-    "copyright": "© 2026 Maintly. Todos los derechos reservados."
+    "copyright": "© 2026 MaintlyQR. Todos los derechos reservados."
   },
   "DashboardReportsPage": {
     "title": "Reportes",
@@ -779,7 +779,7 @@
     "viewReport": "Ver Reporte",
     "noQrCode": "Sin código QR",
     "unknownAsset": "Activo Desconocido",
-    "copyright": "© 2026 Maintly. Todos los derechos reservados."
+    "copyright": "© 2026 MaintlyQR. Todos los derechos reservados."
   },
   "DashboardScheduledPage": {
     "title": "Servicios Programados",
@@ -818,7 +818,7 @@
     "errorDatePast": "La fecha del recordatorio no puede ser en el pasado.",
     "errorKmTooLow": "{unit} no puede ser menor al último valor registrado del activo ({value}).",
     "errorSaveFailed": "No pudimos guardar — el registro no se actualizó. Verificá que la migración de columnas de recordatorio se haya ejecutado.",
-    "copyright": "© 2026 Maintly. Todos los derechos reservados.",
+    "copyright": "© 2026 MaintlyQR. Todos los derechos reservados.",
     "unitHours": "Horas",
     "unitKm": "Km",
     "unitShortHours": "hs",
@@ -851,7 +851,7 @@
     "no": "No",
     "download": "Descargar",
     "delete": "Eliminar",
-    "copyright": "© 2026 Maintly. Todos los derechos reservados.",
+    "copyright": "© 2026 MaintlyQR. Todos los derechos reservados.",
     "unnamedAsset": "Activo sin nombre",
     "unknownAsset": "Activo desconocido",
     "unknownCustomer": "Cliente desconocido",
@@ -922,7 +922,7 @@
     "confirm": "Confirmar",
     "deleteCustomer": "Eliminar cliente",
     "deleteCustomerFailed": "No pudimos eliminar este cliente. Intentá de nuevo.",
-    "copyright": "© 2026 Maintly. Todos los derechos reservados."
+    "copyright": "© 2026 MaintlyQR. Todos los derechos reservados."
   },
   "CustomerPicker": {
     "customerOptional": "Cliente (opcional)",
@@ -986,7 +986,7 @@
     "unnamedAsset": "Activo sin nombre",
     "unitShortHours": "hs",
     "unitShortKm": "km",
-    "copyright": "© 2026 Maintly. Todos los derechos reservados."
+    "copyright": "© 2026 MaintlyQR. Todos los derechos reservados."
   },
   "FuelTypes": {
     "gasoline": "Nafta",
@@ -1063,7 +1063,7 @@
     "assignToNewAsset": "Asignar a un activo nuevo",
     "assign": "Asignar",
     "stickerLostHint": "¿Perdiste o dañaste la calcomanía? Simplemente descargá/imprimí este mismo código de nuevo — nunca deja de pertenecer a este equipo.",
-    "copyright": "© 2026 Maintly. Todos los derechos reservados.",
+    "copyright": "© 2026 MaintlyQR. Todos los derechos reservados.",
     "generateModalTitle": "Generar Códigos QR en Blanco",
     "howMany": "¿Cuántos?",
     "defaultLookHint": "Diseño predeterminado (podés personalizar cada uno después)",
@@ -1106,7 +1106,7 @@
     "setDash": "— Configurar",
     "editReminderMenu": "Editar Recordatorio",
     "setReminderMenu": "Configurar Recordatorio",
-    "copyright": "© 2026 Maintly. Todos los derechos reservados.",
+    "copyright": "© 2026 MaintlyQR. Todos los derechos reservados.",
     "unknownAsset": "Activo desconocido",
     "unnamedAsset": "Activo sin nombre",
     "modalLogNewService": "Registrar Nuevo Servicio",
@@ -1170,7 +1170,7 @@
     "successDesc": "<b>{name}</b> ya está en tu taller. Podés registrar servicios para él desde tu panel.",
     "done": "Listo",
     "unknownAsset": "Activo desconocido",
-    "scannerInstructions": "Apuntá al código QR de Maintly del activo"
+    "scannerInstructions": "Apuntá al código QR de MaintlyQR del activo"
   },
   "CalendarDayCell": {
     "today": "Hoy",
@@ -1198,7 +1198,7 @@
     "unknownAsset": "Activo desconocido",
     "upcomingReminders": "Próximos Recordatorios",
     "noRemindersDueSoon": "No hay recordatorios próximos a vencer.",
-    "copyright": "© 2026 Maintly. Todos los derechos reservados.",
+    "copyright": "© 2026 MaintlyQR. Todos los derechos reservados.",
     "statusOverdue": "Vencido",
     "greetingMorning": "¡Buen día, {name}! 👋",
     "greetingAfternoon": "¡Buenas tardes, {name}! 👋",
@@ -1271,7 +1271,7 @@
     "certificateOrProof": "Certificado o comprobante",
     "chooseFile": "Elegí un archivo para subir",
     "fileHint": "JPG, PNG o PDF — máx. 10MB",
-    "reviewNotice": "Un admin de Maintly revisará tu envío. Una vez aprobado, se te mostrará como un {profession} verificado en cada servicio que registres.",
+    "reviewNotice": "Un admin de MaintlyQR revisará tu envío. Una vez aprobado, se te mostrará como un {profession} verificado en cada servicio que registres.",
     "professionalMaintlerFallback": "Maintler profesional",
     "professionMaintler": "{profession} Maintler",
     "submitting": "Enviando…",
@@ -1290,7 +1290,7 @@
     "verifiedLabel": "Verificado",
     "verifiedDesc": "Tus servicios ahora muestran esta insignia de verificado.",
     "pendingLabel": "Verificación en revisión",
-    "pendingDesc": "Un admin de Maintly está revisando tu envío.",
+    "pendingDesc": "Un admin de MaintlyQR está revisando tu envío.",
     "declinedLabel": "Solicitud de verificación rechazada",
     "declinedDescFallback": "Podés revisar tus datos y enviar de nuevo abajo.",
     "maintlerLabel": "Maintler"
@@ -1316,14 +1316,14 @@
     "professionVerificationDesc": "Opcional. Declará tu profesión y subí un certificado para ganar una insignia de verificado en cada servicio que registres.",
     "updateProfessionOrCertificate": "Actualizar profesión o certificado",
     "editAndResubmit": "Editar y reenviar",
-    "maintlyStats": "Estadísticas Maintly",
+    "maintlyStats": "Estadísticas MaintlyQR",
     "viewAll": "Ver todo",
     "statServicesLogged": "Servicios registrados",
     "statAssetsMaintained": "Activos mantenidos",
     "statCustomersServed": "Clientes atendidos",
     "statRepeatCustomers": "Clientes recurrentes",
     "statYearsActive": "Años activo",
-    "statMaintlyScore": "Puntaje Maintly",
+    "statMaintlyScore": "Puntaje MaintlyQR",
     "loadingStats": "Cargando estadísticas…",
     "profile": "Perfil",
     "profileDesc": "Esto es lo que ven los clientes cuando registrás un servicio en su activo.",
@@ -1364,7 +1364,7 @@
     "confirmNewPassword": "Confirmar nueva contraseña",
     "updating": "Actualizando...",
     "updatePassword": "Actualizar contraseña",
-    "copyright": "© 2026 Maintly. Todos los derechos reservados.",
+    "copyright": "© 2026 MaintlyQR. Todos los derechos reservados.",
     "errorNameEmpty": "El nombre no puede estar vacío.",
     "errorSaveFailed": "No pudimos guardar — intentá de nuevo.",
     "successProfileUpdated": "Perfil actualizado.",
@@ -1438,7 +1438,7 @@
     "copyLink": "Copiar link",
     "viewReport": "Ver Reporte",
     "qrNotGenerated": "Código QR no generado.",
-    "copyright": "© 2026 Maintly. Todos los derechos reservados.",
+    "copyright": "© 2026 MaintlyQR. Todos los derechos reservados.",
     "unnamedAsset": "Activo sin nombre",
     "unitHours": "Horas",
     "unitKm": "Km",
@@ -2022,7 +2022,7 @@
   },
   "ReportIssueModal": {
     "title": "Reportar un problema",
-    "intro": "¿Encontraste algo incorrecto o tenés una consulta sobre este equipo? Contanos y el equipo de Maintly lo va a revisar.",
+    "intro": "¿Encontraste algo incorrecto o tenés una consulta sobre este equipo? Contanos y el equipo de MaintlyQR lo va a revisar.",
     "typeLabel": "Tipo de reporte",
     "types": {
       "incorrectInfo": "Información incorrecta",
@@ -2045,7 +2045,7 @@
     "submitButton": "Enviar reporte",
     "sendingButton": "Enviando...",
     "successTitle": "¡Gracias por avisarnos!",
-    "successDesc": "Tu reporte fue enviado al equipo de Maintly. Lo vamos a revisar a la brevedad.",
+    "successDesc": "Tu reporte fue enviado al equipo de MaintlyQR. Lo vamos a revisar a la brevedad.",
     "done": "Listo"
   },
   "RegisterProfessionPage": {
@@ -2053,7 +2053,7 @@
     "pageSubtitle": "Totalmente opcional. Declará tu profesión y subí un certificado para ganar una insignia de verificado en cada servicio que registres — o saltealo y hacelo más adelante desde Ajustes.",
     "loading": "Cargando...",
     "submittedTitle": "Enviado para revisión",
-    "submittedDesc": "Vamos a revisar tu certificado de {profession} y te avisamos apenas seas un Maintler {profession} verificado. Mientras tanto podés seguir usando Maintly con normalidad.",
+    "submittedDesc": "Vamos a revisar tu certificado de {profession} y te avisamos apenas seas un Maintler {profession} verificado. Mientras tanto podés seguir usando MaintlyQR con normalidad.",
     "goToDashboard": "Ir al Dashboard"
   }
 }

@@ -406,7 +406,7 @@ function MaintlerPublicPageContent() {
                 )}
               </div>
 
-              {/* Maintly Score */}
+              {/* MaintlyQR Score */}
               {stats && (
                 <div className="px-5 py-4">
                   <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-wide mb-1">{t("maintlyScoreLabel")}</p>
@@ -590,7 +590,7 @@ function MaintlerPublicPageContent() {
         </div>
 
         <p className="text-center text-[10px] text-zinc-400 pt-3">
-          {t("poweredByPrefix")} <span className="font-bold text-zinc-600">Maintly</span> · {t("poweredByTagline")}
+          {t("poweredByPrefix")} <span className="font-bold text-zinc-600">MaintlyQR</span> · {t("poweredByTagline")}
         </p>
       </div>
 

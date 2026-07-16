@@ -95,7 +95,7 @@ export default function RegisterPage() {
       <div className="hidden md:block absolute inset-0 z-0 bg-white">
         <Image
           src="/images/login-side.png"
-          alt="Maintly"
+          alt="MaintlyQR"
           fill
           priority
           className="object-contain object-center"
@@ -114,7 +114,7 @@ export default function RegisterPage() {
               <Wrench size={24} className="text-red-600" />
             </div>
             <h2 className="text-[26px] font-black text-zinc-900">Become a Maintler</h2>
-            <p className="text-[13px] text-zinc-500 mt-1">Create your free Maintly account</p>
+            <p className="text-[13px] text-zinc-500 mt-1">Create your free MaintlyQR account</p>
           </div>
 
           <form onSubmit={handleRegister}>

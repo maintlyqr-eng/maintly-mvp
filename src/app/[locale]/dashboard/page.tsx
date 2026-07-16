@@ -23,6 +23,8 @@ import AddAssetChooserIntl from "@/components/AddAssetChooserIntl";
 import NewAssetModalIntl from "@/components/NewAssetModalIntl";
 import LinkExistingAssetModalIntl from "@/components/LinkExistingAssetModalIntl";
 import { assetTypeImg } from "@/lib/assetTypes";
+import CalendarDayCellIntl, { type DayInfo } from "@/components/CalendarDayCellIntl";
+import { buildMonthGridMondayFirst } from "@/lib/calendarGrid";
 
 // NOTE: this page's router stays on plain next/navigation's useRouter
 // (not @/i18n/navigation) — it does router.push(`/dashboard/assets?q=...`)
@@ -110,6 +112,12 @@ type SearchServiceResult = {
 export default function DashboardPage() {
   const router = useRouter();
   const t = useTranslations("DashboardHomePage");
+  // Month/weekday labels for the calendar hover-preview reuse the full
+  // Calendar page's own namespace (DashboardCalendarPage already has
+  // monthJanuary..monthDecember / weekdayMon..weekdaySun) instead of
+  // duplicating those 19 keys under DashboardHomePage — same strings, one
+  // source of truth, at the cost of one extra useTranslations() call.
+  const tCal = useTranslations("DashboardCalendarPage");
   const tServiceTypes = useTranslations("ServiceTypes");
   const [authChecked, setAuthChecked] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -127,6 +135,12 @@ export default function DashboardPage() {
   const [recentActivity, setRecentActivity] = useState<ActivityItem[]>([]);
   const [assetCarouselPage, setAssetCarouselPage] = useState(0);
   const [priorityCarouselPage, setPriorityCarouselPage] = useState(0);
+
+  // ── Calendar preview popover (hover on "Ver calendario completo") ──
+  const [calViewDate, setCalViewDate] = useState(() => new Date());
+  const [calServices, setCalServices] = useState<{ date: string; label: string; type: string }[]>([]);
+  const [calReminders, setCalReminders] = useState<{ date: string; status: ReminderStatus; label: string; type: string }[]>([]);
+  const [calTasks, setCalTasks] = useState<{ date: string; done: boolean; title: string }[]>([]);
 
   // ── Top search bar ──
   const [searchQuery, setSearchQuery] = useState("");
@@ -254,6 +268,29 @@ export default function DashboardPage() {
         .sort((a, b) => (a.status === "overdue" ? 0 : 1) - (b.status === "overdue" ? 0 : 1));
 
       setReminders(reminderItems);
+
+      // ── Calendar preview (hover bubble on "Ver calendario completo") ──
+      // Facu (16 jul 2026): wants that card to pop open a mini month
+      // calendar on hover instead of only linking through. Reuses data this
+      // effect already fetched for other widgets — allReminderItems (every
+      // status, not just overdue/due_soon, unlike the `reminders` state
+      // above), allSvcRows, and taskRowsForCal — so this costs zero extra
+      // queries, only the same JS derivation the old always-visible mini
+      // calendar used to do before the redesign replaced it with this
+      // on-hover version.
+      setCalReminders(
+        allReminderItems
+          .filter((i): i is ReminderItem & { next_due_date: string } => !!i.next_due_date)
+          .map((i) => ({ date: i.next_due_date, status: i.status, label: i.assetLabel, type: i.serviceType ?? "" }))
+      );
+      setCalServices(
+        ((allSvcRows ?? []) as any[]).map((r) => {
+          const a = Array.isArray(r.assets) ? r.assets[0] : r.assets;
+          const label = a?.nickname || [a?.brand, a?.model].filter(Boolean).join(" ") || t("unknownAsset");
+          return { date: r.service_date, label, type: r.service_type };
+        })
+      );
+      setCalTasks(((taskRowsForCal ?? []) as any[]).map((r) => ({ date: r.task_date, done: r.done, title: r.title })));
 
       // ── Full asset list, for the top search bar (assets + QR codes) ──
       const searchList: SearchAsset[] = ((assetRows ?? []) as any[])
@@ -505,6 +542,52 @@ export default function DashboardPage() {
   const safePriorityPage = Math.min(priorityCarouselPage, priorityTotalPages - 1);
   const priorityItems = reminders.slice(safePriorityPage * 3, safePriorityPage * 3 + 3);
   const assetTotalPages = Math.ceil(assetCards.length / 4);
+
+  // ── Calendar preview popover (hover on "Ver calendario completo") ──
+  // Facu (16 jul 2026): wants that card to pop open a mini month calendar on
+  // hover, matching what used to live permanently in this panel before the
+  // "fits in one screen" cleanup removed it. Rebuilt from calServices /
+  // calReminders / calTasks (already derived for free in init(), see the
+  // comment there) — same grid + dot-priority logic the old always-visible
+  // widget used.
+  const CAL_MONTH_LABELS = [
+    tCal("monthJanuary"), tCal("monthFebruary"), tCal("monthMarch"), tCal("monthApril"),
+    tCal("monthMay"), tCal("monthJune"), tCal("monthJuly"), tCal("monthAugust"),
+    tCal("monthSeptember"), tCal("monthOctober"), tCal("monthNovember"), tCal("monthDecember"),
+  ];
+  const CAL_WEEKDAY_LABELS = [
+    tCal("weekdayMon"), tCal("weekdayTue"), tCal("weekdayWed"),
+    tCal("weekdayThu"), tCal("weekdayFri"), tCal("weekdaySat"), tCal("weekdaySun"),
+  ];
+  const calYear = calViewDate.getFullYear();
+  const calMonth = calViewDate.getMonth();
+  const calendarGrid = buildMonthGridMondayFirst(calYear, calMonth);
+
+  // Groups the 3 already-fetched lists by date key, so each day cell can
+  // look up "what's on this day" in O(1) instead of filtering 3 arrays per
+  // cell (42 cells × 3 arrays would add up fast otherwise).
+  const calActivityByDate: Record<string, DayInfo> = {};
+  function ensureCalDay(key: string): DayInfo {
+    if (!calActivityByDate[key]) calActivityByDate[key] = { services: [], tasks: [], reminders: [] };
+    return calActivityByDate[key];
+  }
+  for (const s of calServices) ensureCalDay(s.date).services.push({ label: s.label, type: s.type });
+  for (const r of calReminders) ensureCalDay(r.date).reminders.push({ label: r.label, type: r.type, status: r.status });
+  for (const tk of calTasks) ensureCalDay(tk.date).tasks.push({ title: tk.title, done: tk.done });
+
+  // Priority order for the day's dot color: an overdue reminder always wins
+  // (most urgent), then a due-soon reminder, then an open (not-done) task,
+  // then a logged service, then a reminder that's merely ok/none (still
+  // worth a neutral dot), else no dot at all.
+  function calDotColor(info?: DayInfo): string | null {
+    if (!info) return null;
+    if (info.reminders.some((r) => r.status === "overdue")) return "bg-red-500";
+    if (info.reminders.some((r) => r.status === "due_soon")) return "bg-amber-500";
+    if (info.tasks.some((tk) => !tk.done)) return "bg-blue-400";
+    if (info.services.length > 0) return "bg-emerald-500";
+    if (info.reminders.length > 0) return "bg-zinc-300";
+    return null;
+  }
 
   // "Actividad reciente" timestamps: service items only have a service_date
   // (day granularity, no time-of-day), scans have a full scanned_at
@@ -776,21 +859,77 @@ export default function DashboardPage() {
                   </Link>
                 );
               })}
-              {/* lg:col-start-4 pins this to the last column always — with
-                  1 or 2 real priority items on a page it used to just slot
-                  in right after them (3rd column), leaving an empty 4th
-                  column and making the card jump around depending on the
-                  count. Fixed position now, same as "where it was when
-                  there were three tasks". */}
-              <Link
-                href="/dashboard/calendar"
-                className="lg:col-start-4 rounded-xl border border-dashed border-zinc-300 hover:border-zinc-400 p-3 flex items-center gap-2.5 text-zinc-500 hover:text-zinc-700 transition-colors"
-              >
-                <div className="w-8 h-8 rounded-full bg-zinc-100 flex items-center justify-center shrink-0">
-                  <CalendarClock size={15} />
+              {/* lg:col-start-4 (now on the wrapper, not the Link — see
+                  below) pins this to the last column always — with 1 or 2
+                  real priority items on a page it used to just slot in right
+                  after them (3rd column), leaving an empty 4th column and
+                  making the card jump around depending on the count. Fixed
+                  position now, same as "where it was when there were three
+                  tasks".
+                  Facu (16 jul 2026): "hay forma de q se abra como ventana
+                  tipo burbuja cuando uno le apoya el mouse ahi mismo" —
+                  hovering this card now pops open a mini month calendar
+                  instead of only linking through. `group` + `pt-2` (padding,
+                  not margin) on the popover keeps the gap between card and
+                  bubble inside the hoverable box — a margin gap there would
+                  let the mouse pass through un-hoverable empty space and
+                  close the popover before it's reached. */}
+              <div className="relative group lg:col-start-4">
+                <Link
+                  href="/dashboard/calendar"
+                  className="rounded-xl border border-dashed border-zinc-300 hover:border-zinc-400 p-3 flex items-center gap-2.5 text-zinc-500 hover:text-zinc-700 transition-colors"
+                >
+                  <div className="w-8 h-8 rounded-full bg-zinc-100 flex items-center justify-center shrink-0">
+                    <CalendarClock size={15} />
+                  </div>
+                  <p className="text-[12px] font-bold">{t("viewFullCalendar")}</p>
+                </Link>
+
+                <div className="hidden group-hover:block absolute z-50 top-full right-0 pt-2 w-[280px]">
+                  <div className="bg-white rounded-2xl border border-zinc-200 shadow-2xl p-3.5">
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-[12px] font-black text-zinc-900">
+                        {CAL_MONTH_LABELS[calMonth]} {calYear}
+                      </p>
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={(e) => { e.preventDefault(); setCalViewDate(new Date(calYear, calMonth - 1, 1)); }}
+                          className="w-5 h-5 rounded-full flex items-center justify-center text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700 transition-colors"
+                          aria-label={t("previousPage")}
+                        >
+                          <ChevronLeft size={12} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => { e.preventDefault(); setCalViewDate(new Date(calYear, calMonth + 1, 1)); }}
+                          className="w-5 h-5 rounded-full flex items-center justify-center text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700 transition-colors"
+                          aria-label={t("nextPage")}
+                        >
+                          <ChevronRight size={12} />
+                        </button>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-7 gap-y-0.5">
+                      {CAL_WEEKDAY_LABELS.map((w, i) => (
+                        <p key={i} className="text-[8.5px] font-bold text-zinc-300 text-center uppercase">{w}</p>
+                      ))}
+                      {calendarGrid.map((cell) => (
+                        <CalendarDayCellIntl
+                          key={cell.key}
+                          dateKey={cell.key}
+                          day={cell.day}
+                          inMonth={cell.inMonth}
+                          isToday={cell.isToday}
+                          dateLabel={formatDateDMY(cell.key)}
+                          info={calActivityByDate[cell.key]}
+                          dotColor={calDotColor(calActivityByDate[cell.key])}
+                        />
+                      ))}
+                    </div>
+                  </div>
                 </div>
-                <p className="text-[12px] font-bold">{t("viewFullCalendar")}</p>
-              </Link>
+              </div>
             </div>
             {reminders.length === 0 && (
               <p className="text-[12px] text-zinc-400 mt-1">{t("noRemindersDueSoon")}</p>

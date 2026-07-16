@@ -8,7 +8,7 @@ export default function PricingPage() {
     <MarketingLayout
       eyebrow="Pricing"
       title="Simple, honest profiles."
-      subtitle="No tiers to compare, no hidden fees. Just two ways to use Maintly."
+      subtitle="No tiers to compare, no hidden fees. Just two ways to use MaintlyQR."
     >
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5 max-w-3xl mx-auto">
 

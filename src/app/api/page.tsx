@@ -14,7 +14,7 @@ export default function ApiPage() {
     <MarketingLayout
       eyebrow="Connect Your Software"
       title="Your systems, our history."
-      subtitle="Bring Maintly's maintenance records into the tools you already use — without changing how your team works."
+      subtitle="Bring MaintlyQR's maintenance records into the tools you already use — without changing how your team works."
     >
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {FEATURES.map(({ icon: Icon, title, sub }) => (

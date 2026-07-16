@@ -29,7 +29,7 @@ import { isSafeHref } from "@/lib/contactValidation";
 // themselves (this app has no other kind of account).
 //
 // Round 2 (same day): Facu shared a fuller card concept — a stats panel,
-// specialty icons, "Experience & Skills" bars, badges, and a "Maintly
+// specialty icons, "Experience & Skills" bars, badges, and a "MaintlyQR
 // Score." Every number below is computed from real logged activity via
 // get_maintler_stats()/get_maintler_specialty_breakdown() (migration
 // 025), NOT typed in by the mechanic — deliberately, to keep this
@@ -396,10 +396,10 @@ function MaintlerPublicPageContent() {
                 )}
               </div>
 
-              {/* Maintly Score */}
+              {/* MaintlyQR Score */}
               {stats && (
                 <div className="px-5 py-4">
-                  <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-wide mb-1">Maintly Score</p>
+                  <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-wide mb-1">MaintlyQR Score</p>
                   <div className="flex items-center gap-0.5 lg:justify-start">
                     {Array.from({ length: 5 }, (_, i) => (
                       <Star key={i} size={14} className={i < (score ?? 0) ? "text-amber-400 fill-amber-400" : "text-zinc-200"} />
@@ -572,7 +572,7 @@ function MaintlerPublicPageContent() {
               <div className="px-5 py-3 lg:px-7 bg-zinc-50 flex items-center gap-2.5">
                 <ShieldCheck size={15} className="text-red-500 shrink-0" />
                 <p className="text-[10.5px] text-zinc-500">
-                  <span className="font-bold text-zinc-700">Verified by Maintly</span> · Part of the MaintlyQR World.
+                  <span className="font-bold text-zinc-700">Verified by MaintlyQR</span> · Part of the MaintlyQR World.
                 </p>
               </div>
             </div>
@@ -580,7 +580,7 @@ function MaintlerPublicPageContent() {
         </div>
 
         <p className="text-center text-[10px] text-zinc-400 pt-3">
-          Powered by <span className="font-bold text-zinc-600">Maintly</span> · Maintenance. Tracked.
+          Powered by <span className="font-bold text-zinc-600">MaintlyQR</span> · Maintenance. Tracked.
         </p>
       </div>
 

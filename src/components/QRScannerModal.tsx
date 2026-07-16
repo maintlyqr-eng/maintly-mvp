@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { Camera, X, ZoomIn } from "lucide-react";
 
 // Full-screen camera QR scanner. Extracted from the homepage's scanner so
-// every place in the app that needs to scan a Maintly QR code (the public
+// every place in the app that needs to scan a MaintlyQR code (the public
 // homepage, and now the "link an existing asset" flows in the dashboard)
 // shares one implementation instead of three slightly-different copies.
 //
@@ -15,7 +15,7 @@ import { Camera, X, ZoomIn } from "lucide-react";
 export default function QRScannerModal({
   onDetect,
   onClose,
-  instructions = "Point at a Maintly QR code",
+  instructions = "Point at a MaintlyQR code",
 }: {
   onDetect: (code: string) => void;
   onClose: () => void;

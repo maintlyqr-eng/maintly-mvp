@@ -63,7 +63,7 @@ function LoginForm() {
       <div className="hidden md:block absolute inset-0 z-0 bg-white">
         <Image
           src="/images/login-side.png"
-          alt="Maintly"
+          alt="MaintlyQR"
           fill
           priority
           className="object-contain object-center"
@@ -82,7 +82,7 @@ function LoginForm() {
               <User size={24} className="text-red-600" />
             </div>
             <h2 className="text-[26px] font-black text-zinc-900">Welcome back</h2>
-            <p className="text-[13px] text-zinc-500 mt-1">Log in to your Maintly account</p>
+            <p className="text-[13px] text-zinc-500 mt-1">Log in to your MaintlyQR account</p>
           </div>
 
           <form onSubmit={handleLogin}>
@@ -172,7 +172,7 @@ function LoginForm() {
 
           {/* Create account */}
           <p className="text-center text-[13px] text-zinc-500 mt-6">
-            New to Maintly?{" "}
+            New to MaintlyQR?{" "}
             <a href="/register" className="text-red-600 hover:text-red-700 font-bold">Create an account</a>
           </p>
 

@@ -174,7 +174,7 @@ export default function ProfessionVerificationForm({ mechanicId, initialProfessi
           ? "No document needed for Owners — just confirm and you're all set."
           : (
             <>
-              A Maintly admin will review your submission. Once approved, you&apos;ll be shown as a verified{" "}
+              A MaintlyQR admin will review your submission. Once approved, you&apos;ll be shown as a verified{" "}
               <span className="font-semibold text-zinc-600">{profession ? `${profession} Maintler` : "professional Maintler"}</span> on every service you log.
             </>
           )}
@@ -234,7 +234,7 @@ export function VerificationStatusCard({
         <ShieldCheck size={18} className="text-amber-600 shrink-0" />
         <div>
           <p className="text-[13px] font-bold text-amber-800">Verification pending review{profession ? ` — ${profession}` : ""}</p>
-          <p className="text-[11px] text-amber-600/80">A Maintly admin is reviewing your submission.</p>
+          <p className="text-[11px] text-amber-600/80">A MaintlyQR admin is reviewing your submission.</p>
         </div>
       </div>
     );

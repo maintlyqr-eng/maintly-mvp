@@ -4,7 +4,7 @@ import MarketingLayout from "@/components/MarketingLayout";
 import { QrCode, Smartphone, Eye, UserCheck, ArrowRight } from "lucide-react";
 
 const STEPS = [
-  { icon: QrCode, title: "Attach the QR", sub: "Stick a tamper-proof Maintly QR on the machine. Takes seconds, lasts for the life of the equipment." },
+  { icon: QrCode, title: "Attach the QR", sub: "Stick a tamper-proof MaintlyQR on the machine. Takes seconds, lasts for the life of the equipment." },
   { icon: Smartphone, title: "Anyone Scans It", sub: "No app, no login. Any phone camera opens the machine's full history instantly." },
   { icon: Eye, title: "History Is Visible", sub: "Every past service — dates, parts, notes, who did the work — right there for anyone to see." },
   { icon: UserCheck, title: "Maintlers Log New Work", sub: "Any logged-in Maintler adds new service records in seconds, building the permanent record." },
@@ -15,7 +15,7 @@ export default function HowItWorksPage() {
     <MarketingLayout
       eyebrow="How It Works"
       title="From sticker to full history in seconds."
-      subtitle="No training, no setup, no manuals. If you can scan a QR code, you already know how to use Maintly."
+      subtitle="No training, no setup, no manuals. If you can scan a QR code, you already know how to use MaintlyQR."
     >
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
         {STEPS.map(({ icon: Icon, title, sub }, i) => (

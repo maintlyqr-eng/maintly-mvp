@@ -12,7 +12,7 @@ export default function QrEmptyPage() {
         <div className="relative h-full" style={{ aspectRatio: "1536/1024" }}>
           <Image
             src="/images/qr-empty-side.png"
-            alt="Maintly"
+            alt="MaintlyQR"
             fill
             priority
             className="object-contain"
@@ -36,7 +36,7 @@ export default function QrEmptyPage() {
                 <div className="relative w-32 h-32 mb-3">
                   <div className="absolute inset-0 rounded-full bg-gradient-to-br from-red-50 to-red-100/50 blur-md" />
                   <div className="absolute inset-0 flex items-center justify-center">
-                    <Image src="/images/qr-gear-real.png" alt="Maintly QR" width={128} height={128} className="object-contain drop-shadow-lg" />
+                    <Image src="/images/qr-gear-real.png" alt="MaintlyQR" width={128} height={128} className="object-contain drop-shadow-lg" />
                   </div>
                 </div>
                 <h1 className="text-[24px] font-black text-zinc-900 tracking-tight leading-tight">
@@ -105,7 +105,7 @@ export default function QrEmptyPage() {
             <div className="relative w-24 h-24 mb-3">
               <div className="absolute inset-0 rounded-full bg-gradient-to-br from-red-50 to-red-100/50 blur-md" />
               <div className="absolute inset-0 flex items-center justify-center">
-                <Image src="/images/qr-gear-real.png" alt="Maintly QR" width={96} height={96} className="object-contain drop-shadow-lg" />
+                <Image src="/images/qr-gear-real.png" alt="MaintlyQR" width={96} height={96} className="object-contain drop-shadow-lg" />
               </div>
             </div>
             <h1 className="text-[22px] font-black text-zinc-900 tracking-tight leading-tight">

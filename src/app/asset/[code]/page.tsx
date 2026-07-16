@@ -100,7 +100,7 @@ export default function AssetPublicPage() {
   const [contactError, setContactError] = useState("");
   const [contactSent, setContactSent] = useState(false);
 
-  // Report an issue to Maintly (item 6 del pedido de Facu: "Reportes y
+  // Report an issue to MaintlyQR (item 6 del pedido de Facu: "Reportes y
   // moderación") — separate concern from the "contact the Maintler" form
   // above: this goes to the admin panel's "Reportes y Moderación" section.
   const [showReportModal, setShowReportModal] = useState(false);
@@ -554,13 +554,13 @@ export default function AssetPublicPage() {
         <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm px-5 py-4 flex items-center gap-3">
           <ShieldCheck size={18} className="text-red-500 shrink-0" />
           <div>
-            <p className="text-[12px] font-bold text-zinc-800">Verified by Maintly</p>
+            <p className="text-[12px] font-bold text-zinc-800">Verified by MaintlyQR</p>
             <p className="text-[11px] text-zinc-400">This maintenance record is immutable and tamper-proof.</p>
           </div>
         </div>
 
         <p className="text-center text-[10px] text-zinc-400 pb-2">
-          Powered by <span className="font-bold text-zinc-600">Maintly</span> · Maintenance. Tracked.
+          Powered by <span className="font-bold text-zinc-600">MaintlyQR</span> · Maintenance. Tracked.
         </p>
 
         {!isDemo && (
@@ -580,7 +580,7 @@ export default function AssetPublicPage() {
         {isDemo ? (
           <div className="max-w-lg mx-auto px-4 pt-3 pb-1 text-center">
             <p className="text-[12px] text-zinc-500 mb-2">
-              This is a live example of a Maintly report. Machines and services shown here are for demonstration only.
+              This is a live example of a MaintlyQR report. Machines and services shown here are for demonstration only.
             </p>
             <a
               href="/register"

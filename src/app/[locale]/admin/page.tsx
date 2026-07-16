@@ -2471,7 +2471,7 @@ export default function AdminPage() {
                   al contenido (1081x207, fondo transparente), así que se ve
                   nítido incluso chico. El width/height respeta su relación
                   de aspecto real (~5.22:1) en vez de la 1.5:1 de antes. */}
-              <Image src="/images/Maintly_crop.png" alt="Maintly" width={136} height={26} priority style={{ objectFit: "contain" }} />
+              <Image src="/images/Maintly_crop.png" alt="MaintlyQR" width={136} height={26} priority style={{ objectFit: "contain" }} />
             </div>
             <p className="text-[12px] text-zinc-400 font-semibold tracking-widest uppercase">{t("controlCenterLabel")}</p>
           </div>
@@ -2709,7 +2709,7 @@ export default function AdminPage() {
             <div>
               {/* Incremento 14: mismo cambio que el logo del login — usar
                   el recorte nítido en vez de Maintly.png a tamaño chico. */}
-              <Image src="/images/Maintly_crop.png" alt="Maintly" width={84} height={16} priority style={{ objectFit: "contain" }} />
+              <Image src="/images/Maintly_crop.png" alt="MaintlyQR" width={84} height={16} priority style={{ objectFit: "contain" }} />
               <p className="text-[9px] font-bold text-red-500 tracking-[0.12em] uppercase leading-none mt-0.5">{t("controlCenterLabel")}</p>
             </div>
           </div>

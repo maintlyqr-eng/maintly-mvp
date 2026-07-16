@@ -25,7 +25,7 @@ export async function POST(req: NextRequest) {
     mechanic_id: mechanicId,
     asset_id: null,
     from_admin: true,
-    sender_name: "Maintly Team",
+    sender_name: "MaintlyQR Team",
     sender_contact: "support@maintlyqr.com",
     body: body.trim(),
   });

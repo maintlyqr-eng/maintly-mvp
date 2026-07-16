@@ -88,7 +88,7 @@ export default function AssetPage() {
       <header className="bg-white border-b border-zinc-200 px-6 py-3 flex items-center justify-between">
         <div className="flex items-center gap-6">
           <div className="flex items-center gap-2">
-            <Image src="/images/qr-gear-real.png" alt="Maintly" width={32} height={32} className="object-contain" />
+            <Image src="/images/qr-gear-real.png" alt="MaintlyQR" width={32} height={32} className="object-contain" />
             <div>
               <span className="text-[16px] font-black tracking-tight leading-none">
                 <span className="text-zinc-900">MAIN</span><span className="text-red-600">TLY</span>
@@ -433,7 +433,7 @@ export default function AssetPage() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-[13px] font-bold text-zinc-900">Log in to my account</p>
-                    <p className="text-[11px] text-zinc-500">Already a Maintly mechanic? Log in and track this asset.</p>
+                    <p className="text-[11px] text-zinc-500">Already a MaintlyQR mechanic? Log in and track this asset.</p>
                   </div>
                   <ChevronRight size={16} className="text-zinc-400 group-hover:text-red-600 shrink-0 transition-colors" />
                 </a>
@@ -448,7 +448,7 @@ export default function AssetPage() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-[13px] font-bold text-zinc-900">Create a free account</p>
-                    <p className="text-[11px] text-zinc-500">Register as a Maintly mechanic — free, takes 30 seconds.</p>
+                    <p className="text-[11px] text-zinc-500">Register as a MaintlyQR mechanic — free, takes 30 seconds.</p>
                   </div>
                   <ChevronRight size={16} className="text-zinc-400 group-hover:text-zinc-700 shrink-0 transition-colors" />
                 </a>

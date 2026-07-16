@@ -1,6 +1,6 @@
 // Personalization presets for printable QR codes (dashboard/qr-codes).
 // Each theme is a full qr-code-styling config: dot shape/color, corner
-// shape/color, background, and whether to embed the Maintly gear logo in
+// shape/color, background, and whether to embed the MaintlyQR gear logo in
 // the center. Stored per-code as `qr_codes.theme` (see migration 017) so a
 // mechanic can change a code's look at any time without regenerating it —
 // the underlying data the QR encodes (the code itself) never changes.
@@ -78,8 +78,8 @@ export const qrThemes: QrThemeDef[] = [
   },
   {
     id: "maintly-red",
-    name: "Maintly Red",
-    description: "Brand red modules with the Maintly gear in the center.",
+    name: "MaintlyQR Red",
+    description: "Brand red modules with the MaintlyQR gear in the center.",
     category: "professional",
     options: {
       dotsColor: "#dc2626", dotsType: "rounded", backgroundColor: "#ffffff",
@@ -101,7 +101,7 @@ export const qrThemes: QrThemeDef[] = [
   {
     id: "outline-gear",
     name: "Outline Gear",
-    description: "Rounded, chunky modules styled after the Maintly gear, with the logo front and center.",
+    description: "Rounded, chunky modules styled after the MaintlyQR gear, with the logo front and center.",
     category: "professional",
     options: {
       dotsColor: "#27272a", dotsType: "classy-rounded", backgroundColor: "#ffffff",

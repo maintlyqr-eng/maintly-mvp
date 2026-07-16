@@ -101,14 +101,14 @@ export default function ReportIssueModal({
               <CheckCircle2 size={32} className="text-green-600" />
             </div>
             <h4 className="text-[18px] font-black text-zinc-900 mb-1">Thanks for letting us know!</h4>
-            <p className="text-[13px] text-zinc-500 mb-6">Your report was sent to the Maintly team. We'll review it shortly.</p>
+            <p className="text-[13px] text-zinc-500 mb-6">Your report was sent to the MaintlyQR team. We'll review it shortly.</p>
             <button onClick={onClose} className="w-full bg-zinc-900 hover:bg-zinc-800 text-white font-bold py-3 rounded-xl text-[13px] transition-colors">
               Done
             </button>
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="p-6 space-y-4">
-            <p className="text-[13px] text-zinc-500">Found something incorrect, or have a question about this piece of equipment? Let us know and the Maintly team will look into it.</p>
+            <p className="text-[13px] text-zinc-500">Found something incorrect, or have a question about this piece of equipment? Let us know and the MaintlyQR team will look into it.</p>
 
             <div>
               <label className="text-[11px] font-bold text-zinc-500 uppercase tracking-widest mb-1.5 block">Type of report</label>
