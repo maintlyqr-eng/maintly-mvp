@@ -127,8 +127,6 @@ export default function DashboardPage() {
   const [recentActivity, setRecentActivity] = useState<ActivityItem[]>([]);
   const [assetCarouselPage, setAssetCarouselPage] = useState(0);
 
-
-
   // ── Top search bar ──
   const [searchQuery, setSearchQuery] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
@@ -669,32 +667,36 @@ export default function DashboardPage() {
 
         <div className="flex-1 overflow-y-auto p-4 md:p-5">
 
-          {/* ── Action buttons ── */}
-          <div className="flex justify-end items-center gap-3 mb-4 -mt-2">
-            <Link
-              href="/dashboard/services?new=1"
-              className="flex items-center gap-2 border border-red-200 bg-white hover:bg-red-50 active:scale-[0.98] transition-all text-red-600 text-[13px] font-bold px-4 py-[10px] rounded-xl shadow-sm"
-            >
-              <Wrench size={15} /> {t("addService")} <ChevronDown size={13} className="opacity-60" />
-            </Link>
-            <button
-              onClick={() => setAddStep("choose")}
-              className="flex items-center gap-2 bg-red-600 hover:bg-red-500 active:scale-[0.98] transition-all text-white text-[13px] font-bold px-4 py-[10px] rounded-xl shadow-sm"
-            >
-              <Box size={15} /> {t("addEquipment")} <ChevronDown size={13} className="opacity-70" />
-            </button>
-          </div>
-
           {/* ── "Tus prioridades de hoy" ── the most urgent 3 reminders
               (overdue first, then soonest-due), same merged services+tasks
               list already powering "Próximos Recordatorios" below — plus a
-              permanent 4th card linking straight to the full calendar. */}
-          <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm p-4 mb-4">
-            <div className="flex items-center gap-2 mb-3">
-              <h2 className="text-[14px] font-black text-zinc-900">{t("todaysPriorities")}</h2>
-              {priorityItems.length > 0 && (
-                <span className="bg-red-600 text-white text-[10px] font-black rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">{priorityItems.length}</span>
-              )}
+              permanent 4th card linking straight to the full calendar.
+              Facu (16 jul 2026): the "Agregar Servicio"/"Agregar Equipo"
+              buttons used to sit alone on their own empty row above this
+              card — folded them into this card's header line instead, so
+              that dead strip of whitespace is gone. */}
+          <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm p-4 mb-3">
+            <div className="flex items-center justify-between gap-3 mb-3">
+              <div className="flex items-center gap-2">
+                <h2 className="text-[14px] font-black text-zinc-900">{t("todaysPriorities")}</h2>
+                {priorityItems.length > 0 && (
+                  <span className="bg-red-600 text-white text-[10px] font-black rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">{priorityItems.length}</span>
+                )}
+              </div>
+              <div className="flex items-center gap-2.5 shrink-0">
+                <Link
+                  href="/dashboard/services?new=1"
+                  className="flex items-center gap-1.5 border border-red-200 bg-white hover:bg-red-50 active:scale-[0.98] transition-all text-red-600 text-[12px] font-bold px-3 py-[7px] rounded-xl shadow-sm"
+                >
+                  <Wrench size={13} /> {t("addService")} <ChevronDown size={11} className="opacity-60" />
+                </Link>
+                <button
+                  onClick={() => setAddStep("choose")}
+                  className="flex items-center gap-1.5 bg-red-600 hover:bg-red-500 active:scale-[0.98] transition-all text-white text-[12px] font-bold px-3 py-[7px] rounded-xl shadow-sm"
+                >
+                  <Box size={13} /> {t("addEquipment")} <ChevronDown size={11} className="opacity-70" />
+                </button>
+              </div>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
               {priorityItems.map((item) => {
@@ -737,10 +739,15 @@ export default function DashboardPage() {
           </div>
 
           {/* ── "Estado de tu mantenimiento" (gauge) + "Resumen rápido" + "Próximos Recordatorios" ── */}
-          <div className="grid grid-cols-1 lg:grid-cols-[1.1fr_1fr_1fr] gap-4 mb-4">
+          {/* Facu (16 jul 2026): "todo está dividido por rectángulos y entre
+              ellos hay espacios" — these 3 used to be separate white cards
+              with a gap between each (their own border+shadow+rounded
+              corners apiece). Merged into one card with thin internal
+              dividers instead, so it reads as one unit, not three. */}
+          <div className="grid grid-cols-1 lg:grid-cols-[1.1fr_1fr_1fr] divide-y lg:divide-y-0 lg:divide-x divide-zinc-100 bg-white rounded-2xl border border-zinc-200 shadow-sm mb-3">
 
-            <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm p-4">
-              <h3 className="text-[13px] font-black text-zinc-900 mb-4">{t("maintenanceHealth")}</h3>
+            <div className="p-4">
+              <h3 className="text-[13px] font-black text-zinc-900 mb-3">{t("maintenanceHealth")}</h3>
               <div className="flex items-center gap-4">
                 <div className="relative w-[96px] h-[96px] shrink-0">
                   <svg viewBox="0 0 120 120" className="w-full h-full -rotate-90">
@@ -776,8 +783,8 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm p-4">
-              <h3 className="text-[13px] font-black text-zinc-900 mb-4">{t("quickSummary")}</h3>
+            <div className="p-4">
+              <h3 className="text-[13px] font-black text-zinc-900 mb-3">{t("quickSummary")}</h3>
               <div className="grid grid-cols-2 gap-3">
                 {resumenTiles.map(({ id, value, caption, icon: Icon, color }) => (
                   <div key={id} className="rounded-xl border border-zinc-100 bg-zinc-50/60 p-3">
@@ -791,7 +798,7 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm p-4">
+            <div className="p-4">
               <div className="flex items-center justify-between mb-3">
                 <h3 className="text-[13px] font-black text-zinc-900">{t("upcomingReminders")}</h3>
                 <Link href="/dashboard/services" className="text-[11px] font-semibold text-red-600 hover:text-red-700">{t("viewAll")}</Link>
@@ -824,11 +831,12 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {/* ── "Tus activos" carousel + "Actividad reciente" ── */}
-          <div className="grid grid-cols-1 lg:grid-cols-[1.6fr_1fr] gap-4 mb-4">
+          {/* ── "Tus activos" carousel + "Actividad reciente" ── same
+              merge-into-one-card treatment as the row above. */}
+          <div className="grid grid-cols-1 lg:grid-cols-[1.6fr_1fr] divide-y lg:divide-y-0 lg:divide-x divide-zinc-100 bg-white rounded-2xl border border-zinc-200 shadow-sm mb-3">
 
-            <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm p-4">
-              <div className="flex items-center justify-between mb-4">
+            <div className="p-4">
+              <div className="flex items-center justify-between mb-3">
                 <h3 className="text-[13px] font-black text-zinc-900">{t("yourAssets")}</h3>
                 <Link href="/dashboard/assets" className="text-[11px] font-semibold text-red-600 hover:text-red-700">{t("viewAll")}</Link>
               </div>
@@ -882,7 +890,7 @@ export default function DashboardPage() {
               )}
             </div>
 
-            <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm p-4">
+            <div className="p-4">
               <div className="flex items-center justify-between mb-3">
                 <h3 className="text-[13px] font-black text-zinc-900">{t("recentActivity")}</h3>
               </div>
