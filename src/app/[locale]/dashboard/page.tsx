@@ -434,7 +434,10 @@ export default function DashboardPage() {
     { label: t("statTotalServices"), value: String(totalServices), up: true,  icon: CalendarIcon, color: "bg-red-50 text-red-500"   },
     { label: t("statTotalAssets"),   value: String(totalAssets),   up: true,  icon: Box,          color: "bg-blue-50 text-blue-500"  },
     { label: t("statCompleted"),     value: String(totalServices), up: true,  icon: CheckCircle2, color: "bg-green-50 text-green-500" },
-    { label: t("statPending"),       value: "0",                   up: true,  icon: Clock,        color: "bg-amber-50 text-amber-500" },
+    // Was hardcoded to "0" -- never wired to anything. Now it's the same
+    // count shown in "Próximos Recordatorios" right below: reminders +
+    // calendar tasks that are due soon or already overdue.
+    { label: t("statPending"),       value: String(reminders.length), up: true,  icon: Clock,        color: "bg-amber-50 text-amber-500" },
   ];
 
   const CAL_MONTH_LABELS = [
