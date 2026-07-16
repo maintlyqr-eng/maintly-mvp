@@ -383,23 +383,18 @@
   },
   "PricingPage": {
     "eyebrow": "Preços",
-    "title": "Perfis simples e honestos.",
-    "subtitle": "Sem níveis para comparar, sem taxas ocultas. Apenas duas formas de usar a Maintly.",
+    "title": "Grátis. Para sempre.",
+    "subtitle": "Sem planos, sem níveis, sem cartão de crédito. Todos os recursos do MaintlyQR são grátis para cada Maintler — sempre.",
     "freeTitle": "Grátis",
     "freeForever": "para sempre",
     "freeItem1": "Escaneie e veja o histórico de qualquer máquina — sem necessidade de conta",
     "freeItem2": "Cadastro grátis como Maintler",
     "freeItem3": "Registre serviços ilimitados",
     "freeItem4": "Adicione máquinas à sua oficina",
+    "freeItem5": "Selo de verificado para profissionais — também grátis",
     "getStartedFree": "Comece Grátis",
-    "comingSoon": "Em Breve",
-    "verifiedTitle": "Maintler Verificado",
-    "askUs": "Fale conosco",
-    "verifiedItem1": "Tudo do plano Grátis",
-    "verifiedItem2": "Selo de verificado em cada serviço registrado",
-    "verifiedItem3": "Credibilidade extra com os clientes",
-    "verifiedItem4": "Suporte prioritário",
-    "getNotified": "Avise-me"
+    "sustainabilityTitle": "Como vamos manter isso funcionando",
+    "sustainabilityText": "O MaintlyQR nunca vai cobrar de você ou da sua equipe para usá-lo. No futuro, podemos explorar formas de sustentar o projeto, como parcerias publicitárias — mas isso nunca vai significar cobrar dos Maintlers."
   },
   "ResourcesPage": {
     "eyebrow": "Recursos",

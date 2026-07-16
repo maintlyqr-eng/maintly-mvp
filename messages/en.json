@@ -383,23 +383,18 @@
   },
   "PricingPage": {
     "eyebrow": "Pricing",
-    "title": "Simple, honest profiles.",
-    "subtitle": "No tiers to compare, no hidden fees. Just two ways to use Maintly.",
+    "title": "Free. Always will be.",
+    "subtitle": "No plans, no tiers, no credit card. Every feature on MaintlyQR is free for every Maintler — always.",
     "freeTitle": "Free",
     "freeForever": "forever",
     "freeItem1": "Scan and view any machine's history — no account needed",
     "freeItem2": "Free registration as a Maintler",
     "freeItem3": "Log unlimited services",
     "freeItem4": "Add machines to your workshop",
+    "freeItem5": "Verified badge for professionals — also free",
     "getStartedFree": "Get Started Free",
-    "comingSoon": "Coming Soon",
-    "verifiedTitle": "Verified Maintler",
-    "askUs": "Ask us",
-    "verifiedItem1": "Everything in Free",
-    "verifiedItem2": "Verified badge on every service you log",
-    "verifiedItem3": "Extra credibility with customers",
-    "verifiedItem4": "Priority support",
-    "getNotified": "Get Notified"
+    "sustainabilityTitle": "How we'll keep this running",
+    "sustainabilityText": "MaintlyQR will never charge you or your team to use it. Down the road we may explore ways to support the project, like advertising partnerships — but that will never mean fees for Maintlers."
   },
   "ResourcesPage": {
     "eyebrow": "Resources",
