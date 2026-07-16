@@ -728,7 +728,10 @@
     "emptyThread": "Any question or issue — write it below and the team will reply right here.",
     "you": "You",
     "typeAMessage": "Type a message…",
-    "errorSend": "Couldn't send your message. Try again."
+    "errorSend": "Couldn't send your message. Try again.",
+    "needHelpTitle": "Need help?",
+    "needHelpDesc": "Our team is ready to help you.",
+    "chatWithSupport": "Chat with Support"
   },
   "DashboardMessagesPage": {
     "title": "Messages",

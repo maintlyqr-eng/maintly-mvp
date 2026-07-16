@@ -676,7 +676,7 @@ export default function DashboardPage() {
               buttons used to sit alone on their own empty row above this
               card — folded them into this card's header line instead, so
               that dead strip of whitespace is gone. */}
-          <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm p-3.5 mb-2">
+          <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm p-3.5 mb-1.5">
             {/* flex-col on phones, side-by-side from sm: up — on a narrow
                 screen, a title + 2 buttons on one "justify-between" row
                 either overflowed the card or squished the buttons down to
@@ -764,7 +764,7 @@ export default function DashboardPage() {
               with a gap between each (their own border+shadow+rounded
               corners apiece). Merged into one card with thin internal
               dividers instead, so it reads as one unit, not three. */}
-          <div className="grid grid-cols-1 lg:grid-cols-[1.1fr_1fr_1fr] divide-y lg:divide-y-0 lg:divide-x divide-zinc-100 bg-white rounded-2xl border border-zinc-200 shadow-sm mb-2">
+          <div className="grid grid-cols-1 lg:grid-cols-[1.1fr_1fr_1fr] divide-y lg:divide-y-0 lg:divide-x divide-zinc-100 bg-white rounded-2xl border border-zinc-200 shadow-sm mb-1.5">
 
             <div className="p-3.5">
               <h3 className="text-[13px] font-black text-zinc-900 mb-3">{t("maintenanceHealth")}</h3>
@@ -863,7 +863,7 @@ export default function DashboardPage() {
 
           {/* ── "Tus activos" carousel + "Actividad reciente" ── same
               merge-into-one-card treatment as the row above. */}
-          <div className="grid grid-cols-1 lg:grid-cols-[1.6fr_1fr] divide-y lg:divide-y-0 lg:divide-x divide-zinc-100 bg-white rounded-2xl border border-zinc-200 shadow-sm mb-2">
+          <div className="grid grid-cols-1 lg:grid-cols-[1.6fr_1fr] divide-y lg:divide-y-0 lg:divide-x divide-zinc-100 bg-white rounded-2xl border border-zinc-200 shadow-sm mb-1.5">
 
             <div className="p-3.5">
               <div className="flex items-center justify-between mb-3">

@@ -90,7 +90,15 @@ export default function DashboardSidebarIntl({
           </button>
         </div>
 
-        <nav className="flex-1 px-3 overflow-y-auto">
+        {/* Facu (16 jul 2026): this used to be `flex-1`, which forced the
+            nav to stretch and fill all the leftover vertical space in the
+            sidebar — pushing the support card + profile footer all the way
+            down to the bottom edge with a big empty gap in between, even on
+            a short nav list. Sized to content instead, so the support card
+            sits right under the last nav item where there's actual room,
+            not stranded at the bottom. `overflow-y-auto` stays as a safety
+            net if the nav list ever grows past the viewport. */}
+        <nav className="px-3 overflow-y-auto">
           {navItems.map((item) => (
             <Link
               key={item.key}

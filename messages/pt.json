@@ -728,7 +728,10 @@
     "emptyThread": "Qualquer dúvida ou problema — escreva abaixo e a equipe responderá bem aqui.",
     "you": "Você",
     "typeAMessage": "Digite uma mensagem…",
-    "errorSend": "Não foi possível enviar sua mensagem. Tente novamente."
+    "errorSend": "Não foi possível enviar sua mensagem. Tente novamente.",
+    "needHelpTitle": "Precisa de ajuda?",
+    "needHelpDesc": "Nossa equipe está pronta para ajudar você.",
+    "chatWithSupport": "Chat de Suporte"
   },
   "DashboardMessagesPage": {
     "title": "Mensagens",

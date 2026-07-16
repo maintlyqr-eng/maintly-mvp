@@ -128,23 +128,39 @@ export default function ContactSupportWidgetIntl({ mechanicId, variant = "sideba
             <span className="absolute -top-1 -right-1 bg-white text-red-600 text-[10px] font-black rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1 border-2 border-red-600">{unreadCount}</span>
           )}
         </button>
-      ) : (
+      ) : isInline ? (
         <button
           onClick={openWidget}
-          className={
-            isInline
-              ? "relative flex items-center gap-2 border border-zinc-200 bg-gradient-to-br from-zinc-100 via-white to-zinc-200 hover:to-zinc-300 active:scale-[0.98] transition-all text-zinc-700 text-[13px] font-bold px-4 py-[10px] rounded-xl shadow-sm"
-              : "relative w-[calc(100%-24px)] mx-3 mb-3 flex items-center gap-2.5 px-3.5 py-3 rounded-xl bg-gradient-to-br from-zinc-100 via-white to-zinc-200 hover:to-zinc-300 border border-zinc-200/80 text-zinc-800 text-[13px] font-bold transition-all shadow-sm"
-          }
+          className="relative flex items-center gap-2 border border-zinc-200 bg-gradient-to-br from-zinc-100 via-white to-zinc-200 hover:to-zinc-300 active:scale-[0.98] transition-all text-zinc-700 text-[13px] font-bold px-4 py-[10px] rounded-xl shadow-sm"
         >
-          <div className={`rounded-lg bg-red-600 flex items-center justify-center shrink-0 ${isInline ? "w-5 h-5" : "w-7 h-7"}`}>
-            <LifeBuoy size={isInline ? 11 : 14} className="text-white" />
+          <div className="rounded-lg bg-red-600 flex items-center justify-center shrink-0 w-5 h-5">
+            <LifeBuoy size={11} className="text-white" />
           </div>
           {t("contactSupport")}
           {unreadCount > 0 && (
-            <span className={`bg-red-600 text-white text-[9px] font-black rounded-full min-w-[16px] h-4 flex items-center justify-center px-1 ${isInline ? "" : "ml-auto"}`}>{unreadCount}</span>
+            <span className="bg-red-600 text-white text-[9px] font-black rounded-full min-w-[16px] h-4 flex items-center justify-center px-1">{unreadCount}</span>
           )}
         </button>
+      ) : (
+        // Facu (16 jul 2026): "le damos más calidez... no quiero que sea
+        // tan frío" — this used to be a single flat gray-gradient button
+        // ("Contactar Soporte"). Rebuilt as the warmer card from his own
+        // mockup: a heading + a line of reassurance, then the button, on a
+        // soft warm tint instead of cold zinc gray.
+        <div className="mx-3 mb-3 mt-2 rounded-2xl bg-gradient-to-br from-red-50 to-orange-50 border border-red-100/80 p-3.5">
+          <p className="text-[12.5px] font-black text-zinc-900 leading-tight">{t("needHelpTitle")}</p>
+          <p className="text-[10.5px] text-zinc-500 leading-snug mt-1 mb-2.5">{t("needHelpDesc")}</p>
+          <button
+            onClick={openWidget}
+            className="relative w-full flex items-center justify-center gap-2 bg-white hover:bg-red-50 active:scale-[0.98] border border-red-200 text-red-600 text-[12px] font-bold px-3 py-2.5 rounded-xl transition-all shadow-sm"
+          >
+            <LifeBuoy size={13} />
+            {t("chatWithSupport")}
+            {unreadCount > 0 && (
+              <span className="absolute -top-1.5 -right-1.5 bg-red-600 text-white text-[9px] font-black rounded-full min-w-[16px] h-4 flex items-center justify-center px-1 border-2 border-white">{unreadCount}</span>
+            )}
+          </button>
+        </div>
       )}
 
       {open && mounted && createPortal(
