@@ -4,11 +4,11 @@ import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useTranslations, useLocale } from "next-intl";
+import { useTranslations } from "next-intl";
 import {
-  Box, QrCode, Search, MoreVertical,
-  CheckCircle2, Clock, ChevronLeft, ChevronRight, ChevronDown,
-  Wrench, FileText, ClipboardList,
+  Box, QrCode, Search,
+  CheckCircle2, Clock, ChevronDown,
+  Wrench, ClipboardList,
   AlertCircle, ArrowRight, CalendarClock, Lightbulb, TrendingUp, Heart,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
@@ -20,8 +20,6 @@ import { getUnitKind } from "@/lib/units";
 import ContactSupportWidgetIntl from "@/components/ContactSupportWidgetIntl";
 import DashboardSidebarIntl from "@/components/DashboardSidebarIntl";
 import DashboardHeaderIntl from "@/components/DashboardHeaderIntl";
-import CalendarDayCellIntl, { type DayInfo } from "@/components/CalendarDayCellIntl";
-import { buildMonthGridMondayFirst } from "@/lib/calendarGrid";
 import AddAssetChooserIntl from "@/components/AddAssetChooserIntl";
 import NewAssetModalIntl from "@/components/NewAssetModalIntl";
 import LinkExistingAssetModalIntl from "@/components/LinkExistingAssetModalIntl";
@@ -39,36 +37,6 @@ const SERVICE_TYPE_KEYS: Record<string, string> = {
   "Oil Change": "oilChange", "Service": "service", "Repair": "repair",
   "Inspection": "inspection", "Filter Change": "filterChange",
   "Tire Change": "tireChange", "Brake Service": "brakeService", "Other": "other",
-};
-
-const typeColors: Record<string, string> = {
-  "Oil Change":    "bg-amber-100 text-amber-700",
-  Service:         "bg-blue-100 text-blue-700",
-  Repair:          "bg-red-100 text-red-700",
-  Inspection:      "bg-purple-100 text-purple-700",
-  "Filter Change": "bg-green-100 text-green-700",
-  "Tire Change":   "bg-cyan-100 text-cyan-700",
-  "Brake Service": "bg-orange-100 text-orange-700",
-};
-
-const DATE_LOCALE: Record<string, string> = { en: "en-US", es: "es-AR", pt: "pt-BR" };
-
-type AssetInfo = {
-  brand: string | null;
-  model: string | null;
-  nickname: string | null;
-  asset_type: string;
-  vin_serial: string | null;
-};
-
-type RealService = {
-  id: string;
-  service_date: string;
-  service_type: string;
-  km_hours: number | null;
-  notes: string | null;
-  asset_id: string;
-  assets: AssetInfo | AssetInfo[] | null;
 };
 
 // "kind" distinguishes the two very different things that both end up in
@@ -144,7 +112,6 @@ export default function DashboardPage() {
   const router = useRouter();
   const t = useTranslations("DashboardHomePage");
   const tServiceTypes = useTranslations("ServiceTypes");
-  const locale = useLocale();
   const [authChecked, setAuthChecked] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [mechanicId, setMechanicId] = useState("");
@@ -156,7 +123,6 @@ export default function DashboardPage() {
   const [maintlerCode, setMaintlerCode] = useState("");
   const [totalServices, setTotalServices] = useState(0);
   const [totalAssets, setTotalAssets] = useState(0);
-  const [realServices, setRealServices] = useState<RealService[]>([]);
   const [reminders, setReminders] = useState<ReminderItem[]>([]);
   const [assetCards, setAssetCards] = useState<AssetCardInfo[]>([]);
   const [recentActivity, setRecentActivity] = useState<ActivityItem[]>([]);
@@ -173,16 +139,6 @@ export default function DashboardPage() {
     return getUnitKind(assetType) === "horas" ? t("unitShortHours") : t("unitShortKm");
   }
 
-  function unitValue(value: number | null | undefined, assetType: string | null | undefined) {
-    if (value == null) return "—";
-    return `${value.toLocaleString()} ${unitShort(assetType)}`;
-  }
-
-  // ── Mini calendar widget ──
-  const [calViewDate, setCalViewDate] = useState(() => new Date());
-  const [calServices, setCalServices] = useState<{ date: string; label: string; type: string }[]>([]);
-  const [calReminders, setCalReminders] = useState<{ date: string; status: ReminderStatus; label: string; type: string }[]>([]);
-  const [calTasks, setCalTasks] = useState<{ date: string; done: boolean; title: string }[]>([]);
 
   // ── Top search bar ──
   const [searchQuery, setSearchQuery] = useState("");
@@ -216,14 +172,13 @@ export default function DashboardPage() {
       setMechanicId(session.user.id);
       setMechanicEmail(session.user.email ?? "");
 
-      // These 9 queries are all independent (none depends on another's
+      // These 8 queries are all independent (none depends on another's
       // result), so they're fired concurrently instead of one after another
       // — page load time is now bounded by the slowest single query instead
       // of the sum of all of them.
       const [
         { data: mechanic },
         { count: assetCount },
-        { data: svcs },
         { count: svcCount },
         { data: remRows },
         { data: kmRows },
@@ -233,13 +188,6 @@ export default function DashboardPage() {
       ] = await Promise.all([
         supabase.from("mechanics").select("name, photo_url, maintler_code").eq("id", session.user.id).single(),
         supabase.from("mechanic_assets").select("*", { count: "exact", head: true }).eq("mechanic_id", session.user.id),
-        supabase
-          .from("service_records")
-          .select("id, service_date, service_type, km_hours, notes, asset_id, assets(brand, model, nickname, asset_type, vin_serial)")
-          .eq("mechanic_id", session.user.id)
-          .is("deleted_at", null)
-          .order("service_date", { ascending: false })
-          .limit(6),
         supabase.from("service_records").select("*", { count: "exact", head: true }).eq("mechanic_id", session.user.id).is("deleted_at", null),
         supabase
           .from("service_records")
@@ -259,7 +207,7 @@ export default function DashboardPage() {
           .eq("mechanic_id", session.user.id)
           .is("deleted_at", null)
           .order("service_date", { ascending: false })
-          .limit(3000), // dashboard calendar dots only — bounds payload for very long-tenured accounts
+          .limit(3000), // feeds "last service per asset" + the activity feed — bounds payload for very long-tenured accounts
         supabase
           .from("calendar_tasks")
           .select("id, task_date, done, title")
@@ -274,7 +222,6 @@ export default function DashboardPage() {
 
       if (mechanic) { setMechanicName(mechanic.name); setMechanicPhoto(mechanic.photo_url ?? ""); setMaintlerCode(mechanic.maintler_code ?? ""); }
       setTotalAssets(assetCount ?? 0);
-      setRealServices((svcs as unknown as RealService[]) ?? []);
       setTotalServices(svcCount ?? 0);
 
       // ── Upcoming reminders ──
@@ -319,29 +266,6 @@ export default function DashboardPage() {
         .sort((a, b) => (a.status === "overdue" ? 0 : 1) - (b.status === "overdue" ? 0 : 1));
 
       setReminders(reminderItems);
-
-      // ── Mini calendar widget: full detail for every date-based reminder
-      // (any status), every service's date, and every planned task — so
-      // hovering a day shows exactly what's going on, not just a count.
-      // Tasks are NOT included here on purpose: they're already tracked
-      // separately below via setCalTasks and rendered with their own dot by
-      // CalendarDayCellIntl, so adding them here too would double them up
-      // on the mini calendar. ──
-      setCalReminders(
-        allReminderItems
-          .filter((i): i is ReminderItem & { next_due_date: string } => !!i.next_due_date)
-          .map((i) => ({ date: i.next_due_date, status: i.status, label: i.assetLabel, type: i.serviceType ?? "" }))
-      );
-
-      setCalServices(
-        ((allSvcRows ?? []) as any[]).map((r) => {
-          const a = Array.isArray(r.assets) ? r.assets[0] : r.assets;
-          const label = a?.nickname || [a?.brand, a?.model].filter(Boolean).join(" ") || t("unknownAsset");
-          return { date: r.service_date, label, type: r.service_type };
-        })
-      );
-
-      setCalTasks(((taskRowsForCal ?? []) as any[]).map((r) => ({ date: r.task_date, done: r.done, title: r.title })));
 
       // ── Full asset list, for the top search bar (assets + QR codes) ──
       const searchList: SearchAsset[] = ((assetRows ?? []) as any[])
@@ -637,38 +561,6 @@ export default function DashboardPage() {
       color: "bg-green-50 text-green-500",
     },
   ];
-
-  const CAL_MONTH_LABELS = [
-    t("monthJanuary"), t("monthFebruary"), t("monthMarch"), t("monthApril"), t("monthMay"), t("monthJune"),
-    t("monthJuly"), t("monthAugust"), t("monthSeptember"), t("monthOctober"), t("monthNovember"), t("monthDecember"),
-  ];
-  const calendarMonth = `${CAL_MONTH_LABELS[calViewDate.getMonth()]} ${calViewDate.getFullYear()}`;
-  const calendarGrid = buildMonthGridMondayFirst(calViewDate.getFullYear(), calViewDate.getMonth());
-
-  const WEEKDAY_LABELS = [
-    t("weekdayMon"), t("weekdayTue"), t("weekdayWed"), t("weekdayThu"), t("weekdayFri"), t("weekdaySat"), t("weekdaySun"),
-  ];
-
-  const calActivityByDate: Record<string, DayInfo> = {};
-  function ensureCalDay(k: string): DayInfo {
-    return (calActivityByDate[k] ??= { services: [], tasks: [], reminders: [] });
-  }
-  for (const s of calServices) ensureCalDay(s.date).services.push({ label: s.label, type: s.type });
-  for (const r of calReminders) ensureCalDay(r.date).reminders.push({ label: r.label, type: r.type, status: r.status });
-  for (const task of calTasks) ensureCalDay(task.date).tasks.push({ title: task.title, done: task.done });
-
-  function calDotColor(info?: DayInfo) {
-    if (!info) return null;
-    const overdue = info.reminders.some((r) => r.status === "overdue");
-    const dueSoon = info.reminders.some((r) => r.status === "due_soon");
-    const openTasks = info.tasks.some((t2) => !t2.done);
-    if (overdue) return "bg-red-500";
-    if (dueSoon) return "bg-amber-500";
-    if (openTasks) return "bg-blue-500";
-    if (info.services.length > 0) return "bg-emerald-500";
-    if (info.reminders.length > 0) return "bg-zinc-300";
-    return null;
-  }
 
   // ── Top search bar, rendered inside DashboardHeaderIntl's extraHeaderContent
   // slot — this is the one bit of header markup unique to this page (no
@@ -1024,158 +916,13 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 xl:grid-cols-[1fr_320px] gap-5">
-
-            {/* ── LEFT COLUMN ── */}
-            <div>
-              <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm p-5">
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-[15px] font-black text-zinc-900">{t("recentServices")}</h2>
-                  <Link href="/dashboard/services" className="text-[12px] font-semibold text-zinc-500 hover:text-zinc-800 border border-zinc-200 rounded-lg px-3 py-[6px] transition-colors">{t("viewAll")}</Link>
-                </div>
-
-                {realServices.length === 0 ? (
-                  <div className="text-center py-10">
-                    <p className="text-[13px] text-zinc-400 mb-3">{t("noServicesYet")}</p>
-                    <Link href="/dashboard/services?new=1" className="text-[12px] font-bold text-red-600 hover:text-red-700">{t("logFirstService")}</Link>
-                  </div>
-                ) : (
-                  <div className="overflow-x-auto -mx-5 px-5">
-                  <table className="w-full min-w-[560px]">
-                    <thead>
-                      <tr className="text-left text-[10px] text-zinc-400 font-bold uppercase">
-                        <th className="pb-2 font-bold">{t("columnAsset")}</th>
-                        <th className="pb-2 font-bold">{t("columnServiceType")}</th>
-                        <th className="pb-2 font-bold">{t("columnDate")}</th>
-                        <th className="pb-2 font-bold">{t("columnReading")}</th>
-                        <th className="pb-2 font-bold">{t("columnStatus")}</th>
-                        <th className="pb-2"></th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {realServices.map((s) => {
-                        const asset = Array.isArray(s.assets) ? s.assets[0] ?? null : (s.assets as AssetInfo | null);
-                        const img = asset ? assetTypeImg[asset.asset_type] ?? "/images/car.png" : "/images/car.png";
-                        const label = asset?.nickname || [asset?.brand, asset?.model].filter(Boolean).join(" ") || t("unknownAsset");
-                        return (
-                          <tr key={s.id} className="border-t border-zinc-100">
-                            <td className="py-3 pr-3">
-                              <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-lg bg-zinc-50 border border-zinc-100 flex items-center justify-center shrink-0 overflow-hidden">
-                                  <Image src={img} alt={label} width={32} height={32} className="object-contain" />
-                                </div>
-                                <div>
-                                  <p className="text-[12.5px] font-bold text-zinc-800 leading-tight">{label}</p>
-                                  <p className="text-[10px] text-zinc-400 leading-tight font-mono">{asset?.vin_serial ?? "—"}</p>
-                                </div>
-                              </div>
-                            </td>
-                            <td className="py-3 pr-3">
-                              <span className={`text-[10.5px] font-semibold px-2 py-[3px] rounded-full ${typeColors[s.service_type] ?? "bg-zinc-100 text-zinc-700"}`}>{tServiceTypes(SERVICE_TYPE_KEYS[s.service_type] ?? "other")}</span>
-                            </td>
-                            <td className="py-3 pr-3 text-[12px] text-zinc-700">{formatDateDMY(s.service_date)}</td>
-                            <td className="py-3 pr-3 text-[12px] text-zinc-700 font-medium">{unitValue(s.km_hours, asset?.asset_type)}</td>
-                            <td className="py-3 pr-3">
-                              <span className="flex items-center gap-1 text-[11px] font-semibold text-green-600">
-                                <CheckCircle2 size={12} /> {t("completed")}
-                              </span>
-                            </td>
-                            <td className="py-3 text-right">
-                              <button className="text-zinc-300 hover:text-zinc-600 transition-colors"><MoreVertical size={15} /></button>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* ── RIGHT COLUMN ── ("Próximos Recordatorios" now lives in the
-                new gauge/resumen/reminders row above this, not duplicated here) */}
-            <div className="space-y-5">
-
-              <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm p-5">
-                <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-[13px] font-black text-zinc-900">{t("calendar")}</h3>
-                  <Link href="/dashboard/calendar" className="text-[10px] font-bold text-red-600 hover:text-red-700">{t("viewAllArrow")}</Link>
-                </div>
-                <div className="flex items-center justify-between mb-3">
-                  <button
-                    onClick={() => setCalViewDate(new Date(calViewDate.getFullYear(), calViewDate.getMonth() - 1, 1))}
-                    className="text-zinc-400 hover:text-zinc-700"
-                  ><ChevronLeft size={16} /></button>
-                  <span className="text-[12px] font-bold text-zinc-700">{calendarMonth}</span>
-                  <button
-                    onClick={() => setCalViewDate(new Date(calViewDate.getFullYear(), calViewDate.getMonth() + 1, 1))}
-                    className="text-zinc-400 hover:text-zinc-700"
-                  ><ChevronRight size={16} /></button>
-                </div>
-                <div className="grid grid-cols-7 gap-1 text-center">
-                  {WEEKDAY_LABELS.map(d => (
-                    <span key={d} className="text-[8px] font-bold text-zinc-400 pb-1">{d}</span>
-                  ))}
-                  {calendarGrid.map((cell) => (
-                    <CalendarDayCellIntl
-                      key={cell.key}
-                      dateKey={cell.key}
-                      day={cell.day}
-                      inMonth={cell.inMonth}
-                      isToday={cell.isToday}
-                      dateLabel={new Date(cell.key + "T00:00:00").toLocaleDateString(DATE_LOCALE[locale] ?? "en-US", { weekday: "long", month: "short", day: "numeric" })}
-                      info={calActivityByDate[cell.key]}
-                      dotColor={calDotColor(calActivityByDate[cell.key])}
-                    />
-                  ))}
-                </div>
-              </div>
-
-              <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm p-5">
-                <h3 className="text-[13px] font-black text-zinc-900 mb-3">{t("quickAccess")}</h3>
-                <div className="space-y-2">
-                  <Link href="/dashboard/services" className="flex items-center gap-3 p-3 rounded-xl hover:bg-zinc-50 transition-colors">
-                    <div className="w-9 h-9 rounded-xl bg-red-50 flex items-center justify-center shrink-0">
-                      <FileText size={14} className="text-red-500" />
-                    </div>
-                    <div>
-                      <p className="text-[12px] font-bold text-zinc-800 leading-tight">{t("myServices")}</p>
-                      <p className="text-[10px] text-zinc-400">{t("recordsCount", { count: totalServices })}</p>
-                    </div>
-                  </Link>
-                  <Link href="/dashboard/assets" className="flex items-center gap-3 p-3 rounded-xl hover:bg-zinc-50 transition-colors">
-                    <div className="w-9 h-9 rounded-xl bg-blue-50 flex items-center justify-center shrink-0">
-                      <Box size={14} className="text-blue-500" />
-                    </div>
-                    <div>
-                      <p className="text-[12px] font-bold text-zinc-800 leading-tight">{t("assetsQrCodes")}</p>
-                      <p className="text-[10px] text-zinc-400">{t("assetsRegistered", { count: totalAssets })}</p>
-                    </div>
-                  </Link>
-                  <button
-                    onClick={() => setAddStep("existing")}
-                    className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-zinc-50 transition-colors text-left"
-                  >
-                    <div className="w-9 h-9 rounded-xl bg-purple-50 flex items-center justify-center shrink-0">
-                      <QrCode size={14} className="text-purple-500" />
-                    </div>
-                    <div>
-                      <p className="text-[12px] font-bold text-zinc-800 leading-tight">{t("linkExistingAsset")}</p>
-                      <p className="text-[10px] text-zinc-400">{t("scanOrEnterQr")}</p>
-                    </div>
-                  </button>
-                </div>
-              </div>
-
-              {/* "Tus Estadísticas" mini-sparkline widget removed here — it
-                  duplicated the exact same 4 numbers now shown in "Resumen
-                  rápido" above (plus a fake decorative sparkline that never
-                  reflected real history), so it was redundant rather than
-                  additive with the redesign. */}
-
-            </div>
-          </div>
+          {/* Facu (16 jul 2026): his reference mockup fits on one screen —
+              this dashboard doesn't need a duplicate "Servicios Recientes"
+              table, mini calendar, or quick-access list, since "Mis
+              Servicios" and "Calendario" already have their own pages in the
+              sidebar nav, and "Ver todos"/"Ver calendario completo" links
+              above already point there. Removed to match the mockup and cut
+              the extra scroll height. */}
 
           {/* "Tus logros" (achievements/gamification, the locked-badges
               strip in the mockup) is deliberately NOT here — Facu chose to
