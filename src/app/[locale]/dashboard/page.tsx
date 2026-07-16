@@ -7,7 +7,7 @@ import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import {
   Box, QrCode, Search,
-  CheckCircle2, Clock, ChevronDown,
+  CheckCircle2, Clock, ChevronDown, ChevronLeft, ChevronRight,
   Wrench, ClipboardList,
   AlertCircle, ArrowRight, CalendarClock, Lightbulb, TrendingUp, Heart,
 } from "lucide-react";
@@ -491,6 +491,7 @@ export default function DashboardPage() {
   }
 
   const priorityItems = reminders.slice(0, 3);
+  const assetTotalPages = Math.ceil(assetCards.length / 4);
 
   // "Actividad reciente" timestamps: service items only have a service_date
   // (day granularity, no time-of-day), scans have a full scanned_at
@@ -705,10 +706,25 @@ export default function DashboardPage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
               {priorityItems.map((item) => {
                 const overdue = item.status === "overdue";
+                // Facu (16 jul 2026): these used to be plain non-clickable
+                // divs with a decorative arrow that implied you could tap
+                // them — now they actually go somewhere. A "service" item
+                // deep-links into the add-service form for that exact asset
+                // (the services page already supports ?asset=&new=1, used
+                // by the header's own "Agregar Servicio" button), logging a
+                // new service is what actually clears the reminder. A
+                // "task" item goes to the Calendar, where it can be checked
+                // off (calendar_tasks.done) — there's no per-task deep link
+                // yet, so it lands on the full calendar rather than that
+                // one task pre-opened.
+                const itemHref = item.kind === "service" && item.assetId
+                  ? `/dashboard/services?asset=${item.assetId}&new=1`
+                  : "/dashboard/calendar";
                 return (
-                  <div
+                  <Link
                     key={`${item.kind}-${item.id}`}
-                    className={`rounded-xl border p-3 flex items-center gap-2.5 ${overdue ? "bg-red-50 border-red-200" : "bg-amber-50 border-amber-200"}`}
+                    href={itemHref}
+                    className={`rounded-xl border p-3 flex items-center gap-2.5 transition-colors ${overdue ? "bg-red-50 border-red-200 hover:border-red-300" : "bg-amber-50 border-amber-200 hover:border-amber-300"}`}
                   >
                     <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${overdue ? "bg-red-100 text-red-600" : "bg-amber-100 text-amber-600"}`}>
                       {overdue ? <AlertCircle size={15} /> : <Clock size={15} />}
@@ -724,7 +740,7 @@ export default function DashboardPage() {
                       </p>
                     </div>
                     <ArrowRight size={14} className="text-zinc-300 shrink-0" />
-                  </div>
+                  </Link>
                 );
               })}
               <Link
@@ -789,14 +805,21 @@ export default function DashboardPage() {
 
             <div className="p-3.5">
               <h3 className="text-[13px] font-black text-zinc-900 mb-3">{t("quickSummary")}</h3>
-              <div className="grid grid-cols-2 gap-3">
+              {/* Facu (16 jul 2026): each tile used to stack icon → value →
+                  caption vertically, which made this card one of the
+                  tallest on the page for not much information. Laid out
+                  horizontally (icon beside the number) instead — same 4
+                  numbers, roughly half the height. */}
+              <div className="grid grid-cols-2 gap-2">
                 {resumenTiles.map(({ id, value, caption, icon: Icon, color }) => (
-                  <div key={id} className="rounded-xl border border-zinc-100 bg-zinc-50/60 p-3">
-                    <div className={`w-7 h-7 rounded-lg flex items-center justify-center mb-2 ${color}`}>
+                  <div key={id} className="flex items-center gap-2 rounded-xl border border-zinc-100 bg-zinc-50/60 p-2">
+                    <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${color}`}>
                       <Icon size={13} />
                     </div>
-                    <p className="text-[17px] font-black text-zinc-900 leading-tight">{value}</p>
-                    <p className="text-[9.5px] font-semibold text-zinc-500 leading-snug mt-0.5">{caption}</p>
+                    <div className="min-w-0">
+                      <p className="text-[15px] font-black text-zinc-900 leading-tight">{value}</p>
+                      <p className="text-[9px] font-semibold text-zinc-500 leading-snug truncate">{caption}</p>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -813,8 +836,11 @@ export default function DashboardPage() {
                 <div className="space-y-2">
                   {reminders.slice(0, 4).map((r) => {
                     const overdue = r.status === "overdue";
+                    const rHref = r.kind === "service" && r.assetId
+                      ? `/dashboard/services?asset=${r.assetId}&new=1`
+                      : "/dashboard/calendar";
                     return (
-                      <div key={`${r.kind}-${r.id}`} className="flex items-center gap-2.5">
+                      <Link key={`${r.kind}-${r.id}`} href={rHref} className="flex items-center gap-2.5 -mx-1 px-1 py-0.5 rounded-lg hover:bg-zinc-50 transition-colors">
                         <div className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 ${overdue ? "bg-red-100 text-red-600" : "bg-amber-100 text-amber-600"}`}>
                           {overdue ? <AlertCircle size={13} /> : <Clock size={13} />}
                         </div>
@@ -827,7 +853,7 @@ export default function DashboardPage() {
                         <p className={`text-[10.5px] font-bold shrink-0 whitespace-nowrap ${overdue ? "text-red-600" : "text-amber-600"}`}>
                           {relativeDueLabel(r)}
                         </p>
-                      </div>
+                      </Link>
                     );
                   })}
                 </div>
@@ -842,7 +868,30 @@ export default function DashboardPage() {
             <div className="p-3.5">
               <div className="flex items-center justify-between mb-3">
                 <h3 className="text-[13px] font-black text-zinc-900">{t("yourAssets")}</h3>
-                <Link href="/dashboard/assets" className="text-[11px] font-semibold text-red-600 hover:text-red-700">{t("viewAll")}</Link>
+                <div className="flex items-center gap-2">
+                  {/* Facu (16 jul 2026): the page dots alone didn't make it
+                      obvious this grid pages sideways — added explicit
+                      prev/next arrows next to them as a clearer affordance. */}
+                  {assetTotalPages > 1 && (
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => setAssetCarouselPage((p) => (p - 1 + assetTotalPages) % assetTotalPages)}
+                        aria-label={t("previousPage")}
+                        className="w-6 h-6 rounded-full border border-zinc-200 text-zinc-400 hover:text-zinc-700 hover:border-zinc-300 flex items-center justify-center transition-colors"
+                      >
+                        <ChevronLeft size={13} />
+                      </button>
+                      <button
+                        onClick={() => setAssetCarouselPage((p) => (p + 1) % assetTotalPages)}
+                        aria-label={t("nextPage")}
+                        className="w-6 h-6 rounded-full border border-zinc-200 text-zinc-400 hover:text-zinc-700 hover:border-zinc-300 flex items-center justify-center transition-colors"
+                      >
+                        <ChevronRight size={13} />
+                      </button>
+                    </div>
+                  )}
+                  <Link href="/dashboard/assets" className="text-[11px] font-semibold text-red-600 hover:text-red-700">{t("viewAll")}</Link>
+                </div>
               </div>
               {assetCards.length === 0 ? (
                 <p className="text-[12px] text-zinc-400 text-center py-6">{t("noAssetsYet")}</p>

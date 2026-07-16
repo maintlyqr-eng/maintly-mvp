@@ -1242,7 +1242,9 @@
     "scheduledTask": "Tarea programada",
     "statusUpcoming": "Próximo",
     "valuePropTitle": "Mantené tu historia al día, mantené el valor de lo que importa.",
-    "valuePropDesc": "Cada registro suma confianza, seguridad y tranquilidad."
+    "valuePropDesc": "Cada registro suma confianza, seguridad y tranquilidad.",
+    "previousPage": "Página anterior",
+    "nextPage": "Página siguiente"
   },
   "AvatarCropModal": {
     "title": "Ajustá tu foto",

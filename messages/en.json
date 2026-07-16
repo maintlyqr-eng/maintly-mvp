@@ -1242,7 +1242,9 @@
     "scheduledTask": "Scheduled task",
     "statusUpcoming": "Upcoming",
     "valuePropTitle": "Keep your history up to date, keep the value of what matters.",
-    "valuePropDesc": "Every record builds trust, safety, and peace of mind."
+    "valuePropDesc": "Every record builds trust, safety, and peace of mind.",
+    "previousPage": "Previous page",
+    "nextPage": "Next page"
   },
   "AvatarCropModal": {
     "title": "Adjust your photo",
