@@ -1104,11 +1104,21 @@ export default function DashboardPage() {
                               square image scaled to whatever this card's
                               column happens to be, which on a wide screen
                               made the photo (and the whole card) way taller
-                              than it needed to be. */}
+                              than it needed to be.
+                              Facu (16 jul 2026): "la foto que tiene cargado
+                              el activo no se ve entera... quiero que se
+                              ajuste a ese espacio que tenemos no me importa
+                              que se vea chiquita" — real uploaded photos used
+                              object-cover, which fills the box by cropping
+                              whatever doesn't fit the aspect ratio (so tall/
+                              wide photos got their edges cut off). Switched
+                              to object-contain, same as the fallback icon
+                              below, so the whole photo is always visible,
+                              shrunk to fit instead of cropped. */}
                           <div className="w-full h-16 rounded-lg bg-white border border-zinc-100 flex items-center justify-center overflow-hidden mb-1.5">
                             {a.photoUrl ? (
                               // eslint-disable-next-line @next/next/no-img-element
-                              <img src={img} alt={a.label} className="w-full h-full object-cover" />
+                              <img src={img} alt={a.label} className="w-full h-full object-contain" />
                             ) : (
                               <Image src={img} alt={a.label} width={36} height={36} className="object-contain" />
                             )}

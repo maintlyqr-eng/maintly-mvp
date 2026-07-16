@@ -458,12 +458,23 @@ export default function AssetsPage() {
 
     setEditSaving(true);
 
-    let photoUrl = editingAsset.photo_url;
+    // Facu (16 jul 2026): "cuando me meto en el activo y pongo editar y
+    // borro la foto y guardo el cambio no se guarda" — this used to only
+    // ever REPLACE photoUrl when a new file was picked (editPhotoFile
+    // truthy). Clicking the little X clears editPhotoPreview to "" but
+    // leaves editPhotoFile null too, so that branch never ran and
+    // photoUrl silently stayed pinned to the old editingAsset.photo_url —
+    // the removal was never actually sent to the update() below. Added the
+    // missing case: no new file AND the preview is empty means the photo
+    // was explicitly removed, so persist null.
+    let photoUrl: string | null = editingAsset.photo_url;
     let photoUploadError: string | null = null;
     if (editPhotoFile) {
       const { url, error } = await uploadPhoto(editPhotoFile, editingAsset.id);
       if (url) photoUrl = url;
       else photoUploadError = error ?? t("errorPhotoUploadFailed");
+    } else if (!editPhotoPreview) {
+      photoUrl = null;
     }
 
     const { error } = await supabase
