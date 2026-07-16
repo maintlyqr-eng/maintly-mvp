@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { Link } from "@/i18n/navigation";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { Mail, Lock, Eye, EyeOff, User, Wrench } from "lucide-react";
@@ -23,8 +23,57 @@ export default function RegisterPage() {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
   const [error, setError] = useState("");
   const [confirmEmailSent, setConfirmEmailSent] = useState(false);
+
+  // Incremento 20: el botón "Continuar con Google" no existía en esta
+  // página (solo estaba, sin funcionar, en Login) — Facu esperaba poder
+  // registrarse con Google acá. Como el sign-up con Google no pasa por
+  // handleRegister() de abajo (no hay "submit" del form, todo el flujo es
+  // un redirect a Google y de vuelta), este listener es el único lugar
+  // donde un registro nuevo por Google "aterriza": si la cuenta todavía no
+  // tiene "profession" (columna de la migración 036) la mandamos a
+  // completar el perfil, igual que hace handleRegister() para el alta con
+  // email/contraseña. Mismo patrón que el listener ya existente en
+  // src/app/[locale]/login/page.tsx.
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      if (!session) return;
+
+      const { data: m } = await supabase.from("mechanics").select("suspended, deleted_at, profession").eq("id", session.user.id).single();
+      if (m?.deleted_at) {
+        await supabase.auth.signOut();
+        setError(t("deletedError"));
+        return;
+      }
+      if (m?.suspended) {
+        await supabase.auth.signOut();
+        setError(t("suspendedError"));
+        return;
+      }
+      if (!m?.profession) {
+        router.push("/register/profession");
+        return;
+      }
+      router.push("/dashboard");
+    });
+    return () => subscription.unsubscribe();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [router]);
+
+  async function handleGoogleSignIn() {
+    setError("");
+    setGoogleLoading(true);
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: { redirectTo: window.location.href },
+    });
+    if (error) {
+      setGoogleLoading(false);
+      setError(t("googleSignInError"));
+    }
+  }
 
   async function handleRegister(e: React.FormEvent) {
     e.preventDefault();
@@ -199,12 +248,6 @@ export default function RegisterPage() {
               </div>
             </div>
 
-            {error && (
-              <div className="mb-4 rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-[12px] text-red-700">
-                {error}
-              </div>
-            )}
-
             <button
               type="submit"
               disabled={loading}
@@ -213,6 +256,43 @@ export default function RegisterPage() {
               {loading ? t("creatingAccount") : t("createAccountButton")}
             </button>
           </form>
+
+          {/* Movido fuera del <form>: este mismo mensaje de error cubre
+              tanto el alta con email/contraseña (handleRegister) como el
+              alta con Google (handleGoogleSignIn), que vive fuera del form
+              — un solo lugar visible para cualquiera de los dos caminos. */}
+          {error && (
+            <div className="mt-4 rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-[12px] text-red-700">
+              {error}
+            </div>
+          )}
+
+          {/* Divider */}
+          <div className="flex items-center gap-3 my-5">
+            <div className="flex-1 h-[1px] bg-zinc-200" />
+            <span className="text-[11px] text-zinc-400">{t("orDivider")}</span>
+            <div className="flex-1 h-[1px] bg-zinc-200" />
+          </div>
+
+          {/* Google */}
+          <button
+            type="button"
+            onClick={handleGoogleSignIn}
+            disabled={googleLoading}
+            className="w-full flex items-center justify-center gap-3 border border-zinc-200 hover:bg-zinc-50 active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed transition-all py-[12px] rounded-xl text-[13px] font-semibold text-zinc-700"
+          >
+            {googleLoading ? (
+              <div className="w-[18px] h-[18px] border-2 border-zinc-300 border-t-zinc-600 rounded-full animate-spin" />
+            ) : (
+              <svg width="18" height="18" viewBox="0 0 18 18">
+                <path fill="#4285F4" d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84c-.21 1.13-.84 2.08-1.8 2.72v2.26h2.92c1.7-1.57 2.68-3.88 2.68-6.62z"/>
+                <path fill="#34A853" d="M9 18c2.43 0 4.47-.81 5.96-2.18l-2.92-2.26c-.81.54-1.84.86-3.04.86-2.34 0-4.32-1.58-5.03-3.71H.96v2.33C2.44 15.98 5.48 18 9 18z"/>
+                <path fill="#FBBC05" d="M3.97 10.71c-.18-.54-.28-1.71-.28-1.71s.1-1.17.28-1.71V4.96H.96C.35 6.18 0 7.55 0 9s.35 2.82.96 4.04l3.01-2.33z"/>
+                <path fill="#EA4335" d="M9 3.58c1.32 0 2.5.45 3.44 1.35l2.58-2.58C13.46.89 11.43 0 9 0 5.48 0 2.44 2.02.96 4.96l3.01 2.33C4.68 5.16 6.66 3.58 9 3.58z"/>
+              </svg>
+            )}
+            {googleLoading ? t("connectingToGoogle") : t("continueWithGoogle")}
+          </button>
 
           <p className="text-center text-[13px] text-zinc-500 mt-6">
             {t("alreadyHaveAccount")}{" "}

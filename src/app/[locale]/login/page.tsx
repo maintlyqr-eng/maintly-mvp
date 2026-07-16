@@ -32,13 +32,21 @@ function LoginForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       if (!session) return;
 
-      const { data: m } = await supabase.from("mechanics").select("suspended, deleted_at").eq("id", session.user.id).single();
+      // "profession" (migración 036) también se chequea acá, no solo en
+      // Register: un Maintler que se registra por primera vez con Google
+      // (en vez de email/contraseña) nunca pasa por handleRegister() ni por
+      // el router.push("/register/profession") que hay ahí — este listener
+      // es el único lugar donde ese usuario "aterriza" después del login,
+      // así que es acá donde hay que mandarlo a completar su perfil si
+      // todavía no lo hizo.
+      const { data: m } = await supabase.from("mechanics").select("suspended, deleted_at, profession").eq("id", session.user.id).single();
       if (m?.deleted_at) {
         await supabase.auth.signOut();
         setError(t("deletedError"));
@@ -47,6 +55,10 @@ function LoginForm() {
       if (m?.suspended) {
         await supabase.auth.signOut();
         setError(t("suspendedError"));
+        return;
+      }
+      if (!m?.profession) {
+        router.push("/register/profession");
         return;
       }
 
@@ -72,6 +84,29 @@ function LoginForm() {
 
     // Successful sign-in triggers onAuthStateChange above, which checks the
     // suspended flag before redirecting.
+  }
+
+  // Incremento 20: el botón de Google no tenía ningún handler — no hacía
+  // absolutamente nada al clickear (bug reportado por Facu). redirectTo usa
+  // la URL actual completa (con el locale y el ?redirect= si vino de otra
+  // página) para que, al volver de Google, el cliente de Supabase
+  // (detectSessionInUrl: true) parsee la sesión de la URL y dispare el
+  // onAuthStateChange de arriba en esta misma página/idioma.
+  async function handleGoogleSignIn() {
+    setError("");
+    setGoogleLoading(true);
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: { redirectTo: window.location.href },
+    });
+    // Si signInWithOAuth no tira error acá, el browser ya está siendo
+    // redirigido a Google — este componente no llega a desmontarse "a
+    // tiempo" así que no hace falta (ni conviene) un setGoogleLoading(false)
+    // en el camino feliz.
+    if (error) {
+      setGoogleLoading(false);
+      setError(t("googleSignInError"));
+    }
   }
 
   return (
@@ -178,14 +213,23 @@ function LoginForm() {
           </div>
 
           {/* Google */}
-          <button className="w-full flex items-center justify-center gap-3 border border-zinc-200 hover:bg-zinc-50 transition-colors py-[12px] rounded-xl text-[13px] font-semibold text-zinc-700">
-            <svg width="18" height="18" viewBox="0 0 18 18">
-              <path fill="#4285F4" d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84c-.21 1.13-.84 2.08-1.8 2.72v2.26h2.92c1.7-1.57 2.68-3.88 2.68-6.62z"/>
-              <path fill="#34A853" d="M9 18c2.43 0 4.47-.81 5.96-2.18l-2.92-2.26c-.81.54-1.84.86-3.04.86-2.34 0-4.32-1.58-5.03-3.71H.96v2.33C2.44 15.98 5.48 18 9 18z"/>
-              <path fill="#FBBC05" d="M3.97 10.71c-.18-.54-.28-1.71-.28-1.71s.1-1.17.28-1.71V4.96H.96C.35 6.18 0 7.55 0 9s.35 2.82.96 4.04l3.01-2.33z"/>
-              <path fill="#EA4335" d="M9 3.58c1.32 0 2.5.45 3.44 1.35l2.58-2.58C13.46.89 11.43 0 9 0 5.48 0 2.44 2.02.96 4.96l3.01 2.33C4.68 5.16 6.66 3.58 9 3.58z"/>
-            </svg>
-            {t("continueWithGoogle")}
+          <button
+            type="button"
+            onClick={handleGoogleSignIn}
+            disabled={googleLoading}
+            className="w-full flex items-center justify-center gap-3 border border-zinc-200 hover:bg-zinc-50 active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed transition-all py-[12px] rounded-xl text-[13px] font-semibold text-zinc-700"
+          >
+            {googleLoading ? (
+              <div className="w-[18px] h-[18px] border-2 border-zinc-300 border-t-zinc-600 rounded-full animate-spin" />
+            ) : (
+              <svg width="18" height="18" viewBox="0 0 18 18">
+                <path fill="#4285F4" d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84c-.21 1.13-.84 2.08-1.8 2.72v2.26h2.92c1.7-1.57 2.68-3.88 2.68-6.62z"/>
+                <path fill="#34A853" d="M9 18c2.43 0 4.47-.81 5.96-2.18l-2.92-2.26c-.81.54-1.84.86-3.04.86-2.34 0-4.32-1.58-5.03-3.71H.96v2.33C2.44 15.98 5.48 18 9 18z"/>
+                <path fill="#FBBC05" d="M3.97 10.71c-.18-.54-.28-1.71-.28-1.71s.1-1.17.28-1.71V4.96H.96C.35 6.18 0 7.55 0 9s.35 2.82.96 4.04l3.01-2.33z"/>
+                <path fill="#EA4335" d="M9 3.58c1.32 0 2.5.45 3.44 1.35l2.58-2.58C13.46.89 11.43 0 9 0 5.48 0 2.44 2.02.96 4.96l3.01 2.33C4.68 5.16 6.66 3.58 9 3.58z"/>
+              </svg>
+            )}
+            {googleLoading ? t("connectingToGoogle") : t("continueWithGoogle")}
           </button>
 
           {/* Create account */}
