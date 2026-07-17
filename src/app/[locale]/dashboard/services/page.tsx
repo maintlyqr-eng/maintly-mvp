@@ -664,9 +664,9 @@ export default function ServicesPage() {
               full-width grid, each tile tinted with its own soft color
               (not plain white), solid-color icon circle, label on top in
               regular gray, big bold number below. */}
-          {/* Facu (17 jul 2026): "hay demasiado espacio entre rectángulos"
-              — tightened the grid gap from 12px to 8px. */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-5">
+          {/* Facu (17 jul 2026): "hay demasiado espacio entre rectángulos...
+              llevalo a 4" — tightened the grid gap down to 4px. */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-1 mb-5">
             <div className="rounded-2xl border border-blue-100 bg-blue-50/60 px-4 py-3.5 flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-blue-500 text-white flex items-center justify-center shrink-0"><Box size={18} /></div>
               <div><p className="text-[12.5px] text-zinc-500 leading-tight">{t("tileAssets")}</p><p className="text-[21px] font-black text-zinc-900 leading-tight">{summaryTiles.assets}</p></div>
