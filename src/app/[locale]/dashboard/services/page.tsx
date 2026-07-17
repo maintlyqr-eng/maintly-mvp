@@ -7,10 +7,12 @@ import { useEffect, useMemo, useRef, useState } from "react";
 // Login is migrated and every router.push()/replace() call on this page
 // targets it — safe to use next-intl's locale-aware router.
 import { useRouter } from "@/i18n/navigation";
-import { useTranslations } from "next-intl";
+import { useTranslations, useLocale } from "next-intl";
 import {
-  Plus, X, Bell,
+  Plus, X, Bell, Search,
   Wrench, CheckCircle2, MoreVertical,
+  Box, ClipboardList, CalendarClock, AlertTriangle,
+  Eye, Pencil, Copy, Trash2,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import DashboardSidebarIntl from "@/components/DashboardSidebarIntl";
@@ -19,7 +21,7 @@ import { useUnreadMessagesCount } from "@/lib/useUnreadMessages";
 import { useUnreadMechanicMessages } from "@/lib/useUnreadMechanicMessages";
 import CustomerPickerIntl, { CustomerOption } from "@/components/CustomerPickerIntl";
 import { formatDateDMY } from "@/lib/date";
-import { computeReminderStatus, REMINDER_STATUS_COLOR, type ReminderStatus } from "@/lib/reminders";
+import { computeReminderStatus, REMINDER_STATUS_COLOR } from "@/lib/reminders";
 import { getUnitKind } from "@/lib/units";
 
 const SERVICE_TYPE_ORDER = ["Oil Change", "Service", "Repair", "Inspection", "Filter Change", "Tire Change", "Brake Service", "Other"];
@@ -32,12 +34,31 @@ const SERVICE_TYPE_KEYS: Record<string, string> = {
   "Tire Change": "tireChange", "Brake Service": "brakeService", "Other": "other",
 };
 
+// Facu (17 jul 2026): "usaría colores consistentes... eso hace que el
+// cerebro los identifique sin leer" — every service type now has a fixed,
+// distinct color so the badge is recognizable at a glance instead of
+// several types sharing the same blue. Types not in his reference list
+// (Filter/Tire/Brake/Other) got their own colors too, so nothing falls back
+// to the generic gray unless it's a genuinely unknown/legacy value.
 const typeColors: Record<string, string> = {
-  Service: "bg-blue-100 text-blue-700",
-  Repair: "bg-red-100 text-red-700",
-  Inspection: "bg-purple-100 text-purple-700",
   "Oil Change": "bg-amber-100 text-amber-700",
+  Inspection: "bg-blue-100 text-blue-700",
+  Repair: "bg-red-100 text-red-700",
+  Service: "bg-emerald-100 text-emerald-700",
+  "Filter Change": "bg-cyan-100 text-cyan-700",
+  "Tire Change": "bg-indigo-100 text-indigo-700",
+  "Brake Service": "bg-rose-100 text-rose-700",
+  Other: "bg-zinc-100 text-zinc-600",
 };
+
+// Short "15 Jul" style date, used in the compact Recordatorio bell cell —
+// formatDateDMY's "15/08/2026" is too wide for an icon-sized column.
+const SHORT_DATE_LOCALE: Record<string, string> = { en: "en-US", es: "es-AR", pt: "pt-BR" };
+function formatShortDate(dateStr: string, locale: string) {
+  const d = new Date(dateStr + "T00:00:00");
+  if (isNaN(d.getTime())) return "";
+  return d.toLocaleDateString(SHORT_DATE_LOCALE[locale] ?? "en-US", { day: "2-digit", month: "short" });
+}
 
 const assetTypeImg: Record<string, string> = {
   automotive: "/images/car.png",
@@ -48,14 +69,29 @@ const assetTypeImg: Record<string, string> = {
   aviation: "/images/avion.png",
 };
 
+type QrRow = { code: string };
+
 type AssetInfo = {
   id: string;
   nickname: string | null;
   brand: string | null;
   model: string | null;
   vin_serial: string | null;
+  plate: string | null;
   asset_type: string;
+  photo_url: string | null;
+  qr_codes: QrRow[] | QrRow | null;
 };
+
+// Facu (17 jul 2026): real asset photo instead of a generic type icon —
+// "eso hace que el usuario encuentre el activo en medio segundo". Same
+// getQrCode pattern as the Assets page, just adapted to the nested shape
+// service_records rows carry their asset in (assets: AssetInfo).
+function assetQrCode(a: AssetInfo | null): string | null {
+  if (!a?.qr_codes) return null;
+  const q = Array.isArray(a.qr_codes) ? a.qr_codes[0] : a.qr_codes;
+  return q?.code ?? null;
+}
 
 type AssetOption = {
   id: string;
@@ -86,6 +122,7 @@ function getAsset(row: ServiceRow): AssetInfo | null {
 export default function ServicesPage() {
   const t = useTranslations("DashboardServicesPage");
   const tServiceTypes = useTranslations("ServiceTypes");
+  const locale = useLocale();
   const router = useRouter();
   const [checkingAuth, setCheckingAuth] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -101,8 +138,16 @@ export default function ServicesPage() {
   const [assetOptions, setAssetOptions] = useState<AssetOption[]>([]);
 
   // Filters
+  // Facu (17 jul 2026): "quiero agregar Status... y una búsqueda" — a third
+  // dropdown (Completed / Scheduled / Overdue, derived from the same
+  // reminder-status logic already powering the Recordatorio column) plus a
+  // free-text search across asset name, QR code, plate and notes, "porque
+  // el 95% de las notas son cortitas... es probablemente lo primero que
+  // haría un usuario con 300 servicios".
   const [filterAsset, setFilterAsset] = useState("all");
   const [filterType, setFilterType] = useState("all");
+  const [filterStatus, setFilterStatus] = useState("all");
+  const [searchQuery, setSearchQuery] = useState("");
 
   // Add Service modal
   const [showForm, setShowForm] = useState(false);
@@ -127,12 +172,36 @@ export default function ServicesPage() {
   const [reminderSaving, setReminderSaving] = useState(false);
   const [reminderError, setReminderError] = useState("");
 
-  const REMINDER_STATUS_LABEL: Record<ReminderStatus, string> = {
-    overdue: t("statusOverdue"),
-    due_soon: t("statusDueSoon"),
-    ok: t("statusOk"),
-    none: t("statusNone"),
-  };
+  // Facu (17 jul 2026): "yo agregaría hover... View / Edit / Duplicate /
+  // Delete" — the old menu only had one item (set reminder). View is a
+  // read-only detail popup (this is also where Notes now live — hidden from
+  // the table itself per his note 5, "las notas las ocultaría... las
+  // mostraría solamente al abrir el servicio"). Edit reuses the same fields
+  // as "Agregar Servicio" but updates the existing row instead of
+  // inserting. Duplicate clones type/reading/notes onto a new row dated
+  // today. Delete soft-deletes (deleted_at), with an inline confirm instead
+  // of a native confirm() popup, consistent with the rest of the app.
+  const [viewRow, setViewRow] = useState<ServiceRow | null>(null);
+
+  const [editRow, setEditRow] = useState<ServiceRow | null>(null);
+  const [editDate, setEditDate] = useState("");
+  const [editType, setEditType] = useState("Oil Change");
+  const [editKmHours, setEditKmHours] = useState("");
+  const [editNotes, setEditNotes] = useState("");
+  const [editSaving, setEditSaving] = useState(false);
+  const [editError, setEditError] = useState("");
+
+  const [duplicatingId, setDuplicatingId] = useState<string | null>(null);
+  // Row-hover state for the "..." actions trigger, driven by explicit
+  // onMouseEnter/onMouseLeave rather than a pure CSS group-hover toggle —
+  // same reasoning as the dashboard's calendar-preview popover fix: a
+  // CSS-only hover toggle silently failed to show on the live deploy there,
+  // so this page uses the proven JS-state pattern from the start instead.
+  const [hoveredRowId, setHoveredRowId] = useState<string | null>(null);
+
+  const [deleteRow, setDeleteRow] = useState<ServiceRow | null>(null);
+  const [deleteSaving, setDeleteSaving] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
 
   function assetLabel(a: AssetOption | null) {
     if (!a) return "—";
@@ -164,7 +233,7 @@ export default function ServicesPage() {
     setLoading(true);
     const { data } = await supabase
       .from("service_records")
-      .select("id, service_date, service_type, km_hours, notes, created_at, next_due_date, next_due_km_hours, assets(id, nickname, brand, model, vin_serial, asset_type)")
+      .select("id, service_date, service_type, km_hours, notes, created_at, next_due_date, next_due_km_hours, assets(id, nickname, brand, model, vin_serial, plate, asset_type, photo_url, qr_codes(code))")
       .eq("mechanic_id", uid)
       .is("deleted_at", null)
       .order("service_date", { ascending: false });
@@ -368,14 +437,149 @@ export default function ServicesPage() {
     await loadServices(mechanicId);
   }
 
+  function handleOpenView(row: ServiceRow) {
+    setViewRow(row);
+    setOpenMenuRowId(null);
+  }
+
+  function handleOpenEdit(row: ServiceRow) {
+    setEditRow(row);
+    setEditDate(row.service_date);
+    setEditType(row.service_type);
+    setEditKmHours(row.km_hours != null ? String(row.km_hours) : "");
+    setEditNotes(row.notes ?? "");
+    setEditError("");
+    setOpenMenuRowId(null);
+  }
+
+  async function handleSaveEdit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!editRow) return;
+    setEditError("");
+    setEditSaving(true);
+
+    const { error } = await supabase
+      .from("service_records")
+      .update({
+        service_date: editDate,
+        service_type: editType,
+        km_hours: editKmHours ? parseFloat(editKmHours) : null,
+        notes: editNotes.trim() || null,
+      })
+      .eq("id", editRow.id);
+
+    setEditSaving(false);
+    if (error) { setEditError(error.message); return; }
+
+    setEditRow(null);
+    await loadServices(mechanicId);
+  }
+
+  // Facu (17 jul 2026): "Duplicate" — clones type/reading/notes onto a
+  // brand-new row dated today, same as logging a fresh service manually
+  // would, just pre-filled from this one instead of a blank form. Keeps the
+  // same asset + customer link as the original.
+  async function handleDuplicate(row: ServiceRow) {
+    setOpenMenuRowId(null);
+    const asset = getAsset(row);
+    if (!asset) return;
+    setDuplicatingId(row.id);
+    const assetOpt = assetOptions.find((a) => a.id === asset.id);
+    await supabase.from("service_records").insert({
+      mechanic_id: mechanicId,
+      asset_id: asset.id,
+      service_type: row.service_type,
+      service_date: new Date().toISOString().slice(0, 10),
+      km_hours: row.km_hours,
+      notes: row.notes,
+      customer_id: assetOpt?.customer_id ?? null,
+    });
+    setDuplicatingId(null);
+    await loadServices(mechanicId);
+  }
+
+  function handleOpenDelete(row: ServiceRow) {
+    setDeleteRow(row);
+    setDeleteError("");
+    setOpenMenuRowId(null);
+  }
+
+  async function handleConfirmDelete() {
+    if (!deleteRow) return;
+    setDeleteSaving(true);
+    setDeleteError("");
+    const { error } = await supabase
+      .from("service_records")
+      .update({ deleted_at: new Date().toISOString() })
+      .eq("id", deleteRow.id);
+    setDeleteSaving(false);
+    if (error) { setDeleteError(error.message); return; }
+    setDeleteRow(null);
+    await loadServices(mechanicId);
+  }
+
+  // Facu (17 jul 2026): the Status filter isn't a new concept — every
+  // logged service IS "completed" (it already happened, hence the green
+  // Estado badge on every row), but whether it still has an open reminder
+  // attached is exactly what the Recordatorio column already tracks. So
+  // "Completado" = no pending reminder, "Programado" = has one and it's
+  // not overdue yet, "Vencido" = overdue. Same computeReminderStatus this
+  // page already used for the Recordatorio pill.
   const filtered = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
     return services.filter(row => {
       const asset = getAsset(row);
       if (filterAsset !== "all" && asset?.id !== filterAsset) return false;
       if (filterType !== "all" && row.service_type !== filterType) return false;
+
+      if (filterStatus !== "all") {
+        const hasReminder = row.next_due_date != null || row.next_due_km_hours != null;
+        const status = computeReminderStatus({
+          nextDueDate: row.next_due_date,
+          nextDueKmHours: row.next_due_km_hours,
+          currentKmHours: currentKmHoursForAsset(asset?.id),
+        });
+        if (filterStatus === "overdue" && status !== "overdue") return false;
+        if (filterStatus === "scheduled" && !(hasReminder && status !== "overdue")) return false;
+        if (filterStatus === "completed" && hasReminder) return false;
+      }
+
+      if (q) {
+        const label = (asset?.nickname || [asset?.brand, asset?.model].filter(Boolean).join(" ") || "").toLowerCase();
+        const qr = (assetQrCode(asset) ?? "").toLowerCase();
+        const plate = (asset?.plate ?? "").toLowerCase();
+        const model = (asset?.model ?? "").toLowerCase();
+        const notes = (row.notes ?? "").toLowerCase();
+        const haystack = `${label} ${qr} ${plate} ${model} ${notes}`;
+        if (!haystack.includes(q)) return false;
+      }
+
       return true;
     });
-  }, [services, filterAsset, filterType]);
+  }, [services, filterAsset, filterType, filterStatus, searchQuery]);
+
+  // ── Summary tiles (Activos / Servicios / Programados / Vencidos) ──
+  // Facu (17 jul 2026): "eso convierte la pantalla en un pequeño dashboard"
+  // — counts are over the FULL unfiltered `services` list (not `filtered`),
+  // same convention as the dashboard home page's own summary tiles, so
+  // these numbers don't shift around as someone types into the search box.
+  const summaryTiles = useMemo(() => {
+    let scheduled = 0;
+    let overdue = 0;
+    for (const row of services) {
+      const asset = getAsset(row);
+      const hasReminder = row.next_due_date != null || row.next_due_km_hours != null;
+      if (!hasReminder) continue;
+      const status = computeReminderStatus({
+        nextDueDate: row.next_due_date,
+        nextDueKmHours: row.next_due_km_hours,
+        currentKmHours: currentKmHoursForAsset(asset?.id),
+      });
+      if (status === "overdue") overdue++;
+      else scheduled++;
+    }
+    return { assets: assetOptions.length, services: services.length, scheduled, overdue };
+  }, [services, assetOptions]);
 
   if (checkingAuth) {
     return (
@@ -421,9 +625,44 @@ export default function ServicesPage() {
 
         <div className="flex-1 overflow-y-auto p-4 md:p-7">
 
+          {/* ── Summary tiles ── Facu (17 jul 2026): "eso convierte la
+              pantalla en un pequeño dashboard y le da contexto antes de
+              bajar a la lista". Same 4 numbers his mockup called out. */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
+            <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm p-4 flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-500 flex items-center justify-center shrink-0"><Box size={17} /></div>
+              <div className="min-w-0"><p className="text-[18px] font-black text-zinc-900 leading-tight">{summaryTiles.assets}</p><p className="text-[11px] text-zinc-400 leading-tight truncate">{t("tileAssets")}</p></div>
+            </div>
+            <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm p-4 flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-500 flex items-center justify-center shrink-0"><ClipboardList size={17} /></div>
+              <div className="min-w-0"><p className="text-[18px] font-black text-zinc-900 leading-tight">{summaryTiles.services}</p><p className="text-[11px] text-zinc-400 leading-tight truncate">{t("tileServices")}</p></div>
+            </div>
+            <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm p-4 flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-amber-50 text-amber-500 flex items-center justify-center shrink-0"><CalendarClock size={17} /></div>
+              <div className="min-w-0"><p className="text-[18px] font-black text-zinc-900 leading-tight">{summaryTiles.scheduled}</p><p className="text-[11px] text-zinc-400 leading-tight truncate">{t("tileScheduled")}</p></div>
+            </div>
+            <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm p-4 flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-red-50 text-red-500 flex items-center justify-center shrink-0"><AlertTriangle size={17} /></div>
+              <div className="min-w-0"><p className="text-[18px] font-black text-zinc-900 leading-tight">{summaryTiles.overdue}</p><p className="text-[11px] text-zinc-400 leading-tight truncate">{t("tileOverdue")}</p></div>
+            </div>
+          </div>
+
           {/* Toolbar */}
-          <div className="flex items-center justify-between mb-5 -mt-2 gap-3 flex-wrap">
-            <div className="flex items-center gap-3">
+          <div className="flex items-center justify-between mb-5 gap-3 flex-wrap">
+            <div className="flex items-center gap-2.5 flex-wrap flex-1 min-w-0">
+              {/* Facu (17 jul 2026): "es probablemente lo primero que haría
+                  un usuario con 300 servicios" — searches asset name, QR
+                  code, plate/matrícula, model and notes all at once. */}
+              <div className="relative">
+                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-300" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder={t("searchPlaceholder")}
+                  className="w-[230px] rounded-xl border border-zinc-200 bg-white pl-8 pr-3 py-[9px] text-[12px] outline-none focus:border-red-400"
+                />
+              </div>
               <select
                 value={filterAsset}
                 onChange={(e) => setFilterAsset(e.target.value)}
@@ -440,12 +679,24 @@ export default function ServicesPage() {
                 <option value="all">{t("allTypes")}</option>
                 {SERVICE_TYPE_ORDER.map(ty => <option key={ty} value={ty}>{tServiceTypes(SERVICE_TYPE_KEYS[ty])}</option>)}
               </select>
+              <select
+                value={filterStatus}
+                onChange={(e) => setFilterStatus(e.target.value)}
+                className="rounded-xl border border-zinc-200 bg-white px-3 py-[9px] text-[12px] outline-none focus:border-red-400"
+              >
+                <option value="all">{t("allStatuses")}</option>
+                <option value="completed">{t("filterStatusCompleted")}</option>
+                <option value="scheduled">{t("filterStatusScheduled")}</option>
+                <option value="overdue">{t("filterStatusOverdue")}</option>
+              </select>
             </div>
+            {/* Facu (17 jul 2026): "lo haría un poquito más grande y con más
+                aire" — bumped padding up from the original 4/10px. */}
             <button
               onClick={handleOpenAddService}
-              className="flex items-center gap-2 bg-red-600 hover:bg-red-500 active:scale-[0.98] transition-all text-white text-[13px] font-bold px-4 py-[10px] rounded-xl shadow-sm"
+              className="flex items-center gap-2 bg-red-600 hover:bg-red-500 active:scale-[0.98] transition-all text-white text-[13.5px] font-bold px-5 py-[13px] rounded-xl shadow-sm shrink-0"
             >
-              <Plus size={15} /> {t("addService")}
+              <Plus size={17} /> {t("addService")}
             </button>
           </div>
 
@@ -471,14 +722,13 @@ export default function ServicesPage() {
               {openMenuRowId && (
                 <div className="fixed inset-0 z-10" onClick={() => setOpenMenuRowId(null)} />
               )}
-              <table className="w-full min-w-[820px]">
+              <table className="w-full min-w-[780px]">
                 <thead>
                   <tr className="text-left text-[10px] text-zinc-400 font-bold uppercase border-b border-zinc-100">
                     <th className="px-5 py-3 font-bold">{t("columnAsset")}</th>
-                    <th className="px-3 py-3 font-bold">{t("columnServiceType")}</th>
                     <th className="px-3 py-3 font-bold">{t("columnDate")}</th>
+                    <th className="px-3 py-3 font-bold">{t("columnServiceType")}</th>
                     <th className="px-3 py-3 font-bold">{t("columnReading")}</th>
-                    <th className="px-3 py-3 font-bold">{t("columnNotes")}</th>
                     <th className="px-3 py-3 font-bold">{t("columnStatus")}</th>
                     <th className="px-3 py-3 font-bold">{t("columnReminder")}</th>
                     <th className="px-3 py-3"></th>
@@ -487,8 +737,10 @@ export default function ServicesPage() {
                 <tbody>
                   {filtered.map((row) => {
                     const asset = getAsset(row);
+                    const photo = asset?.photo_url ?? null;
                     const img = asset ? assetTypeImg[asset.asset_type] ?? "/images/car.png" : "/images/car.png";
                     const label = asset?.nickname || [asset?.brand, asset?.model].filter(Boolean).join(" ") || t("unknownAsset");
+                    const qrCode = assetQrCode(asset);
                     const hasReminder = row.next_due_date != null || row.next_due_km_hours != null;
                     const reminderStatus = computeReminderStatus({
                       nextDueDate: row.next_due_date,
@@ -497,66 +749,108 @@ export default function ServicesPage() {
                     });
                     const rc = REMINDER_STATUS_COLOR[reminderStatus];
                     return (
-                      <tr key={row.id} className="border-t border-zinc-100 hover:bg-zinc-50/50 transition-colors">
-                        <td className="px-5 py-3">
+                      <tr
+                        key={row.id}
+                        className="border-t border-zinc-100 hover:bg-zinc-50/50 transition-colors"
+                        onMouseEnter={() => setHoveredRowId(row.id)}
+                        onMouseLeave={() => setHoveredRowId((cur) => (cur === row.id ? null : cur))}
+                      >
+                        {/* Facu (17 jul 2026): "en vez de icono + nombre +
+                            número de serie, haría icono + nombre, y abajo QR
+                            #### en gris claro" — plus a real photo instead of
+                            a generic icon when the asset has one uploaded. */}
+                        <td className="px-5 py-4">
                           <div className="flex items-center gap-3">
                             <div className="w-9 h-9 rounded-lg bg-zinc-50 border border-zinc-100 flex items-center justify-center shrink-0 overflow-hidden">
-                              <Image src={img} alt={label} width={28} height={28} className="object-contain" />
+                              {photo ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img src={photo} alt={label} className="w-full h-full object-cover" />
+                              ) : (
+                                <Image src={img} alt={label} width={28} height={28} className="object-contain" />
+                              )}
                             </div>
-                            <div>
-                              <p className="text-[12.5px] font-bold text-zinc-800 leading-tight">{label}</p>
-                              <p className="text-[10px] text-zinc-400 leading-tight font-mono">{asset?.vin_serial ?? ""}</p>
+                            <div className="min-w-0">
+                              <p className="text-[12.5px] font-bold text-zinc-800 leading-tight truncate">{label}</p>
+                              <p className="text-[10px] text-zinc-400 leading-tight font-mono">{qrCode ? t("qrLabel", { code: qrCode }) : ""}</p>
                             </div>
                           </div>
                         </td>
-                        <td className="px-3 py-3">
-                          <span className={`text-[10.5px] font-semibold px-2 py-[3px] rounded-full ${typeColors[row.service_type] ?? "bg-zinc-100 text-zinc-700"}`}>
+                        <td className="px-3 py-4 text-[12px] text-zinc-700 whitespace-nowrap">{formatDateDMY(row.service_date)}</td>
+                        <td className="px-3 py-4">
+                          <span className={`text-[10.5px] font-semibold px-2 py-[3px] rounded-full whitespace-nowrap ${typeColors[row.service_type] ?? "bg-zinc-100 text-zinc-700"}`}>
                             {tServiceTypes(SERVICE_TYPE_KEYS[row.service_type] ?? "other")}
                           </span>
                         </td>
-                        <td className="px-3 py-3 text-[12px] text-zinc-700">{formatDateDMY(row.service_date)}</td>
-                        <td className="px-3 py-3 text-[12px] text-zinc-700 font-medium">{unitValue(row.km_hours, asset?.asset_type)}</td>
-                        <td className="px-3 py-3 text-[11px] text-zinc-500 max-w-[180px] truncate">{row.notes || "—"}</td>
-                        <td className="px-3 py-3">
-                          <span className="flex items-center gap-1 text-[11px] font-semibold text-green-600">
-                            <CheckCircle2 size={12} /> {t("completed")}
+                        <td className="px-3 py-4 text-[12px] text-zinc-700 font-medium whitespace-nowrap">{unitValue(row.km_hours, asset?.asset_type)}</td>
+                        {/* Facu (17 jul 2026): "yo haría un badge... más
+                            compacto" — same pill shape as the Recordatorio
+                            and service-type badges instead of a bare icon +
+                            text row. */}
+                        <td className="px-3 py-4">
+                          <span className="inline-flex items-center gap-1 text-[10.5px] font-semibold px-2 py-[3px] rounded-full bg-green-100 text-green-700 whitespace-nowrap">
+                            <CheckCircle2 size={11} /> {t("completed")}
                           </span>
                         </td>
-                        <td className="px-3 py-3">
-                          {hasReminder ? (
-                            <button
-                              onClick={() => openReminderModal(row)}
-                              title={t("viewEditReminder")}
-                              className={`inline-flex items-center gap-1.5 text-[10.5px] font-semibold px-2 py-[3px] rounded-full transition-opacity hover:opacity-75 ${rc.bg} ${rc.text}`}
-                            >
-                              <span className={`w-1.5 h-1.5 rounded-full ${rc.dot}`} />
-                              {REMINDER_STATUS_LABEL[reminderStatus]}
-                            </button>
-                          ) : (
-                            <button
-                              onClick={() => openReminderModal(row)}
-                              title={t("setReminder")}
-                              className="text-[11px] text-zinc-300 hover:text-zinc-500 transition-colors"
-                            >
-                              {t("setDash")}
-                            </button>
-                          )}
+                        {/* Facu (17 jul 2026): "la mayoría dice — Configurar,
+                            eso ensucia mucho... yo pondría solamente un
+                            icono" — gray bell if nothing's set, colored bell
+                            + short date if it is. */}
+                        <td className="px-3 py-4">
+                          <button
+                            onClick={() => openReminderModal(row)}
+                            title={hasReminder ? t("viewEditReminder") : t("setReminder")}
+                            className={`inline-flex items-center gap-1 text-[10.5px] font-semibold transition-opacity hover:opacity-70 ${hasReminder ? rc.text : "text-zinc-300"}`}
+                          >
+                            <Bell size={14} />
+                            {hasReminder && row.next_due_date && <span className="whitespace-nowrap">{formatShortDate(row.next_due_date, locale)}</span>}
+                          </button>
                         </td>
-                        <td className="px-3 py-3 text-right relative">
+                        {/* Facu (17 jul 2026): "yo agregaría hover... eso hace
+                            que no haya botones por todos lados" — the trigger
+                            itself only shows up once you're hovering the
+                            row (opacity-0 → group-hover:opacity-100), instead
+                            of a "⋮" sitting on every single row all the time. */}
+                        <td className="px-3 py-4 text-right relative">
                           <button
                             onClick={() => setOpenMenuRowId(openMenuRowId === row.id ? null : row.id)}
-                            className="text-zinc-300 hover:text-zinc-600 transition-colors relative z-20"
+                            className={`text-zinc-300 hover:text-zinc-600 transition-all relative z-20 ${openMenuRowId === row.id || hoveredRowId === row.id ? "opacity-100" : "opacity-0"}`}
                           >
                             <MoreVertical size={15} />
                           </button>
                           {openMenuRowId === row.id && (
-                            <div className="absolute right-3 top-9 z-20 w-48 bg-white border border-zinc-200 rounded-xl shadow-lg py-1 text-left">
+                            <div className="absolute right-3 top-9 z-20 w-44 bg-white border border-zinc-200 rounded-xl shadow-lg py-1 text-left">
+                              <button
+                                onClick={() => handleOpenView(row)}
+                                className="w-full flex items-center gap-2 px-3 py-2 text-[12px] font-medium text-zinc-700 hover:bg-zinc-50"
+                              >
+                                <Eye size={13} className="text-zinc-400" /> {t("actionView")}
+                              </button>
+                              <button
+                                onClick={() => handleOpenEdit(row)}
+                                className="w-full flex items-center gap-2 px-3 py-2 text-[12px] font-medium text-zinc-700 hover:bg-zinc-50"
+                              >
+                                <Pencil size={13} className="text-zinc-400" /> {t("actionEdit")}
+                              </button>
+                              <button
+                                onClick={() => handleDuplicate(row)}
+                                disabled={duplicatingId === row.id}
+                                className="w-full flex items-center gap-2 px-3 py-2 text-[12px] font-medium text-zinc-700 hover:bg-zinc-50 disabled:opacity-50"
+                              >
+                                <Copy size={13} className="text-zinc-400" /> {duplicatingId === row.id ? t("duplicating") : t("actionDuplicate")}
+                              </button>
                               <button
                                 onClick={() => openReminderModal(row)}
                                 className="w-full flex items-center gap-2 px-3 py-2 text-[12px] font-medium text-zinc-700 hover:bg-zinc-50"
                               >
                                 <Bell size={13} className="text-zinc-400" />
                                 {hasReminder ? t("editReminderMenu") : t("setReminderMenu")}
+                              </button>
+                              <div className="my-1 border-t border-zinc-100" />
+                              <button
+                                onClick={() => handleOpenDelete(row)}
+                                className="w-full flex items-center gap-2 px-3 py-2 text-[12px] font-medium text-red-600 hover:bg-red-50"
+                              >
+                                <Trash2 size={13} /> {t("actionDelete")}
                               </button>
                             </div>
                           )}
@@ -722,6 +1016,179 @@ export default function ServicesPage() {
           </div>
         </div>
       )}
+
+      {/* ════ VIEW SERVICE MODAL ════ */}
+      {/* Facu (17 jul 2026): "las notas las ocultaría... las mostraría
+          solamente al abrir el servicio" — this is that "open the service"
+          view: read-only, includes notes (not shown in the table anymore). */}
+      {viewRow && (() => {
+        const asset = getAsset(viewRow);
+        const label = asset?.nickname || [asset?.brand, asset?.model].filter(Boolean).join(" ") || t("unknownAsset");
+        const qrCode = assetQrCode(asset);
+        const hasReminder = viewRow.next_due_date != null || viewRow.next_due_km_hours != null;
+        const reminderStatus = computeReminderStatus({
+          nextDueDate: viewRow.next_due_date,
+          nextDueKmHours: viewRow.next_due_km_hours,
+          currentKmHours: currentKmHoursForAsset(asset?.id),
+        });
+        const rc = REMINDER_STATUS_COLOR[reminderStatus];
+        return (
+          <div className="fixed inset-0 z-50 bg-zinc-900/40 flex items-center justify-center p-4" onClick={() => setViewRow(null)}>
+            <div className="bg-white rounded-2xl shadow-xl w-full max-w-md" onClick={(e) => e.stopPropagation()}>
+              <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-200">
+                <div className="flex items-center gap-2 min-w-0">
+                  <div className="w-8 h-8 rounded-xl bg-zinc-100 flex items-center justify-center shrink-0"><Eye size={15} className="text-zinc-600" /></div>
+                  <div className="min-w-0">
+                    <h2 className="text-[16px] font-black text-zinc-900 leading-tight truncate">{label}</h2>
+                    {qrCode && <p className="text-[11px] text-zinc-400 font-mono">{t("qrLabel", { code: qrCode })}</p>}
+                  </div>
+                </div>
+                <button onClick={() => setViewRow(null)} className="text-zinc-400 hover:text-zinc-700 shrink-0"><X size={18} /></button>
+              </div>
+
+              <div className="px-6 py-5 space-y-3">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className={`text-[10.5px] font-semibold px-2 py-[3px] rounded-full ${typeColors[viewRow.service_type] ?? "bg-zinc-100 text-zinc-700"}`}>
+                    {tServiceTypes(SERVICE_TYPE_KEYS[viewRow.service_type] ?? "other")}
+                  </span>
+                  <span className="inline-flex items-center gap-1 text-[10.5px] font-semibold px-2 py-[3px] rounded-full bg-green-100 text-green-700">
+                    <CheckCircle2 size={11} /> {t("completed")}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3 text-[12.5px]">
+                  <div><p className="text-zinc-400 text-[11px]">{t("columnDate")}</p><p className="font-semibold text-zinc-800">{formatDateDMY(viewRow.service_date)}</p></div>
+                  <div><p className="text-zinc-400 text-[11px]">{t("columnReading")}</p><p className="font-semibold text-zinc-800">{unitValue(viewRow.km_hours, asset?.asset_type)}</p></div>
+                </div>
+
+                <div>
+                  <p className="text-zinc-400 text-[11px] mb-1">{t("notesOptional")}</p>
+                  <p className="text-[12.5px] text-zinc-700 whitespace-pre-wrap">{viewRow.notes || t("noNotes")}</p>
+                </div>
+
+                <div>
+                  <p className="text-zinc-400 text-[11px] mb-1">{t("columnReminder")}</p>
+                  {hasReminder ? (
+                    <span className={`inline-flex items-center gap-1.5 text-[11px] font-semibold px-2 py-[3px] rounded-full ${rc.bg} ${rc.text}`}>
+                      <span className={`w-1.5 h-1.5 rounded-full ${rc.dot}`} />
+                      {viewRow.next_due_date ? formatDateDMY(viewRow.next_due_date) : unitValue(viewRow.next_due_km_hours, asset?.asset_type)}
+                    </span>
+                  ) : (
+                    <p className="text-[12.5px] text-zinc-400">{t("statusNone")}</p>
+                  )}
+                </div>
+              </div>
+
+              <div className="px-6 pb-5 flex gap-3">
+                <button onClick={() => setViewRow(null)} className="flex-1 border border-zinc-200 text-zinc-700 font-bold py-[11px] rounded-xl text-[13px] hover:bg-zinc-50">{t("cancel")}</button>
+                <button
+                  onClick={() => { const r = viewRow; setViewRow(null); handleOpenEdit(r); }}
+                  className="flex-1 bg-red-600 hover:bg-red-500 transition-all text-white font-bold py-[11px] rounded-xl text-[13px]"
+                >
+                  {t("actionEdit")}
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* ════ EDIT SERVICE MODAL ════ */}
+      {editRow && (
+        <div className="fixed inset-0 z-50 bg-zinc-900/40 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-200">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-red-50 flex items-center justify-center">
+                  <Pencil size={15} className="text-red-600" />
+                </div>
+                <h2 className="text-[16px] font-black text-zinc-900">{t("editModalTitle")}</h2>
+              </div>
+              <button onClick={() => setEditRow(null)} className="text-zinc-400 hover:text-zinc-700"><X size={18} /></button>
+            </div>
+
+            <form onSubmit={handleSaveEdit} className="px-6 py-5 space-y-4">
+              <div>
+                <label className="text-[12px] font-bold text-zinc-700">{t("columnDate")}</label>
+                <input
+                  type="date" value={editDate} onChange={(e) => setEditDate(e.target.value)} required
+                  className="w-full mt-1 rounded-xl border border-zinc-200 px-3 py-[10px] text-[13px] outline-none focus:border-red-500"
+                />
+              </div>
+
+              <div>
+                <label className="text-[12px] font-bold text-zinc-700">{t("serviceTypeLabel")}</label>
+                <select value={editType} onChange={(e) => setEditType(e.target.value)} required className="w-full mt-1 rounded-xl border border-zinc-200 px-3 py-[10px] text-[13px] outline-none focus:border-red-500">
+                  {SERVICE_TYPE_ORDER.map(ty => <option key={ty} value={ty}>{tServiceTypes(SERVICE_TYPE_KEYS[ty])}</option>)}
+                </select>
+              </div>
+
+              <div>
+                <label className="text-[12px] font-bold text-zinc-700">{unitLabel(getAsset(editRow)?.asset_type)}</label>
+                <input
+                  type="number" min={0} step="0.1"
+                  value={editKmHours} onChange={(e) => setEditKmHours(e.target.value)}
+                  placeholder={t("kmPlaceholder")}
+                  className="w-full mt-1 rounded-xl border border-zinc-200 px-3 py-[10px] text-[13px] outline-none focus:border-red-500"
+                />
+              </div>
+
+              <div>
+                <label className="text-[12px] font-bold text-zinc-700">{t("notesOptional")}</label>
+                <textarea rows={3} value={editNotes} onChange={(e) => setEditNotes(e.target.value)} placeholder={t("notesPlaceholder")} className="w-full mt-1 rounded-xl border border-zinc-200 px-3 py-[10px] text-[13px] outline-none focus:border-red-500 resize-none" />
+              </div>
+
+              {editError && (
+                <div className="rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-[12px] text-red-700">{editError}</div>
+              )}
+
+              <div className="flex gap-3 pt-1">
+                <button type="button" onClick={() => setEditRow(null)} className="flex-1 border border-zinc-200 text-zinc-700 font-bold py-[11px] rounded-xl text-[13px] hover:bg-zinc-50">{t("cancel")}</button>
+                <button type="submit" disabled={editSaving} className="flex-1 bg-red-600 hover:bg-red-500 disabled:opacity-60 transition-all text-white font-bold py-[11px] rounded-xl text-[13px]">
+                  {editSaving ? t("saving") : t("saveChanges")}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ════ DELETE CONFIRM MODAL ════ */}
+      {/* Facu (17 jul 2026): a custom inline confirm instead of the browser's
+          native confirm() — matches the pattern already used elsewhere in
+          this app (e.g. ContactSupportWidgetIntl's "clear conversation"). */}
+      {deleteRow && (() => {
+        const asset = getAsset(deleteRow);
+        const label = asset?.nickname || [asset?.brand, asset?.model].filter(Boolean).join(" ") || t("unknownAsset");
+        return (
+          <div className="fixed inset-0 z-50 bg-zinc-900/40 flex items-center justify-center p-4" onClick={() => setDeleteRow(null)}>
+            <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm" onClick={(e) => e.stopPropagation()}>
+              <div className="px-6 py-5">
+                <div className="w-10 h-10 rounded-xl bg-red-50 flex items-center justify-center mb-3">
+                  <Trash2 size={17} className="text-red-600" />
+                </div>
+                <h2 className="text-[15px] font-black text-zinc-900 mb-1">{t("deleteConfirmTitle")}</h2>
+                <p className="text-[12.5px] text-zinc-500">
+                  {t("deleteConfirmBody", {
+                    asset: label,
+                    type: tServiceTypes(SERVICE_TYPE_KEYS[deleteRow.service_type] ?? "other"),
+                    date: formatDateDMY(deleteRow.service_date),
+                  })}
+                </p>
+                {deleteError && (
+                  <div className="mt-3 rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-[12px] text-red-700">{deleteError}</div>
+                )}
+                <div className="flex gap-3 pt-4">
+                  <button onClick={() => setDeleteRow(null)} className="flex-1 border border-zinc-200 text-zinc-700 font-bold py-[11px] rounded-xl text-[13px] hover:bg-zinc-50">{t("cancel")}</button>
+                  <button onClick={handleConfirmDelete} disabled={deleteSaving} className="flex-1 bg-red-600 hover:bg-red-500 disabled:opacity-60 transition-all text-white font-bold py-[11px] rounded-xl text-[13px]">
+                    {deleteSaving ? t("deleting") : t("actionDelete")}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
