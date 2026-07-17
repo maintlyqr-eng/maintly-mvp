@@ -9,7 +9,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "@/i18n/navigation";
 import { useTranslations, useLocale } from "next-intl";
 import {
-  Plus, X, Bell, Search,
+  Plus, X, Bell, Search, ChevronLeft, ChevronRight,
   Wrench, CheckCircle2, MoreVertical,
   Box, ClipboardList, CalendarClock, AlertTriangle,
   Eye, Pencil, Copy, Trash2,
@@ -558,6 +558,24 @@ export default function ServicesPage() {
     });
   }, [services, filterAsset, filterType, filterStatus, searchQuery]);
 
+  // Facu (17 jul 2026): "no quiero scrollear la página sino que deberíamos
+  // usar esa forma como hicimos antes en el panel con los activos,
+  // flechitas para movernos" — same paginate-instead-of-scroll approach as
+  // the dashboard's "Tus activos" carousel, just with a bigger page size
+  // since this is a dense table rather than a handful of cards.
+  const SERVICES_PAGE_SIZE = 10;
+  const [servicesPage, setServicesPage] = useState(0);
+  const servicesTotalPages = Math.max(1, Math.ceil(filtered.length / SERVICES_PAGE_SIZE));
+  const safeServicesPage = Math.min(servicesPage, servicesTotalPages - 1);
+  const paginatedServices = filtered.slice(safeServicesPage * SERVICES_PAGE_SIZE, safeServicesPage * SERVICES_PAGE_SIZE + SERVICES_PAGE_SIZE);
+
+  // Jump back to page 1 whenever a filter or the search box changes —
+  // otherwise picking a filter while sitting on, say, page 4 could land on
+  // an empty page even though the new filtered set has plenty of results.
+  useEffect(() => {
+    setServicesPage(0);
+  }, [filterAsset, filterType, filterStatus, searchQuery]);
+
   // ── Summary tiles (Activos / Servicios / Programados / Vencidos) ──
   // Facu (17 jul 2026): "eso convierte la pantalla en un pequeño dashboard"
   // — counts are over the FULL unfiltered `services` list (not `filtered`),
@@ -627,23 +645,33 @@ export default function ServicesPage() {
 
           {/* ── Summary tiles ── Facu (17 jul 2026): "eso convierte la
               pantalla en un pequeño dashboard y le da contexto antes de
-              bajar a la lista". Same 4 numbers his mockup called out. */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
-            <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm p-4 flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-500 flex items-center justify-center shrink-0"><Box size={17} /></div>
-              <div className="min-w-0"><p className="text-[18px] font-black text-zinc-900 leading-tight">{summaryTiles.assets}</p><p className="text-[11px] text-zinc-400 leading-tight truncate">{t("tileAssets")}</p></div>
+              bajar a la lista". Same 4 numbers his mockup called out.
+              Two follow-up fixes from his screenshot: (1) "pones primero el
+              número y abajo el título, debería ser al revés" — label now
+              sits above the number, not below. (2) "hay mucho espacio entre
+              los rectángulos... aprovechar mejor el espacio" — the old
+              4-column grid stretched full-width, so each tile's actual
+              content (a small icon + a couple lines of text) sat in the
+              middle of a mostly-empty cell, reading as huge gaps. Switched
+              to a content-width flex row instead of a stretching grid —
+              tiles now size to their own content and sit snug next to each
+              other, no more dead space baked into each box. */}
+          <div className="flex flex-wrap gap-2.5 mb-5">
+            <div className="bg-white rounded-xl border border-zinc-200 shadow-sm px-3.5 py-2.5 flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-500 flex items-center justify-center shrink-0"><Box size={15} /></div>
+              <div><p className="text-[10px] text-zinc-400 font-bold uppercase tracking-wide leading-tight">{t("tileAssets")}</p><p className="text-[17px] font-black text-zinc-900 leading-tight">{summaryTiles.assets}</p></div>
             </div>
-            <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm p-4 flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-500 flex items-center justify-center shrink-0"><ClipboardList size={17} /></div>
-              <div className="min-w-0"><p className="text-[18px] font-black text-zinc-900 leading-tight">{summaryTiles.services}</p><p className="text-[11px] text-zinc-400 leading-tight truncate">{t("tileServices")}</p></div>
+            <div className="bg-white rounded-xl border border-zinc-200 shadow-sm px-3.5 py-2.5 flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-500 flex items-center justify-center shrink-0"><ClipboardList size={15} /></div>
+              <div><p className="text-[10px] text-zinc-400 font-bold uppercase tracking-wide leading-tight">{t("tileServices")}</p><p className="text-[17px] font-black text-zinc-900 leading-tight">{summaryTiles.services}</p></div>
             </div>
-            <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm p-4 flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl bg-amber-50 text-amber-500 flex items-center justify-center shrink-0"><CalendarClock size={17} /></div>
-              <div className="min-w-0"><p className="text-[18px] font-black text-zinc-900 leading-tight">{summaryTiles.scheduled}</p><p className="text-[11px] text-zinc-400 leading-tight truncate">{t("tileScheduled")}</p></div>
+            <div className="bg-white rounded-xl border border-zinc-200 shadow-sm px-3.5 py-2.5 flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-lg bg-amber-50 text-amber-500 flex items-center justify-center shrink-0"><CalendarClock size={15} /></div>
+              <div><p className="text-[10px] text-zinc-400 font-bold uppercase tracking-wide leading-tight">{t("tileScheduled")}</p><p className="text-[17px] font-black text-zinc-900 leading-tight">{summaryTiles.scheduled}</p></div>
             </div>
-            <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm p-4 flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl bg-red-50 text-red-500 flex items-center justify-center shrink-0"><AlertTriangle size={17} /></div>
-              <div className="min-w-0"><p className="text-[18px] font-black text-zinc-900 leading-tight">{summaryTiles.overdue}</p><p className="text-[11px] text-zinc-400 leading-tight truncate">{t("tileOverdue")}</p></div>
+            <div className="bg-white rounded-xl border border-zinc-200 shadow-sm px-3.5 py-2.5 flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-lg bg-red-50 text-red-500 flex items-center justify-center shrink-0"><AlertTriangle size={15} /></div>
+              <div><p className="text-[10px] text-zinc-400 font-bold uppercase tracking-wide leading-tight">{t("tileOverdue")}</p><p className="text-[17px] font-black text-zinc-900 leading-tight">{summaryTiles.overdue}</p></div>
             </div>
           </div>
 
@@ -735,7 +763,7 @@ export default function ServicesPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filtered.map((row) => {
+                  {paginatedServices.map((row) => {
                     const asset = getAsset(row);
                     const photo = asset?.photo_url ?? null;
                     const img = asset ? assetTypeImg[asset.asset_type] ?? "/images/car.png" : "/images/car.png";
@@ -860,6 +888,33 @@ export default function ServicesPage() {
                   })}
                 </tbody>
               </table>
+              </div>
+            )}
+            {/* Facu (17 jul 2026): "flechitas para movernos y ver páginas de
+                servicios" — same prev/next affordance as the dashboard's
+                asset carousel, instead of the whole page growing tall and
+                needing a scroll. */}
+            {!loading && servicesTotalPages > 1 && (
+              <div className="flex items-center justify-center gap-3 border-t border-zinc-100 py-3">
+                <button
+                  onClick={() => setServicesPage((p) => Math.max(0, p - 1))}
+                  disabled={safeServicesPage === 0}
+                  className="w-7 h-7 rounded-full border border-zinc-200 flex items-center justify-center text-zinc-500 hover:bg-zinc-50 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
+                  aria-label={t("previousPage")}
+                >
+                  <ChevronLeft size={14} />
+                </button>
+                <span className="text-[11.5px] text-zinc-500 font-medium">
+                  {t("pageOf", { page: safeServicesPage + 1, total: servicesTotalPages })}
+                </span>
+                <button
+                  onClick={() => setServicesPage((p) => Math.min(servicesTotalPages - 1, p + 1))}
+                  disabled={safeServicesPage >= servicesTotalPages - 1}
+                  className="w-7 h-7 rounded-full border border-zinc-200 flex items-center justify-center text-zinc-500 hover:bg-zinc-50 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
+                  aria-label={t("nextPage")}
+                >
+                  <ChevronRight size={14} />
+                </button>
               </div>
             )}
           </div>

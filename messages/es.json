@@ -1160,7 +1160,10 @@
     "saveChanges": "Guardar Cambios",
     "deleteConfirmTitle": "¿Eliminar este registro de servicio?",
     "deleteConfirmBody": "Se eliminará permanentemente del historial: {type} en {asset} del {date}.",
-    "noNotes": "Sin notas para este servicio."
+    "noNotes": "Sin notas para este servicio.",
+    "previousPage": "Página anterior",
+    "nextPage": "Página siguiente",
+    "pageOf": "Página {page} de {total}"
   },
   "AddAssetChooser": {
     "title": "Agregar Equipo",
