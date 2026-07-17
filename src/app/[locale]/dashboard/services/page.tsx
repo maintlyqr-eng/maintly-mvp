@@ -657,7 +657,12 @@ export default function ServicesPage() {
           onLogout={handleLogout}
         />
 
-        <div className="flex-1 overflow-y-auto p-4 md:p-7">
+        {/* Facu (17 jul 2026): "el espacio que hay entre la barra de arriba
+            y los rectángulos de Activos... sigue siendo grande" — this
+            container still had the old p-7 (28px) desktop padding from
+            before the rest of the app got tightened up. Matches the
+            dashboard home page's own p-4/p-5 convention now. */}
+        <div className="flex-1 overflow-y-auto p-4 md:p-5">
 
           {/* ── Summary tiles ── Facu (17 jul 2026): "quiero que se vea igual
               a esto" — matching his reference screenshot exactly this time:
