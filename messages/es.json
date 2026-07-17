@@ -1163,7 +1163,7 @@
     "noNotes": "Sin notas para este servicio.",
     "previousPage": "Página anterior",
     "nextPage": "Página siguiente",
-    "pageOf": "Página {page} de {total}"
+    "showingCount": "Mostrando {shown} de {total} servicios"
   },
   "AddAssetChooser": {
     "title": "Agregar Equipo",

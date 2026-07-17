@@ -60,6 +60,22 @@ function formatShortDate(dateStr: string, locale: string) {
   return d.toLocaleDateString(SHORT_DATE_LOCALE[locale] ?? "en-US", { day: "2-digit", month: "short" });
 }
 
+// Facu (17 jul 2026): "quiero que se vea igual a esto" — his reference
+// shows numbered pagination ("‹ 1 2 3 4 5 ... 39 ›"), not just prev/next
+// arrows. Builds "1 2 3 4 5 ... 39"-style windows: the first 5 pages, the
+// last page, and a small window around wherever the user currently is —
+// with "..." filling any gap so it never lists all 39 buttons at once.
+function getPageList(current: number, total: number): (number | "...")[] {
+  const keep = new Set([1, 2, 3, 4, 5, total, current - 1, current, current + 1].filter((n) => n >= 1 && n <= total));
+  const sorted = Array.from(keep).sort((a, b) => a - b);
+  const result: (number | "...")[] = [];
+  for (let i = 0; i < sorted.length; i++) {
+    if (i > 0 && sorted[i] - sorted[i - 1] > 1) result.push("...");
+    result.push(sorted[i]);
+  }
+  return result;
+}
+
 const assetTypeImg: Record<string, string> = {
   automotive: "/images/car.png",
   motorcycle: "/images/moto.png",
@@ -643,35 +659,27 @@ export default function ServicesPage() {
 
         <div className="flex-1 overflow-y-auto p-4 md:p-7">
 
-          {/* ── Summary tiles ── Facu (17 jul 2026): "eso convierte la
-              pantalla en un pequeño dashboard y le da contexto antes de
-              bajar a la lista". Same 4 numbers his mockup called out.
-              Two follow-up fixes from his screenshot: (1) "pones primero el
-              número y abajo el título, debería ser al revés" — label now
-              sits above the number, not below. (2) "hay mucho espacio entre
-              los rectángulos... aprovechar mejor el espacio" — the old
-              4-column grid stretched full-width, so each tile's actual
-              content (a small icon + a couple lines of text) sat in the
-              middle of a mostly-empty cell, reading as huge gaps. Switched
-              to a content-width flex row instead of a stretching grid —
-              tiles now size to their own content and sit snug next to each
-              other, no more dead space baked into each box. */}
-          <div className="flex flex-wrap gap-2.5 mb-5">
-            <div className="bg-white rounded-xl border border-zinc-200 shadow-sm px-3.5 py-2.5 flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-500 flex items-center justify-center shrink-0"><Box size={15} /></div>
-              <div><p className="text-[10px] text-zinc-400 font-bold uppercase tracking-wide leading-tight">{t("tileAssets")}</p><p className="text-[17px] font-black text-zinc-900 leading-tight">{summaryTiles.assets}</p></div>
+          {/* ── Summary tiles ── Facu (17 jul 2026): "quiero que se vea igual
+              a esto" — matching his reference screenshot exactly this time:
+              full-width grid, each tile tinted with its own soft color
+              (not plain white), solid-color icon circle, label on top in
+              regular gray, big bold number below. */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
+            <div className="rounded-2xl border border-blue-100 bg-blue-50/60 px-4 py-3.5 flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-blue-500 text-white flex items-center justify-center shrink-0"><Box size={18} /></div>
+              <div><p className="text-[12.5px] text-zinc-500 leading-tight">{t("tileAssets")}</p><p className="text-[21px] font-black text-zinc-900 leading-tight">{summaryTiles.assets}</p></div>
             </div>
-            <div className="bg-white rounded-xl border border-zinc-200 shadow-sm px-3.5 py-2.5 flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-500 flex items-center justify-center shrink-0"><ClipboardList size={15} /></div>
-              <div><p className="text-[10px] text-zinc-400 font-bold uppercase tracking-wide leading-tight">{t("tileServices")}</p><p className="text-[17px] font-black text-zinc-900 leading-tight">{summaryTiles.services}</p></div>
+            <div className="rounded-2xl border border-emerald-100 bg-emerald-50/60 px-4 py-3.5 flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-emerald-500 text-white flex items-center justify-center shrink-0"><ClipboardList size={18} /></div>
+              <div><p className="text-[12.5px] text-zinc-500 leading-tight">{t("tileServices")}</p><p className="text-[21px] font-black text-zinc-900 leading-tight">{summaryTiles.services}</p></div>
             </div>
-            <div className="bg-white rounded-xl border border-zinc-200 shadow-sm px-3.5 py-2.5 flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-lg bg-amber-50 text-amber-500 flex items-center justify-center shrink-0"><CalendarClock size={15} /></div>
-              <div><p className="text-[10px] text-zinc-400 font-bold uppercase tracking-wide leading-tight">{t("tileScheduled")}</p><p className="text-[17px] font-black text-zinc-900 leading-tight">{summaryTiles.scheduled}</p></div>
+            <div className="rounded-2xl border border-amber-100 bg-amber-50/60 px-4 py-3.5 flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-amber-500 text-white flex items-center justify-center shrink-0"><CalendarClock size={18} /></div>
+              <div><p className="text-[12.5px] text-zinc-500 leading-tight">{t("tileScheduled")}</p><p className="text-[21px] font-black text-zinc-900 leading-tight">{summaryTiles.scheduled}</p></div>
             </div>
-            <div className="bg-white rounded-xl border border-zinc-200 shadow-sm px-3.5 py-2.5 flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-lg bg-red-50 text-red-500 flex items-center justify-center shrink-0"><AlertTriangle size={15} /></div>
-              <div><p className="text-[10px] text-zinc-400 font-bold uppercase tracking-wide leading-tight">{t("tileOverdue")}</p><p className="text-[17px] font-black text-zinc-900 leading-tight">{summaryTiles.overdue}</p></div>
+            <div className="rounded-2xl border border-red-100 bg-red-50/60 px-4 py-3.5 flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-red-500 text-white flex items-center justify-center shrink-0"><AlertTriangle size={18} /></div>
+              <div><p className="text-[12.5px] text-zinc-500 leading-tight">{t("tileOverdue")}</p><p className="text-[21px] font-black text-zinc-900 leading-tight">{summaryTiles.overdue}</p></div>
             </div>
           </div>
 
@@ -890,31 +898,50 @@ export default function ServicesPage() {
               </table>
               </div>
             )}
-            {/* Facu (17 jul 2026): "flechitas para movernos y ver páginas de
-                servicios" — same prev/next affordance as the dashboard's
-                asset carousel, instead of the whole page growing tall and
-                needing a scroll. */}
-            {!loading && servicesTotalPages > 1 && (
-              <div className="flex items-center justify-center gap-3 border-t border-zinc-100 py-3">
-                <button
-                  onClick={() => setServicesPage((p) => Math.max(0, p - 1))}
-                  disabled={safeServicesPage === 0}
-                  className="w-7 h-7 rounded-full border border-zinc-200 flex items-center justify-center text-zinc-500 hover:bg-zinc-50 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
-                  aria-label={t("previousPage")}
-                >
-                  <ChevronLeft size={14} />
-                </button>
-                <span className="text-[11.5px] text-zinc-500 font-medium">
-                  {t("pageOf", { page: safeServicesPage + 1, total: servicesTotalPages })}
-                </span>
-                <button
-                  onClick={() => setServicesPage((p) => Math.min(servicesTotalPages - 1, p + 1))}
-                  disabled={safeServicesPage >= servicesTotalPages - 1}
-                  className="w-7 h-7 rounded-full border border-zinc-200 flex items-center justify-center text-zinc-500 hover:bg-zinc-50 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
-                  aria-label={t("nextPage")}
-                >
-                  <ChevronRight size={14} />
-                </button>
+            {/* Facu (17 jul 2026): "quiero que se vea igual a esto" — his
+                reference has a "Mostrando 10 de 381 servicios" count on the
+                left and numbered page buttons ("‹ 1 2 3 4 5 ... 39 ›") on
+                the right, not just a plain prev/next + "Página X de Y". */}
+            {!loading && filtered.length > 0 && (
+              <div className="flex items-center justify-between gap-3 flex-wrap border-t border-zinc-100 px-5 py-3">
+                <p className="text-[11.5px] text-zinc-400">
+                  {t("showingCount", { shown: paginatedServices.length, total: filtered.length })}
+                </p>
+                {servicesTotalPages > 1 && (
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => setServicesPage((p) => Math.max(0, p - 1))}
+                      disabled={safeServicesPage === 0}
+                      className="w-7 h-7 rounded-full border border-zinc-200 flex items-center justify-center text-zinc-500 hover:bg-zinc-50 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
+                      aria-label={t("previousPage")}
+                    >
+                      <ChevronLeft size={14} />
+                    </button>
+                    {getPageList(safeServicesPage + 1, servicesTotalPages).map((p, i) =>
+                      p === "..." ? (
+                        <span key={`ellipsis-${i}`} className="w-7 h-7 flex items-center justify-center text-[11.5px] text-zinc-300">…</span>
+                      ) : (
+                        <button
+                          key={p}
+                          onClick={() => setServicesPage(p - 1)}
+                          className={`w-7 h-7 rounded-full flex items-center justify-center text-[11.5px] font-bold transition-colors ${
+                            p === safeServicesPage + 1 ? "bg-red-600 text-white" : "text-zinc-500 hover:bg-zinc-50"
+                          }`}
+                        >
+                          {p}
+                        </button>
+                      )
+                    )}
+                    <button
+                      onClick={() => setServicesPage((p) => Math.min(servicesTotalPages - 1, p + 1))}
+                      disabled={safeServicesPage >= servicesTotalPages - 1}
+                      className="w-7 h-7 rounded-full border border-zinc-200 flex items-center justify-center text-zinc-500 hover:bg-zinc-50 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
+                      aria-label={t("nextPage")}
+                    >
+                      <ChevronRight size={14} />
+                    </button>
+                  </div>
+                )}
               </div>
             )}
           </div>

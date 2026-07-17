@@ -1163,7 +1163,7 @@
     "noNotes": "No notes for this service.",
     "previousPage": "Previous page",
     "nextPage": "Next page",
-    "pageOf": "Page {page} of {total}"
+    "showingCount": "Showing {shown} of {total} services"
   },
   "AddAssetChooser": {
     "title": "Add Equipment",
