@@ -760,7 +760,11 @@ export default function DashboardPage() {
 
         <DashboardHeaderIntl
           title={t(greetingKey, { name: firstName })}
-          subtitle={greetingSubtitle}
+          // TEMP TEST MARKER (17 jul 2026) — Facu asked for a tiny, obvious
+          // change to push and confirm the Vercel deploy pipeline is alive,
+          // independent of any other code question. Remove this line once
+          // confirmed and revert to `subtitle={greetingSubtitle}`.
+          subtitle={`${greetingSubtitle} — TEST DEPLOY OK`}
           onOpenSidebar={() => setSidebarOpen(true)}
           mechanicId={mechanicId}
           unreadMessages={unreadMessages}
