@@ -12,7 +12,7 @@ import {
   Plus, X, Bell, Search, ChevronLeft, ChevronRight,
   Wrench, CheckCircle2, MoreVertical,
   Box, ClipboardList, CalendarClock, AlertTriangle,
-  Eye,
+  Eye, Archive,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import DashboardSidebarIntl from "@/components/DashboardSidebarIntl";
@@ -128,6 +128,7 @@ type ServiceRow = {
   created_at: string;
   next_due_date: string | null;
   next_due_km_hours: number | null;
+  hidden_from_panel_at: string | null;
   assets: AssetInfo | AssetInfo[] | null;
 };
 
@@ -203,15 +204,33 @@ export default function ServicesPage() {
   // información pero nunca borrar algo ya cargado en ella" — any logged-in
   // mechanic can ADD a service to any asset (that's intentional, by
   // design), but NONE of them — not even the one who logged it — can
-  // delete a service once it exists. Deleting is admin-only, and already
-  // has its own dedicated flow: the admin Papelera (src/app/api/admin/
-  // trash/route.ts + services/route.ts) soft-deletes / restores / hard-
-  // deletes with capability checks and an audit log. So this page no
-  // longer has a Delete action at all — see also the RLS hardening in
-  // supabase/migrations/040_lock_service_records_delete.sql, which blocks
-  // a regular mechanic from soft-deleting a service_records row even via a
-  // direct API call, not just hiding the button here.
+  // truly delete a service once it exists. Real deletion is admin-only,
+  // via the admin Papelera (src/app/api/admin/trash/route.ts + services/
+  // route.ts), gated by capability checks + audit log, and enforced at the
+  // DB level too (supabase/migrations/040_lock_service_records_delete.sql
+  // blocks any non-admin from setting deleted_at, even via a direct API
+  // call — not just hiding the button here).
+  //
+  // Facu (19 jul 2026), clarifying further with an example (mechanic
+  // creates an asset, logs a service, later removes both from "sus
+  // registros" — but "ni el asset ni el service será borrado jamás de
+  // MaintlyQR... si alguien escanea el QR va a poder ver todo lo que se
+  // cargó"): a mechanic SHOULD still be able to clear things out of their
+  // own personal panel — that's the same pattern `mechanic_assets` already
+  // gives assets (handleRemoveFromWorkshop in dashboard/assets/page.tsx
+  // only unlinks, never touches the shared `assets` row). service_records
+  // doesn't have that many-to-many link table (each row already belongs to
+  // one mechanic_id), so the equivalent here is the `hidden_from_panel_at`
+  // column (migration 041): setting it only removes the row from THIS
+  // mechanic's own "Mis Servicios" (see the .is("hidden_from_panel_at",
+  // null) filter in loadServices above) — the public QR history and any
+  // other mechanic's view of the same asset are untouched. This is why the
+  // menu below has "Quitar de mis registros" and NOT "Eliminar".
   const [viewRow, setViewRow] = useState<ServiceRow | null>(null);
+
+  const [hideRow, setHideRow] = useState<ServiceRow | null>(null);
+  const [hideSaving, setHideSaving] = useState(false);
+  const [hideError, setHideError] = useState("");
 
   // Row-hover state for the "..." actions trigger, driven by explicit
   // onMouseEnter/onMouseLeave rather than a pure CSS group-hover toggle —
@@ -250,9 +269,17 @@ export default function ServicesPage() {
     setLoading(true);
     const { data } = await supabase
       .from("service_records")
-      .select("id, service_date, service_type, km_hours, notes, created_at, next_due_date, next_due_km_hours, assets(id, nickname, brand, model, vin_serial, plate, asset_type, photo_url, qr_codes(code))")
+      .select("id, service_date, service_type, km_hours, notes, created_at, next_due_date, next_due_km_hours, hidden_from_panel_at, assets(id, nickname, brand, model, vin_serial, plate, asset_type, photo_url, qr_codes(code))")
       .eq("mechanic_id", uid)
       .is("deleted_at", null)
+      // Facu (19 jul 2026): "eso sí debería poder hacer, borrar lo que él
+      // quiera porque es su panel, pero nunca se borra de la máquina" —
+      // hidden_from_panel_at (migration 041) is the per-mechanic "remove
+      // from my Mis Servicios list" flag, separate from deleted_at (which
+      // migration 040 locked to Super Admin only). Only THIS query — the
+      // mechanic's own panel — filters on it; the public QR history and
+      // any other mechanic's view of the same asset intentionally do not.
+      .is("hidden_from_panel_at", null)
       .order("service_date", { ascending: false });
     setServices((data as unknown as ServiceRow[]) ?? []);
     setLoading(false);
@@ -468,6 +495,29 @@ export default function ServicesPage() {
   function handleOpenView(row: ServiceRow) {
     setViewRow(row);
     setOpenMenuRowId(null);
+  }
+
+  function handleOpenHide(row: ServiceRow) {
+    setHideRow(row);
+    setHideError("");
+    setOpenMenuRowId(null);
+  }
+
+  // Sets hidden_from_panel_at, never deleted_at — see the comment above
+  // hideRow's declaration. Only affects this mechanic's own "Mis
+  // Servicios" list; the record itself is untouched everywhere else.
+  async function handleConfirmHide() {
+    if (!hideRow) return;
+    setHideSaving(true);
+    setHideError("");
+    const { error } = await supabase
+      .from("service_records")
+      .update({ hidden_from_panel_at: new Date().toISOString() })
+      .eq("id", hideRow.id);
+    setHideSaving(false);
+    if (error) { setHideError(error.message); return; }
+    setHideRow(null);
+    await loadServices(mechanicId);
   }
 
   // Facu (17 jul 2026): the Status filter isn't a new concept — every
@@ -821,6 +871,18 @@ export default function ServicesPage() {
                                 <Bell size={13} className="text-zinc-400" />
                                 {hasReminder ? t("editReminderMenu") : t("setReminderMenu")}
                               </button>
+                              <div className="my-1 border-t border-zinc-100" />
+                              {/* Facu (19 jul 2026): "eso sí debería poder
+                                  hacer, borrar lo que él quiera porque es su
+                                  panel" — deliberately NOT called "Eliminar":
+                                  this only clears it from THIS mechanic's own
+                                  Mis Servicios, never from the machine. */}
+                              <button
+                                onClick={() => handleOpenHide(row)}
+                                className="w-full flex items-center gap-2 px-3 py-2 text-[12px] font-medium text-zinc-700 hover:bg-zinc-50"
+                              >
+                                <Archive size={13} className="text-zinc-400" /> {t("actionRemoveFromPanel")}
+                              </button>
                             </div>
                           )}
                         </td>
@@ -1096,6 +1158,43 @@ export default function ServicesPage() {
 
               <div className="px-6 pb-5">
                 <button onClick={() => setViewRow(null)} className="w-full border border-zinc-200 text-zinc-700 font-bold py-[11px] rounded-xl text-[13px] hover:bg-zinc-50">{t("close")}</button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* ════ REMOVE FROM PANEL CONFIRM MODAL ════ */}
+      {/* Facu (19 jul 2026): NOT the same thing as deleting — copy is
+          explicit that the service stays on the machine's history, this
+          only clears it from the mechanic's own Mis Servicios list. */}
+      {hideRow && (() => {
+        const asset = getAsset(hideRow);
+        const label = asset?.nickname || [asset?.brand, asset?.model].filter(Boolean).join(" ") || t("unknownAsset");
+        return (
+          <div className="fixed inset-0 z-50 bg-zinc-900/40 flex items-center justify-center p-4" onClick={() => setHideRow(null)}>
+            <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm" onClick={(e) => e.stopPropagation()}>
+              <div className="px-6 py-5">
+                <div className="w-10 h-10 rounded-xl bg-amber-50 flex items-center justify-center mb-3">
+                  <Archive size={17} className="text-amber-600" />
+                </div>
+                <h2 className="text-[15px] font-black text-zinc-900 mb-1">{t("removeFromPanelConfirmTitle")}</h2>
+                <p className="text-[12.5px] text-zinc-500">
+                  {t("removeFromPanelConfirmBody", {
+                    asset: label,
+                    type: tServiceTypes(SERVICE_TYPE_KEYS[hideRow.service_type] ?? "other"),
+                    date: formatDateDMY(hideRow.service_date),
+                  })}
+                </p>
+                {hideError && (
+                  <div className="mt-3 rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-[12px] text-red-700">{hideError}</div>
+                )}
+                <div className="flex gap-3 pt-4">
+                  <button onClick={() => setHideRow(null)} className="flex-1 border border-zinc-200 text-zinc-700 font-bold py-[11px] rounded-xl text-[13px] hover:bg-zinc-50">{t("cancel")}</button>
+                  <button onClick={handleConfirmHide} disabled={hideSaving} className="flex-1 bg-red-600 hover:bg-red-500 disabled:opacity-60 transition-all text-white font-bold py-[11px] rounded-xl text-[13px]">
+                    {hideSaving ? t("removingFromPanel") : t("actionRemoveFromPanel")}
+                  </button>
+                </div>
               </div>
             </div>
           </div>

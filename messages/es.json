@@ -1157,7 +1157,11 @@
     "previousPage": "Página anterior",
     "nextPage": "Página siguiente",
     "showingCount": "Mostrando {shown} de {total} servicios",
-    "errorInappropriateContent": "El texto contiene contenido no permitido. Revisalo antes de guardar."
+    "errorInappropriateContent": "El texto contiene contenido no permitido. Revisalo antes de guardar.",
+    "actionRemoveFromPanel": "Quitar de mis registros",
+    "removeFromPanelConfirmTitle": "¿Quitar esto de tus registros?",
+    "removeFromPanelConfirmBody": "{type} en {asset} del {date} dejará de aparecer en tu lista de Mis Servicios. Sigue en el historial del activo: quien escanee su QR lo va a seguir viendo.",
+    "removingFromPanel": "Quitando..."
   },
   "AddAssetChooser": {
     "title": "Agregar Equipo",

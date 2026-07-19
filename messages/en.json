@@ -1157,7 +1157,11 @@
     "previousPage": "Previous page",
     "nextPage": "Next page",
     "showingCount": "Showing {shown} of {total} services",
-    "errorInappropriateContent": "This text contains content that isn't allowed. Please review it before saving."
+    "errorInappropriateContent": "This text contains content that isn't allowed. Please review it before saving.",
+    "actionRemoveFromPanel": "Remove from my list",
+    "removeFromPanelConfirmTitle": "Remove this from your list?",
+    "removeFromPanelConfirmBody": "{type} on {asset} from {date} will no longer appear in your Mis Servicios list. It stays on the asset's history — anyone who scans its QR code will still see it.",
+    "removingFromPanel": "Removing..."
   },
   "AddAssetChooser": {
     "title": "Add Equipment",

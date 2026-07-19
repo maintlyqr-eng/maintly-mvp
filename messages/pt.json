@@ -1157,7 +1157,11 @@
     "previousPage": "Página anterior",
     "nextPage": "Próxima página",
     "showingCount": "Mostrando {shown} de {total} serviços",
-    "errorInappropriateContent": "O texto contém conteúdo não permitido. Revise antes de salvar."
+    "errorInappropriateContent": "O texto contém conteúdo não permitido. Revise antes de salvar.",
+    "actionRemoveFromPanel": "Remover da minha lista",
+    "removeFromPanelConfirmTitle": "Remover isto da sua lista?",
+    "removeFromPanelConfirmBody": "{type} em {asset} de {date} deixará de aparecer na sua lista de Meus Serviços. Continua no histórico do ativo: quem escanear o QR ainda vai vê-lo.",
+    "removingFromPanel": "Removendo..."
   },
   "AddAssetChooser": {
     "title": "Adicionar Equipamento",
