@@ -783,12 +783,17 @@ export default function DashboardPage() {
               buttons used to sit alone on their own empty row above this
               card — folded them into this card's header line instead, so
               that dead strip of whitespace is gone. */}
-          <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm p-3.5 mb-1.5">
+          {/* Facu (19 jul 2026): "quiero 0 escroll... MaintlyQR tiene que
+              ser fácil y práctico" — this whole page got a second, more
+              aggressive density pass on top of the p-4/p-7 -> p-3/p-4
+              container change from before: every card's own padding,
+              every section's inner gaps, all trimmed a notch further. */}
+          <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm p-3 mb-1">
             {/* flex-col on phones, side-by-side from sm: up — on a narrow
                 screen, a title + 2 buttons on one "justify-between" row
                 either overflowed the card or squished the buttons down to
                 unreadable. Stacking avoids both. */}
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5 sm:gap-3 mb-3">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5 sm:gap-3 mb-2.5">
               <div className="flex items-center gap-2">
                 <h2 className="text-[14px] font-black text-zinc-900">{t("todaysPriorities")}</h2>
                 {reminders.length > 0 && (
@@ -851,7 +856,7 @@ export default function DashboardPage() {
                   <Link
                     key={`${item.kind}-${item.id}`}
                     href={itemHref}
-                    className={`rounded-xl border p-3 flex items-center gap-2.5 transition-colors ${overdue ? "bg-red-50 border-red-200 hover:border-red-300" : "bg-amber-50 border-amber-200 hover:border-amber-300"}`}
+                    className={`rounded-xl border p-2.5 flex items-center gap-2.5 transition-colors ${overdue ? "bg-red-50 border-red-200 hover:border-red-300" : "bg-amber-50 border-amber-200 hover:border-amber-300"}`}
                   >
                     <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${overdue ? "bg-red-100 text-red-600" : "bg-amber-100 text-amber-600"}`}>
                       {overdue ? <AlertCircle size={15} /> : <Clock size={15} />}
@@ -896,7 +901,7 @@ export default function DashboardPage() {
               >
                 <Link
                   href="/dashboard/calendar"
-                  className="rounded-xl border border-dashed border-zinc-300 hover:border-zinc-400 p-3 flex items-center gap-2.5 text-zinc-500 hover:text-zinc-700 transition-colors"
+                  className="rounded-xl border border-dashed border-zinc-300 hover:border-zinc-400 p-2.5 flex items-center gap-2.5 text-zinc-500 hover:text-zinc-700 transition-colors"
                 >
                   <div className="w-8 h-8 rounded-full bg-zinc-100 flex items-center justify-center shrink-0">
                     <CalendarClock size={15} />
@@ -956,7 +961,7 @@ export default function DashboardPage() {
               <p className="text-[12px] text-zinc-400 mt-1">{t("noRemindersDueSoon")}</p>
             )}
             {priorityTotalPages > 1 && (
-              <div className="flex items-center justify-center gap-1.5 mt-3">
+              <div className="flex items-center justify-center gap-1.5 mt-2">
                 {Array.from({ length: priorityTotalPages }).map((_, i) => (
                   <button
                     key={i}
@@ -975,12 +980,12 @@ export default function DashboardPage() {
               with a gap between each (their own border+shadow+rounded
               corners apiece). Merged into one card with thin internal
               dividers instead, so it reads as one unit, not three. */}
-          <div className="grid grid-cols-1 lg:grid-cols-[1.1fr_1fr_1fr] divide-y lg:divide-y-0 lg:divide-x divide-zinc-100 bg-white rounded-2xl border border-zinc-200 shadow-sm mb-1.5">
+          <div className="grid grid-cols-1 lg:grid-cols-[1.1fr_1fr_1fr] divide-y lg:divide-y-0 lg:divide-x divide-zinc-100 bg-white rounded-2xl border border-zinc-200 shadow-sm mb-1">
 
-            <div className="p-3.5">
-              <h3 className="text-[13px] font-black text-zinc-900 mb-3">{t("maintenanceHealth")}</h3>
+            <div className="p-3">
+              <h3 className="text-[13px] font-black text-zinc-900 mb-2.5">{t("maintenanceHealth")}</h3>
               <div className="flex items-center gap-4">
-                <div className="relative w-[96px] h-[96px] shrink-0">
+                <div className="relative w-[84px] h-[84px] shrink-0">
                   <svg viewBox="0 0 120 120" className="w-full h-full -rotate-90">
                     <circle cx="60" cy="60" r="52" fill="none" stroke="#e4e4e7" strokeWidth="12" />
                     <circle
@@ -990,12 +995,12 @@ export default function DashboardPage() {
                     />
                   </svg>
                   <div className="absolute inset-0 flex items-center justify-center">
-                    <span className="text-[19px] font-black text-zinc-900">{maintenanceHealth}%</span>
+                    <span className="text-[17px] font-black text-zinc-900">{maintenanceHealth}%</span>
                   </div>
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="text-[12px] font-bold mb-2" style={{ color: healthArcColor }}>{healthStatusLabel}</p>
-                  <ul className="space-y-1.5">
+                  <p className="text-[12px] font-bold mb-1.5" style={{ color: healthArcColor }}>{healthStatusLabel}</p>
+                  <ul className="space-y-1">
                     <li className="flex items-center gap-1.5 text-[11px] text-zinc-600">
                       <CheckCircle2 size={12} className="text-green-500 shrink-0" /> {t("healthCheckAssets", { count: totalAssets })}
                     </li>
@@ -1008,22 +1013,22 @@ export default function DashboardPage() {
                   </ul>
                 </div>
               </div>
-              <div className="mt-3 flex items-start gap-2.5 bg-zinc-50 border border-zinc-100 rounded-xl p-2.5">
+              <div className="mt-2 flex items-start gap-2.5 bg-zinc-50 border border-zinc-100 rounded-xl p-2">
                 <Lightbulb size={14} className="text-amber-500 shrink-0 mt-0.5" />
                 <p className="text-[11px] text-zinc-500 leading-relaxed">{healthTip}</p>
               </div>
             </div>
 
-            <div className="p-3.5">
-              <h3 className="text-[13px] font-black text-zinc-900 mb-3">{t("quickSummary")}</h3>
+            <div className="p-3">
+              <h3 className="text-[13px] font-black text-zinc-900 mb-2.5">{t("quickSummary")}</h3>
               {/* Facu (16 jul 2026): each tile used to stack icon → value →
                   caption vertically, which made this card one of the
                   tallest on the page for not much information. Laid out
                   horizontally (icon beside the number) instead — same 4
                   numbers, roughly half the height. */}
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-2 gap-1.5">
                 {resumenTiles.map(({ id, value, caption, icon: Icon, color }) => (
-                  <div key={id} className="flex items-center gap-2 rounded-xl border border-zinc-100 bg-zinc-50/60 p-2">
+                  <div key={id} className="flex items-center gap-2 rounded-xl border border-zinc-100 bg-zinc-50/60 p-1.5">
                     <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${color}`}>
                       <Icon size={13} />
                     </div>
@@ -1036,15 +1041,15 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            <div className="p-3.5">
-              <div className="flex items-center justify-between mb-3">
+            <div className="p-3">
+              <div className="flex items-center justify-between mb-2.5">
                 <h3 className="text-[13px] font-black text-zinc-900">{t("upcomingReminders")}</h3>
                 <Link href="/dashboard/services" className="text-[11px] font-semibold text-red-600 hover:text-red-700">{t("viewAll")}</Link>
               </div>
               {reminders.length === 0 ? (
                 <p className="text-[12px] text-zinc-400 text-center py-4">{t("noRemindersDueSoon")}</p>
               ) : (
-                <div className="space-y-2">
+                <div className="space-y-1.5">
                   {reminders.slice(0, 4).map((r) => {
                     const overdue = r.status === "overdue";
                     const rHref = r.kind === "service" && r.assetId
@@ -1074,10 +1079,10 @@ export default function DashboardPage() {
 
           {/* ── "Tus activos" carousel + "Actividad reciente" ── same
               merge-into-one-card treatment as the row above. */}
-          <div className="grid grid-cols-1 lg:grid-cols-[1.6fr_1fr] divide-y lg:divide-y-0 lg:divide-x divide-zinc-100 bg-white rounded-2xl border border-zinc-200 shadow-sm mb-1.5">
+          <div className="grid grid-cols-1 lg:grid-cols-[1.6fr_1fr] divide-y lg:divide-y-0 lg:divide-x divide-zinc-100 bg-white rounded-2xl border border-zinc-200 shadow-sm mb-1">
 
-            <div className="p-3.5">
-              <div className="flex items-center justify-between mb-3">
+            <div className="p-3">
+              <div className="flex items-center justify-between mb-2.5">
                 <h3 className="text-[13px] font-black text-zinc-900">{t("yourAssets")}</h3>
                 <div className="flex items-center gap-2">
                   {/* Facu (16 jul 2026): the page dots alone didn't make it
@@ -1136,12 +1141,12 @@ export default function DashboardPage() {
                               to object-contain, same as the fallback icon
                               below, so the whole photo is always visible,
                               shrunk to fit instead of cropped. */}
-                          <div className="w-full h-16 rounded-lg bg-white border border-zinc-100 flex items-center justify-center overflow-hidden mb-1.5">
+                          <div className="w-full h-14 rounded-lg bg-white border border-zinc-100 flex items-center justify-center overflow-hidden mb-1.5">
                             {a.photoUrl ? (
                               // eslint-disable-next-line @next/next/no-img-element
                               <img src={img} alt={a.label} className="w-full h-full object-contain" />
                             ) : (
-                              <Image src={img} alt={a.label} width={36} height={36} className="object-contain" />
+                              <Image src={img} alt={a.label} width={32} height={32} className="object-contain" />
                             )}
                           </div>
                           <p className="text-[11px] font-bold text-zinc-800 truncate">{a.label}</p>
@@ -1154,7 +1159,7 @@ export default function DashboardPage() {
                     })}
                   </div>
                   {assetCards.length > 4 && (
-                    <div className="flex items-center justify-center gap-1.5 mt-4">
+                    <div className="flex items-center justify-center gap-1.5 mt-3">
                       {Array.from({ length: Math.ceil(assetCards.length / 4) }).map((_, i) => (
                         <button
                           key={i}
@@ -1169,14 +1174,14 @@ export default function DashboardPage() {
               )}
             </div>
 
-            <div className="p-3.5">
-              <div className="flex items-center justify-between mb-3">
+            <div className="p-3">
+              <div className="flex items-center justify-between mb-2.5">
                 <h3 className="text-[13px] font-black text-zinc-900">{t("recentActivity")}</h3>
               </div>
               {recentActivity.length === 0 ? (
                 <p className="text-[12px] text-zinc-400 text-center py-6">{t("noActivityYet")}</p>
               ) : (
-                <div className="space-y-2.5">
+                <div className="space-y-2">
                   {recentActivity.map((act) => (
                     <div key={act.id} className="flex items-start gap-2.5">
                       <div className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 mt-0.5 ${act.kind === "service" ? "bg-green-50 text-green-600" : "bg-blue-50 text-blue-600"}`}>
@@ -1207,7 +1212,7 @@ export default function DashboardPage() {
               design that separately later since it needs real unlock
               rules, not just a restyle. This banner is just the warm,
               values-oriented copy from the same mockup, on its own. */}
-          <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm p-3 mb-2 flex items-center gap-3">
+          <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm p-2.5 mb-1 flex items-center gap-3">
             <Heart size={18} className="text-red-500 shrink-0" />
             <div>
               <p className="text-[12.5px] font-bold text-zinc-800">{t("valuePropTitle")}</p>
@@ -1215,7 +1220,7 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          <p className="text-center text-[10px] text-zinc-400 mt-2">{t("copyright")}</p>
+          <p className="text-center text-[10px] text-zinc-400 mt-1">{t("copyright")}</p>
         </div>
       </div>
 

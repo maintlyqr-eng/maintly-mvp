@@ -58,7 +58,13 @@ export default function DashboardHeaderIntl({
 
   return (
     <Fragment>
-      <header className={`${className} flex items-center justify-between gap-3 px-4 md:px-7 py-4 bg-white border-b border-zinc-200`}>
+      {/* Facu (19 jul 2026): "quiero que sea mínimo ese espacio" — pointing
+          at the gap between this header and the card right below it on
+          every dashboard page. Shared header (12 routes), so py-4 -> py-3
+          tightens that gap everywhere at once, same direction as the
+          p-4/p-7 -> p-3/p-4 pass already done on the page containers
+          themselves (e.g. dashboard/services/page.tsx). */}
+      <header className={`${className} flex items-center justify-between gap-3 px-4 md:px-7 py-3 bg-white border-b border-zinc-200`}>
         <div className="flex items-center gap-3 min-w-0">
           <button onClick={onOpenSidebar} className="md:hidden shrink-0 text-zinc-600 hover:text-zinc-900">
             <Menu size={22} />
