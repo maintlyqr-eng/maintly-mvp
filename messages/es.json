@@ -1142,8 +1142,8 @@
     "unitShortHours": "hs",
     "unitShortKm": "km",
     "actionView": "Ver",
-    "actionEdit": "Editar",
     "actionDelete": "Eliminar",
+    "close": "Cerrar",
     "deleting": "Eliminando...",
     "allStatuses": "Todos los estados",
     "filterStatusCompleted": "Completado",
@@ -1155,14 +1155,13 @@
     "tileServices": "Servicios",
     "tileScheduled": "Programados",
     "tileOverdue": "Vencidos",
-    "editModalTitle": "Editar Servicio",
-    "saveChanges": "Guardar Cambios",
     "deleteConfirmTitle": "¿Eliminar este registro de servicio?",
     "deleteConfirmBody": "Se eliminará permanentemente del historial: {type} en {asset} del {date}.",
     "noNotes": "Sin notas para este servicio.",
     "previousPage": "Página anterior",
     "nextPage": "Página siguiente",
-    "showingCount": "Mostrando {shown} de {total} servicios"
+    "showingCount": "Mostrando {shown} de {total} servicios",
+    "errorInappropriateContent": "El texto contiene contenido no permitido. Revisalo antes de guardar."
   },
   "AddAssetChooser": {
     "title": "Agregar Equipo",

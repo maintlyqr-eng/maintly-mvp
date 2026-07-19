@@ -1142,8 +1142,8 @@
     "unitShortHours": "h",
     "unitShortKm": "km",
     "actionView": "Ver",
-    "actionEdit": "Editar",
     "actionDelete": "Excluir",
+    "close": "Fechar",
     "deleting": "Excluindo...",
     "allStatuses": "Todos os status",
     "filterStatusCompleted": "Concluído",
@@ -1155,14 +1155,13 @@
     "tileServices": "Serviços",
     "tileScheduled": "Agendados",
     "tileOverdue": "Atrasados",
-    "editModalTitle": "Editar Serviço",
-    "saveChanges": "Salvar Alterações",
     "deleteConfirmTitle": "Excluir este registro de serviço?",
     "deleteConfirmBody": "Será removido permanentemente do histórico: {type} em {asset} de {date}.",
     "noNotes": "Sem notas para este serviço.",
     "previousPage": "Página anterior",
     "nextPage": "Próxima página",
-    "showingCount": "Mostrando {shown} de {total} serviços"
+    "showingCount": "Mostrando {shown} de {total} serviços",
+    "errorInappropriateContent": "O texto contém conteúdo não permitido. Revise antes de salvar."
   },
   "AddAssetChooser": {
     "title": "Adicionar Equipamento",

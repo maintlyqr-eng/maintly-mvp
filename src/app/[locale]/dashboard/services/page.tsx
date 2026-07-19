@@ -12,7 +12,7 @@ import {
   Plus, X, Bell, Search, ChevronLeft, ChevronRight,
   Wrench, CheckCircle2, MoreVertical,
   Box, ClipboardList, CalendarClock, AlertTriangle,
-  Eye, Pencil, Trash2,
+  Eye, Trash2,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import DashboardSidebarIntl from "@/components/DashboardSidebarIntl";
@@ -23,6 +23,7 @@ import CustomerPickerIntl, { CustomerOption } from "@/components/CustomerPickerI
 import { formatDateDMY } from "@/lib/date";
 import { computeReminderStatus, REMINDER_STATUS_COLOR } from "@/lib/reminders";
 import { getUnitKind } from "@/lib/units";
+import { containsInappropriateContent } from "@/lib/contentModeration";
 
 const SERVICE_TYPE_ORDER = ["Oil Change", "Service", "Repair", "Inspection", "Filter Change", "Tire Change", "Brake Service", "Other"];
 
@@ -188,24 +189,17 @@ export default function ServicesPage() {
   const [reminderSaving, setReminderSaving] = useState(false);
   const [reminderError, setReminderError] = useState("");
 
-  // Facu (17 jul 2026): "yo agregaría hover... View / Edit / Duplicate /
-  // Delete" — the old menu only had one item (set reminder). View is a
-  // read-only detail popup (this is also where Notes now live — hidden from
-  // the table itself per his note 5, "las notas las ocultaría... las
-  // mostraría solamente al abrir el servicio"). Edit reuses the same fields
-  // as "Agregar Servicio" but updates the existing row instead of
-  // inserting. Duplicate clones type/reading/notes onto a new row dated
-  // today. Delete soft-deletes (deleted_at), with an inline confirm instead
-  // of a native confirm() popup, consistent with the rest of the app.
+  // Facu (19 jul 2026): "no se debería poder editar un servicio ya
+  // cargado... eso queda ahí para siempre a menos que el administrador lo
+  // elimine por alguna causa razonable" — a logged service is now
+  // immutable. The menu only has View (read-only detail, also where Notes
+  // now live — hidden from the table itself per his earlier note 5, "las
+  // notas las ocultaría... las mostraría solamente al abrir el servicio")
+  // and Delete (soft-deletes via deleted_at, with an inline confirm instead
+  // of a native confirm() popup). There used to be an Edit action here too
+  // (and briefly a Duplicate one) — both removed; see git history if this
+  // ever needs to come back.
   const [viewRow, setViewRow] = useState<ServiceRow | null>(null);
-
-  const [editRow, setEditRow] = useState<ServiceRow | null>(null);
-  const [editDate, setEditDate] = useState("");
-  const [editType, setEditType] = useState("Oil Change");
-  const [editKmHours, setEditKmHours] = useState("");
-  const [editNotes, setEditNotes] = useState("");
-  const [editSaving, setEditSaving] = useState(false);
-  const [editError, setEditError] = useState("");
 
   // Row-hover state for the "..." actions trigger, driven by explicit
   // onMouseEnter/onMouseLeave rather than a pure CSS group-hover toggle —
@@ -368,6 +362,17 @@ export default function ServicesPage() {
       return;
     }
 
+    // Facu (19 jul 2026): "qué pasa si una persona por hacer bromas o daño
+    // escribe cosas impropias?" — since a service can no longer be edited
+    // once saved (see comment above viewRow), catching this at save time
+    // is the only chance to keep obviously inappropriate text out of a
+    // permanent record. Blocks the save outright rather than saving-and-
+    // flagging, per his call.
+    if (containsInappropriateContent(svcNotes)) {
+      setSvcError(t("errorInappropriateContent"));
+      return;
+    }
+
     setSvcSaving(true);
 
     const { error } = await supabase.from("service_records").insert({
@@ -455,39 +460,6 @@ export default function ServicesPage() {
   function handleOpenView(row: ServiceRow) {
     setViewRow(row);
     setOpenMenuRowId(null);
-  }
-
-  function handleOpenEdit(row: ServiceRow) {
-    setEditRow(row);
-    setEditDate(row.service_date);
-    setEditType(row.service_type);
-    setEditKmHours(row.km_hours != null ? String(row.km_hours) : "");
-    setEditNotes(row.notes ?? "");
-    setEditError("");
-    setOpenMenuRowId(null);
-  }
-
-  async function handleSaveEdit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!editRow) return;
-    setEditError("");
-    setEditSaving(true);
-
-    const { error } = await supabase
-      .from("service_records")
-      .update({
-        service_date: editDate,
-        service_type: editType,
-        km_hours: editKmHours ? parseFloat(editKmHours) : null,
-        notes: editNotes.trim() || null,
-      })
-      .eq("id", editRow.id);
-
-    setEditSaving(false);
-    if (error) { setEditError(error.message); return; }
-
-    setEditRow(null);
-    await loadServices(mechanicId);
   }
 
   function handleOpenDelete(row: ServiceRow) {
@@ -855,12 +827,6 @@ export default function ServicesPage() {
                                 <Eye size={13} className="text-zinc-400" /> {t("actionView")}
                               </button>
                               <button
-                                onClick={() => handleOpenEdit(row)}
-                                className="w-full flex items-center gap-2 px-3 py-2 text-[12px] font-medium text-zinc-700 hover:bg-zinc-50"
-                              >
-                                <Pencil size={13} className="text-zinc-400" /> {t("actionEdit")}
-                              </button>
-                              <button
                                 onClick={() => openReminderModal(row)}
                                 className="w-full flex items-center gap-2 px-3 py-2 text-[12px] font-medium text-zinc-700 hover:bg-zinc-50"
                               >
@@ -1147,79 +1113,13 @@ export default function ServicesPage() {
                 </div>
               </div>
 
-              <div className="px-6 pb-5 flex gap-3">
-                <button onClick={() => setViewRow(null)} className="flex-1 border border-zinc-200 text-zinc-700 font-bold py-[11px] rounded-xl text-[13px] hover:bg-zinc-50">{t("cancel")}</button>
-                <button
-                  onClick={() => { const r = viewRow; setViewRow(null); handleOpenEdit(r); }}
-                  className="flex-1 bg-red-600 hover:bg-red-500 transition-all text-white font-bold py-[11px] rounded-xl text-[13px]"
-                >
-                  {t("actionEdit")}
-                </button>
+              <div className="px-6 pb-5">
+                <button onClick={() => setViewRow(null)} className="w-full border border-zinc-200 text-zinc-700 font-bold py-[11px] rounded-xl text-[13px] hover:bg-zinc-50">{t("close")}</button>
               </div>
             </div>
           </div>
         );
       })()}
-
-      {/* ════ EDIT SERVICE MODAL ════ */}
-      {editRow && (
-        <div className="fixed inset-0 z-50 bg-zinc-900/40 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-200">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-xl bg-red-50 flex items-center justify-center">
-                  <Pencil size={15} className="text-red-600" />
-                </div>
-                <h2 className="text-[16px] font-black text-zinc-900">{t("editModalTitle")}</h2>
-              </div>
-              <button onClick={() => setEditRow(null)} className="text-zinc-400 hover:text-zinc-700"><X size={18} /></button>
-            </div>
-
-            <form onSubmit={handleSaveEdit} className="px-6 py-5 space-y-4">
-              <div>
-                <label className="text-[12px] font-bold text-zinc-700">{t("columnDate")}</label>
-                <input
-                  type="date" value={editDate} onChange={(e) => setEditDate(e.target.value)} required
-                  className="w-full mt-1 rounded-xl border border-zinc-200 px-3 py-[10px] text-[13px] outline-none focus:border-red-500"
-                />
-              </div>
-
-              <div>
-                <label className="text-[12px] font-bold text-zinc-700">{t("serviceTypeLabel")}</label>
-                <select value={editType} onChange={(e) => setEditType(e.target.value)} required className="w-full mt-1 rounded-xl border border-zinc-200 px-3 py-[10px] text-[13px] outline-none focus:border-red-500">
-                  {SERVICE_TYPE_ORDER.map(ty => <option key={ty} value={ty}>{tServiceTypes(SERVICE_TYPE_KEYS[ty])}</option>)}
-                </select>
-              </div>
-
-              <div>
-                <label className="text-[12px] font-bold text-zinc-700">{unitLabel(getAsset(editRow)?.asset_type)}</label>
-                <input
-                  type="number" min={0} step="0.1"
-                  value={editKmHours} onChange={(e) => setEditKmHours(e.target.value)}
-                  placeholder={t("kmPlaceholder")}
-                  className="w-full mt-1 rounded-xl border border-zinc-200 px-3 py-[10px] text-[13px] outline-none focus:border-red-500"
-                />
-              </div>
-
-              <div>
-                <label className="text-[12px] font-bold text-zinc-700">{t("notesOptional")}</label>
-                <textarea rows={3} value={editNotes} onChange={(e) => setEditNotes(e.target.value)} placeholder={t("notesPlaceholder")} className="w-full mt-1 rounded-xl border border-zinc-200 px-3 py-[10px] text-[13px] outline-none focus:border-red-500 resize-none" />
-              </div>
-
-              {editError && (
-                <div className="rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-[12px] text-red-700">{editError}</div>
-              )}
-
-              <div className="flex gap-3 pt-1">
-                <button type="button" onClick={() => setEditRow(null)} className="flex-1 border border-zinc-200 text-zinc-700 font-bold py-[11px] rounded-xl text-[13px] hover:bg-zinc-50">{t("cancel")}</button>
-                <button type="submit" disabled={editSaving} className="flex-1 bg-red-600 hover:bg-red-500 disabled:opacity-60 transition-all text-white font-bold py-[11px] rounded-xl text-[13px]">
-                  {editSaving ? t("saving") : t("saveChanges")}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
 
       {/* ════ DELETE CONFIRM MODAL ════ */}
       {/* Facu (17 jul 2026): a custom inline confirm instead of the browser's
