@@ -919,7 +919,7 @@ function TeamChatPageInner() {
           onLogout={handleLogout}
         />
 
-        <div className="flex-1 flex min-h-0 p-4 md:p-7 gap-4">
+        <div className="flex-1 flex min-h-0 px-3 md:px-4 pt-1.5 md:pt-2 pb-3 md:pb-4 gap-4">
 
           {/* ── Conversation list / Saved Maintlers ── */}
           <div className={`${selectedId ? "hidden md:flex" : "flex"} w-full md:w-[320px] shrink-0 flex-col bg-white rounded-2xl border border-zinc-200 shadow-sm overflow-hidden min-h-0`}>

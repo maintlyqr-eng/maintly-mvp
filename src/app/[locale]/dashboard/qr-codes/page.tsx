@@ -275,7 +275,7 @@ export default function QrCodesPage() {
           className="no-print"
         />
 
-        <div className="no-print flex-1 overflow-y-auto p-4 md:p-7">
+        <div className="no-print flex-1 overflow-y-auto px-3 md:px-4 pt-1.5 md:pt-2 pb-3 md:pb-4">
 
           {/* Stats */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">

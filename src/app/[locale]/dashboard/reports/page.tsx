@@ -191,7 +191,7 @@ export default function ReportsPage() {
           onLogout={handleLogout}
         />
 
-        <div className="flex-1 overflow-y-auto p-4 md:p-7">
+        <div className="flex-1 overflow-y-auto px-3 md:px-4 pt-1.5 md:pt-2 pb-3 md:pb-4">
 
           {/* ── SUMMARY CARDS ── */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-5">

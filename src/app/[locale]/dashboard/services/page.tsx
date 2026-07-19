@@ -650,7 +650,7 @@ export default function ServicesPage() {
             container still had the old p-7 (28px) desktop padding from
             before the rest of the app got tightened up. Matches the
             dashboard home page's own p-4/p-5 convention now. */}
-        <div className="flex-1 overflow-y-auto p-3 md:p-4">
+        <div className="flex-1 overflow-y-auto px-3 md:px-4 pt-1.5 md:pt-2 pb-3 md:pb-4">
 
           {/* ── Summary tiles ── Facu (17 jul 2026): "quiero que se vea igual
               a esto" — matching his reference screenshot exactly this time:

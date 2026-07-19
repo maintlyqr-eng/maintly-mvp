@@ -183,7 +183,7 @@ export default function MessagesPage() {
           onLogout={handleLogout}
         />
 
-        <div className="flex-1 overflow-y-auto p-4 md:p-7">
+        <div className="flex-1 overflow-y-auto px-3 md:px-4 pt-1.5 md:pt-2 pb-3 md:pb-4">
 
           <div className="flex items-center justify-between mb-4">
             <p className="text-[12px] text-zinc-400">
