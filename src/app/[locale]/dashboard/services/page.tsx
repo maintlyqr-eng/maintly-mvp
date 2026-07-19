@@ -12,7 +12,7 @@ import {
   Plus, X, Bell, Search, ChevronLeft, ChevronRight,
   Wrench, CheckCircle2, MoreVertical,
   Box, ClipboardList, CalendarClock, AlertTriangle,
-  Eye, Trash2,
+  Eye,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import DashboardSidebarIntl from "@/components/DashboardSidebarIntl";
@@ -194,11 +194,23 @@ export default function ServicesPage() {
   // elimine por alguna causa razonable" — a logged service is now
   // immutable. The menu only has View (read-only detail, also where Notes
   // now live — hidden from the table itself per his earlier note 5, "las
-  // notas las ocultaría... las mostraría solamente al abrir el servicio")
-  // and Delete (soft-deletes via deleted_at, with an inline confirm instead
-  // of a native confirm() popup). There used to be an Edit action here too
-  // (and briefly a Duplicate one) — both removed; see git history if this
-  // ever needs to come back.
+  // notas las ocultaría... las mostraría solamente al abrir el servicio").
+  // There used to be Edit/Duplicate/Delete actions here too — all removed;
+  // see git history if any of them ever needs to come back.
+  //
+  // Facu (19 jul 2026): "nuestro sistema le da prioridad a la máquina, de
+  // la cual nadie es dueño... los diferentes maintlers le pueden cargar
+  // información pero nunca borrar algo ya cargado en ella" — any logged-in
+  // mechanic can ADD a service to any asset (that's intentional, by
+  // design), but NONE of them — not even the one who logged it — can
+  // delete a service once it exists. Deleting is admin-only, and already
+  // has its own dedicated flow: the admin Papelera (src/app/api/admin/
+  // trash/route.ts + services/route.ts) soft-deletes / restores / hard-
+  // deletes with capability checks and an audit log. So this page no
+  // longer has a Delete action at all — see also the RLS hardening in
+  // supabase/migrations/040_lock_service_records_delete.sql, which blocks
+  // a regular mechanic from soft-deleting a service_records row even via a
+  // direct API call, not just hiding the button here.
   const [viewRow, setViewRow] = useState<ServiceRow | null>(null);
 
   // Row-hover state for the "..." actions trigger, driven by explicit
@@ -207,10 +219,6 @@ export default function ServicesPage() {
   // CSS-only hover toggle silently failed to show on the live deploy there,
   // so this page uses the proven JS-state pattern from the start instead.
   const [hoveredRowId, setHoveredRowId] = useState<string | null>(null);
-
-  const [deleteRow, setDeleteRow] = useState<ServiceRow | null>(null);
-  const [deleteSaving, setDeleteSaving] = useState(false);
-  const [deleteError, setDeleteError] = useState("");
 
   function assetLabel(a: AssetOption | null) {
     if (!a) return "—";
@@ -460,26 +468,6 @@ export default function ServicesPage() {
   function handleOpenView(row: ServiceRow) {
     setViewRow(row);
     setOpenMenuRowId(null);
-  }
-
-  function handleOpenDelete(row: ServiceRow) {
-    setDeleteRow(row);
-    setDeleteError("");
-    setOpenMenuRowId(null);
-  }
-
-  async function handleConfirmDelete() {
-    if (!deleteRow) return;
-    setDeleteSaving(true);
-    setDeleteError("");
-    const { error } = await supabase
-      .from("service_records")
-      .update({ deleted_at: new Date().toISOString() })
-      .eq("id", deleteRow.id);
-    setDeleteSaving(false);
-    if (error) { setDeleteError(error.message); return; }
-    setDeleteRow(null);
-    await loadServices(mechanicId);
   }
 
   // Facu (17 jul 2026): the Status filter isn't a new concept — every
@@ -833,13 +821,6 @@ export default function ServicesPage() {
                                 <Bell size={13} className="text-zinc-400" />
                                 {hasReminder ? t("editReminderMenu") : t("setReminderMenu")}
                               </button>
-                              <div className="my-1 border-t border-zinc-100" />
-                              <button
-                                onClick={() => handleOpenDelete(row)}
-                                className="w-full flex items-center gap-2 px-3 py-2 text-[12px] font-medium text-red-600 hover:bg-red-50"
-                              >
-                                <Trash2 size={13} /> {t("actionDelete")}
-                              </button>
                             </div>
                           )}
                         </td>
@@ -1121,42 +1102,6 @@ export default function ServicesPage() {
         );
       })()}
 
-      {/* ════ DELETE CONFIRM MODAL ════ */}
-      {/* Facu (17 jul 2026): a custom inline confirm instead of the browser's
-          native confirm() — matches the pattern already used elsewhere in
-          this app (e.g. ContactSupportWidgetIntl's "clear conversation"). */}
-      {deleteRow && (() => {
-        const asset = getAsset(deleteRow);
-        const label = asset?.nickname || [asset?.brand, asset?.model].filter(Boolean).join(" ") || t("unknownAsset");
-        return (
-          <div className="fixed inset-0 z-50 bg-zinc-900/40 flex items-center justify-center p-4" onClick={() => setDeleteRow(null)}>
-            <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm" onClick={(e) => e.stopPropagation()}>
-              <div className="px-6 py-5">
-                <div className="w-10 h-10 rounded-xl bg-red-50 flex items-center justify-center mb-3">
-                  <Trash2 size={17} className="text-red-600" />
-                </div>
-                <h2 className="text-[15px] font-black text-zinc-900 mb-1">{t("deleteConfirmTitle")}</h2>
-                <p className="text-[12.5px] text-zinc-500">
-                  {t("deleteConfirmBody", {
-                    asset: label,
-                    type: tServiceTypes(SERVICE_TYPE_KEYS[deleteRow.service_type] ?? "other"),
-                    date: formatDateDMY(deleteRow.service_date),
-                  })}
-                </p>
-                {deleteError && (
-                  <div className="mt-3 rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-[12px] text-red-700">{deleteError}</div>
-                )}
-                <div className="flex gap-3 pt-4">
-                  <button onClick={() => setDeleteRow(null)} className="flex-1 border border-zinc-200 text-zinc-700 font-bold py-[11px] rounded-xl text-[13px] hover:bg-zinc-50">{t("cancel")}</button>
-                  <button onClick={handleConfirmDelete} disabled={deleteSaving} className="flex-1 bg-red-600 hover:bg-red-500 disabled:opacity-60 transition-all text-white font-bold py-[11px] rounded-xl text-[13px]">
-                    {deleteSaving ? t("deleting") : t("actionDelete")}
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        );
-      })()}
     </div>
   );
 }
