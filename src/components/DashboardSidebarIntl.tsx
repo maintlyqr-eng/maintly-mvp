@@ -2,7 +2,7 @@
 
 import { Link } from "@/i18n/navigation";
 import Image from "next/image";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { X } from "lucide-react";
 import { useTranslations } from "next-intl";
 import HoverAvatar from "@/components/HoverAvatar";
@@ -10,6 +10,7 @@ import ContactSupportWidgetIntl from "@/components/ContactSupportWidgetIntl";
 import { navItems } from "@/lib/dashboardNav";
 import { getInitials } from "@/lib/initials";
 import { supabase } from "@/lib/supabase";
+import { PROFESSION_KEYS } from "@/components/ProfessionVerificationFormIntl";
 
 // The sidebar used by every dashboard page + admin now that the full
 // Phase 2 i18n rollout is complete (see MAINTLYQR_FEATURE_BACKLOG.md). It
@@ -58,6 +59,7 @@ export default function DashboardSidebarIntl({
 }) {
   const t = useTranslations("DashboardSidebar");
   const tNav = useTranslations("DashboardNav");
+  const tProfessionTypes = useTranslations("ProfessionTypes");
   const initials = getInitials(name);
 
   // Stamps mechanics.last_active_at (migration 033) on every Dashboard page
@@ -72,6 +74,28 @@ export default function DashboardSidebarIntl({
     supabase.from("mechanics").update({ last_active_at: new Date().toISOString() }).eq("id", mechanicId)
       .then(({ error }) => { if (error) console.error("last_active_at stamp failed", error.message); });
   }, [mechanicId]);
+
+  // Facu (17 jul 2026): "ahí debería decir Maintler Mecánico, dueño,
+  // electricista, etc." — the footer used to always show the generic
+  // "Maintler de MaintlyQR" tagline regardless of who was logged in. Fetches
+  // this mechanic's own `profession` (same enum ProfessionVerificationForm
+  // writes: Owner/Mechanic/Electrician/...) and shows the real role instead.
+  // A plain SELECT here rather than threading a new prop through all 12
+  // dashboard pages that render this sidebar — mechanicId is already
+  // available, so this stays self-contained like the last_active_at stamp
+  // above.
+  const [profession, setProfession] = useState<string | null>(null);
+  useEffect(() => {
+    if (!mechanicId) return;
+    let active = true;
+    supabase.from("mechanics").select("profession").eq("id", mechanicId).single()
+      .then(({ data }) => { if (active) setProfession((data as { profession: string | null } | null)?.profession ?? null); });
+    return () => { active = false; };
+  }, [mechanicId]);
+
+  const professionLabel = profession && PROFESSION_KEYS[profession]
+    ? t("maintlerWithProfession", { profession: tProfessionTypes(PROFESSION_KEYS[profession]) })
+    : t("maintlyMaintler");
 
   return (
     <>
@@ -139,7 +163,7 @@ export default function DashboardSidebarIntl({
           )}
           <div className="flex-1 min-w-0">
             <p className="text-[12px] font-bold text-zinc-800 leading-tight truncate">{name || email}</p>
-            <p className="text-[10px] text-zinc-400 leading-tight">{t("maintlyMaintler")}</p>
+            <p className="text-[10px] text-zinc-400 leading-tight">{professionLabel}</p>
           </div>
         </Link>
       </aside>

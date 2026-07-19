@@ -698,7 +698,8 @@
     "settings": "Configurações"
   },
   "DashboardSidebar": {
-    "maintlyMaintler": "Maintler da MaintlyQR"
+    "maintlyMaintler": "Maintler da MaintlyQR",
+    "maintlerWithProfession": "Maintler {profession}"
   },
   "DashboardHeader": {
     "maintler": "Maintler",
@@ -1142,9 +1143,7 @@
     "unitShortKm": "km",
     "actionView": "Ver",
     "actionEdit": "Editar",
-    "actionDuplicate": "Duplicar",
     "actionDelete": "Excluir",
-    "duplicating": "Duplicando...",
     "deleting": "Excluindo...",
     "allStatuses": "Todos os status",
     "filterStatusCompleted": "Concluído",

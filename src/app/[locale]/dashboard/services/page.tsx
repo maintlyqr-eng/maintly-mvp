@@ -12,7 +12,7 @@ import {
   Plus, X, Bell, Search, ChevronLeft, ChevronRight,
   Wrench, CheckCircle2, MoreVertical,
   Box, ClipboardList, CalendarClock, AlertTriangle,
-  Eye, Pencil, Copy, Trash2,
+  Eye, Pencil, Trash2,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import DashboardSidebarIntl from "@/components/DashboardSidebarIntl";
@@ -207,7 +207,6 @@ export default function ServicesPage() {
   const [editSaving, setEditSaving] = useState(false);
   const [editError, setEditError] = useState("");
 
-  const [duplicatingId, setDuplicatingId] = useState<string | null>(null);
   // Row-hover state for the "..." actions trigger, driven by explicit
   // onMouseEnter/onMouseLeave rather than a pure CSS group-hover toggle —
   // same reasoning as the dashboard's calendar-preview popover fix: a
@@ -491,29 +490,6 @@ export default function ServicesPage() {
     await loadServices(mechanicId);
   }
 
-  // Facu (17 jul 2026): "Duplicate" — clones type/reading/notes onto a
-  // brand-new row dated today, same as logging a fresh service manually
-  // would, just pre-filled from this one instead of a blank form. Keeps the
-  // same asset + customer link as the original.
-  async function handleDuplicate(row: ServiceRow) {
-    setOpenMenuRowId(null);
-    const asset = getAsset(row);
-    if (!asset) return;
-    setDuplicatingId(row.id);
-    const assetOpt = assetOptions.find((a) => a.id === asset.id);
-    await supabase.from("service_records").insert({
-      mechanic_id: mechanicId,
-      asset_id: asset.id,
-      service_type: row.service_type,
-      service_date: new Date().toISOString().slice(0, 10),
-      km_hours: row.km_hours,
-      notes: row.notes,
-      customer_id: assetOpt?.customer_id ?? null,
-    });
-    setDuplicatingId(null);
-    await loadServices(mechanicId);
-  }
-
   function handleOpenDelete(row: ServiceRow) {
     setDeleteRow(row);
     setDeleteError("");
@@ -577,9 +553,11 @@ export default function ServicesPage() {
   // Facu (17 jul 2026): "no quiero scrollear la página sino que deberíamos
   // usar esa forma como hicimos antes en el panel con los activos,
   // flechitas para movernos" — same paginate-instead-of-scroll approach as
-  // the dashboard's "Tus activos" carousel, just with a bigger page size
-  // since this is a dense table rather than a handful of cards.
-  const SERVICES_PAGE_SIZE = 10;
+  // the dashboard's "Tus activos" carousel. First tried 10/page, but with
+  // the taller Stripe-style rows that still needed a scroll to see the last
+  // couple — dropped to 7, matching how many rows actually fit on screen
+  // without scrolling per his own screenshot.
+  const SERVICES_PAGE_SIZE = 7;
   const [servicesPage, setServicesPage] = useState(0);
   const servicesTotalPages = Math.max(1, Math.ceil(filtered.length / SERVICES_PAGE_SIZE));
   const safeServicesPage = Math.min(servicesPage, servicesTotalPages - 1);
@@ -794,7 +772,15 @@ export default function ServicesPage() {
                     return (
                       <tr
                         key={row.id}
-                        className="border-t border-zinc-100 hover:bg-zinc-50/50 transition-colors"
+                        // Facu (17 jul 2026): "el mismo service sea un
+                        // botón... uno no tenga que tocar los 3 puntos para
+                        // ir a ver el service" — the whole row now opens the
+                        // View modal on click. The reminder bell and the
+                        // actions column each stop propagation (below) so
+                        // clicking THEM fires their own action instead of
+                        // also opening View underneath.
+                        onClick={() => handleOpenView(row)}
+                        className="border-t border-zinc-100 hover:bg-zinc-50/50 transition-colors cursor-pointer"
                         onMouseEnter={() => setHoveredRowId(row.id)}
                         onMouseLeave={() => setHoveredRowId((cur) => (cur === row.id ? null : cur))}
                       >
@@ -838,7 +824,7 @@ export default function ServicesPage() {
                             eso ensucia mucho... yo pondría solamente un
                             icono" — gray bell if nothing's set, colored bell
                             + short date if it is. */}
-                        <td className="px-3 py-4">
+                        <td className="px-3 py-4" onClick={(e) => e.stopPropagation()}>
                           <button
                             onClick={() => openReminderModal(row)}
                             title={hasReminder ? t("viewEditReminder") : t("setReminder")}
@@ -853,7 +839,7 @@ export default function ServicesPage() {
                             itself only shows up once you're hovering the
                             row (opacity-0 → group-hover:opacity-100), instead
                             of a "⋮" sitting on every single row all the time. */}
-                        <td className="px-3 py-4 text-right relative">
+                        <td className="px-3 py-4 text-right relative" onClick={(e) => e.stopPropagation()}>
                           <button
                             onClick={() => setOpenMenuRowId(openMenuRowId === row.id ? null : row.id)}
                             className={`text-zinc-300 hover:text-zinc-600 transition-all relative z-20 ${openMenuRowId === row.id || hoveredRowId === row.id ? "opacity-100" : "opacity-0"}`}
@@ -873,13 +859,6 @@ export default function ServicesPage() {
                                 className="w-full flex items-center gap-2 px-3 py-2 text-[12px] font-medium text-zinc-700 hover:bg-zinc-50"
                               >
                                 <Pencil size={13} className="text-zinc-400" /> {t("actionEdit")}
-                              </button>
-                              <button
-                                onClick={() => handleDuplicate(row)}
-                                disabled={duplicatingId === row.id}
-                                className="w-full flex items-center gap-2 px-3 py-2 text-[12px] font-medium text-zinc-700 hover:bg-zinc-50 disabled:opacity-50"
-                              >
-                                <Copy size={13} className="text-zinc-400" /> {duplicatingId === row.id ? t("duplicating") : t("actionDuplicate")}
                               </button>
                               <button
                                 onClick={() => openReminderModal(row)}
