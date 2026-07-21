@@ -675,10 +675,10 @@ export default function AssetsPage() {
           onLogout={handleLogout}
         />
 
-        <div className="flex-1 overflow-y-auto px-3 md:px-4 pt-1.5 md:pt-2 pb-2 md:pb-3">
+        <div className="flex-1 overflow-y-auto px-3 md:px-4 pt-1.5 md:pt-2 pb-1.5 md:pb-2">
 
           {/* KPI summary bar */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-3">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-2">
             <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm p-3">
               <p className="text-[11px] font-semibold text-zinc-400 mb-1">{t("totalAssets")}</p>
               <p className="text-[22px] font-black text-zinc-900">{totalAssets}</p>
@@ -707,7 +707,7 @@ export default function AssetsPage() {
           </div>
 
           {/* Search / filter / sort + New Asset */}
-          <div className="flex flex-col lg:flex-row lg:items-center gap-3 mb-3">
+          <div className="flex flex-col lg:flex-row lg:items-center gap-3 mb-2">
             <div className="relative flex-1 min-w-0">
               <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
               <input
@@ -780,7 +780,7 @@ export default function AssetsPage() {
               <p className="text-[13px] text-zinc-500">{t("noAssetsMatch")}</p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2">
               {visibleAssets.map((a) => {
                 const code = getQrCode(a);
                 const label = assetDisplayName(a);
