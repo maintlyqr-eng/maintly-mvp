@@ -675,29 +675,29 @@ export default function AssetsPage() {
           onLogout={handleLogout}
         />
 
-        <div className="flex-1 overflow-y-auto px-3 md:px-4 pt-1.5 md:pt-2 pb-3 md:pb-4">
+        <div className="flex-1 overflow-y-auto px-3 md:px-4 pt-1.5 md:pt-2 pb-2 md:pb-3">
 
           {/* KPI summary bar */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
-            <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm p-4">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-3">
+            <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm p-3">
               <p className="text-[11px] font-semibold text-zinc-400 mb-1">{t("totalAssets")}</p>
               <p className="text-[22px] font-black text-zinc-900">{totalAssets}</p>
             </div>
-            <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm p-4">
+            <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm p-3">
               <div className="flex items-center gap-1.5 mb-1">
                 <span className="w-2 h-2 rounded-full bg-green-500" />
                 <p className="text-[11px] font-semibold text-zinc-400">{t("healthy")}</p>
               </div>
               <p className="text-[22px] font-black text-green-600">{healthyCount}</p>
             </div>
-            <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm p-4">
+            <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm p-3">
               <div className="flex items-center gap-1.5 mb-1">
                 <span className="w-2 h-2 rounded-full bg-amber-500" />
                 <p className="text-[11px] font-semibold text-zinc-400">{t("dueSoon")}</p>
               </div>
               <p className="text-[22px] font-black text-amber-600">{dueSoonCount}</p>
             </div>
-            <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm p-4">
+            <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm p-3">
               <div className="flex items-center gap-1.5 mb-1">
                 <AlertTriangle size={11} className="text-red-500" />
                 <p className="text-[11px] font-semibold text-zinc-400">{t("overdue")}</p>
@@ -707,7 +707,7 @@ export default function AssetsPage() {
           </div>
 
           {/* Search / filter / sort + New Asset */}
-          <div className="flex flex-col lg:flex-row lg:items-center gap-3 mb-5">
+          <div className="flex flex-col lg:flex-row lg:items-center gap-3 mb-3">
             <div className="relative flex-1 min-w-0">
               <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
               <input
@@ -780,7 +780,7 @@ export default function AssetsPage() {
               <p className="text-[13px] text-zinc-500">{t("noAssetsMatch")}</p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
               {visibleAssets.map((a) => {
                 const code = getQrCode(a);
                 const label = assetDisplayName(a);
@@ -790,17 +790,17 @@ export default function AssetsPage() {
                 const statusColor = ASSET_STATUS_COLOR[statusKey];
                 const qrOpen = qrOpenId === a.id;
                 return (
-                  <div key={a.id} className="bg-white rounded-2xl border border-zinc-200 shadow-sm p-5 flex flex-col transition-all duration-200 hover:scale-[1.03] hover:shadow-lg hover:border-zinc-300 hover:z-10">
+                  <div key={a.id} className="bg-white rounded-2xl border border-zinc-200 shadow-sm p-4 flex flex-col transition-all duration-200 hover:scale-[1.03] hover:shadow-lg hover:border-zinc-300 hover:z-10">
                     {/* Asset header */}
-                    <div className="flex items-center gap-3 mb-3">
+                    <div className="flex items-center gap-3 mb-2">
                       {/* Photo or icon */}
-                      <div className="w-12 h-12 rounded-xl bg-zinc-50 border border-zinc-100 flex items-center justify-center shrink-0 overflow-hidden">
+                      <div className="w-10 h-10 rounded-xl bg-zinc-50 border border-zinc-100 flex items-center justify-center shrink-0 overflow-hidden">
                         {a.photo_url ? (
                           // eslint-disable-next-line @next/next/no-img-element
                           <img src={a.photo_url} alt={label} className="w-full h-full object-cover" />
                         ) : (
                           // eslint-disable-next-line @next/next/no-img-element
-                          <img src={imgSrc} alt={label} className="w-9 h-9 object-contain" />
+                          <img src={imgSrc} alt={label} className="w-7 h-7 object-contain" />
                         )}
                       </div>
                       <div className="min-w-0 flex-1">
@@ -851,9 +851,9 @@ export default function AssetsPage() {
                     </div>
 
                     {/* Stat row */}
-                    <div className="grid grid-cols-3 gap-2 mb-3 pb-3 border-b border-zinc-100">
+                    <div className="grid grid-cols-3 gap-2 mb-2 pb-2 border-b border-zinc-100">
                       <div className="min-w-0">
-                        <div className="flex items-center gap-1 text-zinc-400 mb-0.5">
+                        <div className="flex items-center gap-1 text-zinc-400">
                           <Clock size={11} />
                           <p className="text-[9px] font-semibold uppercase tracking-wide">{t("lastServiced")}</p>
                         </div>
@@ -862,7 +862,7 @@ export default function AssetsPage() {
                         </p>
                       </div>
                       <div className="min-w-0">
-                        <div className="flex items-center gap-1 text-zinc-400 mb-0.5">
+                        <div className="flex items-center gap-1 text-zinc-400">
                           <CalendarClock size={11} />
                           <p className="text-[9px] font-semibold uppercase tracking-wide">{t("nextService")}</p>
                         </div>
@@ -875,7 +875,7 @@ export default function AssetsPage() {
                         </p>
                       </div>
                       <div className="min-w-0">
-                        <div className="flex items-center gap-1 text-zinc-400 mb-0.5">
+                        <div className="flex items-center gap-1 text-zinc-400">
                           <ListChecks size={11} />
                           <p className="text-[9px] font-semibold uppercase tracking-wide">{t("services")}</p>
                         </div>
@@ -889,20 +889,20 @@ export default function AssetsPage() {
                     <div className="grid grid-cols-3 gap-2">
                       <button
                         onClick={() => openHistory(a)}
-                        className="flex items-center justify-center gap-1.5 border border-zinc-200 text-zinc-600 hover:bg-zinc-50 active:scale-[0.98] transition-all text-[11px] font-bold py-[8px] rounded-xl"
+                        className="flex items-center justify-center gap-1.5 border border-zinc-200 text-zinc-600 hover:bg-zinc-50 active:scale-[0.98] transition-all text-[11px] font-bold py-[6px] rounded-xl"
                       >
                         <History size={12} /> {t("history")}
                       </button>
                       <button
                         onClick={() => openAddService(a.id)}
-                        className="flex items-center justify-center gap-1.5 border border-red-200 text-red-600 hover:bg-red-50 active:scale-[0.98] transition-all text-[11px] font-bold py-[8px] rounded-xl"
+                        className="flex items-center justify-center gap-1.5 border border-red-200 text-red-600 hover:bg-red-50 active:scale-[0.98] transition-all text-[11px] font-bold py-[6px] rounded-xl"
                       >
                         <Wrench size={12} /> {t("service")}
                       </button>
                       <button
                         onClick={() => setQrOpenId(qrOpen ? null : a.id)}
                         disabled={!code}
-                        className="flex items-center justify-center gap-1.5 border border-zinc-200 text-zinc-600 hover:bg-zinc-50 active:scale-[0.98] transition-all text-[11px] font-bold py-[8px] rounded-xl disabled:opacity-40 disabled:cursor-not-allowed"
+                        className="flex items-center justify-center gap-1.5 border border-zinc-200 text-zinc-600 hover:bg-zinc-50 active:scale-[0.98] transition-all text-[11px] font-bold py-[6px] rounded-xl disabled:opacity-40 disabled:cursor-not-allowed"
                       >
                         <QrIcon size={12} /> {t("qr")}
                       </button>
