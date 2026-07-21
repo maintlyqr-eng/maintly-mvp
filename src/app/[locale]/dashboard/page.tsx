@@ -995,241 +995,229 @@ export default function DashboardPage() {
             )}
           </div>
 
-          {/* ── Middle section, reorganized into 2 top-level columns ──
-              Facu (21 jul 2026): measured via a console script that this
-              section (previously two separate full-width rows: "Estado +
-              Resumen + Recordatorios" stacked above "Activos + Actividad")
-              needed ~545px more height than fits on his actual screen
-              (791px viewport). Rather than compress padding/fonts even
-              further (already went through that once and he said it got
-              "muy chico"), reorganized into 2 side-by-side columns so the
-              page uses width it already had spare instead of stacking
-              everything vertically. LEFT = health status + your assets
-              (compact, well under viewport height). RIGHT = reminders +
-              activity (both already capped at 4 items each). Whichever
-              column ends up taller now drives this section's height once,
-              instead of the old layout summing BOTH rows' heights. */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 mb-1.5">
+          {/* ── "Estado de tu mantenimiento" (gauge) + "Resumen rápido" + "Próximos Recordatorios" ── */}
+          {/* Facu (16 jul 2026): "todo está dividido por rectángulos y entre
+              ellos hay espacios" — these 3 used to be separate white cards
+              with a gap between each (their own border+shadow+rounded
+              corners apiece). Merged into one card with thin internal
+              dividers instead, so it reads as one unit, not three. */}
+          <div className="grid grid-cols-1 lg:grid-cols-[1.1fr_1fr_1fr] divide-y lg:divide-y-0 lg:divide-x divide-zinc-100 bg-white rounded-2xl border border-zinc-200 shadow-sm mb-1.5">
 
-            {/* LEFT column: health status + quick summary, then your assets */}
-            <div className="flex flex-col gap-3">
-              <div className="grid grid-cols-1 sm:grid-cols-2 divide-y sm:divide-y-0 sm:divide-x divide-zinc-100 bg-white rounded-2xl border border-zinc-200 shadow-sm">
-                <div className="p-3.5">
-                  <h3 className="text-[13px] font-black text-zinc-900 mb-3">{t("maintenanceHealth")}</h3>
-                  <div className="flex items-center gap-4">
-                    <div className="relative w-[92px] h-[92px] shrink-0">
-                      <svg viewBox="0 0 120 120" className="w-full h-full -rotate-90">
-                        <circle cx="60" cy="60" r="52" fill="none" stroke="#e4e4e7" strokeWidth="12" />
-                        <circle
-                          cx="60" cy="60" r="52" fill="none" stroke={healthArcColor} strokeWidth="12" strokeLinecap="round"
-                          strokeDasharray={2 * Math.PI * 52}
-                          strokeDashoffset={2 * Math.PI * 52 * (1 - maintenanceHealth / 100)}
-                        />
-                      </svg>
-                      <div className="absolute inset-0 flex items-center justify-center">
-                        <span className="text-[18px] font-black text-zinc-900">{maintenanceHealth}%</span>
-                      </div>
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-[12px] font-bold mb-2" style={{ color: healthArcColor }}>{healthStatusLabel}</p>
-                      <ul className="space-y-1.5">
-                        <li className="flex items-center gap-1.5 text-[11px] text-zinc-600">
-                          <CheckCircle2 size={12} className="text-green-500 shrink-0" /> {t("healthCheckAssets", { count: totalAssets })}
-                        </li>
-                        <li className="flex items-center gap-1.5 text-[11px] text-zinc-600">
-                          <CheckCircle2 size={12} className="text-green-500 shrink-0" /> {t("healthCheckServices", { count: totalServices })}
-                        </li>
-                        <li className="flex items-center gap-1.5 text-[11px] text-zinc-600">
-                          <Clock size={12} className="text-amber-500 shrink-0" /> {t("healthCheckPending", { count: reminders.length })}
-                        </li>
-                      </ul>
-                    </div>
-                  </div>
-                  <div className="mt-2.5 flex items-start gap-2.5 bg-zinc-50 border border-zinc-100 rounded-xl p-2.5">
-                    <Lightbulb size={14} className="text-amber-500 shrink-0 mt-0.5" />
-                    <p className="text-[11px] text-zinc-500 leading-relaxed">{healthTip}</p>
+            <div className="p-3.5">
+              <h3 className="text-[13px] font-black text-zinc-900 mb-3">{t("maintenanceHealth")}</h3>
+              <div className="flex items-center gap-4">
+                <div className="relative w-[92px] h-[92px] shrink-0">
+                  <svg viewBox="0 0 120 120" className="w-full h-full -rotate-90">
+                    <circle cx="60" cy="60" r="52" fill="none" stroke="#e4e4e7" strokeWidth="12" />
+                    <circle
+                      cx="60" cy="60" r="52" fill="none" stroke={healthArcColor} strokeWidth="12" strokeLinecap="round"
+                      strokeDasharray={2 * Math.PI * 52}
+                      strokeDashoffset={2 * Math.PI * 52 * (1 - maintenanceHealth / 100)}
+                    />
+                  </svg>
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <span className="text-[18px] font-black text-zinc-900">{maintenanceHealth}%</span>
                   </div>
                 </div>
-
-                <div className="p-3.5">
-                  <h3 className="text-[13px] font-black text-zinc-900 mb-3">{t("quickSummary")}</h3>
-                  {/* Facu (16 jul 2026): each tile used to stack icon → value →
-                      caption vertically, which made this card one of the
-                      tallest on the page for not much information. Laid out
-                      horizontally (icon beside the number) instead — same 4
-                      numbers, roughly half the height. */}
-                  <div className="grid grid-cols-2 gap-2">
-                    {resumenTiles.map(({ id, value, caption, icon: Icon, color }) => (
-                      <div key={id} className="flex items-center gap-2 rounded-xl border border-zinc-100 bg-zinc-50/60 p-2">
-                        <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${color}`}>
-                          <Icon size={13} />
-                        </div>
-                        <div className="min-w-0">
-                          <p className="text-[15px] font-black text-zinc-900 leading-tight">{value}</p>
-                          <p className="text-[9px] font-semibold text-zinc-500 leading-snug truncate">{caption}</p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-[12px] font-bold mb-2" style={{ color: healthArcColor }}>{healthStatusLabel}</p>
+                  <ul className="space-y-1.5">
+                    <li className="flex items-center gap-1.5 text-[11px] text-zinc-600">
+                      <CheckCircle2 size={12} className="text-green-500 shrink-0" /> {t("healthCheckAssets", { count: totalAssets })}
+                    </li>
+                    <li className="flex items-center gap-1.5 text-[11px] text-zinc-600">
+                      <CheckCircle2 size={12} className="text-green-500 shrink-0" /> {t("healthCheckServices", { count: totalServices })}
+                    </li>
+                    <li className="flex items-center gap-1.5 text-[11px] text-zinc-600">
+                      <Clock size={12} className="text-amber-500 shrink-0" /> {t("healthCheckPending", { count: reminders.length })}
+                    </li>
+                  </ul>
                 </div>
               </div>
-
-              <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm p-3.5">
-                <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-[13px] font-black text-zinc-900">{t("yourAssets")}</h3>
-                  <div className="flex items-center gap-2">
-                    {/* Facu (16 jul 2026): the page dots alone didn't make it
-                        obvious this grid pages sideways — added explicit
-                        prev/next arrows next to them as a clearer affordance. */}
-                    {assetTotalPages > 1 && (
-                      <div className="flex items-center gap-1">
-                        <button
-                          onClick={() => setAssetCarouselPage((p) => (p - 1 + assetTotalPages) % assetTotalPages)}
-                          aria-label={t("previousPage")}
-                          className="w-6 h-6 rounded-full border border-zinc-200 text-zinc-400 hover:text-zinc-700 hover:border-zinc-300 flex items-center justify-center transition-colors"
-                        >
-                          <ChevronLeft size={13} />
-                        </button>
-                        <button
-                          onClick={() => setAssetCarouselPage((p) => (p + 1) % assetTotalPages)}
-                          aria-label={t("nextPage")}
-                          className="w-6 h-6 rounded-full border border-zinc-200 text-zinc-400 hover:text-zinc-700 hover:border-zinc-300 flex items-center justify-center transition-colors"
-                        >
-                          <ChevronRight size={13} />
-                        </button>
-                      </div>
-                    )}
-                    <Link href="/dashboard/assets" className="text-[11px] font-semibold text-red-600 hover:text-red-700">{t("viewAll")}</Link>
-                  </div>
-                </div>
-                {assetCards.length === 0 ? (
-                  <p className="text-[12px] text-zinc-400 text-center py-6">{t("noAssetsYet")}</p>
-                ) : (
-                  <>
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                      {assetCards.slice(assetCarouselPage * 4, assetCarouselPage * 4 + 4).map((a) => {
-                        const overdue = a.status === "overdue";
-                        const dueSoon = a.status === "due_soon";
-                        const badgeLabel = overdue ? t("assetOverdue") : dueSoon ? t("assetUpcomingService") : t("assetUpToDate");
-                        const badgeColor = overdue ? "bg-red-100 text-red-700" : dueSoon ? "bg-amber-100 text-amber-700" : "bg-green-100 text-green-700";
-                        const img = a.photoUrl || assetTypeImg[a.assetType] || "/images/car.png";
-                        return (
-                          <button
-                            key={a.id}
-                            onClick={() => router.push(`/dashboard/assets?q=${encodeURIComponent(a.label)}`)}
-                            className="rounded-xl border border-zinc-100 hover:border-zinc-300 bg-zinc-50/50 p-2 text-left transition-colors"
-                          >
-                            {/* Fixed height (not aspect-square) — a full-width
-                                square image scaled to whatever this card's
-                                column happens to be, which on a wide screen
-                                made the photo (and the whole card) way taller
-                                than it needed to be.
-                                Facu (16 jul 2026): "la foto que tiene cargado
-                                el activo no se ve entera... quiero que se
-                                ajuste a ese espacio que tenemos no me importa
-                                que se vea chiquita" — real uploaded photos used
-                                object-cover, which fills the box by cropping
-                                whatever doesn't fit the aspect ratio (so tall/
-                                wide photos got their edges cut off). Switched
-                                to object-contain, same as the fallback icon
-                                below, so the whole photo is always visible,
-                                shrunk to fit instead of cropped. */}
-                            <div className="w-full h-16 rounded-lg bg-white border border-zinc-100 flex items-center justify-center overflow-hidden mb-1.5">
-                              {a.photoUrl ? (
-                                // eslint-disable-next-line @next/next/no-img-element
-                                <img src={img} alt={a.label} className="w-full h-full object-contain" />
-                              ) : (
-                                <Image src={img} alt={a.label} width={36} height={36} className="object-contain" />
-                              )}
-                            </div>
-                            <p className="text-[11px] font-bold text-zinc-800 truncate">{a.label}</p>
-                            <span className={`inline-block mt-1 text-[9px] font-bold px-1.5 py-[2px] rounded-full ${badgeColor}`}>{badgeLabel}</span>
-                            <p className="text-[9px] text-zinc-400 mt-1 truncate">
-                              {a.lastServiceDate ? t("lastServiceOn", { date: formatDateDMY(a.lastServiceDate) }) : t("noServiceLoggedYet")}
-                            </p>
-                          </button>
-                        );
-                      })}
-                    </div>
-                    {assetCards.length > 4 && (
-                      <div className="flex items-center justify-center gap-1.5 mt-4">
-                        {Array.from({ length: Math.ceil(assetCards.length / 4) }).map((_, i) => (
-                          <button
-                            key={i}
-                            onClick={() => setAssetCarouselPage(i)}
-                            aria-label={`page ${i + 1}`}
-                            className={`w-1.5 h-1.5 rounded-full transition-colors ${i === assetCarouselPage ? "bg-red-600" : "bg-zinc-200"}`}
-                          />
-                        ))}
-                      </div>
-                    )}
-                  </>
-                )}
+              <div className="mt-2.5 flex items-start gap-2.5 bg-zinc-50 border border-zinc-100 rounded-xl p-2.5">
+                <Lightbulb size={14} className="text-amber-500 shrink-0 mt-0.5" />
+                <p className="text-[11px] text-zinc-500 leading-relaxed">{healthTip}</p>
               </div>
             </div>
 
-            {/* RIGHT column: upcoming reminders, then recent activity */}
-            <div className="flex flex-col gap-3">
-              <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm p-3.5">
-                <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-[13px] font-black text-zinc-900">{t("upcomingReminders")}</h3>
-                  <Link href="/dashboard/services" className="text-[11px] font-semibold text-red-600 hover:text-red-700">{t("viewAll")}</Link>
-                </div>
-                {reminders.length === 0 ? (
-                  <p className="text-[12px] text-zinc-400 text-center py-4">{t("noRemindersDueSoon")}</p>
-                ) : (
-                  <div className="space-y-2">
-                    {reminders.slice(0, 4).map((r) => {
-                      const overdue = r.status === "overdue";
-                      const rHref = r.kind === "service" && r.assetId
-                        ? `/dashboard/services?asset=${r.assetId}&new=1`
-                        : "/dashboard/calendar";
-                      return (
-                        <Link key={`${r.kind}-${r.id}`} href={rHref} className="flex items-center gap-2.5 -mx-1 px-1 py-0.5 rounded-lg hover:bg-zinc-50 transition-colors">
-                          <div className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 ${overdue ? "bg-red-100 text-red-600" : "bg-amber-100 text-amber-600"}`}>
-                            {overdue ? <AlertCircle size={13} /> : <Clock size={13} />}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="text-[12px] font-bold text-zinc-800 truncate">{r.assetLabel}</p>
-                            <p className="text-[10px] text-zinc-400 truncate">
-                              {r.kind === "service" ? tServiceTypes(SERVICE_TYPE_KEYS[r.serviceType ?? "Other"] ?? "other") : t("scheduledTask")}
-                            </p>
-                          </div>
-                          <p className={`text-[10.5px] font-bold shrink-0 whitespace-nowrap ${overdue ? "text-red-600" : "text-amber-600"}`}>
-                            {relativeDueLabel(r)}
+            <div className="p-3.5">
+              <h3 className="text-[13px] font-black text-zinc-900 mb-3">{t("quickSummary")}</h3>
+              {/* Facu (16 jul 2026): each tile used to stack icon → value →
+                  caption vertically, which made this card one of the
+                  tallest on the page for not much information. Laid out
+                  horizontally (icon beside the number) instead — same 4
+                  numbers, roughly half the height. */}
+              <div className="grid grid-cols-2 gap-2">
+                {resumenTiles.map(({ id, value, caption, icon: Icon, color }) => (
+                  <div key={id} className="flex items-center gap-2 rounded-xl border border-zinc-100 bg-zinc-50/60 p-2">
+                    <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${color}`}>
+                      <Icon size={13} />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-[15px] font-black text-zinc-900 leading-tight">{value}</p>
+                      <p className="text-[9px] font-semibold text-zinc-500 leading-snug truncate">{caption}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="p-3.5">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-[13px] font-black text-zinc-900">{t("upcomingReminders")}</h3>
+                <Link href="/dashboard/services" className="text-[11px] font-semibold text-red-600 hover:text-red-700">{t("viewAll")}</Link>
+              </div>
+              {reminders.length === 0 ? (
+                <p className="text-[12px] text-zinc-400 text-center py-4">{t("noRemindersDueSoon")}</p>
+              ) : (
+                <div className="space-y-2">
+                  {reminders.slice(0, 4).map((r) => {
+                    const overdue = r.status === "overdue";
+                    const rHref = r.kind === "service" && r.assetId
+                      ? `/dashboard/services?asset=${r.assetId}&new=1`
+                      : "/dashboard/calendar";
+                    return (
+                      <Link key={`${r.kind}-${r.id}`} href={rHref} className="flex items-center gap-2.5 -mx-1 px-1 py-0.5 rounded-lg hover:bg-zinc-50 transition-colors">
+                        <div className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 ${overdue ? "bg-red-100 text-red-600" : "bg-amber-100 text-amber-600"}`}>
+                          {overdue ? <AlertCircle size={13} /> : <Clock size={13} />}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-[12px] font-bold text-zinc-800 truncate">{r.assetLabel}</p>
+                          <p className="text-[10px] text-zinc-400 truncate">
+                            {r.kind === "service" ? tServiceTypes(SERVICE_TYPE_KEYS[r.serviceType ?? "Other"] ?? "other") : t("scheduledTask")}
                           </p>
-                        </Link>
+                        </div>
+                        <p className={`text-[10.5px] font-bold shrink-0 whitespace-nowrap ${overdue ? "text-red-600" : "text-amber-600"}`}>
+                          {relativeDueLabel(r)}
+                        </p>
+                      </Link>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* ── "Tus activos" carousel + "Actividad reciente" ── same
+              merge-into-one-card treatment as the row above. */}
+          <div className="grid grid-cols-1 lg:grid-cols-[1.6fr_1fr] divide-y lg:divide-y-0 lg:divide-x divide-zinc-100 bg-white rounded-2xl border border-zinc-200 shadow-sm mb-1.5">
+
+            <div className="p-3.5">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-[13px] font-black text-zinc-900">{t("yourAssets")}</h3>
+                <div className="flex items-center gap-2">
+                  {/* Facu (16 jul 2026): the page dots alone didn't make it
+                      obvious this grid pages sideways — added explicit
+                      prev/next arrows next to them as a clearer affordance. */}
+                  {assetTotalPages > 1 && (
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => setAssetCarouselPage((p) => (p - 1 + assetTotalPages) % assetTotalPages)}
+                        aria-label={t("previousPage")}
+                        className="w-6 h-6 rounded-full border border-zinc-200 text-zinc-400 hover:text-zinc-700 hover:border-zinc-300 flex items-center justify-center transition-colors"
+                      >
+                        <ChevronLeft size={13} />
+                      </button>
+                      <button
+                        onClick={() => setAssetCarouselPage((p) => (p + 1) % assetTotalPages)}
+                        aria-label={t("nextPage")}
+                        className="w-6 h-6 rounded-full border border-zinc-200 text-zinc-400 hover:text-zinc-700 hover:border-zinc-300 flex items-center justify-center transition-colors"
+                      >
+                        <ChevronRight size={13} />
+                      </button>
+                    </div>
+                  )}
+                  <Link href="/dashboard/assets" className="text-[11px] font-semibold text-red-600 hover:text-red-700">{t("viewAll")}</Link>
+                </div>
+              </div>
+              {assetCards.length === 0 ? (
+                <p className="text-[12px] text-zinc-400 text-center py-6">{t("noAssetsYet")}</p>
+              ) : (
+                <>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    {assetCards.slice(assetCarouselPage * 4, assetCarouselPage * 4 + 4).map((a) => {
+                      const overdue = a.status === "overdue";
+                      const dueSoon = a.status === "due_soon";
+                      const badgeLabel = overdue ? t("assetOverdue") : dueSoon ? t("assetUpcomingService") : t("assetUpToDate");
+                      const badgeColor = overdue ? "bg-red-100 text-red-700" : dueSoon ? "bg-amber-100 text-amber-700" : "bg-green-100 text-green-700";
+                      const img = a.photoUrl || assetTypeImg[a.assetType] || "/images/car.png";
+                      return (
+                        <button
+                          key={a.id}
+                          onClick={() => router.push(`/dashboard/assets?q=${encodeURIComponent(a.label)}`)}
+                          className="rounded-xl border border-zinc-100 hover:border-zinc-300 bg-zinc-50/50 p-2 text-left transition-colors"
+                        >
+                          {/* Fixed height (not aspect-square) — a full-width
+                              square image scaled to whatever this card's
+                              column happens to be, which on a wide screen
+                              made the photo (and the whole card) way taller
+                              than it needed to be.
+                              Facu (16 jul 2026): "la foto que tiene cargado
+                              el activo no se ve entera... quiero que se
+                              ajuste a ese espacio que tenemos no me importa
+                              que se vea chiquita" — real uploaded photos used
+                              object-cover, which fills the box by cropping
+                              whatever doesn't fit the aspect ratio (so tall/
+                              wide photos got their edges cut off). Switched
+                              to object-contain, same as the fallback icon
+                              below, so the whole photo is always visible,
+                              shrunk to fit instead of cropped. */}
+                          <div className="w-full h-16 rounded-lg bg-white border border-zinc-100 flex items-center justify-center overflow-hidden mb-1.5">
+                            {a.photoUrl ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img src={img} alt={a.label} className="w-full h-full object-contain" />
+                            ) : (
+                              <Image src={img} alt={a.label} width={36} height={36} className="object-contain" />
+                            )}
+                          </div>
+                          <p className="text-[11px] font-bold text-zinc-800 truncate">{a.label}</p>
+                          <span className={`inline-block mt-1 text-[9px] font-bold px-1.5 py-[2px] rounded-full ${badgeColor}`}>{badgeLabel}</span>
+                          <p className="text-[9px] text-zinc-400 mt-1 truncate">
+                            {a.lastServiceDate ? t("lastServiceOn", { date: formatDateDMY(a.lastServiceDate) }) : t("noServiceLoggedYet")}
+                          </p>
+                        </button>
                       );
                     })}
                   </div>
-                )}
-              </div>
-
-              <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm p-3.5">
-                <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-[13px] font-black text-zinc-900">{t("recentActivity")}</h3>
-                </div>
-                {recentActivity.length === 0 ? (
-                  <p className="text-[12px] text-zinc-400 text-center py-6">{t("noActivityYet")}</p>
-                ) : (
-                  <div className="space-y-2.5">
-                    {recentActivity.map((act) => (
-                      <div key={act.id} className="flex items-start gap-2.5">
-                        <div className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 mt-0.5 ${act.kind === "service" ? "bg-green-50 text-green-600" : "bg-blue-50 text-blue-600"}`}>
-                          {act.kind === "service" ? <CheckCircle2 size={12} /> : <QrCode size={12} />}
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <p className="text-[11.5px] font-bold text-zinc-800 leading-tight">{act.label}</p>
-                          {act.sub && <p className="text-[10px] text-zinc-400">{act.sub}</p>}
-                        </div>
-                        <p className="text-[9.5px] text-zinc-400 shrink-0 whitespace-nowrap">{formatRelativeTime(act.timestamp)}</p>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
+                  {assetCards.length > 4 && (
+                    <div className="flex items-center justify-center gap-1.5 mt-4">
+                      {Array.from({ length: Math.ceil(assetCards.length / 4) }).map((_, i) => (
+                        <button
+                          key={i}
+                          onClick={() => setAssetCarouselPage(i)}
+                          aria-label={`page ${i + 1}`}
+                          className={`w-1.5 h-1.5 rounded-full transition-colors ${i === assetCarouselPage ? "bg-red-600" : "bg-zinc-200"}`}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </>
+              )}
             </div>
 
+            <div className="p-3.5">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-[13px] font-black text-zinc-900">{t("recentActivity")}</h3>
+              </div>
+              {recentActivity.length === 0 ? (
+                <p className="text-[12px] text-zinc-400 text-center py-6">{t("noActivityYet")}</p>
+              ) : (
+                <div className="space-y-2.5">
+                  {recentActivity.map((act) => (
+                    <div key={act.id} className="flex items-start gap-2.5">
+                      <div className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 mt-0.5 ${act.kind === "service" ? "bg-green-50 text-green-600" : "bg-blue-50 text-blue-600"}`}>
+                        {act.kind === "service" ? <CheckCircle2 size={12} /> : <QrCode size={12} />}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[11.5px] font-bold text-zinc-800 leading-tight">{act.label}</p>
+                        {act.sub && <p className="text-[10px] text-zinc-400">{act.sub}</p>}
+                      </div>
+                      <p className="text-[9.5px] text-zinc-400 shrink-0 whitespace-nowrap">{formatRelativeTime(act.timestamp)}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Facu (16 jul 2026): his reference mockup fits on one screen —
