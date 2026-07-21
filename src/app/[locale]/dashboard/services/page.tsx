@@ -650,7 +650,14 @@ export default function ServicesPage() {
             container still had the old p-7 (28px) desktop padding from
             before the rest of the app got tightened up. Matches the
             dashboard home page's own p-4/p-5 convention now. */}
-        <div className="flex-1 overflow-y-auto px-3 md:px-4 pt-1.5 md:pt-2 pb-3 md:pb-4">
+        {/* Facu (21 jul 2026): medido con la consola — este contenedor
+            sobraba 83px respecto al alto visible, suficiente para que
+            apareciera la barra de scroll de Chrome incluso con el resto
+            del dashboard ya sin ese problema. Recortado en varios lugares
+            a la vez (este padding, los 2 "mb-5" de abajo, y el padding
+            vertical de las filas de la tabla) en vez de un solo cambio
+            grande, para no perder legibilidad en ningún punto puntual. */}
+        <div className="flex-1 overflow-y-auto px-3 md:px-4 pt-1.5 md:pt-2 pb-2 md:pb-3">
 
           {/* ── Summary tiles ── Facu (17 jul 2026): "quiero que se vea igual
               a esto" — matching his reference screenshot exactly this time:
@@ -659,7 +666,7 @@ export default function ServicesPage() {
               regular gray, big bold number below. */}
           {/* Facu (17 jul 2026): "hay demasiado espacio entre rectángulos...
               llevalo a 4" — tightened the grid gap down to 4px. */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-1 mb-5">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-1 mb-3">
             <div className="rounded-2xl border border-blue-100 bg-blue-50/60 px-4 py-3.5 flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-blue-500 text-white flex items-center justify-center shrink-0"><Box size={18} /></div>
               <div><p className="text-[12.5px] text-zinc-500 leading-tight">{t("tileAssets")}</p><p className="text-[21px] font-black text-zinc-900 leading-tight">{summaryTiles.assets}</p></div>
@@ -679,7 +686,7 @@ export default function ServicesPage() {
           </div>
 
           {/* Toolbar */}
-          <div className="flex items-center justify-between mb-5 gap-3 flex-wrap">
+          <div className="flex items-center justify-between mb-3 gap-3 flex-wrap">
             <div className="flex items-center gap-2.5 flex-wrap flex-1 min-w-0">
               {/* Facu (17 jul 2026): "es probablemente lo primero que haría
                   un usuario con 300 servicios" — searches asset name, QR
@@ -798,7 +805,7 @@ export default function ServicesPage() {
                             número de serie, haría icono + nombre, y abajo QR
                             #### en gris claro" — plus a real photo instead of
                             a generic icon when the asset has one uploaded. */}
-                        <td className="px-5 py-4">
+                        <td className="px-5 py-3">
                           <div className="flex items-center gap-3">
                             <div className="w-9 h-9 rounded-lg bg-zinc-50 border border-zinc-100 flex items-center justify-center shrink-0 overflow-hidden">
                               {photo ? (
@@ -814,18 +821,18 @@ export default function ServicesPage() {
                             </div>
                           </div>
                         </td>
-                        <td className="px-3 py-4 text-[12px] text-zinc-700 whitespace-nowrap">{formatDateDMY(row.service_date)}</td>
-                        <td className="px-3 py-4">
+                        <td className="px-3 py-3 text-[12px] text-zinc-700 whitespace-nowrap">{formatDateDMY(row.service_date)}</td>
+                        <td className="px-3 py-3">
                           <span className={`text-[10.5px] font-semibold px-2 py-[3px] rounded-full whitespace-nowrap ${typeColors[row.service_type] ?? "bg-zinc-100 text-zinc-700"}`}>
                             {tServiceTypes(SERVICE_TYPE_KEYS[row.service_type] ?? "other")}
                           </span>
                         </td>
-                        <td className="px-3 py-4 text-[12px] text-zinc-700 font-medium whitespace-nowrap">{unitValue(row.km_hours, asset?.asset_type)}</td>
+                        <td className="px-3 py-3 text-[12px] text-zinc-700 font-medium whitespace-nowrap">{unitValue(row.km_hours, asset?.asset_type)}</td>
                         {/* Facu (17 jul 2026): "yo haría un badge... más
                             compacto" — same pill shape as the Recordatorio
                             and service-type badges instead of a bare icon +
                             text row. */}
-                        <td className="px-3 py-4">
+                        <td className="px-3 py-3">
                           <span className="inline-flex items-center gap-1 text-[10.5px] font-semibold px-2 py-[3px] rounded-full bg-green-100 text-green-700 whitespace-nowrap">
                             <CheckCircle2 size={11} /> {t("completed")}
                           </span>
@@ -834,7 +841,7 @@ export default function ServicesPage() {
                             eso ensucia mucho... yo pondría solamente un
                             icono" — gray bell if nothing's set, colored bell
                             + short date if it is. */}
-                        <td className="px-3 py-4" onClick={(e) => e.stopPropagation()}>
+                        <td className="px-3 py-3" onClick={(e) => e.stopPropagation()}>
                           <button
                             onClick={() => openReminderModal(row)}
                             title={hasReminder ? t("viewEditReminder") : t("setReminder")}
@@ -849,7 +856,7 @@ export default function ServicesPage() {
                             itself only shows up once you're hovering the
                             row (opacity-0 → group-hover:opacity-100), instead
                             of a "⋮" sitting on every single row all the time. */}
-                        <td className="px-3 py-4 text-right relative" onClick={(e) => e.stopPropagation()}>
+                        <td className="px-3 py-3 text-right relative" onClick={(e) => e.stopPropagation()}>
                           <button
                             onClick={() => setOpenMenuRowId(openMenuRowId === row.id ? null : row.id)}
                             className={`text-zinc-300 hover:text-zinc-600 transition-all relative z-20 ${openMenuRowId === row.id || hoveredRowId === row.id ? "opacity-100" : "opacity-0"}`}
@@ -898,7 +905,7 @@ export default function ServicesPage() {
                 left and numbered page buttons ("‹ 1 2 3 4 5 ... 39 ›") on
                 the right, not just a plain prev/next + "Página X de Y". */}
             {!loading && filtered.length > 0 && (
-              <div className="flex items-center justify-between gap-3 flex-wrap border-t border-zinc-100 px-5 py-3">
+              <div className="flex items-center justify-between gap-3 flex-wrap border-t border-zinc-100 px-5 py-2">
                 <p className="text-[11.5px] text-zinc-400">
                   {t("showingCount", { shown: paginatedServices.length, total: filtered.length })}
                 </p>
