@@ -256,7 +256,7 @@ export default function ScheduledServicesPage() {
   const okCount = withStatus.filter((r) => r.status === "ok").length;
 
   return (
-    <div className="min-h-screen bg-zinc-50 flex relative">
+    <div className="h-dvh bg-zinc-50 flex relative overflow-hidden">
 
       <DashboardSidebarIntl
         activeHref="/dashboard/scheduled"

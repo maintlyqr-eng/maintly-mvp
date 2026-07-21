@@ -331,7 +331,7 @@ export default function CalendarPage() {
   }
 
   return (
-    <div className="min-h-screen bg-zinc-50 flex relative">
+    <div className="h-dvh bg-zinc-50 flex relative overflow-hidden">
 
       <DashboardSidebarIntl
         activeHref="/dashboard/calendar"

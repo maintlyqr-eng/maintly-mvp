@@ -614,7 +614,7 @@ export default function ServicesPage() {
   const svcAssetType = assetOptions.find((a) => a.id === svcAssetId)?.asset_type;
 
   return (
-    <div className="min-h-screen bg-zinc-50 flex relative">
+    <div className="h-dvh bg-zinc-50 flex relative overflow-hidden">
 
       <DashboardSidebarIntl
         activeHref="/dashboard/services"

@@ -427,7 +427,7 @@ export default function SettingsPage() {
   const maintlyScore = stats ? computeScore(verified, stats, specialties.length, yearsActive) : null;
 
   return (
-    <div className="min-h-screen bg-zinc-50 flex relative">
+    <div className="h-dvh bg-zinc-50 flex relative overflow-hidden">
 
       <DashboardSidebarIntl
         activeHref="/dashboard/settings"

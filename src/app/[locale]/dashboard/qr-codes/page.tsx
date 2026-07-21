@@ -243,7 +243,7 @@ export default function QrCodesPage() {
   const printRows = printCodes ? codes.filter((c) => printCodes.includes(c.code)) : [];
 
   return (
-    <div className="min-h-screen bg-zinc-50 flex relative">
+    <div className="h-dvh bg-zinc-50 flex relative overflow-hidden">
 
       <DashboardSidebarIntl
         activeHref="/dashboard/qr-codes"

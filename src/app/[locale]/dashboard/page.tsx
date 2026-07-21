@@ -729,8 +729,24 @@ export default function DashboardPage() {
     </div>
   );
 
+  // Facu (19 jul 2026): "no entiendo por qué sigue la barra de scroll ahí
+  // si no la necesito" — the main content column itself was already
+  // fitting, but `min-h-screen` on this wrapper only sets a *minimum*
+  // height, it doesn't cap the page at the viewport. The sidebar (logo +
+  // nav + support card + profile footer) is a normal flex item here, so
+  // if ITS natural stacked height runs even a couple px past the
+  // viewport, the whole page grows past 100vh and the browser shows its
+  // own scrollbar — regardless of how tight the main content is. Switched
+  // to the same h-dvh + overflow-hidden app-shell pattern Team Chat
+  // already uses for this exact reason (see the long comment in
+  // dashboard/team-chat/page.tsx): it caps the whole shell at the
+  // viewport, so the sidebar and the main content column each handle
+  // their own internal scrolling (nav's own overflow-y-auto, main's
+  // flex-1 overflow-y-auto) instead of the outer page ever growing taller
+  // than the screen. h-dvh over h-screen for the same mobile-address-bar
+  // reason documented there.
   return (
-    <div className="min-h-screen bg-zinc-50 flex relative">
+    <div className="h-dvh bg-zinc-50 flex relative overflow-hidden">
 
       {/* Redesign (jul 2026): this page used to hide the sidebar's own
           "¿Necesitás ayuda?" support card (hideSupportWidget) and render an
