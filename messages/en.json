@@ -1082,7 +1082,10 @@
     "sizeAll": "Size (all):",
     "perCodeSizeHint": "Need one code bigger or smaller than the rest? Use the −/+ under its own preview below — the size above sets the baseline for everyone.",
     "smaller": "Smaller",
-    "bigger": "Bigger"
+    "bigger": "Bigger",
+    "previousPage": "Previous page",
+    "nextPage": "Next page",
+    "showingCodesCount": "Showing {shown} of {total} codes"
   },
   "DashboardServicesPage": {
     "title": "My Services",

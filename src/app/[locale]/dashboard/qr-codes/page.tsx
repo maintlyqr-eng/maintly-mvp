@@ -8,6 +8,7 @@ import { useTranslations } from "next-intl";
 import {
   QrCode, Plus, X,
   Search, Download, Printer, Sparkles, ScanLine, Tag, Wrench,
+  ChevronLeft, ChevronRight,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { authedFetch } from "@/lib/apiAuth";
@@ -166,6 +167,27 @@ export default function QrCodesPage() {
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [codes, search, filter]);
+
+  // Facu (21 jul 2026): "hay que meter el scroll hacia el costado" — this
+  // grid used to just keep growing downward with every code (10 today, but
+  // could be hundreds), which is exactly what made the page need internal
+  // vertical scrolling. Paginated into fixed-height pages instead, same
+  // carousel pattern (fixed page size, chevrons, dot indicators) already
+  // used by the dashboard's "Tus activos" and this same page's own
+  // Personalize/Print flows elsewhere in the app — one row of cards is
+  // always visible, no matter how many codes exist in total.
+  const QR_PAGE_SIZE = 4;
+  const [qrPage, setQrPage] = useState(0);
+  const qrTotalPages = Math.max(1, Math.ceil(filtered.length / QR_PAGE_SIZE));
+  const safeQrPage = Math.min(qrPage, qrTotalPages - 1);
+  const visibleCodes = filtered.slice(safeQrPage * QR_PAGE_SIZE, safeQrPage * QR_PAGE_SIZE + QR_PAGE_SIZE);
+
+  // Jump back to page 1 whenever the search box or filter changes —
+  // otherwise landing on, say, page 3 while typing a search could show an
+  // empty page even though the new filtered set has plenty of results.
+  useEffect(() => {
+    setQrPage(0);
+  }, [search, filter]);
 
   const stats = useMemo(() => ({
     total: codes.length,
@@ -357,8 +379,32 @@ export default function QrCodesPage() {
               )}
             </div>
           ) : (
+            <>
+              <div className="flex items-center justify-between mb-3 gap-3">
+                <p className="text-[11.5px] text-zinc-400">
+                  {t("showingCodesCount", { shown: visibleCodes.length, total: filtered.length })}
+                </p>
+                {qrTotalPages > 1 && (
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => setQrPage((p) => (p - 1 + qrTotalPages) % qrTotalPages)}
+                      aria-label={t("previousPage")}
+                      className="w-6 h-6 rounded-full border border-zinc-200 text-zinc-400 hover:text-zinc-700 hover:border-zinc-300 flex items-center justify-center transition-colors"
+                    >
+                      <ChevronLeft size={13} />
+                    </button>
+                    <button
+                      onClick={() => setQrPage((p) => (p + 1) % qrTotalPages)}
+                      aria-label={t("nextPage")}
+                      className="w-6 h-6 rounded-full border border-zinc-200 text-zinc-400 hover:text-zinc-700 hover:border-zinc-300 flex items-center justify-center transition-colors"
+                    >
+                      <ChevronRight size={13} />
+                    </button>
+                  </div>
+                )}
+              </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-              {filtered.map((row) => (
+              {visibleCodes.map((row) => (
                 <div key={row.code} className="bg-white rounded-2xl border border-zinc-200 p-4 flex flex-col items-center text-center relative">
                   <input
                     type="checkbox"
@@ -411,6 +457,19 @@ export default function QrCodesPage() {
                 </div>
               ))}
             </div>
+            {filtered.length > QR_PAGE_SIZE && (
+              <div className="flex items-center justify-center gap-1.5 mt-4">
+                {Array.from({ length: qrTotalPages }).map((_, i) => (
+                  <button
+                    key={i}
+                    onClick={() => setQrPage(i)}
+                    aria-label={`page ${i + 1}`}
+                    className={`w-1.5 h-1.5 rounded-full transition-colors ${i === safeQrPage ? "bg-red-600" : "bg-zinc-200"}`}
+                  />
+                ))}
+              </div>
+            )}
+            </>
           )}
 
           <p className="text-center text-[11px] text-zinc-400 mt-8">{t("copyright")}</p>

@@ -1082,7 +1082,10 @@
     "sizeAll": "Tamanho (todos):",
     "perCodeSizeHint": "Precisa de um código maior ou menor que os demais? Use o −/+ abaixo da própria prévia — o tamanho acima define a base para todos.",
     "smaller": "Menor",
-    "bigger": "Maior"
+    "bigger": "Maior",
+    "previousPage": "Página anterior",
+    "nextPage": "Próxima página",
+    "showingCodesCount": "Mostrando {shown} de {total} códigos"
   },
   "DashboardServicesPage": {
     "title": "Meus Serviços",
