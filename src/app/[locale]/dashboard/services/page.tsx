@@ -864,7 +864,16 @@ export default function ServicesPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {paginatedServices.map((row) => {
+                  {paginatedServices.map((row, rowIdx) => {
+                    // Facu (22 jul 2026): "cuando toco en los 3 puntitos el
+                    // cartelito que se abre me hace tener que escrolear hacia
+                    // abajo... sobre todo los de abajo" — the menu always
+                    // opened downward from the button, so on the last couple
+                    // rows of the page it got clipped below the visible
+                    // table and forced a scroll to see the rest of it. For
+                    // the last 3 rows of the current page, open it upward
+                    // instead so it always lands fully on screen.
+                    const openMenuUpward = rowIdx >= paginatedServices.length - 3;
                     const asset = getAsset(row);
                     const photo = asset?.photo_url ?? null;
                     const img = asset ? assetTypeImg[asset.asset_type] ?? "/images/car.png" : "/images/car.png";
@@ -955,7 +964,7 @@ export default function ServicesPage() {
                             <MoreVertical size={15} />
                           </button>
                           {openMenuRowId === row.id && (
-                            <div className="absolute right-3 top-9 z-20 w-44 bg-white border border-zinc-200 rounded-xl shadow-lg py-1 text-left">
+                            <div className={`absolute right-3 z-20 w-44 bg-white border border-zinc-200 rounded-xl shadow-lg py-1 text-left ${openMenuUpward ? "bottom-9" : "top-9"}`}>
                               <button
                                 onClick={() => handleOpenView(row)}
                                 className="w-full flex items-center gap-2 px-3 py-2 text-[12px] font-medium text-zinc-700 hover:bg-zinc-50"
