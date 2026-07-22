@@ -310,13 +310,6 @@ export default function ServicesPage() {
     setRequestRow(null);
   }
 
-  // Row-hover state for the "..." actions trigger, driven by explicit
-  // onMouseEnter/onMouseLeave rather than a pure CSS group-hover toggle —
-  // same reasoning as the dashboard's calendar-preview popover fix: a
-  // CSS-only hover toggle silently failed to show on the live deploy there,
-  // so this page uses the proven JS-state pattern from the start instead.
-  const [hoveredRowId, setHoveredRowId] = useState<string | null>(null);
-
   function assetLabel(a: AssetOption | null) {
     if (!a) return "—";
     return a.nickname || [a.brand, a.model].filter(Boolean).join(" ") || t("unnamedAsset");
@@ -898,8 +891,6 @@ export default function ServicesPage() {
                         // also opening View underneath.
                         onClick={() => handleOpenView(row)}
                         className="border-t border-zinc-100 hover:bg-zinc-50/50 transition-colors cursor-pointer"
-                        onMouseEnter={() => setHoveredRowId(row.id)}
-                        onMouseLeave={() => setHoveredRowId((cur) => (cur === row.id ? null : cur))}
                       >
                         {/* Facu (17 jul 2026): "en vez de icono + nombre +
                             número de serie, haría icono + nombre, y abajo QR
@@ -951,15 +942,16 @@ export default function ServicesPage() {
                             {hasReminder && row.next_due_date && <span className="whitespace-nowrap">{formatShortDate(row.next_due_date, locale)}</span>}
                           </button>
                         </td>
-                        {/* Facu (17 jul 2026): "yo agregaría hover... eso hace
-                            que no haya botones por todos lados" — the trigger
-                            itself only shows up once you're hovering the
-                            row (opacity-0 → group-hover:opacity-100), instead
-                            of a "⋮" sitting on every single row all the time. */}
+                        {/* Facu (22 jul 2026): "creo q los 3 puntitos se
+                            deberian ver mas, no se notan mucho, solo
+                            aparecen cuando les paso el mouse x encima,
+                            prefiero q se vean siempre y negros" — reverting
+                            the earlier hover-only/gray treatment (17 jul) in
+                            favor of always-visible and dark. */}
                         <td className="px-3 py-3 text-right relative" onClick={(e) => e.stopPropagation()}>
                           <button
                             onClick={() => setOpenMenuRowId(openMenuRowId === row.id ? null : row.id)}
-                            className={`text-zinc-300 hover:text-zinc-600 transition-all relative z-20 ${openMenuRowId === row.id || hoveredRowId === row.id ? "opacity-100" : "opacity-0"}`}
+                            className="text-zinc-900 hover:text-black transition-colors relative z-20"
                           >
                             <MoreVertical size={15} />
                           </button>
