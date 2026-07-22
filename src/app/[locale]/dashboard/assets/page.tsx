@@ -805,7 +805,18 @@ export default function AssetsPage() {
                       </div>
                       <div className="min-w-0 flex-1">
                         <p className="text-[14px] font-bold text-zinc-900 leading-tight truncate">{label}</p>
-                        <p className="text-[11px] text-zinc-400 leading-tight">{a.year ? a.year + " · " : ""}{a.plate || a.vin_serial || "—"}</p>
+                        {/* Facu (22 jul 2026): "si pongo apodo me muestra el
+                            apodo arriba y abajo el vin. deberia aparecer el
+                            apodo arriba y la marca y modelo abajo. el vin
+                            solo deberia aparecer en caso de no poner apodo"
+                            — with a nickname, the subtitle shows brand+model
+                            instead of the VIN/plate; without one, `label`
+                            above already falls back to brand+model, so the
+                            subtitle shows the VIN/plate like before. */}
+                        <p className="text-[11px] text-zinc-400 leading-tight truncate">
+                          {a.year ? a.year + " · " : ""}
+                          {a.nickname ? ([a.brand, a.model].filter(Boolean).join(" ") || "—") : (a.plate || a.vin_serial || "—")}
+                        </p>
                         {a.sharedByName && (
                           <p className="text-[10px] text-blue-500 font-semibold leading-tight mt-0.5 flex items-center gap-1">
                             <Share2 size={9} /> {t("sharedBy", { name: a.sharedByName })}
