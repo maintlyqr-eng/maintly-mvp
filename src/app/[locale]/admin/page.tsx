@@ -11,7 +11,7 @@ import {
   Ban, ShieldCheck, ShieldOff, Trash2, KeyRound, UserCog,
   UserPlus, UserMinus, Plus, Link2Off, ScanLine, ClipboardList,
   LifeBuoy, Send, MessageCircle, Flag, History, ChevronDown, ChevronRight,
-  Trash, RotateCcw, TrendingUp, MapPin, Calendar, Pencil, Download, Settings, AlertTriangle, Bug,
+  Trash, RotateCcw, TrendingUp, MapPin, Calendar, Pencil, Download, Settings, AlertTriangle, Bug, Undo2, CheckCircle2,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { formatDateDMY } from "@/lib/date";
@@ -131,6 +131,31 @@ type TrashServiceRow = {
   assets: { brand: string | null; model: string | null; nickname: string | null } | null;
 };
 
+// Facu (21 jul 2026): "una vez pasado ese tiempo debería tener la opción
+// de pedirle al administrador que borre ese service" — see migration 042
+// + /api/admin/delete-requests. Row shape matches that endpoint's GET
+// exactly (nested joins typed as plain objects, same convention as
+// TrashServiceRow above).
+type DeleteRequestRow = {
+  id: string;
+  reason: string | null;
+  status: "pending" | "approved" | "rejected";
+  requested_at: string;
+  resolved_at: string | null;
+  resolved_by: string | null;
+  service_record_id: string;
+  requested_by: string;
+  mechanics: { name: string; email: string } | null;
+  service_records: {
+    id: string;
+    service_date: string;
+    service_type: string;
+    km_hours: number | null;
+    deleted_at: string | null;
+    assets: { brand: string | null; model: string | null; nickname: string | null } | null;
+  } | null;
+};
+
 type AssetTypeCount = { type: string; count: number };
 type DayBucket = { label: string; count: number };
 type UsageMetrics = {
@@ -155,7 +180,7 @@ type UsageMetrics = {
 // verificación pendiente) — ahora es una sola sección "accounts" (label
 // "Maintlers" en el sidebar) con pestañas internas, ver `maintlersTab` más
 // abajo.
-type Section = "dashboard" | "accounts" | "assets" | "services" | "qr" | "support" | "team-chat" | "moderation" | "analytics" | "audit-log" | "trash" | "admins" | "system" | "errors";
+type Section = "dashboard" | "accounts" | "assets" | "services" | "delete-requests" | "qr" | "support" | "team-chat" | "moderation" | "analytics" | "audit-log" | "trash" | "admins" | "system" | "errors";
 
 // Incremento 11 (14 jul 2026, roles y permisos): rol de un admin del panel
 // y las capacidades que devuelve /api/admin/session — mismo tipo/nombres
@@ -211,6 +236,9 @@ const SECTION_CAPABILITY: Partial<Record<Section, string>> = {
   accounts: "accounts",
   assets: "assets",
   services: "assets",
+  // Incremento 21 (migración 042): mismas manos que "services" — es la
+  // misma tabla service_records, solo con un paso de revisión en el medio.
+  "delete-requests": "assets",
   qr: "qr",
   support: "support",
   "team-chat": "reports",
@@ -252,7 +280,7 @@ function canSeeSection(id: Section, capabilities: string[]): boolean {
 // sección visible en el orden del sidebar — este último caso es un
 // fallback defensivo, no debería activarse con los 4 roles actuales.
 const SECTION_LANDING_ORDER: Section[] = [
-  "dashboard", "accounts", "assets", "services",
+  "dashboard", "accounts", "assets", "services", "delete-requests",
   "qr", "support", "team-chat", "moderation", "analytics", "audit-log", "trash", "admins", "system", "errors",
 ];
 
@@ -930,6 +958,10 @@ export default function AdminPage() {
   const [trashFilterFrom, setTrashFilterFrom] = useState("");
   const [trashFilterTo, setTrashFilterTo] = useState("");
 
+  // ── Solicitudes de Borrado (migración 042, item pedido 21 jul 2026) ──
+  const [deleteRequests, setDeleteRequests] = useState<DeleteRequestRow[]>([]);
+  const [deleteRequestsLoading, setDeleteRequestsLoading] = useState(true);
+
   // ── Assets UI state ──
   const [assetSearch, setAssetSearch] = useState("");
   // Edición de campos de asset desde el admin (item 3 del pedido: "editar") —
@@ -1494,6 +1526,47 @@ export default function AdminPage() {
     }
   }
 
+  async function loadDeleteRequests() {
+    setDeleteRequestsLoading(true);
+    try {
+      const res = await fetch("/api/admin/delete-requests");
+      const data = await res.json().catch(() => ({}));
+      setDeleteRequests((data.requests as DeleteRequestRow[]) ?? []);
+    } finally {
+      setDeleteRequestsLoading(false);
+    }
+  }
+
+  function confirmApproveDeleteRequest(row: DeleteRequestRow) {
+    const label = row.service_records?.assets ? assetLabel(row.service_records.assets) : t("unnamedAsset");
+    setConfirmAction({
+      title: t("approveDeleteRequestConfirmTitle"),
+      body: t("approveDeleteRequestConfirmBody", { type: row.service_records?.service_type ?? "", asset: label }),
+      danger: true,
+      onConfirm: async () => {
+        const res = await adminFetch("/api/admin/delete-requests", "PATCH", { id: row.id, decision: "approve" });
+        if (!res.ok) { flash(res.error, "error"); return; }
+        setDeleteRequests((prev) => prev.filter((x) => x.id !== row.id));
+        flash(t("deleteRequestApproved"));
+      },
+    });
+  }
+
+  function confirmRejectDeleteRequest(row: DeleteRequestRow) {
+    const label = row.service_records?.assets ? assetLabel(row.service_records.assets) : t("unnamedAsset");
+    setConfirmAction({
+      title: t("rejectDeleteRequestConfirmTitle"),
+      body: t("rejectDeleteRequestConfirmBody", { type: row.service_records?.service_type ?? "", asset: label }),
+      collectReason: true,
+      onConfirm: async (reason) => {
+        const res = await adminFetch("/api/admin/delete-requests", "PATCH", { id: row.id, decision: "reject", note: reason });
+        if (!res.ok) { flash(res.error, "error"); return; }
+        setDeleteRequests((prev) => prev.filter((x) => x.id !== row.id));
+        flash(t("deleteRequestRejected"));
+      },
+    });
+  }
+
   // Grouped by unordered pair (sorted id pair joined into one key) rather
   // than by a single "mechanic_id" the way support conversations are,
   // since here BOTH sides are ordinary Maintlers — there's no fixed
@@ -1792,6 +1865,17 @@ export default function AdminPage() {
   useEffect(() => {
     if (section === "trash" && adminAuthed) {
       loadTrash();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [section, adminAuthed]);
+
+  // Solicitudes de Borrado (migración 042, item pedido 21 jul 2026): mismo
+  // patrón perezoso que Papelera — se recarga cada vez que se abre la
+  // pestaña, así una aprobación/rechazo hecho en otra pestaña no deja la
+  // lista desactualizada.
+  useEffect(() => {
+    if (section === "delete-requests" && adminAuthed) {
+      loadDeleteRequests();
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [section, adminAuthed]);
@@ -2558,6 +2642,7 @@ export default function AdminPage() {
     { id: "accounts",  label: t("navMaintlers"),  icon: Users     },
     { id: "assets",    label: t("navAssets"),    icon: Box       },
     { id: "services",  label: t("navServices"),  icon: ClipboardList },
+    { id: "delete-requests", label: t("navDeleteRequests"), icon: Undo2 },
     { id: "qr",        label: t("navQr"), icon: QrCode   },
     { id: "support",   label: t("navSupport"),   icon: LifeBuoy  },
     { id: "team-chat", label: t("navTeamChat"), icon: MessageCircle },
@@ -2572,7 +2657,7 @@ export default function AdminPage() {
   const navItems = ALL_NAV_ITEMS.filter(({ id }) => canSeeSection(id, adminCapabilities));
   const sectionLabels: Record<Section, string> = {
     dashboard: t("navDashboard"), accounts: t("navMaintlers"),
-    assets: t("navAssets"), services: t("navServices"), qr: t("navQr"), support: t("navSupport"), "team-chat": t("navTeamChat"),
+    assets: t("navAssets"), services: t("navServices"), "delete-requests": t("navDeleteRequests"), qr: t("navQr"), support: t("navSupport"), "team-chat": t("navTeamChat"),
     moderation: t("navModeration"), analytics: t("navAnalytics"), "audit-log": t("navAuditLog"), trash: t("navTrash"),
     admins: t("navAdmins"), system: t("navSystem"), errors: t("navErrors"),
   };
@@ -4602,6 +4687,77 @@ export default function AdminPage() {
                                 </button>
                                 <button onClick={() => confirmPermanentDeleteService(row)} className="text-zinc-300 hover:text-red-600 transition-colors" title={t("permanentDeleteTitle")}>
                                   <Trash2 size={14} />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* ── SOLICITUDES DE BORRADO (migración 042, item pedido 21 jul
+               2026 — "recien me paso de q cargue un service en un generador
+               erroneamente... deberiamos tener la opcion de tener un
+               tiempito para borrarlo antes q quede fijo y bloqueado el
+               service" + "y un vez pasdo ese tiempo deberia tener la opcion
+               de pedirle al administrador q borre ese service"). El
+               mecánico dueño del registro puede borrarlo solo dentro de la
+               primera hora; pasado ese tiempo el mismo ícono de borrar le
+               abre este flujo de solicitud, que termina acá: el admin
+               aprueba (soft-delete real, mismo efecto que Papelera) o
+               rechaza (el registro queda intacto). ──────────────────── */}
+          {section === "delete-requests" && (
+            <div className="space-y-4">
+              <p className="text-[12px] text-zinc-400">{t("deleteRequestsIntro")}</p>
+
+              <div className="bg-white rounded-2xl border border-zinc-200/80 shadow-sm overflow-hidden">
+                {deleteRequestsLoading ? (
+                  <p className="text-[13px] text-zinc-400 text-center py-16">{t("loading")}</p>
+                ) : deleteRequests.length === 0 ? (
+                  <div className="text-center py-16">
+                    <Undo2 size={28} className="mx-auto text-zinc-200 mb-2" />
+                    <p className="text-[13px] text-zinc-300 font-medium">{t("deleteRequestsEmpty")}</p>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full min-w-[720px]">
+                      <thead>
+                        <tr className="bg-zinc-50 border-b border-zinc-100">
+                          {[t("colAsset"), t("colServiceType"), t("colDate"), t("colRequestedBy"), t("colReason"), t("colRequestedAt"), ""].map((h) => (
+                            <th key={h} className="px-7 py-3 text-left text-[9px] font-bold text-zinc-400 uppercase tracking-widest">{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-zinc-50">
+                        {deleteRequests.map((row) => (
+                          <tr key={row.id} className="hover:bg-zinc-50/80 transition-colors">
+                            <td className="px-7 py-4 text-[13px] font-bold text-zinc-900">
+                              {row.service_records?.assets ? assetLabel(row.service_records.assets) : t("unnamedAsset")}
+                            </td>
+                            <td className="px-7 py-4">
+                              <span className={`text-[10px] font-bold px-2.5 py-1 rounded-lg ${TYPE_COLORS[row.service_records?.service_type ?? ""] ?? "bg-zinc-100 text-zinc-500 border border-zinc-200"}`}>
+                                {row.service_records?.service_type ?? "—"}
+                              </span>
+                            </td>
+                            <td className="px-7 py-4 text-[12px] text-zinc-400">{row.service_records ? formatDate(row.service_records.service_date) : "—"}</td>
+                            <td className="px-7 py-4 text-[12px] text-zinc-500">
+                              <div className="font-bold text-zinc-700">{row.mechanics?.name ?? "—"}</div>
+                              <div className="text-zinc-400">{row.mechanics?.email ?? ""}</div>
+                            </td>
+                            <td className="px-7 py-4 text-[12px] text-zinc-500 max-w-[220px]">{row.reason || <span className="text-zinc-300">{t("noReasonGiven")}</span>}</td>
+                            <td className="px-7 py-4 text-[12px] text-zinc-400 whitespace-nowrap">{formatDate(row.requested_at)} · {formatTime(row.requested_at, locale)}</td>
+                            <td className="px-7 py-4">
+                              <div className="flex items-center justify-end gap-3">
+                                <button onClick={() => confirmApproveDeleteRequest(row)} className="flex items-center gap-1.5 text-[11px] font-bold text-emerald-600 hover:text-emerald-700 transition-colors" title={t("approveDeleteRequestTitle")}>
+                                  <CheckCircle2 size={13} /> {t("approveDeleteRequestTitle")}
+                                </button>
+                                <button onClick={() => confirmRejectDeleteRequest(row)} className="text-zinc-300 hover:text-red-600 transition-colors" title={t("rejectDeleteRequestTitle")}>
+                                  <X size={14} />
                                 </button>
                               </div>
                             </td>

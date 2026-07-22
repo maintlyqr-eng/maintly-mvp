@@ -12,7 +12,7 @@ import {
   Plus, X, Bell, Search, ChevronLeft, ChevronRight,
   Wrench, CheckCircle2, MoreVertical,
   Box, ClipboardList, CalendarClock, AlertTriangle,
-  Eye, Archive,
+  Eye, Archive, Trash2, Clock3,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import DashboardSidebarIntl from "@/components/DashboardSidebarIntl";
@@ -126,11 +126,20 @@ type ServiceRow = {
   km_hours: number | null;
   notes: string | null;
   created_at: string;
+  mechanic_id: string | null;
   next_due_date: string | null;
   next_due_km_hours: number | null;
   hidden_from_panel_at: string | null;
   assets: AssetInfo | AssetInfo[] | null;
 };
+
+// Facu (21 jul 2026): "un tiempito para borrarlo antes de que quede fijo y
+// bloqueado" — 1 hour, matching the window migration 042's RLS policy
+// actually enforces server-side. This constant is ONLY for the UI (which
+// icon/label/action to show); the real gate is the database policy, so a
+// stale clock or a delayed page load can never let this UI lie its way
+// past what the server will actually allow.
+const SELF_DELETE_WINDOW_MS = 60 * 60 * 1000;
 
 function getAsset(row: ServiceRow): AssetInfo | null {
   if (!row.assets) return null;
@@ -232,6 +241,75 @@ export default function ServicesPage() {
   const [hideSaving, setHideSaving] = useState(false);
   const [hideError, setHideError] = useState("");
 
+  // Facu (21 jul 2026): "un tiempito para borrarlo antes de que quede fijo
+  // y bloqueado... y una vez pasado ese tiempo, la opción de pedirle al
+  // administrador que lo borre" (migration 042). One button/icon in the
+  // row menu ("lo que se me ocurre es que el mismo ícono de borrar, una
+  // vez pasada la hora, te abra la solicitud de borrado") routes to one of
+  // two flows depending on how old the row is — see
+  // handleOpenDeleteOrRequest below. deleteRow/deleteSaving/deleteError
+  // power the direct self-delete confirm (only reachable within the
+  // window); requestRow/requestReason/requestSaving/requestError power the
+  // "solicitar borrado al admin" form (only reachable once the window has
+  // passed). pendingDeleteRequestIds tracks which rows already have an
+  // unresolved request filed, so the menu can show "pendiente de revisión"
+  // instead of letting the mechanic file a second one for the same row.
+  const [deleteRow, setDeleteRow] = useState<ServiceRow | null>(null);
+  const [deleteSaving, setDeleteSaving] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
+
+  const [requestRow, setRequestRow] = useState<ServiceRow | null>(null);
+  const [requestReason, setRequestReason] = useState("");
+  const [requestSaving, setRequestSaving] = useState(false);
+  const [requestError, setRequestError] = useState("");
+
+  const [pendingDeleteRequestIds, setPendingDeleteRequestIds] = useState<Set<string>>(new Set());
+
+  function isWithinSelfDeleteWindow(row: ServiceRow) {
+    return Date.now() - new Date(row.created_at).getTime() < SELF_DELETE_WINDOW_MS;
+  }
+
+  function handleOpenDeleteOrRequest(row: ServiceRow) {
+    if (pendingDeleteRequestIds.has(row.id)) return; // already filed, nothing to do here
+    if (isWithinSelfDeleteWindow(row)) {
+      setDeleteError("");
+      setDeleteRow(row);
+    } else {
+      setRequestError("");
+      setRequestReason("");
+      setRequestRow(row);
+    }
+  }
+
+  async function handleConfirmDelete() {
+    if (!deleteRow) return;
+    setDeleteSaving(true);
+    setDeleteError("");
+    const { error } = await supabase
+      .from("service_records")
+      .update({ deleted_at: new Date().toISOString() })
+      .eq("id", deleteRow.id);
+    setDeleteSaving(false);
+    if (error) { setDeleteError(t("errorDeleteService")); return; }
+    setDeleteRow(null);
+    await loadServices(mechanicId);
+  }
+
+  async function handleSubmitDeleteRequest() {
+    if (!requestRow) return;
+    setRequestSaving(true);
+    setRequestError("");
+    const { error } = await supabase.from("service_delete_requests").insert({
+      service_record_id: requestRow.id,
+      requested_by: mechanicId,
+      reason: requestReason.trim() || null,
+    });
+    setRequestSaving(false);
+    if (error) { setRequestError(t("errorSendDeleteRequest")); return; }
+    setPendingDeleteRequestIds((prev) => new Set(prev).add(requestRow.id));
+    setRequestRow(null);
+  }
+
   // Row-hover state for the "..." actions trigger, driven by explicit
   // onMouseEnter/onMouseLeave rather than a pure CSS group-hover toggle —
   // same reasoning as the dashboard's calendar-preview popover fix: a
@@ -269,7 +347,7 @@ export default function ServicesPage() {
     setLoading(true);
     const { data } = await supabase
       .from("service_records")
-      .select("id, service_date, service_type, km_hours, notes, created_at, next_due_date, next_due_km_hours, hidden_from_panel_at, assets(id, nickname, brand, model, vin_serial, plate, asset_type, photo_url, qr_codes(code))")
+      .select("id, service_date, service_type, km_hours, notes, created_at, mechanic_id, next_due_date, next_due_km_hours, hidden_from_panel_at, assets(id, nickname, brand, model, vin_serial, plate, asset_type, photo_url, qr_codes(code))")
       .eq("mechanic_id", uid)
       .is("deleted_at", null)
       // Facu (19 jul 2026): "eso sí debería poder hacer, borrar lo que él
@@ -282,6 +360,19 @@ export default function ServicesPage() {
       .is("hidden_from_panel_at", null)
       .order("service_date", { ascending: false });
     setServices((data as unknown as ServiceRow[]) ?? []);
+
+    // Facu (21 jul 2026): which rows already have a pending "solicitar
+    // borrado al admin" request filed — see migration 042. RLS on
+    // service_delete_requests only lets a mechanic SELECT their own rows,
+    // so this is already scoped without needing a .eq("requested_by", uid)
+    // (kept anyway for clarity and as a second line of defense).
+    const { data: pendingRequests } = await supabase
+      .from("service_delete_requests")
+      .select("service_record_id")
+      .eq("requested_by", uid)
+      .eq("status", "pending");
+    setPendingDeleteRequestIds(new Set((pendingRequests ?? []).map((r: { service_record_id: string }) => r.service_record_id)));
+
     setLoading(false);
   }
 
@@ -890,6 +981,28 @@ export default function ServicesPage() {
                               >
                                 <Archive size={13} className="text-zinc-400" /> {t("actionRemoveFromPanel")}
                               </button>
+                              {/* Facu (21 jul 2026): "un tiempito para
+                                  borrarlo antes de que quede fijo... y una
+                                  vez pasado ese tiempo, pedirle al admin que
+                                  lo borre" — same icon/slot the whole time,
+                                  handleOpenDeleteOrRequest decides which of
+                                  the two flows it opens (see migration 042).
+                                  A row with a pending request already filed
+                                  shows as disabled instead of offering the
+                                  action again. */}
+                              {pendingDeleteRequestIds.has(row.id) ? (
+                                <div className="w-full flex items-center gap-2 px-3 py-2 text-[12px] font-medium text-zinc-300 cursor-default">
+                                  <Clock3 size={13} /> {t("deleteRequestPending")}
+                                </div>
+                              ) : (
+                                <button
+                                  onClick={() => handleOpenDeleteOrRequest(row)}
+                                  className="w-full flex items-center gap-2 px-3 py-2 text-[12px] font-medium text-red-600 hover:bg-red-50"
+                                >
+                                  <Trash2 size={13} />
+                                  {isWithinSelfDeleteWindow(row) ? t("actionDelete") : t("actionRequestDelete")}
+                                </button>
+                              )}
                             </div>
                           )}
                         </td>
@@ -1200,6 +1313,92 @@ export default function ServicesPage() {
                   <button onClick={() => setHideRow(null)} className="flex-1 border border-zinc-200 text-zinc-700 font-bold py-[11px] rounded-xl text-[13px] hover:bg-zinc-50">{t("cancel")}</button>
                   <button onClick={handleConfirmHide} disabled={hideSaving} className="flex-1 bg-red-600 hover:bg-red-500 disabled:opacity-60 transition-all text-white font-bold py-[11px] rounded-xl text-[13px]">
                     {hideSaving ? t("removingFromPanel") : t("actionRemoveFromPanel")}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Facu (21 jul 2026): direct self-delete, only reachable within
+          SELF_DELETE_WINDOW_MS of logging it (see handleOpenDeleteOrRequest
+          and migration 042's matching RLS window — the server enforces the
+          same 1-hour cutoff independently of this UI). Unlike "Quitar de
+          mis registros", this really does soft-delete the row
+          (deleted_at), same as any admin-initiated delete — it's just
+          scoped to the mechanic's own honest mistake, in the first hour. */}
+      {deleteRow && (() => {
+        const asset = getAsset(deleteRow);
+        const label = asset?.nickname || [asset?.brand, asset?.model].filter(Boolean).join(" ") || t("unknownAsset");
+        return (
+          <div className="fixed inset-0 z-50 bg-zinc-900/40 flex items-center justify-center p-4" onClick={() => setDeleteRow(null)}>
+            <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm" onClick={(e) => e.stopPropagation()}>
+              <div className="px-6 py-5">
+                <div className="w-10 h-10 rounded-xl bg-red-50 flex items-center justify-center mb-3">
+                  <Trash2 size={17} className="text-red-600" />
+                </div>
+                <h2 className="text-[15px] font-black text-zinc-900 mb-1">{t("deleteConfirmTitle")}</h2>
+                <p className="text-[12.5px] text-zinc-500">
+                  {t("deleteConfirmBody", {
+                    asset: label,
+                    type: tServiceTypes(SERVICE_TYPE_KEYS[deleteRow.service_type] ?? "other"),
+                    date: formatDateDMY(deleteRow.service_date),
+                  })}
+                </p>
+                {deleteError && (
+                  <div className="mt-3 rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-[12px] text-red-700">{deleteError}</div>
+                )}
+                <div className="flex gap-3 pt-4">
+                  <button onClick={() => setDeleteRow(null)} className="flex-1 border border-zinc-200 text-zinc-700 font-bold py-[11px] rounded-xl text-[13px] hover:bg-zinc-50">{t("cancel")}</button>
+                  <button onClick={handleConfirmDelete} disabled={deleteSaving} className="flex-1 bg-red-600 hover:bg-red-500 disabled:opacity-60 transition-all text-white font-bold py-[11px] rounded-xl text-[13px]">
+                    {deleteSaving ? t("deleting") : t("actionDelete")}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Facu (21 jul 2026): once the 1-hour window is gone, this is the
+          only path left for the mechanic's own mistake — a request the
+          admin has to approve before anything actually gets deleted (see
+          migration 042 + /api/admin/delete-requests). Never deletes
+          anything itself. */}
+      {requestRow && (() => {
+        const asset = getAsset(requestRow);
+        const label = asset?.nickname || [asset?.brand, asset?.model].filter(Boolean).join(" ") || t("unknownAsset");
+        return (
+          <div className="fixed inset-0 z-50 bg-zinc-900/40 flex items-center justify-center p-4" onClick={() => setRequestRow(null)}>
+            <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm" onClick={(e) => e.stopPropagation()}>
+              <div className="px-6 py-5">
+                <div className="w-10 h-10 rounded-xl bg-amber-50 flex items-center justify-center mb-3">
+                  <Clock3 size={17} className="text-amber-600" />
+                </div>
+                <h2 className="text-[15px] font-black text-zinc-900 mb-1">{t("requestDeleteTitle")}</h2>
+                <p className="text-[12.5px] text-zinc-500 mb-3">
+                  {t("requestDeleteBody", {
+                    asset: label,
+                    type: tServiceTypes(SERVICE_TYPE_KEYS[requestRow.service_type] ?? "other"),
+                    date: formatDateDMY(requestRow.service_date),
+                  })}
+                </p>
+                <label className="text-[12px] font-bold text-zinc-700">{t("requestDeleteReasonLabel")}</label>
+                <textarea
+                  rows={3}
+                  value={requestReason}
+                  onChange={(e) => setRequestReason(e.target.value)}
+                  placeholder={t("requestDeleteReasonPlaceholder")}
+                  className="w-full mt-1 rounded-xl border border-zinc-200 px-3 py-[10px] text-[13px] outline-none focus:border-red-500 resize-none"
+                />
+                {requestError && (
+                  <div className="mt-3 rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-[12px] text-red-700">{requestError}</div>
+                )}
+                <div className="flex gap-3 pt-4">
+                  <button onClick={() => setRequestRow(null)} className="flex-1 border border-zinc-200 text-zinc-700 font-bold py-[11px] rounded-xl text-[13px] hover:bg-zinc-50">{t("cancel")}</button>
+                  <button onClick={handleSubmitDeleteRequest} disabled={requestSaving} className="flex-1 bg-red-600 hover:bg-red-500 disabled:opacity-60 transition-all text-white font-bold py-[11px] rounded-xl text-[13px]">
+                    {requestSaving ? t("sendingRequest") : t("sendDeleteRequest")}
                   </button>
                 </div>
               </div>

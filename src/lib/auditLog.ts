@@ -24,6 +24,7 @@ export type AdminAuditAction =
   | "service.delete"
   | "service.restore"
   | "service.delete_permanent"
+  | "service.delete_request_reject"
   | "qr.generate_batch"
   | "qr.unlink"
   | "support_thread.clear"
