@@ -21,10 +21,28 @@ import { supabase } from "@/lib/supabase";
 // another page (e.g. "/asset/ABC123") — those stay unprefixed on purpose,
 // same convention as every other not-yet-migrated target in this rollout.
 
+// Facu (26 jul 2026, revisión de seguridad): "?redirect=" venía confiado tal
+// cual, sin validar. Alguien podía mandar un link tipo
+// "/login?redirect=https://sitio-trucho.com" y, después de loguearse de
+// verdad en MaintlyQR, terminar en un sitio externo -- un vector clásico de
+// phishing (el link real es maintlyqr.com, así que no levanta sospechas
+// hasta que ya inició sesión). Esto solo permite rutas internas relativas:
+// tienen que empezar con un solo "/" (nunca "//", que los navegadores tratan
+// como URL absoluta -- mismo esquema/host que la página actual -- ni con
+// backslashes, que algunos navegadores normalizan como "//" también).
+// Cualquier otra cosa cae al default seguro de siempre, "/dashboard".
+function sanitizeRedirect(value: string | null): string {
+  if (!value) return "/dashboard";
+  if (!value.startsWith("/") || value.startsWith("//") || value.includes("\\")) {
+    return "/dashboard";
+  }
+  return value;
+}
+
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const redirectTo = searchParams.get("redirect") || "/dashboard";
+  const redirectTo = sanitizeRedirect(searchParams.get("redirect"));
 
   const t = useTranslations("LoginPage");
 

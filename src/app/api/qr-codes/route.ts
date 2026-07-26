@@ -152,9 +152,8 @@ export async function POST(req: NextRequest) {
     if (!code || typeof code !== "string") return NextResponse.json({ error: "Missing code." }, { status: 400 });
     if (!assetId || typeof assetId !== "string") return NextResponse.json({ error: "Missing assetId." }, { status: 400 });
 
-    const { data: row } = await admin.from("qr_codes").select("code, asset_id").eq("code", code).single();
+    const { data: row } = await admin.from("qr_codes").select("code").eq("code", code).single();
     if (!row) return NextResponse.json({ error: "QR code not found." }, { status: 404 });
-    if (row.asset_id) return NextResponse.json({ error: "This QR code is already assigned to an asset." }, { status: 409 });
 
     // The asset must actually be one this mechanic just created/owns —
     // guards against blindly pointing an arbitrary code at an arbitrary
@@ -164,8 +163,28 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "You don't own this asset." }, { status: 403 });
     }
 
-    const { error } = await admin.from("qr_codes").update({ asset_id: assetId, created_by: mechanicId }).eq("code", code);
+    // Facu (26 jul 2026, revisión de seguridad): esto antes leía asset_id,
+    // chequeaba en JS que fuera null, y RECIÉN AHÍ hacía el UPDATE — dos
+    // pasos separados con una ventana entre medio. Si dos requests para el
+    // mismo código en blanco llegaban casi al mismo tiempo (dos personas
+    // escaneando el mismo sticker físico, por ejemplo), las dos podían leer
+    // asset_id === null ANTES de que cualquiera de las dos terminara su
+    // UPDATE, y las dos pasaban el chequeo — un TOCTOU clásico. La versión
+    // de abajo hace el chequeo Y el update en una sola sentencia atómica
+    // (".is('asset_id', null)" como parte del UPDATE, no como un select
+    // previo): Postgres no puede intercalar dos UPDATEs sobre la misma fila,
+    // así que como mucho uno de los dos requests concurrentes va a
+    // encontrar la fila todavía con asset_id null y quedarse con el código.
+    const { data: updated, error } = await admin
+      .from("qr_codes")
+      .update({ asset_id: assetId, created_by: mechanicId })
+      .eq("code", code)
+      .is("asset_id", null)
+      .select("code");
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    if (!updated || updated.length === 0) {
+      return NextResponse.json({ error: "This QR code is already assigned to an asset." }, { status: 409 });
+    }
     return NextResponse.json({ ok: true });
   }
 
