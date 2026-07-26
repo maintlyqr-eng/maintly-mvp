@@ -2,11 +2,16 @@
 
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
 import type { KeyboardEvent } from "react";
+import { useTranslations } from "next-intl";
 import { X, Download, Share2, Printer } from "lucide-react";
 import QrCodeCanvas, { type QrCodeCanvasHandle } from "@/components/QrCodeCanvas";
 import { DEFAULT_QR_THEME } from "@/lib/qrThemes";
-import { computeBadges, yearsSince, type MaintlerStats } from "@/lib/maintlerScore";
-import { assetTypeOptions, assetTypeImg } from "@/lib/assetTypes";
+import { computeBadges, yearsSince, type MaintlerStats, type BadgeKind } from "@/lib/maintlerScore";
+import { assetTypeImg } from "@/lib/assetTypes";
+import { formatDateDMY } from "@/lib/date";
+// Reusing the same specialty-key map the public /maintler/[code] page uses,
+// so both surfaces translate a given asset_type the same way.
+import { SPECIALTY_TYPE_KEYS } from "@/lib/specialtyTypes";
 
 // Round 7 (July 9, 2026): Facu sent a fresh mockup — a real credit-card-
 // shaped, double-sided ID card (front: photo/name/status/QR; back: bio,
@@ -153,21 +158,21 @@ function drawSignalGlyph(ctx: CanvasRenderingContext2D, cx: number, cy: number, 
   ctx.restore();
 }
 
-function assetTypeLabel(type: string) {
-  return assetTypeOptions.find((o) => o.value === type)?.label ?? type;
-}
-
-// Maps each REAL badge label (from computeBadges()'s canonical thresholds —
-// same numbers the public card and Settings' Maintly Stats panel use) to a
+// Maps each REAL badge (from computeBadges()'s canonical thresholds — same
+// numbers the public card and Settings' Maintly Stats panel use) to a
 // canvas-drawable emoji + color. Doesn't re-derive the thresholds — just
-// styles whatever labels computeBadges() actually returned, so this can't
-// drift from the single source of truth for what counts as "100+ Services"
-// etc.
-function styleForBadge(label: string): { emoji: string; bg: string } {
-  if (label === "Verified") return { emoji: "✓", bg: "#059669" };
-  if (label.includes("Services")) return { emoji: "🔧", bg: "#2563eb" };
-  if (label.includes("Years Active")) return { emoji: "📅", bg: "#d97706" };
-  if (label === "Multi-Asset Specialist") return { emoji: "📦", bg: "#7c3aed" };
+// styles whatever badges computeBadges() actually returned.
+//
+// 26 jul 2026: switched from matching `label` text (e.g. `label === "Verified"`)
+// to matching the new stable `kind` field — this component now passes
+// *translated* labels into computeBadges() (see drawBack below), so the old
+// English-literal string matching would've silently dumped every badge into
+// the "⭐ generic" fallback for es/pt users.
+function styleForBadge(kind: BadgeKind): { emoji: string; bg: string } {
+  if (kind === "verified") return { emoji: "✓", bg: "#059669" };
+  if (kind === "services100" || kind === "services25") return { emoji: "🔧", bg: "#2563eb" };
+  if (kind === "yearsActive") return { emoji: "📅", bg: "#d97706" };
+  if (kind === "multiAssetSpecialist") return { emoji: "📦", bg: "#7c3aed" };
   return { emoji: "⭐", bg: "#71717a" };
 }
 
@@ -218,6 +223,19 @@ const MaintlerCardCanvas = forwardRef<MaintlerCardCanvasHandle, Props>(function 
   },
   ref
 ) {
+  // 26 jul 2026: localización — este componente dibujaba texto en inglés
+  // directo en el canvas (badge "VERIFIED MAINTLER", "Member since") y en
+  // el JSX del modal ("My Maintler Card", "Front"/"Back", botones), sin
+  // pasar por next-intl. Detectado en la auditoría UX de ChatGPT. Como es
+  // "use client" y siempre se monta dentro de páginas [locale] envueltas en
+  // NextIntlClientProvider, alcanza con el hook acá adentro — no hace falta
+  // recibir t como prop.
+  const t = useTranslations("MaintlerCard");
+  const tSpecialtyTypes = useTranslations("MaintlerPage.specialtyTypes");
+  function specialtyLabel(assetType: string) {
+    const key = SPECIALTY_TYPE_KEYS[assetType];
+    return key ? tSpecialtyTypes(key) : assetType;
+  }
   const previewCanvasRef = useRef<HTMLCanvasElement>(null);
   const qrFrontHandleRef = useRef<QrCodeCanvasHandle>(null);
   const qrBackHandleRef = useRef<QrCodeCanvasHandle>(null);
@@ -229,7 +247,13 @@ const MaintlerCardCanvas = forwardRef<MaintlerCardCanvasHandle, Props>(function 
   const effStats = stats ?? EMPTY_STATS;
   const years = createdAt ? yearsSince(createdAt) : 0;
   const activeSpecialties = specialties.filter((s) => s.services_count > 0).sort((a, b) => b.services_count - a.services_count);
-  const domBadges = computeBadges(!!verified, effStats, activeSpecialties.length, years);
+  const domBadges = computeBadges(!!verified, effStats, activeSpecialties.length, years, {
+    verified: t("badgeVerified"),
+    services100: t("badge100Services"),
+    services25: t("badge25Services"),
+    yearsActive: (y) => t("badgeYearsActive", { years: y }),
+    multiAssetSpecialist: t("badgeMultiAssetSpecialist"),
+  });
 
   // ── FRONT ──
   // Round 8 take 2: the first attempt (frontcard.png) baked in fixed icon
@@ -383,7 +407,7 @@ const MaintlerCardCanvas = forwardRef<MaintlerCardCanvasHandle, Props>(function 
 
     if (verified) {
       y += 40;
-      const label = "✓ VERIFIED MAINTLER";
+      const label = t("verifiedBadge");
       ctx.font = "bold 16px Arial, sans-serif";
       const textWidth = ctx.measureText(label).width;
       const pillH = 32, padX = 14;
@@ -415,8 +439,8 @@ const MaintlerCardCanvas = forwardRef<MaintlerCardCanvasHandle, Props>(function 
       y += 30;
       ctx.font = "17px Arial, sans-serif";
       ctx.fillStyle = "#71717a";
-      const memberSince = new Date(createdAt).toLocaleDateString("en-US", { day: "2-digit", month: "2-digit", year: "numeric" });
-      ctx.fillText(`📅 Member since ${memberSince}`, textX, y);
+      const memberSince = formatDateDMY(createdAt);
+      ctx.fillText(t("memberSince", { date: memberSince }), textX, y);
     }
 
     // QR — the "gear-ring" theme's composited blob (QrCodeCanvas.tsx,
@@ -457,7 +481,7 @@ const MaintlerCardCanvas = forwardRef<MaintlerCardCanvasHandle, Props>(function 
     ctx.textAlign = "left";
     ctx.fillStyle = "rgba(255,255,255,0.8)";
     ctx.font = "bold 13px Arial, sans-serif";
-    ctx.fillText("MAINTLER ID", 40, 555);
+    ctx.fillText(t("maintlerIdLabel"), 40, 555);
     ctx.fillStyle = "#ffffff";
     ctx.font = "bold 26px Arial, sans-serif";
     ctx.fillText(code.slice(0, 8).toUpperCase(), 40, 585);
@@ -467,7 +491,7 @@ const MaintlerCardCanvas = forwardRef<MaintlerCardCanvasHandle, Props>(function 
     ctx.textAlign = "right";
     ctx.fillStyle = "#e4e4e7";
     ctx.font = "bold 15px Arial, sans-serif";
-    ctx.fillText("SCAN TO VIEW MY PROFILE", W - 80, 590);
+    ctx.fillText(t("scanToViewProfile"), W - 80, 590);
     drawSignalGlyph(ctx, W - 42, 580, 26);
     ctx.textAlign = "left";
   }
@@ -517,17 +541,17 @@ const MaintlerCardCanvas = forwardRef<MaintlerCardCanvasHandle, Props>(function 
     let leftY = 54;
     ctx.font = "bold 15px Arial, sans-serif";
     ctx.fillStyle = "#dc2626";
-    ctx.fillText("ABOUT ME", colLeftX, leftY);
+    ctx.fillText(t("aboutMeHeading"), colLeftX, leftY);
     leftY += 26;
 
-    const topSpecialty = activeSpecialties[0] ? assetTypeLabel(activeSpecialties[0].asset_type) : null;
+    const topSpecialty = activeSpecialties[0] ? specialtyLabel(activeSpecialties[0].asset_type) : null;
     const aboutParts: string[] = [];
     aboutParts.push(
       profession && verified
-        ? `Verified ${profession} on MaintlyQR${years > 0 ? ` for ${years} year${years === 1 ? "" : "s"}` : ""}.`
-        : `Active Maintler on MaintlyQR${years > 0 ? ` for ${years} year${years === 1 ? "" : "s"}` : ""}.`
+        ? (years > 0 ? t("aboutVerifiedYears", { profession, years }) : t("aboutVerifiedNoYears", { profession }))
+        : (years > 0 ? t("aboutActiveYears", { years }) : t("aboutActiveNoYears"))
     );
-    if (topSpecialty) aboutParts.push(`Specialized in ${topSpecialty.toLowerCase()} maintenance.`);
+    if (topSpecialty) aboutParts.push(t("specializedIn", { specialty: topSpecialty }));
     ctx.font = "17px Arial, sans-serif";
     ctx.fillStyle = "#d4d4d8";
     const aboutLines = wrapText(ctx, aboutParts.join(" "), colLeftW, 3);
@@ -543,7 +567,7 @@ const MaintlerCardCanvas = forwardRef<MaintlerCardCanvasHandle, Props>(function 
     if (activeSpecialties.length > 0) {
       ctx.font = "bold 15px Arial, sans-serif";
       ctx.fillStyle = "#dc2626";
-      ctx.fillText("SPECIALTIES", colLeftX, leftY);
+      ctx.fillText(t("specialtiesHeading"), colLeftX, leftY);
       leftY += 26;
 
       const iconSize = 38;
@@ -567,7 +591,7 @@ const MaintlerCardCanvas = forwardRef<MaintlerCardCanvasHandle, Props>(function 
         ctx.font = "13px Arial, sans-serif";
         ctx.fillStyle = "#a1a1aa";
         ctx.textAlign = "center";
-        const label = truncateToWidth(ctx, assetTypeLabel(shown[i].asset_type), cellW - 6);
+        const label = truncateToWidth(ctx, specialtyLabel(shown[i].asset_type), cellW - 6);
         ctx.fillText(label, cx, cy + iconSize / 2 + 18);
         ctx.textAlign = "left";
       }
@@ -579,15 +603,15 @@ const MaintlerCardCanvas = forwardRef<MaintlerCardCanvasHandle, Props>(function 
     let midY = 54;
     ctx.font = "bold 15px Arial, sans-serif";
     ctx.fillStyle = "#dc2626";
-    ctx.fillText("STATS", colMidX, midY);
+    ctx.fillText(t("statsHeading"), colMidX, midY);
     midY += 32;
 
     const statRows: [string, number][] = [
-      ["Services Logged", effStats.services_count],
-      ["Assets Maintained", effStats.assets_count],
-      ["Documents Uploaded", documentsCount],
-      ["Repeat Customers", effStats.repeat_customers_count],
-      ["Years Active", years],
+      [t("statServicesLogged"), effStats.services_count],
+      [t("statAssetsMaintained"), effStats.assets_count],
+      [t("statDocumentsUploaded"), documentsCount],
+      [t("statRepeatCustomers"), effStats.repeat_customers_count],
+      [t("statYearsActive"), years],
     ];
     for (const [label, value] of statRows) {
       ctx.font = "14px Arial, sans-serif";
@@ -608,18 +632,18 @@ const MaintlerCardCanvas = forwardRef<MaintlerCardCanvasHandle, Props>(function 
     let rightY = 54;
     ctx.font = "bold 15px Arial, sans-serif";
     ctx.fillStyle = "#dc2626";
-    ctx.fillText("BADGES", colRightX, rightY);
+    ctx.fillText(t("badgesHeading"), colRightX, rightY);
     rightY += 28;
 
-    const cardBadges = [...domBadges.map((b) => ({ label: b.label, ...styleForBadge(b.label) }))];
+    const cardBadges = [...domBadges.map((b) => ({ label: b.label, ...styleForBadge(b.kind) }))];
     if (verified && profession) cardBadges.push({ label: profession, emoji: "🛠", bg: "#dc2626" });
 
     let badgesBottomY = rightY;
     if (cardBadges.length === 0) {
       ctx.font = "14px Arial, sans-serif";
       ctx.fillStyle = "#71717a";
-      ctx.fillText("Keep logging services", colRightX, rightY);
-      ctx.fillText("to unlock badges.", colRightX, rightY + 20);
+      ctx.fillText(t("noBadgesLine1"), colRightX, rightY);
+      ctx.fillText(t("noBadgesLine2"), colRightX, rightY + 20);
       badgesBottomY = rightY + 20;
     } else {
       // Vertically center the badge grid within the same content height the
@@ -682,7 +706,7 @@ const MaintlerCardCanvas = forwardRef<MaintlerCardCanvasHandle, Props>(function 
     let contactY = dividerY + 32;
     ctx.font = "bold 15px Arial, sans-serif";
     ctx.fillStyle = "#dc2626";
-    ctx.fillText("CONTACT", colLeftX, contactY);
+    ctx.fillText(t("contactHeading"), colLeftX, contactY);
     contactY += 26;
 
     const contactRows: string[] = [];
@@ -692,7 +716,7 @@ const MaintlerCardCanvas = forwardRef<MaintlerCardCanvasHandle, Props>(function 
     if (contactRows.length === 0) {
       ctx.font = "14px Arial, sans-serif";
       ctx.fillStyle = "#71717a";
-      ctx.fillText("No public contact info added yet.", colLeftX, contactY);
+      ctx.fillText(t("noContactInfo"), colLeftX, contactY);
     } else {
       ctx.font = "15px Arial, sans-serif";
       ctx.fillStyle = "#d4d4d8";
@@ -729,10 +753,10 @@ const MaintlerCardCanvas = forwardRef<MaintlerCardCanvasHandle, Props>(function 
     ctx.textAlign = "right";
     ctx.font = "bold 14px Arial, sans-serif";
     ctx.fillStyle = "#e4e4e7";
-    ctx.fillText("SHARE MY CARD", W - pad, shareCy - shareBoxSize / 2 - 12);
+    ctx.fillText(t("shareMyCardHeading"), W - pad, shareCy - shareBoxSize / 2 - 12);
     ctx.font = "12px Arial, sans-serif";
     ctx.fillStyle = "#71717a";
-    ctx.fillText("Scan or share with anyone.", W - pad, shareCy + shareBoxSize / 2 + 20);
+    ctx.fillText(t("scanOrShare"), W - pad, shareCy + shareBoxSize / 2 + 20);
     ctx.textAlign = "left";
 
     // Brand + Maintler ID, over the artwork's (otherwise blank) red banner
@@ -760,7 +784,7 @@ const MaintlerCardCanvas = forwardRef<MaintlerCardCanvasHandle, Props>(function 
     ctx.textAlign = "right";
     ctx.font = "bold 16px Arial, sans-serif";
     ctx.fillStyle = "#ffffff";
-    ctx.fillText(`MAINTLER ID: ${code.slice(0, 8).toUpperCase()}`, W - pad, BACK_CONTENT_H + 48);
+    ctx.fillText(t("maintlerIdWithCode", { code: code.slice(0, 8).toUpperCase() }), W - pad, BACK_CONTENT_H + 48);
     ctx.textAlign = "left";
   }
 
@@ -827,7 +851,7 @@ const MaintlerCardCanvas = forwardRef<MaintlerCardCanvasHandle, Props>(function 
       const nav = navigator as Navigator & { canShare?: (data?: ShareData) => boolean };
       if (nav.canShare && nav.canShare({ files: [file] })) {
         try {
-          await navigator.share({ files: [file], title: "My Maintler Card", text: "Scan my MaintlyQR Maintler card" });
+          await navigator.share({ files: [file], title: t("modalTitle"), text: t("shareText") });
           return;
         } catch {
           // User cancelled the share sheet, or the browser refused mid-way
@@ -844,7 +868,7 @@ const MaintlerCardCanvas = forwardRef<MaintlerCardCanvasHandle, Props>(function 
       const printWindow = window.open("", "_blank");
       if (!printWindow) return;
       printWindow.document.write(
-        `<html><head><title>Maintler Card</title><style>` +
+        `<html><head><title>${t("printWindowTitle")}</title><style>` +
         `body{margin:0;background:#fff;}` +
         `.page{display:flex;align-items:center;justify-content:center;min-height:100vh;}` +
         `.page img{max-width:92%;max-height:92vh;}` +
@@ -876,7 +900,7 @@ const MaintlerCardCanvas = forwardRef<MaintlerCardCanvasHandle, Props>(function 
     const nav = navigator as Navigator & { canShare?: (data?: ShareData) => boolean };
     if (nav.canShare && nav.canShare({ files: [file] })) {
       try {
-        await navigator.share({ files: [file], title: "My Maintler Card", text: "Scan my MaintlyQR Maintler card" });
+        await navigator.share({ files: [file], title: t("modalTitle"), text: t("shareText") });
         return;
       } catch {
         // Falls through to a plain download below.
@@ -892,7 +916,7 @@ const MaintlerCardCanvas = forwardRef<MaintlerCardCanvasHandle, Props>(function 
     const printWindow = window.open("", "_blank");
     if (!printWindow) return;
     printWindow.document.write(
-      `<html><head><title>Maintler Card</title><style>` +
+      `<html><head><title>${t("printWindowTitle")}</title><style>` +
       `body{margin:0;background:#fff;}` +
       `.page{display:flex;align-items:center;justify-content:center;min-height:100vh;}` +
       `.page img{max-width:92%;max-height:92vh;}` +
@@ -916,7 +940,7 @@ const MaintlerCardCanvas = forwardRef<MaintlerCardCanvasHandle, Props>(function 
               onClick: () => setViewOpen(true),
               role: "button" as const,
               tabIndex: 0,
-              "aria-label": "View both sides of your Maintler card",
+              "aria-label": t("viewBothSidesAria"),
               onKeyDown: (e: KeyboardEvent<HTMLDivElement>) => {
                 if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setViewOpen(true); }
               },
@@ -934,7 +958,7 @@ const MaintlerCardCanvas = forwardRef<MaintlerCardCanvasHandle, Props>(function 
       </div>
       {clickToView && (
         <p className="text-center text-[11px] text-zinc-400 mt-2">
-          Tap the card to view both sides &amp; print
+          {t("tapToView")}
         </p>
       )}
 
@@ -942,7 +966,7 @@ const MaintlerCardCanvas = forwardRef<MaintlerCardCanvasHandle, Props>(function 
         <div className="fixed inset-0 z-[100] bg-zinc-900/70 flex items-center justify-center p-4" onClick={() => setViewOpen(false)}>
           <div className="bg-white rounded-2xl p-6 max-w-7xl w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-[15px] font-black text-zinc-900">My Maintler Card</h3>
+              <h3 className="text-[15px] font-black text-zinc-900">{t("modalTitle")}</h3>
               <button onClick={() => setViewOpen(false)} className="text-zinc-400 hover:text-zinc-700">
                 <X size={20} />
               </button>
@@ -952,13 +976,13 @@ const MaintlerCardCanvas = forwardRef<MaintlerCardCanvasHandle, Props>(function 
                 <div style={{ width: "100%", aspectRatio: `${CARD_W} / ${CARD_H}` }} className="rounded-2xl overflow-hidden border border-zinc-200 shadow-sm">
                   <canvas ref={viewFrontCanvasRef} style={{ width: "100%", height: "100%", display: "block" }} />
                 </div>
-                <p className="text-center text-[11px] font-bold text-zinc-400 mt-2 uppercase tracking-wide">Front</p>
+                <p className="text-center text-[11px] font-bold text-zinc-400 mt-2 uppercase tracking-wide">{t("front")}</p>
               </div>
               <div className="w-full md:w-1/2">
                 <div style={{ width: "100%", aspectRatio: `${CARD_W} / ${CARD_H}` }} className="rounded-2xl overflow-hidden border border-zinc-200 shadow-sm">
                   <canvas ref={viewBackCanvasRef} style={{ width: "100%", height: "100%", display: "block" }} />
                 </div>
-                <p className="text-center text-[11px] font-bold text-zinc-400 mt-2 uppercase tracking-wide">Back</p>
+                <p className="text-center text-[11px] font-bold text-zinc-400 mt-2 uppercase tracking-wide">{t("back")}</p>
               </div>
             </div>
             <div className="flex items-center justify-center gap-2 mt-6">
@@ -966,19 +990,19 @@ const MaintlerCardCanvas = forwardRef<MaintlerCardCanvasHandle, Props>(function 
                 onClick={() => downloadFromModal()}
                 className="flex items-center gap-1.5 text-[12px] font-bold text-white bg-zinc-900 hover:bg-zinc-800 px-4 py-2.5 rounded-xl transition-colors"
               >
-                <Download size={13} /> Download Both
+                <Download size={13} /> {t("downloadBoth")}
               </button>
               <button
                 onClick={() => printFromModal()}
                 className="flex items-center gap-1.5 text-[12px] font-bold text-zinc-600 hover:text-red-600 border border-zinc-200 hover:bg-zinc-50 px-4 py-2.5 rounded-xl transition-colors"
               >
-                <Printer size={13} /> Print Card
+                <Printer size={13} /> {t("printCard")}
               </button>
               <button
                 onClick={() => shareFromModal()}
                 className="flex items-center gap-1.5 text-[12px] font-bold text-zinc-600 hover:text-red-600 border border-zinc-200 hover:bg-zinc-50 px-4 py-2.5 rounded-xl transition-colors"
               >
-                <Share2 size={13} /> Share
+                <Share2 size={13} /> {t("share")}
               </button>
             </div>
           </div>

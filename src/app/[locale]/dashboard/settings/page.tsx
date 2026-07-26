@@ -24,12 +24,13 @@ import DashboardSidebarIntl from "@/components/DashboardSidebarIntl";
 import DashboardHeaderIntl from "@/components/DashboardHeaderIntl";
 import { getInitials } from "@/lib/initials";
 
-// NOTE: MaintlerCardCanvas is used here UNCHANGED (no Intl variant) — it's
-// already used unmigrated, with its original hardcoded canvas-drawn English
-// text, by two already-migrated Phase 1 pages (src/app/[locale]/maintler/
-// [code]/page.tsx and src/app/[locale]/asset/[code]/page.tsx). This mirrors
-// that existing, already-shipped precedent rather than introducing a new
-// canvas-text-localization effort as part of this page.
+// NOTE (updated 26 jul 2026): MaintlerCardCanvas used to draw hardcoded
+// English text straight onto its canvas (badge/stat/section labels, "Member
+// since", etc.) regardless of which page rendered it — flagged in ChatGPT's
+// UX audit. It's now localized internally via next-intl (own "MaintlerCard"
+// namespace, see that component's file), so this page needs zero changes
+// beyond passing an already-translated `profession` string (professionLabel()
+// below), same as every other localized call site.
 //
 // This page's router stays on plain next/navigation's useRouter (not
 // @/i18n/navigation) is NOT actually required here — every router target on
@@ -508,7 +509,7 @@ export default function SettingsPage() {
                     workshopName={workshopName}
                     photoUrl={photoUrl}
                     verified={verified}
-                    profession={verified ? profession : null}
+                    profession={verified && profession ? professionLabel(profession) : null}
                     location={location || null}
                     createdAt={createdAt || null}
                     stats={stats}

@@ -38,7 +38,14 @@ export function computeScore(
   return Math.min(5, score);
 }
 
-export type Badge = { label: string; icon: typeof ShieldCheck; className: string };
+// `kind` is a stable, language-independent identifier for each badge —
+// added 26 jul 2026 so consumers that need to tell badges apart (e.g.
+// MaintlerCardCanvas's canvas-drawn emoji/color styling) don't have to
+// pattern-match on `label`, which breaks the moment a caller passes
+// translated labels (Spanish/Portuguese) instead of the English defaults.
+export type BadgeKind = "verified" | "services100" | "services25" | "yearsActive" | "multiAssetSpecialist";
+
+export type Badge = { kind: BadgeKind; label: string; icon: typeof ShieldCheck; className: string };
 
 // Optional translated labels — the badge text used to be hardcoded English
 // literals baked directly into this function, which is shared by the public
@@ -73,10 +80,10 @@ export function computeBadges(
   labels: BadgeLabels = DEFAULT_BADGE_LABELS
 ): Badge[] {
   const badges: Badge[] = [];
-  if (verified) badges.push({ label: labels.verified, icon: ShieldCheck, className: "bg-emerald-50 text-emerald-700 border-emerald-200" });
-  if (stats.services_count >= 100) badges.push({ label: labels.services100, icon: Wrench, className: "bg-blue-50 text-blue-700 border-blue-200" });
-  else if (stats.services_count >= 25) badges.push({ label: labels.services25, icon: Wrench, className: "bg-blue-50 text-blue-700 border-blue-200" });
-  if (years >= 5) badges.push({ label: labels.yearsActive(years), icon: CalendarDays, className: "bg-amber-50 text-amber-700 border-amber-200" });
-  if (specialtyCount >= 3) badges.push({ label: labels.multiAssetSpecialist, icon: Box, className: "bg-purple-50 text-purple-700 border-purple-200" });
+  if (verified) badges.push({ kind: "verified", label: labels.verified, icon: ShieldCheck, className: "bg-emerald-50 text-emerald-700 border-emerald-200" });
+  if (stats.services_count >= 100) badges.push({ kind: "services100", label: labels.services100, icon: Wrench, className: "bg-blue-50 text-blue-700 border-blue-200" });
+  else if (stats.services_count >= 25) badges.push({ kind: "services25", label: labels.services25, icon: Wrench, className: "bg-blue-50 text-blue-700 border-blue-200" });
+  if (years >= 5) badges.push({ kind: "yearsActive", label: labels.yearsActive(years), icon: CalendarDays, className: "bg-amber-50 text-amber-700 border-amber-200" });
+  if (specialtyCount >= 3) badges.push({ kind: "multiAssetSpecialist", label: labels.multiAssetSpecialist, icon: Box, className: "bg-purple-50 text-purple-700 border-purple-200" });
   return badges;
 }

@@ -14,6 +14,7 @@ import { formatDateDMY } from "@/lib/date";
 import MaintlerCardCanvas, { type MaintlerCardCanvasHandle } from "@/components/MaintlerCardCanvas";
 import { yearsSince, computeScore, computeBadges, type MaintlerStats } from "@/lib/maintlerScore";
 import { isSafeHref } from "@/lib/contactValidation";
+import { SPECIALTY_TYPE_KEYS } from "@/lib/specialtyTypes";
 
 // Localized copy of src/app/maintler/[code]/page.tsx — see that file's
 // header comment for the full feature history (Item 4 of the backlog).
@@ -37,16 +38,6 @@ const assetTypeImg: Record<string, string> = {
   machinery: "/images/excavator.png",
   marine: "/images/barco.png",
   aviation: "/images/avion.png",
-};
-
-// Deliberately its own key set, not the shared AssetTypes namespace used by
-// the Asset/Report pages — the original English here used plural forms for
-// some specialties ("Motorcycles", "Generators") since it reads as a
-// specialty category, not a single asset's type. Keeping that distinction
-// instead of silently flattening it to the singular AssetTypes wording.
-const SPECIALTY_TYPE_KEYS: Record<string, string> = {
-  automotive: "automotive", motorcycle: "motorcycle", generator: "generator",
-  machinery: "machinery", marine: "marine", aviation: "aviation",
 };
 
 // Mirrors MAINTLER_ROLE_KEYS in src/app/[locale]/asset/[code]/page.tsx
@@ -550,7 +541,7 @@ function MaintlerPublicPageContent() {
                       workshopName={profile.workshop_name}
                       photoUrl={profile.photo_url}
                       verified={profile.verified}
-                      profession={profile.verified ? profile.profession : null}
+                      profession={profile.verified && profile.profession ? maintlerRoleLabel(profile.profession) : null}
                       previewWidth={110}
                     />
                     <div className="flex flex-col gap-2">
