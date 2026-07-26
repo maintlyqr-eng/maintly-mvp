@@ -2107,5 +2107,11 @@
     "submittedTitle": "Enviado para revisão",
     "submittedDesc": "Vamos revisar seu certificado de {profession} e avisar assim que você for um Maintler {profession} verificado. Enquanto isso, você pode continuar usando o MaintlyQR normalmente.",
     "goToDashboard": "Ir para o Dashboard"
+  },
+  "ErrorFallback": {
+    "title": "Estamos trabalhando nisso",
+    "subtitle": "Algo deu errado do nosso lado — já fomos notificados e estamos resolvendo. Tente novamente em instantes.",
+    "retry": "Tentar novamente",
+    "goHome": "Ir para o início"
   }
 }

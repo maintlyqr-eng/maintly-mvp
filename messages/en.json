@@ -2107,5 +2107,11 @@
     "submittedTitle": "Submitted for review",
     "submittedDesc": "We'll review your {profession} certificate and let you know once you're a verified {profession} Maintler. You can keep using MaintlyQR in the meantime.",
     "goToDashboard": "Go to Dashboard"
+  },
+  "ErrorFallback": {
+    "title": "We're working on it",
+    "subtitle": "Something went wrong on our end — we've already been notified and we're on it. Try again in a moment.",
+    "retry": "Try again",
+    "goHome": "Go to homepage"
   }
 }
