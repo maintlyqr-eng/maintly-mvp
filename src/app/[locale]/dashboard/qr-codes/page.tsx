@@ -189,6 +189,26 @@ export default function QrCodesPage() {
     setQrPage(0);
   }, [search, filter]);
 
+  // Facu (26 jul 2026): "me meti en mis servicios o en codigos qr y le paso
+  // el dedo y nada. si funciona con activos" — same swipe-to-change-page
+  // gesture as Mis Activos. This page's arrow buttons wrap around at the
+  // ends (modulo), so the swipe matches that instead of clamping.
+  const qrTouchStartX = useRef<number | null>(null);
+  function handleQrTouchStart(e: React.TouchEvent) {
+    qrTouchStartX.current = e.touches[0].clientX;
+  }
+  function handleQrTouchEnd(e: React.TouchEvent) {
+    if (qrTouchStartX.current === null || qrTotalPages <= 1) return;
+    const deltaX = e.changedTouches[0].clientX - qrTouchStartX.current;
+    qrTouchStartX.current = null;
+    const SWIPE_THRESHOLD = 40;
+    if (deltaX > SWIPE_THRESHOLD) {
+      setQrPage((p) => (p - 1 + qrTotalPages) % qrTotalPages);
+    } else if (deltaX < -SWIPE_THRESHOLD) {
+      setQrPage((p) => (p + 1) % qrTotalPages);
+    }
+  }
+
   const stats = useMemo(() => ({
     total: codes.length,
     assigned: codes.filter((c) => c.asset).length,
@@ -403,7 +423,11 @@ export default function QrCodesPage() {
                   </div>
                 )}
               </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+            <div
+              className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 touch-pan-y"
+              onTouchStart={handleQrTouchStart}
+              onTouchEnd={handleQrTouchEnd}
+            >
               {visibleCodes.map((row) => (
                 <div key={row.code} className="bg-white rounded-2xl border border-zinc-200 p-4 flex flex-col items-center text-center relative">
                   <input

@@ -664,6 +664,27 @@ export default function ServicesPage() {
     setServicesPage(0);
   }, [filterAsset, filterType, filterStatus, searchQuery]);
 
+  // Facu (26 jul 2026): "me meti en mis servicios o en codigos qr y le paso
+  // el dedo y nada. si funciona con activos" — same swipe-to-change-page
+  // gesture as Mis Activos, now wired up here too (arrow buttons on this
+  // page don't wrap around at the ends, so the swipe mirrors that with
+  // Math.max/Math.min instead of the modulo wraparound used elsewhere).
+  const servicesTouchStartX = useRef<number | null>(null);
+  function handleServicesTouchStart(e: React.TouchEvent) {
+    servicesTouchStartX.current = e.touches[0].clientX;
+  }
+  function handleServicesTouchEnd(e: React.TouchEvent) {
+    if (servicesTouchStartX.current === null || servicesTotalPages <= 1) return;
+    const deltaX = e.changedTouches[0].clientX - servicesTouchStartX.current;
+    servicesTouchStartX.current = null;
+    const SWIPE_THRESHOLD = 40;
+    if (deltaX > SWIPE_THRESHOLD) {
+      setServicesPage((p) => Math.max(0, p - 1));
+    } else if (deltaX < -SWIPE_THRESHOLD) {
+      setServicesPage((p) => Math.min(servicesTotalPages - 1, p + 1));
+    }
+  }
+
   // ── Summary tiles (Activos / Servicios / Programados / Vencidos) ──
   // Facu (17 jul 2026): "eso convierte la pantalla en un pequeño dashboard"
   // — counts are over the FULL unfiltered `services` list (not `filtered`),
@@ -840,7 +861,11 @@ export default function ServicesPage() {
                 </button>
               </div>
             ) : (
-              <div className="overflow-x-auto overscroll-x-contain relative">
+              <div
+                className="overflow-x-auto overscroll-x-contain touch-pan-y relative"
+                onTouchStart={handleServicesTouchStart}
+                onTouchEnd={handleServicesTouchEnd}
+              >
               {openMenuRowId && (
                 <div className="fixed inset-0 z-10" onClick={() => setOpenMenuRowId(null)} />
               )}

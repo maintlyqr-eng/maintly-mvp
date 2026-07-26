@@ -2,7 +2,7 @@
 
 import { Link } from "@/i18n/navigation";
 import Image from "next/image";
-import { Fragment, useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslations, useLocale } from "next-intl";
 import {
   Users, Box, Wrench, QrCode, BarChart3, Shield,
@@ -2691,7 +2691,59 @@ export default function AdminPage() {
   };
   const auditLogTotalPages = Math.max(1, Math.ceil(auditLogsTotal / AUDIT_LOG_PAGE_SIZE));
   const reportsTotalPages = Math.max(1, Math.ceil(reportsTotal / REPORTS_PAGE_SIZE));
+  const errorLogsTotalPages = Math.max(1, Math.ceil(errorLogsTotal / ERROR_LOGS_PAGE_SIZE));
   const unreadSupportCount = supportMessages.filter((m) => !m.from_admin && !m.read).length;
+
+  // Facu (26 jul 2026): "te habia pedido q lo agregues en todos lados
+  // donde haya escrol de ese tipo" — same swipe-to-change-page gesture as
+  // the mechanic-facing pages, now on these 3 admin tables too. Pages here
+  // are 1-indexed and clamp (not wrap) at both ends, same as their arrow
+  // buttons below.
+  const auditLogTouchStartX = useRef<number | null>(null);
+  function handleAuditLogTouchStart(e: React.TouchEvent) {
+    auditLogTouchStartX.current = e.touches[0].clientX;
+  }
+  function handleAuditLogTouchEnd(e: React.TouchEvent) {
+    if (auditLogTouchStartX.current === null || auditLogTotalPages <= 1) return;
+    const deltaX = e.changedTouches[0].clientX - auditLogTouchStartX.current;
+    auditLogTouchStartX.current = null;
+    const SWIPE_THRESHOLD = 40;
+    if (deltaX > SWIPE_THRESHOLD) {
+      setAuditLogsPage((p) => Math.max(1, p - 1));
+    } else if (deltaX < -SWIPE_THRESHOLD) {
+      setAuditLogsPage((p) => Math.min(auditLogTotalPages, p + 1));
+    }
+  }
+  const reportsTouchStartX = useRef<number | null>(null);
+  function handleReportsTouchStart(e: React.TouchEvent) {
+    reportsTouchStartX.current = e.touches[0].clientX;
+  }
+  function handleReportsTouchEnd(e: React.TouchEvent) {
+    if (reportsTouchStartX.current === null || reportsTotalPages <= 1) return;
+    const deltaX = e.changedTouches[0].clientX - reportsTouchStartX.current;
+    reportsTouchStartX.current = null;
+    const SWIPE_THRESHOLD = 40;
+    if (deltaX > SWIPE_THRESHOLD) {
+      setReportsPage((p) => Math.max(1, p - 1));
+    } else if (deltaX < -SWIPE_THRESHOLD) {
+      setReportsPage((p) => Math.min(reportsTotalPages, p + 1));
+    }
+  }
+  const errorLogsTouchStartX = useRef<number | null>(null);
+  function handleErrorLogsTouchStart(e: React.TouchEvent) {
+    errorLogsTouchStartX.current = e.touches[0].clientX;
+  }
+  function handleErrorLogsTouchEnd(e: React.TouchEvent) {
+    if (errorLogsTouchStartX.current === null || errorLogsTotalPages <= 1) return;
+    const deltaX = e.changedTouches[0].clientX - errorLogsTouchStartX.current;
+    errorLogsTouchStartX.current = null;
+    const SWIPE_THRESHOLD = 40;
+    if (deltaX > SWIPE_THRESHOLD) {
+      setErrorLogsPage((p) => Math.max(1, p - 1));
+    } else if (deltaX < -SWIPE_THRESHOLD) {
+      setErrorLogsPage((p) => Math.min(errorLogsTotalPages, p + 1));
+    }
+  }
 
   // Incremento 15: tabla compartida entre las pestañas "Todos" y "Por
   // profesión" de la sección Maintlers (antes eran 2 secciones separadas
@@ -3954,7 +4006,11 @@ export default function AdminPage() {
                   </div>
                 ) : (
                   <>
-                    <div className="overflow-x-auto overscroll-x-contain">
+                    <div
+                      className="overflow-x-auto overscroll-x-contain touch-pan-y"
+                      onTouchStart={handleAuditLogTouchStart}
+                      onTouchEnd={handleAuditLogTouchEnd}
+                    >
                       <table className="w-full min-w-[720px]">
                         <thead>
                           <tr className="bg-zinc-50 border-b border-zinc-100">
@@ -4132,7 +4188,11 @@ export default function AdminPage() {
                   </div>
                 ) : (
                   <>
-                    <div className="overflow-x-auto overscroll-x-contain">
+                    <div
+                      className="overflow-x-auto overscroll-x-contain touch-pan-y"
+                      onTouchStart={handleReportsTouchStart}
+                      onTouchEnd={handleReportsTouchEnd}
+                    >
                       <table className="w-full min-w-[760px]">
                         <thead>
                           <tr className="bg-zinc-50 border-b border-zinc-100">
@@ -5155,7 +5215,11 @@ export default function AdminPage() {
                   </div>
                 ) : (
                   <>
-                    <div className="overflow-x-auto overscroll-x-contain">
+                    <div
+                      className="overflow-x-auto overscroll-x-contain touch-pan-y"
+                      onTouchStart={handleErrorLogsTouchStart}
+                      onTouchEnd={handleErrorLogsTouchEnd}
+                    >
                       <table className="w-full min-w-[760px]">
                         <thead>
                           <tr className="bg-zinc-50 border-b border-zinc-100">
@@ -5268,11 +5332,11 @@ export default function AdminPage() {
                           {t("auditPrevPage")}
                         </button>
                         <span className="text-[11px] text-zinc-400">
-                          {t("auditPageOf", { page: errorLogsPage, totalPages: Math.max(1, Math.ceil(errorLogsTotal / ERROR_LOGS_PAGE_SIZE)) })}
+                          {t("auditPageOf", { page: errorLogsPage, totalPages: errorLogsTotalPages })}
                         </span>
                         <button
-                          onClick={() => setErrorLogsPage((p) => Math.min(Math.max(1, Math.ceil(errorLogsTotal / ERROR_LOGS_PAGE_SIZE)), p + 1))}
-                          disabled={errorLogsPage >= Math.max(1, Math.ceil(errorLogsTotal / ERROR_LOGS_PAGE_SIZE))}
+                          onClick={() => setErrorLogsPage((p) => Math.min(errorLogsTotalPages, p + 1))}
+                          disabled={errorLogsPage >= errorLogsTotalPages}
                           className="text-[11px] font-bold px-3 py-1.5 rounded-lg border border-zinc-200 text-zinc-600 hover:bg-zinc-50 transition-colors disabled:opacity-30"
                         >
                           {t("auditNextPage")}

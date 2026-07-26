@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import {
@@ -554,6 +554,42 @@ export default function DashboardPage() {
   const priorityItems = reminders.slice(safePriorityPage * 3, safePriorityPage * 3 + 3);
   const assetTotalPages = Math.ceil(assetCards.length / 4);
 
+  // Facu (26 jul 2026): "te habia pedido q lo agregues en todos lados
+  // donde haya escrol de ese tipo" — same swipe-to-change-page gesture as
+  // Mis Activos/Mis Servicios/Códigos QR, now on these two dashboard
+  // carousels too. Both wrap around at the ends (modulo), matching their
+  // arrow buttons below.
+  const priorityTouchStartX = useRef<number | null>(null);
+  function handlePriorityTouchStart(e: React.TouchEvent) {
+    priorityTouchStartX.current = e.touches[0].clientX;
+  }
+  function handlePriorityTouchEnd(e: React.TouchEvent) {
+    if (priorityTouchStartX.current === null || priorityTotalPages <= 1) return;
+    const deltaX = e.changedTouches[0].clientX - priorityTouchStartX.current;
+    priorityTouchStartX.current = null;
+    const SWIPE_THRESHOLD = 40;
+    if (deltaX > SWIPE_THRESHOLD) {
+      setPriorityCarouselPage((p) => (p - 1 + priorityTotalPages) % priorityTotalPages);
+    } else if (deltaX < -SWIPE_THRESHOLD) {
+      setPriorityCarouselPage((p) => (p + 1) % priorityTotalPages);
+    }
+  }
+  const assetCarouselTouchStartX = useRef<number | null>(null);
+  function handleAssetCarouselTouchStart(e: React.TouchEvent) {
+    assetCarouselTouchStartX.current = e.touches[0].clientX;
+  }
+  function handleAssetCarouselTouchEnd(e: React.TouchEvent) {
+    if (assetCarouselTouchStartX.current === null || assetTotalPages <= 1) return;
+    const deltaX = e.changedTouches[0].clientX - assetCarouselTouchStartX.current;
+    assetCarouselTouchStartX.current = null;
+    const SWIPE_THRESHOLD = 40;
+    if (deltaX > SWIPE_THRESHOLD) {
+      setAssetCarouselPage((p) => (p - 1 + assetTotalPages) % assetTotalPages);
+    } else if (deltaX < -SWIPE_THRESHOLD) {
+      setAssetCarouselPage((p) => (p + 1) % assetTotalPages);
+    }
+  }
+
   // ── Calendar preview popover (hover on "Ver calendario completo") ──
   // Facu (16 jul 2026): wants that card to pop open a mini month calendar on
   // hover, matching what used to live permanently in this panel before the
@@ -861,7 +897,11 @@ export default function DashboardPage() {
                 </button>
               </div>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            <div
+              className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 touch-pan-y"
+              onTouchStart={handlePriorityTouchStart}
+              onTouchEnd={handlePriorityTouchEnd}
+            >
               {priorityItems.map((item) => {
                 const overdue = item.status === "overdue";
                 // Facu (16 jul 2026): these used to be plain non-clickable
@@ -1139,7 +1179,11 @@ export default function DashboardPage() {
                 <p className="text-[12px] text-zinc-400 text-center py-6">{t("noAssetsYet")}</p>
               ) : (
                 <>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  <div
+                    className="grid grid-cols-2 sm:grid-cols-4 gap-3 touch-pan-y"
+                    onTouchStart={handleAssetCarouselTouchStart}
+                    onTouchEnd={handleAssetCarouselTouchEnd}
+                  >
                     {assetCards.slice(assetCarouselPage * 4, assetCarouselPage * 4 + 4).map((a) => {
                       const overdue = a.status === "overdue";
                       const dueSoon = a.status === "due_soon";
