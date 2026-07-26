@@ -221,7 +221,7 @@ export default function ReportsPage() {
                 className="w-full rounded-xl border border-zinc-200 bg-white pl-9 pr-3 py-[9px] text-[12px] outline-none focus:border-red-400 transition-colors"
               />
             </div>
-            <div className="flex gap-2 overflow-x-auto">
+            <div className="flex gap-2 overflow-x-auto overscroll-x-contain">
               <button
                 onClick={() => setTypeFilter("all")}
                 className={`shrink-0 px-3 py-[7px] rounded-full text-[12px] font-bold transition-colors ${typeFilter === "all" ? "bg-zinc-900 text-white" : "bg-white border border-zinc-200 text-zinc-500 hover:bg-zinc-50"}`}

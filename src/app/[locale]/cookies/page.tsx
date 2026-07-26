@@ -59,7 +59,7 @@ export default function CookiesPage() {
       </Section>
 
       <Section heading={t("s3Heading")}>
-        <div className="overflow-x-auto rounded-lg border border-zinc-200">
+        <div className="overflow-x-auto overscroll-x-contain rounded-lg border border-zinc-200">
           <table className="w-full text-xs">
             <thead className="bg-zinc-50">
               <tr>

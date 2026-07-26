@@ -765,7 +765,7 @@ export default function AssetsPage() {
                 className="w-full pl-9 pr-3 py-[9px] rounded-xl border border-zinc-200 text-[13px] outline-none focus:border-red-500 bg-white"
               />
             </div>
-            <div className="flex items-center gap-2 overflow-x-auto pb-1 lg:pb-0">
+            <div className="flex items-center gap-2 overflow-x-auto overscroll-x-contain pb-1 lg:pb-0">
               <button
                 onClick={() => setTypeFilter("all")}
                 className={`shrink-0 px-3 py-[7px] rounded-full text-[12px] font-bold transition-colors ${typeFilter === "all" ? "bg-zinc-900 text-white" : "bg-white border border-zinc-200 text-zinc-500 hover:bg-zinc-50"}`}

@@ -318,7 +318,7 @@ export default function CustomersPage() {
                 )}
               </div>
             ) : (
-              <div className="overflow-x-auto">
+              <div className="overflow-x-auto overscroll-x-contain">
                 <table className="w-full min-w-[680px]">
                   <thead>
                     <tr className="text-left text-[10px] text-zinc-400 font-bold uppercase border-b border-zinc-100">

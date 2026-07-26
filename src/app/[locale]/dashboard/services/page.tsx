@@ -840,7 +840,7 @@ export default function ServicesPage() {
                 </button>
               </div>
             ) : (
-              <div className="overflow-x-auto relative">
+              <div className="overflow-x-auto overscroll-x-contain relative">
               {openMenuRowId && (
                 <div className="fixed inset-0 z-10" onClick={() => setOpenMenuRowId(null)} />
               )}

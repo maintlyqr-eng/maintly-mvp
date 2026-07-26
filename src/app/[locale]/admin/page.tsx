@@ -2704,7 +2704,7 @@ export default function AdminPage() {
         <div className="px-7 py-5 border-b border-zinc-100">
           <SectionTitle>{countLabel}</SectionTitle>
         </div>
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto overscroll-x-contain">
           <table className="w-full min-w-[980px]">
             <thead>
               <tr className="bg-zinc-50 border-b border-zinc-100">
@@ -3222,7 +3222,7 @@ export default function AdminPage() {
                 <div className="px-7 py-5 border-b border-zinc-100">
                   <SectionTitle>{t("assetsCount", { count: visibleAssets.length })}</SectionTitle>
                 </div>
-                <div className="overflow-x-auto">
+                <div className="overflow-x-auto overscroll-x-contain">
                   <table className="w-full min-w-[900px]">
                     <thead>
                       <tr className="bg-zinc-50 border-b border-zinc-100">
@@ -3317,7 +3317,7 @@ export default function AdminPage() {
                 <div className="px-7 py-5 border-b border-zinc-100">
                   <SectionTitle>{t("serviceHistoryTitle")}</SectionTitle>
                 </div>
-                <div className="overflow-x-auto">
+                <div className="overflow-x-auto overscroll-x-contain">
                   <table className="w-full min-w-[680px]">
                     <thead>
                       <tr className="bg-zinc-50 border-b border-zinc-100">
@@ -3414,7 +3414,7 @@ export default function AdminPage() {
               </div>
 
               <div className="bg-white rounded-2xl border border-zinc-200/80 shadow-sm overflow-hidden">
-                <div className="overflow-x-auto">
+                <div className="overflow-x-auto overscroll-x-contain">
                   <table className="w-full min-w-[680px]">
                     <thead>
                       <tr className="bg-zinc-50 border-b border-zinc-100">
@@ -3954,7 +3954,7 @@ export default function AdminPage() {
                   </div>
                 ) : (
                   <>
-                    <div className="overflow-x-auto">
+                    <div className="overflow-x-auto overscroll-x-contain">
                       <table className="w-full min-w-[720px]">
                         <thead>
                           <tr className="bg-zinc-50 border-b border-zinc-100">
@@ -4132,7 +4132,7 @@ export default function AdminPage() {
                   </div>
                 ) : (
                   <>
-                    <div className="overflow-x-auto">
+                    <div className="overflow-x-auto overscroll-x-contain">
                       <table className="w-full min-w-[760px]">
                         <thead>
                           <tr className="bg-zinc-50 border-b border-zinc-100">
@@ -4280,7 +4280,7 @@ export default function AdminPage() {
                         <p className="text-[13px] text-zinc-300 font-medium">{t("suspiciousEmpty")}</p>
                       </div>
                     ) : (
-                      <div className="overflow-x-auto">
+                      <div className="overflow-x-auto overscroll-x-contain">
                         <table className="w-full min-w-[760px]">
                           <thead>
                             <tr className="bg-zinc-50 border-b border-zinc-100">
@@ -4575,7 +4575,7 @@ export default function AdminPage() {
                       <p className="text-[13px] text-zinc-300 font-medium">{t("trashEmptyMechanics")}</p>
                     </div>
                   ) : (
-                    <div className="overflow-x-auto">
+                    <div className="overflow-x-auto overscroll-x-contain">
                       <table className="w-full min-w-[640px]">
                         <thead>
                           <tr className="bg-zinc-50 border-b border-zinc-100">
@@ -4613,7 +4613,7 @@ export default function AdminPage() {
                       <p className="text-[13px] text-zinc-300 font-medium">{t("trashEmptyAssets")}</p>
                     </div>
                   ) : (
-                    <div className="overflow-x-auto">
+                    <div className="overflow-x-auto overscroll-x-contain">
                       <table className="w-full min-w-[640px]">
                         <thead>
                           <tr className="bg-zinc-50 border-b border-zinc-100">
@@ -4659,7 +4659,7 @@ export default function AdminPage() {
                     <p className="text-[13px] text-zinc-300 font-medium">{t("trashEmptyServices")}</p>
                   </div>
                 ) : (
-                  <div className="overflow-x-auto">
+                  <div className="overflow-x-auto overscroll-x-contain">
                     <table className="w-full min-w-[640px]">
                       <thead>
                         <tr className="bg-zinc-50 border-b border-zinc-100">
@@ -4724,7 +4724,7 @@ export default function AdminPage() {
                     <p className="text-[13px] text-zinc-300 font-medium">{t("deleteRequestsEmpty")}</p>
                   </div>
                 ) : (
-                  <div className="overflow-x-auto">
+                  <div className="overflow-x-auto overscroll-x-contain">
                     <table className="w-full min-w-[720px]">
                       <thead>
                         <tr className="bg-zinc-50 border-b border-zinc-100">
@@ -4831,7 +4831,7 @@ export default function AdminPage() {
                     <p className="text-[13px] text-zinc-300 font-medium">{t("adminsEmpty")}</p>
                   </div>
                 ) : (
-                  <div className="overflow-x-auto">
+                  <div className="overflow-x-auto overscroll-x-contain">
                     <table className="w-full min-w-[720px]">
                       <thead>
                         <tr className="bg-zinc-50 border-b border-zinc-100">
@@ -5155,7 +5155,7 @@ export default function AdminPage() {
                   </div>
                 ) : (
                   <>
-                    <div className="overflow-x-auto">
+                    <div className="overflow-x-auto overscroll-x-contain">
                       <table className="w-full min-w-[760px]">
                         <thead>
                           <tr className="bg-zinc-50 border-b border-zinc-100">
