@@ -9,7 +9,7 @@ import {
   Wrench, Pencil, History, CheckCircle2, UserCircle2, Camera, Gauge,
   Search, MoreVertical, Trash2, Clock, CalendarClock, ListChecks, ChevronDown,
   QrCode as QrIcon, AlertTriangle,
-  Share2,
+  Share2, ChevronLeft, ChevronRight,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useUnreadMessagesCount } from "@/lib/useUnreadMessages";
@@ -621,6 +621,21 @@ export default function AssetsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [assets, typeFilter, searchQuery, sortBy, assetAgg]);
 
+  // Facu (26 jul 2026): "vamos a hacer la misma que en las otras. sacar el
+  // escroll... solo hay q dejar 9 activos por pagina y queda barbaro" —
+  // same fixed-page-size carousel pattern as "Tus activos" on the
+  // dashboard and "Códigos QR", now applied here so the grid never grows
+  // taller than the viewport no matter how many assets exist. 9 fits the
+  // 3-column grid as exactly 3 full rows.
+  const ASSETS_PAGE_SIZE = 9;
+  const [assetsPage, setAssetsPage] = useState(0);
+  const assetsTotalPages = Math.max(1, Math.ceil(visibleAssets.length / ASSETS_PAGE_SIZE));
+  const safeAssetsPage = Math.min(assetsPage, assetsTotalPages - 1);
+  const pagedAssets = visibleAssets.slice(safeAssetsPage * ASSETS_PAGE_SIZE, safeAssetsPage * ASSETS_PAGE_SIZE + ASSETS_PAGE_SIZE);
+  useEffect(() => {
+    setAssetsPage(0);
+  }, [searchQuery, typeFilter, sortBy]);
+
   if (checkingAuth) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-zinc-50">
@@ -780,8 +795,32 @@ export default function AssetsPage() {
               <p className="text-[13px] text-zinc-500">{t("noAssetsMatch")}</p>
             </div>
           ) : (
+            <>
+              <div className="flex items-center justify-between mb-2 gap-3">
+                <p className="text-[11.5px] text-zinc-400">
+                  {t("showingAssetsCount", { shown: pagedAssets.length, total: visibleAssets.length })}
+                </p>
+                {assetsTotalPages > 1 && (
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => setAssetsPage((p) => (p - 1 + assetsTotalPages) % assetsTotalPages)}
+                      aria-label={t("previousPage")}
+                      className="w-6 h-6 rounded-full border border-zinc-200 text-zinc-400 hover:text-zinc-700 hover:border-zinc-300 flex items-center justify-center transition-colors"
+                    >
+                      <ChevronLeft size={13} />
+                    </button>
+                    <button
+                      onClick={() => setAssetsPage((p) => (p + 1) % assetsTotalPages)}
+                      aria-label={t("nextPage")}
+                      className="w-6 h-6 rounded-full border border-zinc-200 text-zinc-400 hover:text-zinc-700 hover:border-zinc-300 flex items-center justify-center transition-colors"
+                    >
+                      <ChevronRight size={13} />
+                    </button>
+                  </div>
+                )}
+              </div>
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2">
-              {visibleAssets.map((a) => {
+              {pagedAssets.map((a) => {
                 const code = getQrCode(a);
                 const label = assetDisplayName(a);
                 const imgSrc = assetTypeImg[a.asset_type] ?? "/images/car.png";
@@ -958,6 +997,19 @@ export default function AssetsPage() {
                 );
               })}
             </div>
+            {visibleAssets.length > ASSETS_PAGE_SIZE && (
+              <div className="flex items-center justify-center gap-1.5 mt-4">
+                {Array.from({ length: assetsTotalPages }).map((_, i) => (
+                  <button
+                    key={i}
+                    onClick={() => setAssetsPage(i)}
+                    aria-label={`page ${i + 1}`}
+                    className={`w-1.5 h-1.5 rounded-full transition-colors ${i === safeAssetsPage ? "bg-red-600" : "bg-zinc-200"}`}
+                  />
+                ))}
+              </div>
+            )}
+            </>
           )}
 
           <p className="text-center text-[11px] text-zinc-400 mt-8">{t("copyright")}</p>
