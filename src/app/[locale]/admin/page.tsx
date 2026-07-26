@@ -17,6 +17,11 @@ import { supabase } from "@/lib/supabase";
 import { formatDateDMY } from "@/lib/date";
 import HoverAvatar from "@/components/HoverAvatar";
 import ErrorLogger from "@/components/ErrorLogger";
+// Facu (26 jul 2026, split del admin): primeras 2 de 15 secciones movidas
+// a archivos propios bajo ./_sections/ — ver el comentario en cada uno
+// para el criterio (JSX movido tal cual, estado/lógica se quedan acá).
+import AuditLogSection from "./_sections/AuditLogSection";
+import ErrorsSection from "./_sections/ErrorsSection";
 
 // Local enum-key maps, same pattern as ShareAssetModal.tsx / the Settings
 // and Assets [locale] pages — raw DB values (English) map to translation
@@ -366,7 +371,7 @@ type MechanicReportRow = {
 // desde src/lib/auditLog.ts, leído acá desde /api/admin/audit-logs. El tipo
 // de acción se mantiene como string suelto (no importa el union type del
 // server) para no acoplar el bundle del cliente a un archivo server-only.
-type AdminAuditLogRow = {
+export type AdminAuditLogRow = {
   id: string;
   created_at: string;
   admin_username: string;
@@ -427,7 +432,7 @@ type FlaggedMechanicRow = {
 // Incremento 19 (Fase 3 — "Panel técnico de errores y rendimiento"),
 // leído desde /api/admin/error-logs. Ver ese route.ts y
 // src/lib/errorLog.ts para cómo se llenan estas filas.
-type PlatformErrorLogRow = {
+export type PlatformErrorLogRow = {
   id: string;
   created_at: string;
   source: "client" | "server";
@@ -504,7 +509,11 @@ const ASSET_COLORS: Record<string, string> = {
 // Small helpers
 // ────────────────────────────────────────────────────────────────────────────
 
-function formatDate(iso: string) {
+// Facu (26 jul 2026, split del admin): exportadas (antes internas al
+// archivo) para que los componentes de sección nuevos en ./_sections/
+// puedan importarlas en vez de duplicar esta lógica — nada cambia para
+// quien las usaba desde acá adentro.
+export function formatDate(iso: string) {
   return formatDateDMY(iso);
 }
 
@@ -521,7 +530,7 @@ function isStaleActivity(iso: string) {
 
 const DATE_LOCALE: Record<string, string> = { en: "en-US", es: "es-AR", pt: "pt-BR" };
 
-function formatTime(iso: string, locale: string) {
+export function formatTime(iso: string, locale: string) {
   const d = new Date(iso);
   if (isNaN(d.getTime())) return "";
   return d.toLocaleTimeString(DATE_LOCALE[locale] ?? "en-US", { hour: "2-digit", minute: "2-digit" });
@@ -712,7 +721,7 @@ function TrendRow({ label, data, color }: { label: string; data: DayBucket[]; co
   );
 }
 
-function Pill({ children, tone }: { children: React.ReactNode; tone: "zinc" | "blue" | "emerald" | "amber" | "red" }) {
+export function Pill({ children, tone }: { children: React.ReactNode; tone: "zinc" | "blue" | "emerald" | "amber" | "red" }) {
   const tones: Record<string, string> = {
     zinc: "bg-zinc-50 text-zinc-500 border-zinc-200",
     blue: "bg-blue-50 text-blue-700 border-blue-200",
@@ -3938,181 +3947,20 @@ export default function AdminPage() {
 
           {/* ── AUDIT LOG (Logs de auditoría) ────────────────────────────── */}
           {section === "audit-log" && (
-            <div className="space-y-4">
-              <p className="text-[12px] text-zinc-400">{t("auditLogIntro")}</p>
-
-              <div className="flex flex-wrap items-end gap-3">
-                <div>
-                  <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1">{t("auditFilterAction")}</label>
-                  <select
-                    value={auditLogActionFilter}
-                    onChange={(e) => { setAuditLogActionFilter(e.target.value); setAuditLogsPage(1); }}
-                    className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-[12px] outline-none focus:border-red-400"
-                  >
-                    <option value="all">{t("auditFilterAll")}</option>
-                    {Object.entries(AUDIT_ACTION_LABEL).map(([key, label]) => (
-                      <option key={key} value={key}>{label}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1">{t("auditFilterEntity")}</label>
-                  <select
-                    value={auditLogEntityFilter}
-                    onChange={(e) => { setAuditLogEntityFilter(e.target.value); setAuditLogsPage(1); }}
-                    className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-[12px] outline-none focus:border-red-400"
-                  >
-                    <option value="all">{t("auditFilterAll")}</option>
-                    {Object.entries(AUDIT_ENTITY_LABEL).map(([key, label]) => (
-                      <option key={key} value={key}>{label}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1">{t("auditFilterFrom")}</label>
-                  <input
-                    type="date" value={auditLogFrom}
-                    onChange={(e) => { setAuditLogFrom(e.target.value); setAuditLogsPage(1); }}
-                    className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-[12px] outline-none focus:border-red-400"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1">{t("auditFilterTo")}</label>
-                  <input
-                    type="date" value={auditLogTo}
-                    onChange={(e) => { setAuditLogTo(e.target.value); setAuditLogsPage(1); }}
-                    className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-[12px] outline-none focus:border-red-400"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1">{t("auditFilterEntityId")}</label>
-                  <input
-                    type="text" value={auditLogEntityIdFilter}
-                    onChange={(e) => { setAuditLogEntityIdFilter(e.target.value); setAuditLogsPage(1); }}
-                    placeholder={t("auditFilterEntityIdPlaceholder")}
-                    className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-[12px] font-mono outline-none focus:border-red-400 w-[220px]"
-                  />
-                </div>
-                {(auditLogActionFilter !== "all" || auditLogEntityFilter !== "all" || auditLogEntityIdFilter || auditLogFrom || auditLogTo) && (
-                  <button
-                    onClick={() => { setAuditLogActionFilter("all"); setAuditLogEntityFilter("all"); setAuditLogEntityIdFilter(""); setAuditLogFrom(""); setAuditLogTo(""); setAuditLogsPage(1); }}
-                    className="text-[11px] font-bold text-zinc-400 hover:text-red-600 transition-colors px-2 py-2"
-                  >
-                    {t("auditFilterClear")}
-                  </button>
-                )}
-                <button
-                  onClick={handleExportAuditLogs} disabled={auditExportBusy}
-                  className="ml-auto flex items-center gap-2 bg-white border border-zinc-200 hover:bg-zinc-50 disabled:opacity-60 text-zinc-600 text-[12px] font-bold px-3.5 py-[9px] rounded-xl transition-colors"
-                >
-                  <Download size={13} /> {auditExportBusy ? t("exporting") : t("exportCsv")}
-                </button>
-              </div>
-
-              <div className="bg-white rounded-2xl border border-zinc-200/80 shadow-sm overflow-hidden">
-                {auditLogsLoading ? (
-                  <p className="text-[13px] text-zinc-400 text-center py-16">{t("loading")}</p>
-                ) : auditLogs.length === 0 ? (
-                  <div className="text-center py-16">
-                    <History size={28} className="mx-auto text-zinc-200 mb-2" />
-                    <p className="text-[13px] text-zinc-300 font-medium">{t("auditNoLogs")}</p>
-                  </div>
-                ) : (
-                  <>
-                    <div
-                      className="overflow-x-auto overscroll-x-contain touch-pan-y"
-                      onTouchStart={handleAuditLogTouchStart}
-                      onTouchEnd={handleAuditLogTouchEnd}
-                    >
-                      <table className="w-full min-w-[720px]">
-                        <thead>
-                          <tr className="bg-zinc-50 border-b border-zinc-100">
-                            {[t("auditColWhen"), t("auditColAdmin"), t("auditColAction"), t("auditColEntity"), t("auditColEntityId"), ""].map((h) => (
-                              <th key={h} className="px-7 py-3 text-left text-[9px] font-bold text-zinc-400 uppercase tracking-widest">{h}</th>
-                            ))}
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-zinc-50">
-                          {auditLogs.map((log) => {
-                            const isExpanded = expandedAuditLogId === log.id;
-                            return (
-                              <Fragment key={log.id}>
-                                <tr
-                                  className="hover:bg-zinc-50/80 transition-colors cursor-pointer"
-                                  onClick={() => setExpandedAuditLogId(isExpanded ? null : log.id)}
-                                >
-                                  <td className="px-7 py-4 text-[12px] text-zinc-400 whitespace-nowrap">{formatDate(log.created_at)} · {formatTime(log.created_at, locale)}</td>
-                                  <td className="px-7 py-4 text-[12px] font-semibold text-zinc-700">{log.admin_username}</td>
-                                  <td className="px-7 py-4"><Pill tone="blue">{AUDIT_ACTION_LABEL[log.action] ?? log.action}</Pill></td>
-                                  <td className="px-7 py-4 text-[12px] text-zinc-500">{log.entity_type ? (AUDIT_ENTITY_LABEL[log.entity_type] ?? log.entity_type) : "—"}</td>
-                                  <td className="px-7 py-4 text-[12px] font-mono text-zinc-400">{log.entity_id ?? "—"}</td>
-                                  <td className="px-7 py-4 text-right text-zinc-300">
-                                    {isExpanded ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
-                                  </td>
-                                </tr>
-                                {isExpanded && (
-                                  <tr key={`${log.id}-detail`} className="bg-zinc-50/60">
-                                    <td colSpan={6} className="px-7 py-4">
-                                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-[11.5px]">
-                                        <div>
-                                          <p className="font-bold text-zinc-500 uppercase tracking-wide text-[9.5px] mb-1">{t("auditDetailOldValue")}</p>
-                                          <pre className="whitespace-pre-wrap break-words bg-white border border-zinc-200 rounded-lg p-2.5 text-zinc-600 font-mono text-[11px]">
-                                            {log.old_value ? JSON.stringify(log.old_value, null, 2) : "—"}
-                                          </pre>
-                                        </div>
-                                        <div>
-                                          <p className="font-bold text-zinc-500 uppercase tracking-wide text-[9.5px] mb-1">{t("auditDetailNewValue")}</p>
-                                          <pre className="whitespace-pre-wrap break-words bg-white border border-zinc-200 rounded-lg p-2.5 text-zinc-600 font-mono text-[11px]">
-                                            {log.new_value ? JSON.stringify(log.new_value, null, 2) : "—"}
-                                          </pre>
-                                        </div>
-                                        {log.reason && (
-                                          <div className="sm:col-span-2">
-                                            <p className="font-bold text-zinc-500 uppercase tracking-wide text-[9.5px] mb-1">{t("auditDetailReason")}</p>
-                                            <p className="text-zinc-600">{log.reason}</p>
-                                          </div>
-                                        )}
-                                        {log.ip_address && (
-                                          <div className="sm:col-span-2">
-                                            <p className="font-bold text-zinc-500 uppercase tracking-wide text-[9.5px] mb-1">{t("auditDetailIp")}</p>
-                                            <p className="text-zinc-600 font-mono">{log.ip_address}</p>
-                                          </div>
-                                        )}
-                                      </div>
-                                    </td>
-                                  </tr>
-                                )}
-                              </Fragment>
-                            );
-                          })}
-                        </tbody>
-                      </table>
-                    </div>
-
-                    <div className="flex items-center justify-between px-7 py-4 border-t border-zinc-100">
-                      <p className="text-[11px] text-zinc-400">{t("auditTotalCount", { count: auditLogsTotal })}</p>
-                      <div className="flex items-center gap-3">
-                        <button
-                          onClick={() => setAuditLogsPage((p) => Math.max(1, p - 1))}
-                          disabled={auditLogsPage <= 1}
-                          className="text-[11px] font-bold px-3 py-1.5 rounded-lg border border-zinc-200 text-zinc-600 hover:bg-zinc-50 transition-colors disabled:opacity-30"
-                        >
-                          {t("auditPrevPage")}
-                        </button>
-                        <span className="text-[11px] text-zinc-400">{t("auditPageOf", { page: auditLogsPage, totalPages: auditLogTotalPages })}</span>
-                        <button
-                          onClick={() => setAuditLogsPage((p) => Math.min(auditLogTotalPages, p + 1))}
-                          disabled={auditLogsPage >= auditLogTotalPages}
-                          className="text-[11px] font-bold px-3 py-1.5 rounded-lg border border-zinc-200 text-zinc-600 hover:bg-zinc-50 transition-colors disabled:opacity-30"
-                        >
-                          {t("auditNextPage")}
-                        </button>
-                      </div>
-                    </div>
-                  </>
-                )}
-              </div>
-            </div>
+            <AuditLogSection
+              t={t} locale={locale}
+              auditLogs={auditLogs} auditLogsLoading={auditLogsLoading} auditLogsTotal={auditLogsTotal}
+              auditLogsPage={auditLogsPage} auditLogTotalPages={auditLogTotalPages} setAuditLogsPage={setAuditLogsPage}
+              auditLogActionFilter={auditLogActionFilter} setAuditLogActionFilter={setAuditLogActionFilter}
+              auditLogEntityFilter={auditLogEntityFilter} setAuditLogEntityFilter={setAuditLogEntityFilter}
+              auditLogEntityIdFilter={auditLogEntityIdFilter} setAuditLogEntityIdFilter={setAuditLogEntityIdFilter}
+              auditLogFrom={auditLogFrom} setAuditLogFrom={setAuditLogFrom}
+              auditLogTo={auditLogTo} setAuditLogTo={setAuditLogTo}
+              AUDIT_ACTION_LABEL={AUDIT_ACTION_LABEL} AUDIT_ENTITY_LABEL={AUDIT_ENTITY_LABEL}
+              expandedAuditLogId={expandedAuditLogId} setExpandedAuditLogId={setExpandedAuditLogId}
+              auditExportBusy={auditExportBusy} handleExportAuditLogs={handleExportAuditLogs}
+              handleAuditLogTouchStart={handleAuditLogTouchStart} handleAuditLogTouchEnd={handleAuditLogTouchEnd}
+            />
           )}
 
           {/* ── REPORTES Y MODERACIÓN (item 6 del pedido de Facu) ──────────── */}
@@ -5161,205 +5009,18 @@ export default function AdminPage() {
           {/* ── ERRORES (panel técnico de errores y rendimiento — incremento
                19, Fase 3) ─────────────────────────────────────────────── */}
           {section === "errors" && (
-            <div className="space-y-4">
-              <p className="text-[12px] text-zinc-400">{t("errorsIntro")}</p>
-
-              <div className="flex flex-wrap items-center gap-3">
-                <div className={`flex items-center gap-2 rounded-xl border px-3.5 py-2.5 ${
-                  errorLogsUnresolvedCount > 0 ? "bg-amber-50 border-amber-200" : "bg-emerald-50 border-emerald-200"
-                }`}>
-                  {errorLogsUnresolvedCount > 0 ? (
-                    <AlertTriangle size={14} className="text-amber-600" />
-                  ) : (
-                    <ShieldCheck size={14} className="text-emerald-600" />
-                  )}
-                  <p className={`text-[12px] font-bold ${errorLogsUnresolvedCount > 0 ? "text-amber-800" : "text-emerald-800"}`}>
-                    {t("errorsUnresolvedSummary", { count: errorLogsUnresolvedCount })}
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex flex-wrap items-end gap-3">
-                <div>
-                  <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1">{t("errorsFilterSource")}</label>
-                  <select
-                    value={errorLogSourceFilter}
-                    onChange={(e) => { setErrorLogSourceFilter(e.target.value); setErrorLogsPage(1); }}
-                    className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-[12px] outline-none focus:border-red-400"
-                  >
-                    <option value="all">{t("auditFilterAll")}</option>
-                    <option value="client">{t("errorsSourceClient")}</option>
-                    <option value="server">{t("errorsSourceServer")}</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1">{t("errorsFilterSeverity")}</label>
-                  <select
-                    value={errorLogSeverityFilter}
-                    onChange={(e) => { setErrorLogSeverityFilter(e.target.value); setErrorLogsPage(1); }}
-                    className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-[12px] outline-none focus:border-red-400"
-                  >
-                    <option value="all">{t("auditFilterAll")}</option>
-                    <option value="error">{t("errorsSeverityError")}</option>
-                    <option value="warning">{t("errorsSeverityWarning")}</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1">{t("errorsFilterStatus")}</label>
-                  <select
-                    value={errorLogResolvedFilter}
-                    onChange={(e) => { setErrorLogResolvedFilter(e.target.value as "all" | "unresolved" | "resolved"); setErrorLogsPage(1); }}
-                    className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-[12px] outline-none focus:border-red-400"
-                  >
-                    <option value="unresolved">{t("errorsStatusUnresolved")}</option>
-                    <option value="resolved">{t("errorsStatusResolved")}</option>
-                    <option value="all">{t("auditFilterAll")}</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="bg-white rounded-2xl border border-zinc-200/80 shadow-sm overflow-hidden">
-                {errorLogsLoading ? (
-                  <p className="text-[13px] text-zinc-400 text-center py-16">{t("loading")}</p>
-                ) : errorLogs.length === 0 ? (
-                  <div className="text-center py-16">
-                    <Bug size={28} className="mx-auto text-zinc-200 mb-2" />
-                    <p className="text-[13px] text-zinc-300 font-medium">{t("errorsEmpty")}</p>
-                  </div>
-                ) : (
-                  <>
-                    <div
-                      className="overflow-x-auto overscroll-x-contain touch-pan-y"
-                      onTouchStart={handleErrorLogsTouchStart}
-                      onTouchEnd={handleErrorLogsTouchEnd}
-                    >
-                      <table className="w-full min-w-[760px]">
-                        <thead>
-                          <tr className="bg-zinc-50 border-b border-zinc-100">
-                            {[t("auditColWhen"), t("errorsColSource"), t("errorsColSeverity"), t("errorsColMessage"), t("errorsColRoute"), t("colStatus"), ""].map((h) => (
-                              <th key={h} className="px-7 py-3 text-left text-[9px] font-bold text-zinc-400 uppercase tracking-widest">{h}</th>
-                            ))}
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-zinc-50">
-                          {errorLogs.map((log) => {
-                            const isExpanded = expandedErrorLogId === log.id;
-                            return (
-                              <Fragment key={log.id}>
-                                <tr
-                                  className="hover:bg-zinc-50/80 transition-colors cursor-pointer"
-                                  onClick={() => setExpandedErrorLogId(isExpanded ? null : log.id)}
-                                >
-                                  <td className="px-7 py-4 text-[12px] text-zinc-400 whitespace-nowrap">{formatDate(log.created_at)} · {formatTime(log.created_at, locale)}</td>
-                                  <td className="px-7 py-4 text-[12px] font-semibold text-zinc-600">
-                                    {log.source === "client" ? t("errorsSourceClient") : t("errorsSourceServer")}
-                                  </td>
-                                  <td className="px-7 py-4">
-                                    {log.severity === "warning"
-                                      ? <Pill tone="amber">{t("errorsSeverityWarning")}</Pill>
-                                      : <Pill tone="red">{t("errorsSeverityError")}</Pill>}
-                                  </td>
-                                  <td className="px-7 py-4 text-[12px] text-zinc-700 max-w-[360px] truncate">{log.message}</td>
-                                  <td className="px-7 py-4 text-[12px] font-mono text-zinc-400">{log.route ?? "—"}</td>
-                                  <td className="px-7 py-4">
-                                    {log.resolved
-                                      ? <Pill tone="emerald">{t("errorsStatusResolved")}</Pill>
-                                      : <Pill tone="zinc">{t("errorsStatusUnresolved")}</Pill>}
-                                  </td>
-                                  <td className="px-7 py-4 text-right text-zinc-300">
-                                    {isExpanded ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
-                                  </td>
-                                </tr>
-                                {isExpanded && (
-                                  <tr key={`${log.id}-detail`} className="bg-zinc-50/60">
-                                    <td colSpan={7} className="px-7 py-4">
-                                      <div className="space-y-3 text-[11.5px]">
-                                        <div>
-                                          <p className="font-bold text-zinc-500 uppercase tracking-wide text-[9.5px] mb-1">{t("errorsDetailMessage")}</p>
-                                          <p className="whitespace-pre-wrap break-words bg-white border border-zinc-200 rounded-lg p-2.5 text-zinc-700">{log.message}</p>
-                                        </div>
-                                        {log.stack && (
-                                          <div>
-                                            <p className="font-bold text-zinc-500 uppercase tracking-wide text-[9.5px] mb-1">{t("errorsDetailStack")}</p>
-                                            <pre className="whitespace-pre-wrap break-words bg-white border border-zinc-200 rounded-lg p-2.5 text-zinc-600 font-mono text-[11px] max-h-64 overflow-y-auto">
-                                              {log.stack}
-                                            </pre>
-                                          </div>
-                                        )}
-                                        {log.context != null && (
-                                          <div>
-                                            <p className="font-bold text-zinc-500 uppercase tracking-wide text-[9.5px] mb-1">{t("errorsDetailContext")}</p>
-                                            <pre className="whitespace-pre-wrap break-words bg-white border border-zinc-200 rounded-lg p-2.5 text-zinc-600 font-mono text-[11px]">
-                                              {JSON.stringify(log.context, null, 2)}
-                                            </pre>
-                                          </div>
-                                        )}
-                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                          {log.user_agent && (
-                                            <div>
-                                              <p className="font-bold text-zinc-500 uppercase tracking-wide text-[9.5px] mb-1">{t("errorsDetailUserAgent")}</p>
-                                              <p className="text-zinc-600 break-words">{log.user_agent}</p>
-                                            </div>
-                                          )}
-                                          {log.ip_address && (
-                                            <div>
-                                              <p className="font-bold text-zinc-500 uppercase tracking-wide text-[9.5px] mb-1">{t("auditDetailIp")}</p>
-                                              <p className="text-zinc-600 font-mono">{log.ip_address}</p>
-                                            </div>
-                                          )}
-                                          {log.resolved && log.resolved_by && (
-                                            <div>
-                                              <p className="font-bold text-zinc-500 uppercase tracking-wide text-[9.5px] mb-1">{t("errorsDetailResolvedBy")}</p>
-                                              <p className="text-zinc-600">{log.resolved_by} · {log.resolved_at ? formatDate(log.resolved_at) : ""}</p>
-                                            </div>
-                                          )}
-                                        </div>
-                                        <button
-                                          onClick={(e) => { e.stopPropagation(); toggleErrorLogResolved(log); }}
-                                          disabled={errorLogBusyId === log.id}
-                                          className={`text-[11px] font-bold px-3 py-1.5 rounded-lg border transition-colors disabled:opacity-40 ${
-                                            log.resolved ? "border-zinc-200 text-zinc-600 hover:bg-zinc-50" : "border-emerald-200 text-emerald-700 hover:bg-emerald-50"
-                                          }`}
-                                        >
-                                          {log.resolved ? t("errorsReopenButton") : t("errorsResolveButton")}
-                                        </button>
-                                      </div>
-                                    </td>
-                                  </tr>
-                                )}
-                              </Fragment>
-                            );
-                          })}
-                        </tbody>
-                      </table>
-                    </div>
-
-                    <div className="flex items-center justify-between px-7 py-4 border-t border-zinc-100">
-                      <p className="text-[11px] text-zinc-400">{t("auditTotalCount", { count: errorLogsTotal })}</p>
-                      <div className="flex items-center gap-3">
-                        <button
-                          onClick={() => setErrorLogsPage((p) => Math.max(1, p - 1))}
-                          disabled={errorLogsPage <= 1}
-                          className="text-[11px] font-bold px-3 py-1.5 rounded-lg border border-zinc-200 text-zinc-600 hover:bg-zinc-50 transition-colors disabled:opacity-30"
-                        >
-                          {t("auditPrevPage")}
-                        </button>
-                        <span className="text-[11px] text-zinc-400">
-                          {t("auditPageOf", { page: errorLogsPage, totalPages: errorLogsTotalPages })}
-                        </span>
-                        <button
-                          onClick={() => setErrorLogsPage((p) => Math.min(errorLogsTotalPages, p + 1))}
-                          disabled={errorLogsPage >= errorLogsTotalPages}
-                          className="text-[11px] font-bold px-3 py-1.5 rounded-lg border border-zinc-200 text-zinc-600 hover:bg-zinc-50 transition-colors disabled:opacity-30"
-                        >
-                          {t("auditNextPage")}
-                        </button>
-                      </div>
-                    </div>
-                  </>
-                )}
-              </div>
-            </div>
+            <ErrorsSection
+              t={t} locale={locale}
+              errorLogs={errorLogs} errorLogsLoading={errorLogsLoading} errorLogsTotal={errorLogsTotal}
+              errorLogsUnresolvedCount={errorLogsUnresolvedCount}
+              errorLogsPage={errorLogsPage} errorLogsTotalPages={errorLogsTotalPages} setErrorLogsPage={setErrorLogsPage}
+              errorLogSourceFilter={errorLogSourceFilter} setErrorLogSourceFilter={setErrorLogSourceFilter}
+              errorLogSeverityFilter={errorLogSeverityFilter} setErrorLogSeverityFilter={setErrorLogSeverityFilter}
+              errorLogResolvedFilter={errorLogResolvedFilter} setErrorLogResolvedFilter={setErrorLogResolvedFilter}
+              expandedErrorLogId={expandedErrorLogId} setExpandedErrorLogId={setExpandedErrorLogId}
+              errorLogBusyId={errorLogBusyId} toggleErrorLogResolved={toggleErrorLogResolved}
+              handleErrorLogsTouchStart={handleErrorLogsTouchStart} handleErrorLogsTouchEnd={handleErrorLogsTouchEnd}
+            />
           )}
 
           <p className="text-center text-[10px] text-zinc-300 mt-12 font-medium">{t("mainFooterNote")}</p>
