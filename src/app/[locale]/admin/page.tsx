@@ -1056,16 +1056,17 @@ export default function AdminPage() {
     if (canLoadBulkData) {
     // mechanics/assets/qr_codes/service_records/mechanic_assets are read
     // through a service-role API route rather than the browser's anon-key
-    // client — see /api/admin/bulk-data for why. The two qr_scans queries
-    // stay direct since that table's RLS is already narrow (see migration
-    // 006) and they're small, date-filtered reads.
-    const [bulkRes, { count: scansTodayCount }, { data: scanWeekRows }] = await Promise.all([
+    // client — see /api/admin/bulk-data for why. qr_scans now follows the
+    // same pattern via /api/admin/qr-scan-stats (revisión de seguridad, 26
+    // jul 2026) — la sesión de admin no es una sesión "authenticated" real
+    // de Supabase, así que ya no puede leer esta tabla directo una vez que
+    // su RLS se angostó (ver migración 044).
+    const [bulkRes, scanStatsRes] = await Promise.all([
       fetch("/api/admin/bulk-data").then((r) => r.json()).catch(() => null),
-      supabase.from("qr_scans").select("*", { count: "exact", head: true })
-        .gte("scanned_at", new Date(new Date().setHours(0, 0, 0, 0)).toISOString()),
-      supabase.from("qr_scans").select("scanned_at")
-        .gte("scanned_at", new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()),
+      fetch("/api/admin/qr-scan-stats").then((r) => r.json()).catch(() => null),
     ]);
+    const scansTodayCount = scanStatsRes?.scansToday ?? 0;
+    const scanWeekRows = scanStatsRes?.scanWeekRows ?? [];
 
     if (!bulkRes || bulkRes.error) {
       flash(bulkRes?.error || t("errorLoadPlatformData"), "error");
@@ -1418,10 +1419,10 @@ export default function AdminPage() {
     try {
       const [logsRes, scansRes] = await Promise.all([
         fetch(`/api/admin/audit-logs?page=1&pageSize=${RECENT_ACTIVITY_LOG_LIMIT}`).then((r) => r.json()).catch(() => null),
-        supabase.from("qr_scans").select("code, asset_id, scanned_at").order("scanned_at", { ascending: false }).limit(RECENT_SCANS_LIMIT),
+        fetch(`/api/admin/qr-scan-stats?only=recent`).then((r) => r.json()).catch(() => null),
       ]);
       if (logsRes && Array.isArray(logsRes.logs)) setRecentAuditLogs(logsRes.logs as AdminAuditLogRow[]);
-      if (scansRes && !scansRes.error && scansRes.data) setRecentScans(scansRes.data as RecentScanRow[]);
+      if (scansRes && !scansRes.error && Array.isArray(scansRes.recentScans)) setRecentScans(scansRes.recentScans as RecentScanRow[]);
       setActivityRefreshedAt(new Date().toISOString());
     } catch {
       // Best-effort, silencioso — un refresco de fondo que falla no debería
