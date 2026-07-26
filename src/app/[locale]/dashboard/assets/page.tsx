@@ -643,6 +643,15 @@ export default function AssetsPage() {
   // finger swipe over the cards did nothing. This reads the swipe
   // direction manually and moves the page the same way the arrow buttons
   // do, only past a distance threshold so it doesn't fire on a normal tap.
+  //
+  // Follow-up (26 jul 2026): "escroleo para la derecha y bien pero cuando
+  // quiero volver me manda a servicios" — one direction worked but the
+  // other got hijacked by Chrome's own edge-swipe "go back in history"
+  // gesture and actually navigated the browser away to whatever page was
+  // previously open (Mis Servicios), instead of just changing our React
+  // state. The `touch-pan-y` class on the grid div (below) tells the
+  // browser this element owns horizontal touch gestures itself, so it
+  // stops treating a sideways swipe here as a back/forward navigation.
   const assetsTouchStartX = useRef<number | null>(null);
   function handleAssetsTouchStart(e: React.TouchEvent) {
     assetsTouchStartX.current = e.touches[0].clientX;
@@ -843,7 +852,7 @@ export default function AssetsPage() {
                 )}
               </div>
             <div
-              className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2"
+              className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2 touch-pan-y"
               onTouchStart={handleAssetsTouchStart}
               onTouchEnd={handleAssetsTouchEnd}
             >
