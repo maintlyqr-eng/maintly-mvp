@@ -401,11 +401,17 @@ export default function ServicesPage() {
       setMechanicId(session.user.id);
       setMechanicEmail(session.user.email ?? "");
 
-      const { data: mechanic } = await supabase
-        .from("mechanics").select("name, photo_url, maintler_code").eq("id", session.user.id).single();
+      // Facu (26 jul 2026, revisión de rendimiento): el perfil propio se
+      // pedía antes que las otras 3 cargas, en fila — ahora las 4 van
+      // juntas, ninguna depende de otra.
+      const [{ data: mechanic }] = await Promise.all([
+        supabase
+          .from("mechanics").select("name, photo_url, maintler_code").eq("id", session.user.id).maybeSingle(),
+        loadServices(session.user.id),
+        loadAssets(session.user.id),
+        loadCustomers(session.user.id),
+      ]);
       if (active && mechanic) { setMechanicName(mechanic.name); setMechanicPhoto(mechanic.photo_url ?? ""); setMaintlerCode(mechanic.maintler_code ?? ""); }
-
-      await Promise.all([loadServices(session.user.id), loadAssets(session.user.id), loadCustomers(session.user.id)]);
       if (active) setCheckingAuth(false);
     }
 

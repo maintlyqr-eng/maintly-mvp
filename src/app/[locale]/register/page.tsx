@@ -42,7 +42,7 @@ export default function RegisterPage() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       if (!session) return;
 
-      const { data: m } = await supabase.from("mechanics").select("suspended, deleted_at, profession").eq("id", session.user.id).single();
+      const { data: m } = await supabase.from("mechanics").select("suspended, deleted_at, profession").eq("id", session.user.id).maybeSingle();
       if (m?.deleted_at) {
         await supabase.auth.signOut();
         setError(t("deletedError"));
@@ -161,6 +161,7 @@ export default function RegisterPage() {
           alt="MaintlyQR"
           fill
           priority
+          sizes="100vw"
           className="object-contain object-center"
         />
       </div>

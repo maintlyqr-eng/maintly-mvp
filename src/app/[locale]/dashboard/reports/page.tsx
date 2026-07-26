@@ -70,13 +70,14 @@ export default function ReportsPage() {
       setMechanicId(session.user.id);
       setMechanicEmail(session.user.email ?? "");
 
-      const { data: mechanic } = await supabase
-        .from("mechanics").select("name, photo_url, maintler_code").eq("id", session.user.id).single();
-      if (active && mechanic) { setMechanicName(mechanic.name); setMechanicPhoto(mechanic.photo_url ?? ""); setMaintlerCode(mechanic.maintler_code ?? ""); }
-
       setLoading(true);
 
-      const [{ data: assetRows }, { data: svcRows }] = await Promise.all([
+      // Facu (26 jul 2026, revisión de rendimiento): el perfil propio se
+      // pedía antes que assetRows/svcRows, en fila — ninguna de las 3
+      // depende de otra, así que ahora las 3 van en la misma tanda.
+      const [{ data: mechanic }, { data: assetRows }, { data: svcRows }] = await Promise.all([
+        supabase
+          .from("mechanics").select("name, photo_url, maintler_code").eq("id", session.user.id).maybeSingle(),
         supabase
           .from("mechanic_assets")
           .select("assets(id, nickname, brand, model, asset_type, qr_codes(code))")
@@ -87,6 +88,7 @@ export default function ReportsPage() {
           .eq("mechanic_id", session.user.id)
           .is("deleted_at", null),
       ]);
+      if (active && mechanic) { setMechanicName(mechanic.name); setMechanicPhoto(mechanic.photo_url ?? ""); setMaintlerCode(mechanic.maintler_code ?? ""); }
 
       const statsByAsset: Record<string, { count: number; lastDate: string | null }> = {};
       for (const s of (svcRows ?? []) as any[]) {

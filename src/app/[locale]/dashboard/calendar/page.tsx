@@ -145,44 +145,58 @@ export default function CalendarPage() {
     setTaskRows((data as unknown as TaskRow[]) ?? []);
   }
 
+  // Facu (26 jul 2026, revisión de rendimiento): esto pedía 5 cosas
+  // independientes una atrás de la otra — service_records dos veces (una
+  // para el calendario en sí, otra solo para calcular el km/horas más
+  // alto por activo), assets, customers y las tareas del calendario.
+  // Ninguna de las 5 depende del resultado de otra (todas filtran por el
+  // mismo "uid", nada más), así que no había ningún motivo real para
+  // esperarlas en fila — Promise.all las dispara todas juntas y el tiempo
+  // total pasa a ser el de la más lenta de las 5, no la suma de las 5.
   async function loadAll(uid: string) {
-    const { data: svc } = await supabase
-      .from("service_records")
-      .select("id, asset_id, service_date, service_type, next_due_date, next_due_km_hours, assets(id, nickname, brand, model, asset_type)")
-      .eq("mechanic_id", uid)
-      .is("deleted_at", null);
-    setServiceRows((svc as unknown as ServiceRow[]) ?? []);
-
-    const { data: kmRows } = await supabase
-      .from("service_records")
-      .select("asset_id, km_hours")
-      .eq("mechanic_id", uid)
-      .is("deleted_at", null)
-      .not("km_hours", "is", null);
-    const maxKm: Record<string, number> = {};
-    for (const r of (kmRows ?? []) as any[]) {
-      if (r.km_hours != null && (maxKm[r.asset_id] == null || r.km_hours > maxKm[r.asset_id])) {
-        maxKm[r.asset_id] = r.km_hours;
-      }
-    }
-    setMaxKmByAsset(maxKm);
-
-    const { data: assets } = await supabase
-      .from("assets")
-      .select("id, nickname, brand, model")
-      .eq("created_by", uid)
-      .is("deleted_at", null)
-      .order("created_at", { ascending: false });
-    setAssetOptions((assets as AssetOption[]) ?? []);
-
-    const { data: custRows } = await supabase
-      .from("customers")
-      .select("id, name, phone, email")
-      .eq("mechanic_id", uid)
-      .order("name", { ascending: true });
-    setCustomers((custRows as CustomerOption[]) ?? []);
-
-    await loadTasks(uid);
+    await Promise.all([
+      (async () => {
+        const { data: svc } = await supabase
+          .from("service_records")
+          .select("id, asset_id, service_date, service_type, next_due_date, next_due_km_hours, assets(id, nickname, brand, model, asset_type)")
+          .eq("mechanic_id", uid)
+          .is("deleted_at", null);
+        setServiceRows((svc as unknown as ServiceRow[]) ?? []);
+      })(),
+      (async () => {
+        const { data: kmRows } = await supabase
+          .from("service_records")
+          .select("asset_id, km_hours")
+          .eq("mechanic_id", uid)
+          .is("deleted_at", null)
+          .not("km_hours", "is", null);
+        const maxKm: Record<string, number> = {};
+        for (const r of (kmRows ?? []) as any[]) {
+          if (r.km_hours != null && (maxKm[r.asset_id] == null || r.km_hours > maxKm[r.asset_id])) {
+            maxKm[r.asset_id] = r.km_hours;
+          }
+        }
+        setMaxKmByAsset(maxKm);
+      })(),
+      (async () => {
+        const { data: assets } = await supabase
+          .from("assets")
+          .select("id, nickname, brand, model")
+          .eq("created_by", uid)
+          .is("deleted_at", null)
+          .order("created_at", { ascending: false });
+        setAssetOptions((assets as AssetOption[]) ?? []);
+      })(),
+      (async () => {
+        const { data: custRows } = await supabase
+          .from("customers")
+          .select("id, name, phone, email")
+          .eq("mechanic_id", uid)
+          .order("name", { ascending: true });
+        setCustomers((custRows as CustomerOption[]) ?? []);
+      })(),
+      loadTasks(uid),
+    ]);
   }
 
   useEffect(() => {
@@ -196,11 +210,17 @@ export default function CalendarPage() {
       setMechanicId(session.user.id);
       setMechanicEmail(session.user.email ?? "");
 
-      const { data: mechanic } = await supabase
-        .from("mechanics").select("name, photo_url, maintler_code").eq("id", session.user.id).single();
-      if (active && mechanic) { setMechanicName(mechanic.name); setMechanicPhoto(mechanic.photo_url ?? ""); setMaintlerCode(mechanic.maintler_code ?? ""); }
-
-      await loadAll(session.user.id);
+      // El perfil del mecánico (nombre/foto para el sidebar) tampoco
+      // depende de ni bloquea la carga principal del calendario — se
+      // pide en paralelo, no antes.
+      await Promise.all([
+        (async () => {
+          const { data: mechanic } = await supabase
+            .from("mechanics").select("name, photo_url, maintler_code").eq("id", session.user.id).maybeSingle();
+          if (active && mechanic) { setMechanicName(mechanic.name); setMechanicPhoto(mechanic.photo_url ?? ""); setMaintlerCode(mechanic.maintler_code ?? ""); }
+        })(),
+        loadAll(session.user.id),
+      ]);
       if (active) setCheckingAuth(false);
     }
 

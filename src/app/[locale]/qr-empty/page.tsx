@@ -27,6 +27,7 @@ export default function QrEmptyPage() {
             alt="MaintlyQR"
             fill
             priority
+            sizes="100vw"
             className="object-contain"
           />
         </div>

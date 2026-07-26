@@ -153,11 +153,16 @@ export default function ScheduledServicesPage() {
       setMechanicId(session.user.id);
       setMechanicEmail(session.user.email ?? "");
 
-      const { data: mechanic } = await supabase
-        .from("mechanics").select("name, photo_url, maintler_code").eq("id", session.user.id).single();
-      if (active && mechanic) { setMechanicName(mechanic.name); setMechanicPhoto(mechanic.photo_url ?? ""); setMaintlerCode(mechanic.maintler_code ?? ""); }
-
-      await loadScheduled(session.user.id);
+      // Facu (26 jul 2026, revisión de rendimiento): perfil propio y
+      // carga principal en paralelo, no en fila.
+      await Promise.all([
+        (async () => {
+          const { data: mechanic } = await supabase
+            .from("mechanics").select("name, photo_url, maintler_code").eq("id", session.user.id).maybeSingle();
+          if (active && mechanic) { setMechanicName(mechanic.name); setMechanicPhoto(mechanic.photo_url ?? ""); setMaintlerCode(mechanic.maintler_code ?? ""); }
+        })(),
+        loadScheduled(session.user.id),
+      ]);
       if (active) setCheckingAuth(false);
     }
 

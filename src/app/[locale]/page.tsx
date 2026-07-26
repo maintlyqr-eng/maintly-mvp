@@ -67,7 +67,7 @@ export default function HomePage() {
       // "INITIAL_SESSION") para no redirigir a alguien que ya estaba
       // logueado y simplemente entró a mirar la home a propósito.
       if (event === "SIGNED_IN" && session) {
-        const { data: m } = await supabase.from("mechanics").select("suspended, deleted_at, profession").eq("id", session.user.id).single();
+        const { data: m } = await supabase.from("mechanics").select("suspended, deleted_at, profession").eq("id", session.user.id).maybeSingle();
         if (m?.deleted_at || m?.suspended) return; // el listener de Login ya muestra el error si vino de ahí; acá no hay dónde mostrarlo, así que no forzamos nada más.
         router.push(m?.profession ? "/dashboard" : "/register/profession");
       }

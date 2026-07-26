@@ -127,11 +127,18 @@ export default function DocumentsPage() {
       setMechanicId(session.user.id);
       setMechanicEmail(session.user.email ?? "");
 
-      const { data: mechanic } = await supabase
-        .from("mechanics").select("name, photo_url, maintler_code").eq("id", session.user.id).single();
-      if (active && mechanic) { setMechanicName(mechanic.name); setMechanicPhoto(mechanic.photo_url ?? ""); setMaintlerCode(mechanic.maintler_code ?? ""); }
-
-      await loadAll(session.user.id);
+      // Facu (26 jul 2026, revisión de rendimiento): el perfil propio
+      // (nombre/foto para el sidebar) no depende de ni bloquea la carga
+      // principal de la página — antes se esperaba primero y recién
+      // después arrancaba loadAll(); ahora van juntos.
+      await Promise.all([
+        (async () => {
+          const { data: mechanic } = await supabase
+            .from("mechanics").select("name, photo_url, maintler_code").eq("id", session.user.id).maybeSingle();
+          if (active && mechanic) { setMechanicName(mechanic.name); setMechanicPhoto(mechanic.photo_url ?? ""); setMaintlerCode(mechanic.maintler_code ?? ""); }
+        })(),
+        loadAll(session.user.id),
+      ]);
       if (active) setCheckingAuth(false);
     }
 

@@ -435,13 +435,26 @@ function TeamChatPageInner() {
       setMechanicId(session.user.id);
       setMechanicEmail(session.user.email ?? "");
 
-      const { data: mechanic } = await supabase
-        .from("mechanics").select("name, photo_url, maintler_code").eq("id", session.user.id).single();
-      if (active && mechanic) { setMechanicName(mechanic.name); setMechanicPhoto(mechanic.photo_url ?? ""); setMaintlerCode(mechanic.maintler_code ?? ""); }
-
-      await loadConversations(session.user.id);
-      await loadSavedContacts(session.user.id);
-      await loadBlocks(session.user.id);
+      // Facu (26 jul 2026, revisión de rendimiento): el perfil propio y
+      // las 3 cargas de abajo (conversaciones, contactos guardados,
+      // bloqueados) son 4 lecturas independientes — ninguna necesita el
+      // resultado de otra, cada una filtra solo por mi propio id. Antes
+      // se esperaban en fila; Promise.all las dispara juntas. Esto NO
+      // cambia el orden relativo entre conversationsLoading y
+      // checkingAuth que el efecto del deep-link de más abajo necesita
+      // (ver el comentario largo ahí) — checkingAuth sigue sin bajar
+      // hasta que las 4 terminaron, igual que antes, solo que ahora en
+      // paralelo en vez de en serie.
+      await Promise.all([
+        (async () => {
+          const { data: mechanic } = await supabase
+            .from("mechanics").select("name, photo_url, maintler_code").eq("id", session.user.id).maybeSingle();
+          if (active && mechanic) { setMechanicName(mechanic.name); setMechanicPhoto(mechanic.photo_url ?? ""); setMaintlerCode(mechanic.maintler_code ?? ""); }
+        })(),
+        loadConversations(session.user.id),
+        loadSavedContacts(session.user.id),
+        loadBlocks(session.user.id),
+      ]);
       if (active) setCheckingAuth(false);
     }
 

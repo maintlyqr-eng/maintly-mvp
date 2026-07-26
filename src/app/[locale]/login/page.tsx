@@ -64,7 +64,7 @@ function LoginForm() {
       // es el único lugar donde ese usuario "aterriza" después del login,
       // así que es acá donde hay que mandarlo a completar su perfil si
       // todavía no lo hizo.
-      const { data: m } = await supabase.from("mechanics").select("suspended, deleted_at, profession").eq("id", session.user.id).single();
+      const { data: m } = await supabase.from("mechanics").select("suspended, deleted_at, profession").eq("id", session.user.id).maybeSingle();
       if (m?.deleted_at) {
         await supabase.auth.signOut();
         setError(t("deletedError"));
@@ -137,6 +137,7 @@ function LoginForm() {
           alt="MaintlyQR"
           fill
           priority
+          sizes="100vw"
           className="object-contain object-center"
         />
       </div>

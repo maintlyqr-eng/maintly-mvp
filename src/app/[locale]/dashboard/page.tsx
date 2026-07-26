@@ -210,7 +210,7 @@ export default function DashboardPage() {
         { data: taskRowsForCal },
         { data: assetRows },
       ] = await Promise.all([
-        supabase.from("mechanics").select("name, photo_url, maintler_code").eq("id", session.user.id).single(),
+        supabase.from("mechanics").select("name, photo_url, maintler_code").eq("id", session.user.id).maybeSingle(),
         supabase.from("mechanic_assets").select("*", { count: "exact", head: true }).eq("mechanic_id", session.user.id),
         supabase.from("service_records").select("*", { count: "exact", head: true }).eq("mechanic_id", session.user.id).is("deleted_at", null),
         supabase
