@@ -1006,6 +1006,20 @@ export default function AdminPage() {
   const [confirmTypedText, setConfirmTypedText] = useState("");
   const [confirmReasonText, setConfirmReasonText] = useState("");
 
+  // Facu (26 jul 2026): swipe-to-change-page refs for the 3 paginated
+  // tables (Auditoría / Reportes / Errores) below. IMPORTANT — these must
+  // stay up here with the rest of the hooks, BEFORE the `if (!loginChecked)
+  // return null`, `if (!adminAuthed) return (...)` and `if (loading)
+  // return (...)` early returns further down. Declaring them after those
+  // (like a previous version of this file did) means React calls this
+  // hook on some renders (once logged in) but not others (still on the
+  // login screen) — a Rules-of-Hooks violation that crashed the whole
+  // panel with "Minified React error #310" right after logging in. Hooks
+  // must always run unconditionally, in the same order, on every render.
+  const auditLogTouchStartX = useRef<number | null>(null);
+  const reportsTouchStartX = useRef<number | null>(null);
+  const errorLogsTouchStartX = useRef<number | null>(null);
+
   function flash(text: string, tone: "ok" | "error" = "ok") {
     setActionMsg({ text, tone });
     setTimeout(() => setActionMsg((m) => (m?.text === text ? null : m)), 4000);
@@ -2698,8 +2712,8 @@ export default function AdminPage() {
   // donde haya escrol de ese tipo" — same swipe-to-change-page gesture as
   // the mechanic-facing pages, now on these 3 admin tables too. Pages here
   // are 1-indexed and clamp (not wrap) at both ends, same as their arrow
-  // buttons below.
-  const auditLogTouchStartX = useRef<number | null>(null);
+  // buttons below. (The refs themselves live up near the other hooks —
+  // see the comment there for why.)
   function handleAuditLogTouchStart(e: React.TouchEvent) {
     auditLogTouchStartX.current = e.touches[0].clientX;
   }
@@ -2714,7 +2728,6 @@ export default function AdminPage() {
       setAuditLogsPage((p) => Math.min(auditLogTotalPages, p + 1));
     }
   }
-  const reportsTouchStartX = useRef<number | null>(null);
   function handleReportsTouchStart(e: React.TouchEvent) {
     reportsTouchStartX.current = e.touches[0].clientX;
   }
@@ -2729,7 +2742,6 @@ export default function AdminPage() {
       setReportsPage((p) => Math.min(reportsTotalPages, p + 1));
     }
   }
-  const errorLogsTouchStartX = useRef<number | null>(null);
   function handleErrorLogsTouchStart(e: React.TouchEvent) {
     errorLogsTouchStartX.current = e.touches[0].clientX;
   }

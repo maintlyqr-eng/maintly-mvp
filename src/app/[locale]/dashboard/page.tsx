@@ -135,6 +135,17 @@ export default function DashboardPage() {
   const [recentActivity, setRecentActivity] = useState<ActivityItem[]>([]);
   const [assetCarouselPage, setAssetCarouselPage] = useState(0);
   const [priorityCarouselPage, setPriorityCarouselPage] = useState(0);
+  // Facu (26 jul 2026): swipe-to-change-page refs for the two carousels
+  // below. IMPORTANT — these must be declared up here with the rest of the
+  // hooks, before the `if (!authChecked) return (...)` further down. A
+  // previous version had them declared after that early return, which
+  // means React called this hook on some renders (once authChecked was
+  // true) but not others (while still checking auth) — a Rules-of-Hooks
+  // violation that crashed the whole page with "Minified React error #310"
+  // for every mechanic hitting the dashboard. Hooks must always run
+  // unconditionally, in the same order, on every render.
+  const priorityTouchStartX = useRef<number | null>(null);
+  const assetCarouselTouchStartX = useRef<number | null>(null);
 
   // ── Calendar preview popover (hover on "Ver calendario completo") ──
   const [calViewDate, setCalViewDate] = useState(() => new Date());
@@ -558,8 +569,8 @@ export default function DashboardPage() {
   // donde haya escrol de ese tipo" — same swipe-to-change-page gesture as
   // Mis Activos/Mis Servicios/Códigos QR, now on these two dashboard
   // carousels too. Both wrap around at the ends (modulo), matching their
-  // arrow buttons below.
-  const priorityTouchStartX = useRef<number | null>(null);
+  // arrow buttons below. (The refs themselves live up near the other
+  // hooks — see the comment there for why.)
   function handlePriorityTouchStart(e: React.TouchEvent) {
     priorityTouchStartX.current = e.touches[0].clientX;
   }
@@ -574,7 +585,6 @@ export default function DashboardPage() {
       setPriorityCarouselPage((p) => (p + 1) % priorityTotalPages);
     }
   }
-  const assetCarouselTouchStartX = useRef<number | null>(null);
   function handleAssetCarouselTouchStart(e: React.TouchEvent) {
     assetCarouselTouchStartX.current = e.touches[0].clientX;
   }
