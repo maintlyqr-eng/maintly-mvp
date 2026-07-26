@@ -636,6 +636,29 @@ export default function AssetsPage() {
     setAssetsPage(0);
   }, [searchQuery, typeFilter, sortBy]);
 
+  // Facu (26 jul 2026, pantalla táctil): "paso el dedo sobre los activos
+  // para escrolear los 9 q tengo y me muestre la pagina siguiente igual
+  // como si tocara la flechita pero no lo hace" — the grid itself isn't a
+  // scroll container anymore (pagination replaced the scrollbar), so a
+  // finger swipe over the cards did nothing. This reads the swipe
+  // direction manually and moves the page the same way the arrow buttons
+  // do, only past a distance threshold so it doesn't fire on a normal tap.
+  const assetsTouchStartX = useRef<number | null>(null);
+  function handleAssetsTouchStart(e: React.TouchEvent) {
+    assetsTouchStartX.current = e.touches[0].clientX;
+  }
+  function handleAssetsTouchEnd(e: React.TouchEvent) {
+    if (assetsTouchStartX.current === null || assetsTotalPages <= 1) return;
+    const deltaX = e.changedTouches[0].clientX - assetsTouchStartX.current;
+    assetsTouchStartX.current = null;
+    const SWIPE_THRESHOLD = 40;
+    if (deltaX > SWIPE_THRESHOLD) {
+      setAssetsPage((p) => (p - 1 + assetsTotalPages) % assetsTotalPages);
+    } else if (deltaX < -SWIPE_THRESHOLD) {
+      setAssetsPage((p) => (p + 1) % assetsTotalPages);
+    }
+  }
+
   if (checkingAuth) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-zinc-50">
@@ -819,7 +842,11 @@ export default function AssetsPage() {
                   </div>
                 )}
               </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2">
+            <div
+              className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2"
+              onTouchStart={handleAssetsTouchStart}
+              onTouchEnd={handleAssetsTouchEnd}
+            >
               {pagedAssets.map((a) => {
                 const code = getQrCode(a);
                 const label = assetDisplayName(a);
