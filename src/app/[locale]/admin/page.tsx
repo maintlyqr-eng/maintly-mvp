@@ -26,6 +26,9 @@ import AnalyticsSection from "./_sections/AnalyticsSection";
 import ModerationSection from "./_sections/ModerationSection";
 import TeamChatSection from "./_sections/TeamChatSection";
 import TrashSection from "./_sections/TrashSection";
+import DeleteRequestsSection from "./_sections/DeleteRequestsSection";
+import AdminsSection from "./_sections/AdminsSection";
+import SystemSection from "./_sections/SystemSection";
 
 // Local enum-key maps, same pattern as ShareAssetModal.tsx / the Settings
 // and Assets [locale] pages — raw DB values (English) map to translation
@@ -145,7 +148,7 @@ export type TrashServiceRow = {
 // + /api/admin/delete-requests. Row shape matches that endpoint's GET
 // exactly (nested joins typed as plain objects, same convention as
 // TrashServiceRow above).
-type DeleteRequestRow = {
+export type DeleteRequestRow = {
   id: string;
   reason: string | null;
   status: "pending" | "approved" | "rejected";
@@ -197,8 +200,8 @@ type Section = "dashboard" | "accounts" | "assets" | "services" | "delete-reques
 // "use client" no debería importar nada del lado del servidor, aunque este
 // archivo en particular no toca crypto/env — es más simple mantener este
 // tipo como fuente de verdad del lado del cliente).
-type AdminRole = "super_admin" | "support_admin" | "content_moderator" | "analytics_viewer";
-type AdminUserRow = {
+export type AdminRole = "super_admin" | "support_admin" | "content_moderator" | "analytics_viewer";
+export type AdminUserRow = {
   id: string;
   username: string;
   role: AdminRole;
@@ -212,7 +215,7 @@ type AdminUserRow = {
 // avanzadas"): fila única de src/app/api/admin/system-settings/route.ts
 // (migración 037). Nombres en snake_case porque viajan tal cual desde
 // la fila de Postgres, mismo criterio que AccountRow/AssetRow.
-type SystemSettingsRow = {
+export type SystemSettingsRow = {
   maintenance_mode: boolean;
   maintenance_message: string | null;
   banner_enabled: boolean;
@@ -226,7 +229,7 @@ type SystemSettingsRow = {
   updated_by: string | null;
 };
 
-type ChangelogEntry = {
+export type ChangelogEntry = {
   id: string;
   version_label: string;
   notes: string;
@@ -3882,377 +3885,38 @@ export default function AdminPage() {
                aprueba (soft-delete real, mismo efecto que Papelera) o
                rechaza (el registro queda intacto). ──────────────────── */}
           {section === "delete-requests" && (
-            <div className="space-y-4">
-              <p className="text-[12px] text-zinc-400">{t("deleteRequestsIntro")}</p>
-
-              <div className="bg-white rounded-2xl border border-zinc-200/80 shadow-sm overflow-hidden">
-                {deleteRequestsLoading ? (
-                  <p className="text-[13px] text-zinc-400 text-center py-16">{t("loading")}</p>
-                ) : deleteRequests.length === 0 ? (
-                  <div className="text-center py-16">
-                    <Undo2 size={28} className="mx-auto text-zinc-200 mb-2" />
-                    <p className="text-[13px] text-zinc-300 font-medium">{t("deleteRequestsEmpty")}</p>
-                  </div>
-                ) : (
-                  <div className="overflow-x-auto overscroll-x-contain">
-                    <table className="w-full min-w-[720px]">
-                      <thead>
-                        <tr className="bg-zinc-50 border-b border-zinc-100">
-                          {[t("colAsset"), t("colServiceType"), t("colDate"), t("colRequestedBy"), t("colReason"), t("colRequestedAt"), ""].map((h) => (
-                            <th key={h} className="px-7 py-3 text-left text-[9px] font-bold text-zinc-400 uppercase tracking-widest">{h}</th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-zinc-50">
-                        {deleteRequests.map((row) => (
-                          <tr key={row.id} className="hover:bg-zinc-50/80 transition-colors">
-                            <td className="px-7 py-4 text-[13px] font-bold text-zinc-900">
-                              {row.service_records?.assets ? assetLabel(row.service_records.assets) : t("unnamedAsset")}
-                            </td>
-                            <td className="px-7 py-4">
-                              <span className={`text-[10px] font-bold px-2.5 py-1 rounded-lg ${TYPE_COLORS[row.service_records?.service_type ?? ""] ?? "bg-zinc-100 text-zinc-500 border border-zinc-200"}`}>
-                                {row.service_records?.service_type ?? "—"}
-                              </span>
-                            </td>
-                            <td className="px-7 py-4 text-[12px] text-zinc-400">{row.service_records ? formatDate(row.service_records.service_date) : "—"}</td>
-                            <td className="px-7 py-4 text-[12px] text-zinc-500">
-                              <div className="font-bold text-zinc-700">{row.mechanics?.name ?? "—"}</div>
-                              <div className="text-zinc-400">{row.mechanics?.email ?? ""}</div>
-                            </td>
-                            <td className="px-7 py-4 text-[12px] text-zinc-500 max-w-[220px]">{row.reason || <span className="text-zinc-300">{t("noReasonGiven")}</span>}</td>
-                            <td className="px-7 py-4 text-[12px] text-zinc-400 whitespace-nowrap">{formatDate(row.requested_at)} · {formatTime(row.requested_at, locale)}</td>
-                            <td className="px-7 py-4">
-                              <div className="flex items-center justify-end gap-3">
-                                <button onClick={() => confirmApproveDeleteRequest(row)} className="flex items-center gap-1.5 text-[11px] font-bold text-emerald-600 hover:text-emerald-700 transition-colors" title={t("approveDeleteRequestTitle")}>
-                                  <CheckCircle2 size={13} /> {t("approveDeleteRequestTitle")}
-                                </button>
-                                <button onClick={() => confirmRejectDeleteRequest(row)} className="text-zinc-300 hover:text-red-600 transition-colors" title={t("rejectDeleteRequestTitle")}>
-                                  <X size={14} />
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </div>
-            </div>
+            <DeleteRequestsSection
+              t={t} locale={locale}
+              deleteRequestsLoading={deleteRequestsLoading} deleteRequests={deleteRequests}
+              assetLabel={assetLabel}
+              confirmApproveDeleteRequest={confirmApproveDeleteRequest} confirmRejectDeleteRequest={confirmRejectDeleteRequest}
+            />
           )}
 
           {/* ── ADMINISTRADORES (incremento 11, 14 jul 2026 — solo Super
                Admin, capacidad "admin_management") ──────────────────── */}
           {section === "admins" && (
-            <div className="space-y-4">
-              <p className="text-[12px] text-zinc-400">{t("adminsIntro")}</p>
-
-              <div className="bg-white rounded-2xl border border-zinc-200/80 shadow-sm p-5 space-y-3">
-                <p className="text-[11px] font-bold text-zinc-400 uppercase tracking-widest">{t("adminsCreateTitle")}</p>
-                <div className="flex flex-wrap items-end gap-3">
-                  <div>
-                    <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1">{t("adminsUsername")}</label>
-                    <input
-                      type="text" value={newAdminUsername}
-                      onChange={(e) => setNewAdminUsername(e.target.value)}
-                      className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-[12px] outline-none focus:border-red-400 w-40"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1">{t("adminsPassword")}</label>
-                    <input
-                      type="password" value={newAdminPassword}
-                      onChange={(e) => setNewAdminPassword(e.target.value)}
-                      className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-[12px] outline-none focus:border-red-400 w-40"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1">{t("adminsRole")}</label>
-                    <select
-                      value={newAdminRole}
-                      onChange={(e) => setNewAdminRole(e.target.value as AdminRole)}
-                      className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-[12px] outline-none focus:border-red-400"
-                    >
-                      <option value="support_admin">{t("roleSupportAdmin")}</option>
-                      <option value="content_moderator">{t("roleContentModerator")}</option>
-                      <option value="analytics_viewer">{t("roleAnalyticsViewer")}</option>
-                      <option value="super_admin">{t("roleSuperAdmin")}</option>
-                    </select>
-                  </div>
-                  <button
-                    onClick={createAdmin}
-                    disabled={creatingAdmin || !newAdminUsername.trim() || newAdminPassword.length < 8}
-                    className="text-[11px] font-bold px-4 py-2.5 rounded-xl bg-zinc-900 text-white hover:bg-zinc-800 transition-colors disabled:opacity-40"
-                  >
-                    {creatingAdmin ? t("creating") : t("adminsCreateButton")}
-                  </button>
-                </div>
-                {newAdminPassword.length > 0 && newAdminPassword.length < 8 && (
-                  <p className="text-[11px] text-amber-600">{t("adminsPasswordTooShort")}</p>
-                )}
-              </div>
-
-              <div className="bg-white rounded-2xl border border-zinc-200/80 shadow-sm overflow-hidden">
-                {adminsLoading ? (
-                  <p className="text-[13px] text-zinc-400 text-center py-16">{t("loading")}</p>
-                ) : adminsList.length === 0 ? (
-                  <div className="text-center py-16">
-                    <UserCog size={28} className="mx-auto text-zinc-200 mb-2" />
-                    <p className="text-[13px] text-zinc-300 font-medium">{t("adminsEmpty")}</p>
-                  </div>
-                ) : (
-                  <div className="overflow-x-auto overscroll-x-contain">
-                    <table className="w-full min-w-[720px]">
-                      <thead>
-                        <tr className="bg-zinc-50 border-b border-zinc-100">
-                          {[t("adminsUsername"), t("adminsRole"), t("colStatus"), t("adminsLastLogin"), ""].map((h) => (
-                            <th key={h} className="px-7 py-3 text-left text-[9px] font-bold text-zinc-400 uppercase tracking-widest">{h}</th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-zinc-50">
-                        {adminsList.map((a) => (
-                          <tr key={a.id} className="hover:bg-zinc-50/80 transition-colors">
-                            <td className="px-7 py-4 text-[13px] font-bold text-zinc-900">{a.username}</td>
-                            <td className="px-7 py-4">
-                              <select
-                                value={a.role}
-                                onChange={(e) => updateAdmin(a.id, { role: e.target.value as AdminRole })}
-                                className="rounded-lg border border-zinc-200 bg-white px-2 py-1 text-[12px] outline-none focus:border-red-400"
-                              >
-                                <option value="support_admin">{t("roleSupportAdmin")}</option>
-                                <option value="content_moderator">{t("roleContentModerator")}</option>
-                                <option value="analytics_viewer">{t("roleAnalyticsViewer")}</option>
-                                <option value="super_admin">{t("roleSuperAdmin")}</option>
-                              </select>
-                            </td>
-                            <td className="px-7 py-4">
-                              {a.active ? <Pill tone="emerald">{t("adminActive")}</Pill> : <Pill tone="zinc">{t("adminInactive")}</Pill>}
-                            </td>
-                            <td className="px-7 py-4 text-[12px] text-zinc-400">
-                              {a.last_login_at ? formatDateDMY(a.last_login_at) : <span className="text-zinc-300">{t("adminsNeverLoggedIn")}</span>}
-                            </td>
-                            <td className="px-7 py-4">
-                              <button
-                                onClick={() => updateAdmin(a.id, { active: !a.active })}
-                                className={`text-[11px] font-bold px-2.5 py-1.5 rounded-lg border transition-colors ${
-                                  a.active ? "border-red-200 text-red-600 hover:bg-red-50" : "border-emerald-200 text-emerald-700 hover:bg-emerald-50"
-                                }`}
-                              >
-                                {a.active ? t("deactivate") : t("reactivate")}
-                              </button>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </div>
-            </div>
+            <AdminsSection
+              t={t}
+              newAdminUsername={newAdminUsername} setNewAdminUsername={setNewAdminUsername}
+              newAdminPassword={newAdminPassword} setNewAdminPassword={setNewAdminPassword}
+              newAdminRole={newAdminRole} setNewAdminRole={setNewAdminRole}
+              creatingAdmin={creatingAdmin} createAdmin={createAdmin}
+              adminsLoading={adminsLoading} adminsList={adminsList} updateAdmin={updateAdmin}
+            />
           )}
 
           {section === "system" && (
-            <div className="space-y-4">
-              <p className="text-[12px] text-zinc-400">{t("systemIntro")}</p>
-
-              {systemSettingsLoading ? (
-                <p className="text-[13px] text-zinc-400 text-center py-16">{t("loading")}</p>
-              ) : (
-                <>
-                  {/* Modo mantenimiento */}
-                  <div className="bg-white rounded-2xl border border-zinc-200/80 shadow-sm p-5 space-y-3">
-                    <div className="flex items-center justify-between gap-3">
-                      <div>
-                        <p className="text-[13px] font-bold text-zinc-900">{t("systemMaintenanceTitle")}</p>
-                        <p className="text-[11px] text-zinc-400">{t("systemMaintenanceDesc")}</p>
-                      </div>
-                      <button
-                        onClick={() => setSystemSettingsDraft((prev) => ({ ...prev, maintenance_mode: !systemSettingValue("maintenance_mode") }))}
-                        className={`text-[11px] font-bold px-3 py-2 rounded-xl border transition-colors shrink-0 ${
-                          systemSettingValue("maintenance_mode") ? "border-red-200 text-red-600 hover:bg-red-50" : "border-zinc-200 text-zinc-500 hover:bg-zinc-50"
-                        }`}
-                      >
-                        {systemSettingValue("maintenance_mode") ? t("systemMaintenanceEnabled") : t("systemMaintenanceDisabled")}
-                      </button>
-                    </div>
-                    <div>
-                      <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1">{t("systemMaintenanceMessageLabel")}</label>
-                      <textarea
-                        value={systemSettingValue("maintenance_message") ?? ""}
-                        onChange={(e) => setSystemSettingsDraft((prev) => ({ ...prev, maintenance_message: e.target.value }))}
-                        placeholder={t("systemMaintenanceMessagePlaceholder")}
-                        rows={2}
-                        className="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-[12px] outline-none focus:border-red-400 resize-none"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Banner informativo */}
-                  <div className="bg-white rounded-2xl border border-zinc-200/80 shadow-sm p-5 space-y-3">
-                    <div className="flex items-center justify-between gap-3">
-                      <div>
-                        <p className="text-[13px] font-bold text-zinc-900">{t("systemBannerTitle")}</p>
-                        <p className="text-[11px] text-zinc-400">{t("systemBannerDesc")}</p>
-                      </div>
-                      <button
-                        onClick={() => setSystemSettingsDraft((prev) => ({ ...prev, banner_enabled: !systemSettingValue("banner_enabled") }))}
-                        className={`text-[11px] font-bold px-3 py-2 rounded-xl border transition-colors shrink-0 ${
-                          systemSettingValue("banner_enabled") ? "border-emerald-200 text-emerald-700 hover:bg-emerald-50" : "border-zinc-200 text-zinc-500 hover:bg-zinc-50"
-                        }`}
-                      >
-                        {systemSettingValue("banner_enabled") ? t("systemBannerEnabled") : t("systemBannerDisabled")}
-                      </button>
-                    </div>
-                    <div className="grid sm:grid-cols-2 gap-3">
-                      <div className="sm:col-span-2">
-                        <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1">{t("systemBannerTextLabel")}</label>
-                        <input
-                          type="text"
-                          value={systemSettingValue("banner_text") ?? ""}
-                          onChange={(e) => setSystemSettingsDraft((prev) => ({ ...prev, banner_text: e.target.value }))}
-                          className="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-[12px] outline-none focus:border-red-400"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1">{t("systemBannerSeverityLabel")}</label>
-                        <select
-                          value={systemSettingValue("banner_severity") ?? "info"}
-                          onChange={(e) => setSystemSettingsDraft((prev) => ({ ...prev, banner_severity: e.target.value as SystemSettingsRow["banner_severity"] }))}
-                          className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-[12px] outline-none focus:border-red-400 w-full"
-                        >
-                          <option value="info">{t("systemBannerSeverityInfo")}</option>
-                          <option value="warning">{t("systemBannerSeverityWarning")}</option>
-                          <option value="critical">{t("systemBannerSeverityCritical")}</option>
-                        </select>
-                      </div>
-                      <div>
-                        <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1">{t("systemBannerLinkLabel")}</label>
-                        <input
-                          type="text"
-                          value={systemSettingValue("banner_link_url") ?? ""}
-                          onChange={(e) => setSystemSettingsDraft((prev) => ({ ...prev, banner_link_url: e.target.value }))}
-                          className="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-[12px] outline-none focus:border-red-400"
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Límites de archivo */}
-                  <div className="bg-white rounded-2xl border border-zinc-200/80 shadow-sm p-5 space-y-3">
-                    <div>
-                      <p className="text-[13px] font-bold text-zinc-900">{t("systemLimitsTitle")}</p>
-                      <p className="text-[11px] text-zinc-400">{t("systemLimitsDesc")}</p>
-                    </div>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                      <div>
-                        <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1">{t("systemLimitsAssetPhoto")}</label>
-                        <input
-                          type="number" min={1}
-                          value={systemSettingValue("max_asset_photo_mb") ?? 8}
-                          onChange={(e) => setSystemSettingsDraft((prev) => ({ ...prev, max_asset_photo_mb: Number(e.target.value) }))}
-                          className="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-[12px] outline-none focus:border-red-400"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1">{t("systemLimitsDocument")}</label>
-                        <input
-                          type="number" min={1}
-                          value={systemSettingValue("max_document_mb") ?? 25}
-                          onChange={(e) => setSystemSettingsDraft((prev) => ({ ...prev, max_document_mb: Number(e.target.value) }))}
-                          className="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-[12px] outline-none focus:border-red-400"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1">{t("systemLimitsCertificate")}</label>
-                        <input
-                          type="number" min={1}
-                          value={systemSettingValue("max_certificate_mb") ?? 10}
-                          onChange={(e) => setSystemSettingsDraft((prev) => ({ ...prev, max_certificate_mb: Number(e.target.value) }))}
-                          className="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-[12px] outline-none focus:border-red-400"
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Guardar */}
-                  <div className="flex items-center gap-3 flex-wrap">
-                    <button
-                      onClick={saveSystemSettings}
-                      disabled={systemSettingsSaving || Object.keys(systemSettingsDraft).length === 0}
-                      className="text-[11px] font-bold px-4 py-2.5 rounded-xl bg-zinc-900 text-white hover:bg-zinc-800 transition-colors disabled:opacity-40"
-                    >
-                      {systemSettingsSaving ? t("systemSaving") : t("systemSaveButton")}
-                    </button>
-                    {Object.keys(systemSettingsDraft).length > 0 && (
-                      <p className="text-[11px] text-amber-600">{t("systemUnsavedNotice")}</p>
-                    )}
-                    {systemSettings?.updated_at && (
-                      <p className="text-[11px] text-zinc-300 ml-auto">{t("systemLastUpdated")}: {formatDateDMY(systemSettings.updated_at)}</p>
-                    )}
-                  </div>
-
-                  {/* Changelog */}
-                  <div className="bg-white rounded-2xl border border-zinc-200/80 shadow-sm p-5 space-y-4">
-                    <div>
-                      <p className="text-[13px] font-bold text-zinc-900">{t("systemChangelogTitle")}</p>
-                      <p className="text-[11px] text-zinc-400">{t("systemChangelogDesc")}</p>
-                    </div>
-
-                    <div className="flex flex-wrap items-end gap-3">
-                      <div>
-                        <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1">{t("systemChangelogVersionLabel")}</label>
-                        <input
-                          type="text" value={newChangelogVersion}
-                          onChange={(e) => setNewChangelogVersion(e.target.value)}
-                          className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-[12px] outline-none focus:border-red-400 w-32"
-                        />
-                      </div>
-                      <div className="flex-1 min-w-[220px]">
-                        <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1">{t("systemChangelogNotesLabel")}</label>
-                        <input
-                          type="text" value={newChangelogNotes}
-                          onChange={(e) => setNewChangelogNotes(e.target.value)}
-                          className="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-[12px] outline-none focus:border-red-400"
-                        />
-                      </div>
-                      <button
-                        onClick={createChangelogEntry}
-                        disabled={creatingChangelogEntry || !newChangelogVersion.trim() || !newChangelogNotes.trim()}
-                        className="text-[11px] font-bold px-4 py-2.5 rounded-xl bg-zinc-900 text-white hover:bg-zinc-800 transition-colors disabled:opacity-40"
-                      >
-                        {creatingChangelogEntry ? t("creating") : t("systemChangelogCreateButton")}
-                      </button>
-                    </div>
-
-                    {changelogLoading ? (
-                      <p className="text-[13px] text-zinc-400 text-center py-8">{t("loading")}</p>
-                    ) : changelogEntries.length === 0 ? (
-                      <p className="text-[12px] text-zinc-300 text-center py-8">{t("systemChangelogEmpty")}</p>
-                    ) : (
-                      <div className="divide-y divide-zinc-50">
-                        {changelogEntries.map((entry) => (
-                          <div key={entry.id} className="flex items-start justify-between gap-3 py-3">
-                            <div className="min-w-0">
-                              <p className="text-[12px] font-bold text-zinc-900">
-                                {entry.version_label} <span className="text-[11px] font-medium text-zinc-400">— {formatDateDMY(entry.published_at)}</span>
-                              </p>
-                              <p className="text-[12px] text-zinc-500 mt-0.5">{entry.notes}</p>
-                            </div>
-                            <button
-                              onClick={() => deleteChangelogEntry(entry.id)}
-                              className="text-[11px] font-bold px-2.5 py-1.5 rounded-lg border border-red-200 text-red-600 hover:bg-red-50 transition-colors shrink-0"
-                            >
-                              {t("systemChangelogDeleteButton")}
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </>
-              )}
-            </div>
+            <SystemSection
+              t={t}
+              systemSettingsLoading={systemSettingsLoading} systemSettingValue={systemSettingValue}
+              setSystemSettingsDraft={setSystemSettingsDraft} systemSettingsDraft={systemSettingsDraft}
+              systemSettings={systemSettings} systemSettingsSaving={systemSettingsSaving} saveSystemSettings={saveSystemSettings}
+              newChangelogVersion={newChangelogVersion} setNewChangelogVersion={setNewChangelogVersion}
+              newChangelogNotes={newChangelogNotes} setNewChangelogNotes={setNewChangelogNotes}
+              createChangelogEntry={createChangelogEntry} creatingChangelogEntry={creatingChangelogEntry}
+              changelogLoading={changelogLoading} changelogEntries={changelogEntries} deleteChangelogEntry={deleteChangelogEntry}
+            />
           )}
 
           {/* ── ERRORES (panel técnico de errores y rendimiento — incremento
