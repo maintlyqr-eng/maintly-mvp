@@ -196,13 +196,16 @@ export default function DashboardPage() {
       setMechanicId(session.user.id);
       setMechanicEmail(session.user.email ?? "");
 
-      // These 8 queries are all independent (none depends on another's
+      // These 7 queries are all independent (none depends on another's
       // result), so they're fired concurrently instead of one after another
       // — page load time is now bounded by the slowest single query instead
-      // of the sum of all of them.
+      // of the sum of all of them. (26 jul 2026: was 8 — the separate
+      // mechanic_assets head-count query was dropped; totalAssets is now
+      // derived from the assets(...) rows fetched below, post soft-delete
+      // filtering, so "Activos" means the same thing here as on the Activos
+      // page instead of an unfiltered raw count.)
       const [
         { data: mechanic },
-        { count: assetCount },
         { count: svcCount },
         { data: remRows },
         { data: kmRows },
@@ -211,7 +214,6 @@ export default function DashboardPage() {
         { data: assetRows },
       ] = await Promise.all([
         supabase.from("mechanics").select("name, photo_url, maintler_code").eq("id", session.user.id).maybeSingle(),
-        supabase.from("mechanic_assets").select("*", { count: "exact", head: true }).eq("mechanic_id", session.user.id),
         supabase.from("service_records").select("*", { count: "exact", head: true }).eq("mechanic_id", session.user.id).is("deleted_at", null),
         supabase
           .from("service_records")
@@ -238,14 +240,13 @@ export default function DashboardPage() {
           .eq("mechanic_id", session.user.id),
         supabase
           .from("mechanic_assets")
-          .select("assets(id, nickname, brand, model, vin_serial, asset_type, photo_url, qr_codes(code))")
+          .select("assets(id, nickname, brand, model, vin_serial, asset_type, photo_url, deleted_at, qr_codes(code))")
           .eq("mechanic_id", session.user.id),
       ]);
 
       if (!active) return;
 
       if (mechanic) { setMechanicName(mechanic.name); setMechanicPhoto(mechanic.photo_url ?? ""); setMaintlerCode(mechanic.maintler_code ?? ""); }
-      setTotalAssets(assetCount ?? 0);
       setTotalServices(svcCount ?? 0);
 
       // ── Upcoming reminders ──
@@ -318,7 +319,13 @@ export default function DashboardPage() {
       const searchList: SearchAsset[] = ((assetRows ?? []) as any[])
         .map((r) => {
           const a = Array.isArray(r.assets) ? r.assets[0] : r.assets;
-          if (!a) return null;
+          // 26 jul 2026: skip admin-soft-deleted assets — matches the
+          // "Total de Activos" definition on the Assets page (single
+          // agreed-on meaning for "activos" across Panel/Activos/Reportes,
+          // see the audit item this closes). Previously this query didn't
+          // even select deleted_at, so a soft-deleted asset could still
+          // show up in the top search bar.
+          if (!a || a.deleted_at) return null;
           const qr = Array.isArray(a.qr_codes) ? a.qr_codes[0]?.code : a.qr_codes?.code;
           return {
             id: a.id,
@@ -356,7 +363,11 @@ export default function DashboardPage() {
       const cards: AssetCardInfo[] = ((assetRows ?? []) as any[])
         .map((r) => {
           const a = Array.isArray(r.assets) ? r.assets[0] : r.assets;
-          if (!a) return null;
+          // Same soft-delete exclusion as searchList above — this is also
+          // where totalAssets (the "Activos bajo tu cuidado" tile) gets its
+          // count from now, instead of the old separate head-count query
+          // that didn't check deleted_at at all.
+          if (!a || a.deleted_at) return null;
           assetIds.push(a.id);
           return {
             id: a.id,
@@ -368,7 +379,7 @@ export default function DashboardPage() {
           };
         })
         .filter(Boolean) as AssetCardInfo[];
-      if (active) setAssetCards(cards);
+      if (active) { setAssetCards(cards); setTotalAssets(cards.length); }
 
       // ── "Actividad reciente": merges two real, already-tracked sources
       // (see the ActivityItem type comment for why nothing else is mixed

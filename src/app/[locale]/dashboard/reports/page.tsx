@@ -80,7 +80,7 @@ export default function ReportsPage() {
           .from("mechanics").select("name, photo_url, maintler_code").eq("id", session.user.id).maybeSingle(),
         supabase
           .from("mechanic_assets")
-          .select("assets(id, nickname, brand, model, asset_type, qr_codes(code))")
+          .select("assets(id, nickname, brand, model, asset_type, deleted_at, qr_codes(code))")
           .eq("mechanic_id", session.user.id),
         supabase
           .from("service_records")
@@ -101,7 +101,11 @@ export default function ReportsPage() {
       const list: ReportAsset[] = ((assetRows ?? []) as any[])
         .map((r) => {
           const a = Array.isArray(r.assets) ? r.assets[0] : r.assets;
-          if (!a) return null;
+          // 26 jul 2026: exclude admin-soft-deleted assets, so "Total de
+          // Reportes" (one row per asset here) matches the same "activos"
+          // count as the Panel and the Activos page — see the cross-page
+          // metrics audit this closes.
+          if (!a || a.deleted_at) return null;
           const qr = Array.isArray(a.qr_codes) ? a.qr_codes[0]?.code : a.qr_codes?.code;
           const stats = statsByAsset[a.id] ?? { count: 0, lastDate: null };
           return {

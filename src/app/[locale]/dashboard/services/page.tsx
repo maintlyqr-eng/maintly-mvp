@@ -370,13 +370,25 @@ export default function ServicesPage() {
   }
 
   async function loadAssets(uid: string) {
+    // 26 jul 2026: antes esto sólo traía `assets` con created_by = uid, así
+    // que un activo vinculado o compartido por otro Maintler (migration 029)
+    // no aparecía acá — ni en el tile "Activos" ni en el selector "por
+    // activo" — aunque sí se le pudieran registrar servicios. Ahora usa la
+    // misma fuente (mechanic_assets, todo el taller) y el mismo criterio de
+    // soft-delete que la página Activos, para que "Activos" signifique lo
+    // mismo en toda la app (ver auditoría de métricas cruzadas).
     const { data } = await supabase
-      .from("assets")
-      .select("id, nickname, brand, model, asset_type, customer_id")
-      .eq("created_by", uid)
-      .is("deleted_at", null)
-      .order("created_at", { ascending: false });
-    const opts = (data as AssetOption[]) ?? [];
+      .from("mechanic_assets")
+      .select("assets(id, nickname, brand, model, asset_type, customer_id, deleted_at)")
+      .eq("mechanic_id", uid)
+      .order("added_at", { ascending: false });
+    const opts = ((data ?? []) as any[])
+      .map((row) => {
+        const a = Array.isArray(row.assets) ? row.assets[0] : row.assets;
+        if (!a || a.deleted_at) return null;
+        return a as AssetOption;
+      })
+      .filter(Boolean) as AssetOption[];
     setAssetOptions(opts);
     if (opts.length > 0) setSvcAssetId(opts[0].id);
   }
