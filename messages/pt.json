@@ -823,7 +823,10 @@
     "unitHours": "Horas",
     "unitKm": "Km",
     "unitShortHours": "h",
-    "unitShortKm": "km"
+    "unitShortKm": "km",
+    "scheduleEmptyTitle": "Você ainda não agendou nenhuma manutenção",
+    "scheduleEmptyDesc": "Registre um serviço e defina quando vence o próximo para que apareça aqui.",
+    "scheduleMaintenanceButton": "Agendar manutenção"
   },
   "DashboardDocumentsPage": {
     "title": "Biblioteca de Documentos",

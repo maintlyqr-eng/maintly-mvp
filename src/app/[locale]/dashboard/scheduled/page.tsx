@@ -329,17 +329,39 @@ export default function ScheduledServicesPage() {
           <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm">
             {loading ? (
               <p className="text-[13px] text-zinc-400 text-center py-12">{t("loadingScheduled")}</p>
-            ) : filtered.length === 0 ? (
+            ) : filtered.length === 0 && statusFilter !== "all" ? (
+              // Zero results for a status filter (e.g. "Overdue" with none
+              // pending) — the account still has scheduled reminders
+              // elsewhere, so this stays a light message next to the
+              // "clear filter" button above rather than the full CTA below.
               <div className="text-center py-16">
                 <div className="inline-flex items-center justify-center w-12 h-12 rounded-full border border-zinc-100 bg-zinc-50 mb-3">
                   <Bell size={20} className="text-zinc-300" />
                 </div>
-                <p className="text-[13px] text-zinc-400 mb-1">{statusFilter !== "all" ? t("noScheduledFiltered") : t("noScheduled")}</p>
-                <p className="text-[12px] text-zinc-300">
-                  {t("setReminderHintPrefix")}{" "}
-                  <Link href="/dashboard/services" className="font-bold text-red-500 hover:text-red-600">{t("myServicesLinkLabel")}</Link>
-                  {t("setReminderHintSuffix")}
-                </p>
+                <p className="text-[13px] text-zinc-400">{t("noScheduledFiltered")}</p>
+              </div>
+            ) : filtered.length === 0 ? (
+              // 26 jul 2026: genuinely zero scheduled reminders account-wide
+              // — this used to be a plain sentence + inline text link, which
+              // the UX audit flagged as a weak dead end. Now a real CTA
+              // (same visual pattern as the Activos page's own empty state),
+              // deep-linking into Mis Servicios with ?scheduleReminder=1 so
+              // the Add Service modal opens immediately — logging a service
+              // and setting its "next due" is the actual first step, since
+              // a reminder always hangs off a logged service_record; there's
+              // no such thing as a bare freestanding reminder.
+              <div className="text-center py-16 px-6">
+                <div className="inline-flex items-center justify-center w-14 h-14 rounded-full border border-red-100 bg-red-50 mb-4">
+                  <Bell size={24} className="text-red-600" />
+                </div>
+                <h2 className="text-[16px] font-black text-zinc-900 mb-1">{t("scheduleEmptyTitle")}</h2>
+                <p className="text-[13px] text-zinc-500 mb-5 max-w-sm mx-auto">{t("scheduleEmptyDesc")}</p>
+                <Link
+                  href="/dashboard/services?scheduleReminder=1"
+                  className="inline-flex items-center gap-2 bg-red-600 hover:bg-red-500 transition-all text-white text-[13px] font-bold px-5 py-[11px] rounded-xl"
+                >
+                  <Calendar size={15} /> {t("scheduleMaintenanceButton")}
+                </Link>
               </div>
             ) : (
               <div className="divide-y divide-zinc-100">

@@ -3,7 +3,8 @@
 import Image from "next/image";
 // Assets isn't migrated yet — keep this one plain next/link.
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 // Login is migrated and every router.push()/replace() call on this page
 // targets it — safe to use next-intl's locale-aware router.
 import { useRouter } from "@/i18n/navigation";
@@ -146,7 +147,13 @@ function getAsset(row: ServiceRow): AssetInfo | null {
   return Array.isArray(row.assets) ? row.assets[0] ?? null : row.assets;
 }
 
-export default function ServicesPage() {
+function ServicesPageInner() {
+  // ?scheduleReminder=1 — deep link from the Servicios Programados empty
+  // state (26 jul 2026, UX audit fix): opens the Add Service modal
+  // immediately, since a reminder always hangs off a logged service_record
+  // (there's no bare freestanding reminder), so logging a service is the
+  // real first step of "scheduling maintenance."
+  const searchParams = useSearchParams();
   const t = useTranslations("DashboardServicesPage");
   const tServiceTypes = useTranslations("ServiceTypes");
   const locale = useLocale();
@@ -457,6 +464,13 @@ export default function ServicesPage() {
     resetForm();
     setShowForm(true);
   }
+
+  useEffect(() => {
+    if (!checkingAuth && searchParams.get("scheduleReminder") === "1") {
+      handleOpenAddService();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [checkingAuth]);
 
   async function fetchMinKmHours(assetId: string) {
     if (!assetId) { setMinKmHours(null); return; }
@@ -1452,5 +1466,21 @@ export default function ServicesPage() {
       })()}
 
     </div>
+  );
+}
+
+// useSearchParams() (for the ?scheduleReminder=1 deep link from Servicios
+// Programados) opts the page out of static rendering unless wrapped in a
+// Suspense boundary — same pattern already used by team-chat/page.tsx and
+// login/page.tsx for their own query-param reads.
+export default function ServicesPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center bg-zinc-50">
+        <div className="w-8 h-8 border-4 border-red-600 border-t-transparent rounded-full animate-spin" />
+      </div>
+    }>
+      <ServicesPageInner />
+    </Suspense>
   );
 }

@@ -823,7 +823,10 @@
     "unitHours": "Hours",
     "unitKm": "Km",
     "unitShortHours": "hrs",
-    "unitShortKm": "km"
+    "unitShortKm": "km",
+    "scheduleEmptyTitle": "You haven't scheduled any maintenance yet",
+    "scheduleEmptyDesc": "Log a service and set when the next one's due — it'll show up here.",
+    "scheduleMaintenanceButton": "Schedule maintenance"
   },
   "DashboardDocumentsPage": {
     "title": "Document Library",
