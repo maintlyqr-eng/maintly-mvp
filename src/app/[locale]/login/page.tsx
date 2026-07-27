@@ -26,14 +26,18 @@ import { supabase } from "@/lib/supabase";
 // encima con seguridad. Se guardan las otras 3 (light desktop/mobile y el
 // alterno oscuro con vehículos) en public/images para una futura pantalla
 // con más espacio dedicado (o un toggle claro/oscuro) — no se usan acá.
-//   1. Mobile ahora usa login-hero-mobile-dark.png (recorte vertical
-//      hecho a medida, ya no hay que adivinar un object-position sobre una
-//      imagen horizontal como antes con login-side.png).
-//   2. Desktop pasa de "imagen con panel dibujado + form encastrado en un
-//      contenedor con aspect-ratio fijo" a un fondo full-bleed
-//      (object-cover) con el form centrado de forma simple — más robusto
-//      ante distintos anchos de ventana, y ya no depende de que el dibujo
-//      tenga un panel vacío en un lugar exacto.
+//   1. Mobile usa login-hero-mobile-dark.png (recorte vertical hecho a
+//      medida), en una franja fija de 125px arriba + tarjeta del form
+//      compacta debajo, todo dentro de una sola pantalla (h-dvh +
+//      overflow-hidden, sin scroll — pedido explícito de Facu).
+//   2. Desktop usa login-hero-desktop-dark.png de fondo, full-bleed
+//      (absolute inset-0) con object-CONTAIN (no cover) — así el
+//      engranaje/mapa nunca queda cortado, sea cual sea el ancho/alto de
+//      la ventana — y el form flota centrado encima, simple. (Se probó un
+//      panel contenido con la tarjeta "enganchada" arriba/abajo, pero no
+//      entraba en una ventana de laptop común sin forzar scroll y el
+//      "enganche" no se leía bien visualmente — se volvió a este approach
+//      más simple.)
 //   3. La tarjeta del form pasa de blanca a un panel carbón claro
 //      (shadow-industrial-dark, el token pensado justamente para esto),
 //      con inputs/textos adaptados a fondo oscuro. El botón de Google
@@ -161,52 +165,48 @@ function LoginForm() {
   }
 
   return (
-    <main className="relative h-dvh md:h-auto md:min-h-dvh bg-carbon overflow-hidden md:overflow-x-hidden md:overflow-y-visible flex flex-col md:items-center md:justify-center px-0 md:px-6 py-0 md:py-10">
+    <main className="relative h-dvh md:h-auto md:min-h-dvh bg-carbon overflow-hidden md:overflow-x-hidden md:overflow-y-visible flex flex-col md:block">
 
-      {/* Facu (27 jul 2026, 2da vuelta): en desktop la imagen ocupaba TODA
-          la pantalla de punta a punta (absolute inset-0) con el form
-          flotando centrado y chiquito encima — en monitores anchos quedaba
-          un montón de espacio vacío a los costados, y encima el engranaje
-          quedaba cortado arriba (el recorte centrado de object-cover caía
-          sobre la zona vacía de la imagen, no sobre el logo). Ahora la
-          imagen vive en un panel contenido (no de punta a punta, esquinas
-          redondeadas + sombra), del mismo ancho que el form, y la tarjeta
-          se "engancha" superpuesta en el borde inferior — mismo espíritu
-          que mobile (franja arriba + tarjeta abajo) pero a escala de
-          escritorio, para que se sienta diseñado y no un modal genérico
-          flotando sobre un fondo de pantalla. Mobile no se tocó. ── */}
-      <div className="w-full md:max-w-[1040px] flex flex-col flex-1 md:flex-none min-h-0">
+      {/* ── HERO MOBILE (< md) — esto quedó bien, no se tocó: recorte
+          vertical hecho a medida (login-hero-mobile-dark.png). ── */}
+      <div className="md:hidden relative h-[125px] shrink-0 overflow-hidden bg-carbon">
+        <Image
+          src="/images/login-hero-mobile-dark.png"
+          alt="MaintlyQR"
+          fill
+          priority
+          sizes="100vw"
+          style={{ objectFit: "cover", objectPosition: "50% 8%" }}
+        />
+        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-carbon" />
+      </div>
 
-        {/* ── HERO: mobile usa la franja angosta de 125px (recorte vertical
-            hecho a medida); desktop usa un panel contenido de 380px con
-            esquinas redondeadas y sombra, no full-bleed. ── */}
-        <div className="relative shrink-0 overflow-hidden bg-carbon h-[125px] md:h-[380px] md:rounded-[32px] md:shadow-industrial-dark">
-          <Image
-            src="/images/login-hero-mobile-dark.png"
-            alt="MaintlyQR"
-            fill
-            priority
-            sizes="100vw"
-            className="md:hidden"
-            style={{ objectFit: "cover", objectPosition: "50% 8%" }}
-          />
-          <Image
-            src="/images/login-hero-desktop-dark.png"
-            alt="MaintlyQR"
-            fill
-            priority
-            sizes="(max-width: 768px) 0px, 1040px"
-            className="hidden md:block"
-            style={{ objectFit: "cover", objectPosition: "50% 22%" }}
-          />
-          <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-carbon md:bg-gradient-to-t md:from-carbon-light/90 md:via-transparent md:to-transparent" />
-        </div>
+      {/* ── IMAGEN DE FONDO (desktop). Facu (27 jul 2026, 3ra vuelta): el
+          panel contenido con la tarjeta "enganchada" (intento anterior) no
+          funcionó — el enganche no se notaba (se veía como un hueco entre
+          la imagen y la tarjeta) y la suma panel+tarjeta no entraba en una
+          ventana de laptop común, forzaba scroll. Vuelta a un fondo
+          full-bleed simple, pero con object-CONTAIN en vez de object-cover:
+          así la imagen entera (incluido el engranaje) se ve siempre
+          completa, sin que ningún recorte la corte por arriba, sea cual
+          sea el ancho/alto de la ventana. Si la ventana no calza exacto con
+          el aspect-ratio de la imagen, sobra un margen parejo a los
+          costados o arriba/abajo — pero al ser del mismo color carbón que
+          el fondo de la página, no se nota como "espacio vacío", se funde
+          con la página. ── */}
+      <div className="hidden md:block absolute inset-0 z-0 bg-carbon">
+        <Image
+          src="/images/login-hero-desktop-dark.png"
+          alt="MaintlyQR"
+          fill
+          priority
+          sizes="100vw"
+          className="object-contain object-center"
+        />
+      </div>
 
-        {/* ── FORMULARIO: en mobile centra en el espacio que queda debajo de
-            la franja; en desktop se superpone (margen negativo) sobre el
-            borde inferior del panel de arriba, como una tarjeta
-            "enganchada". ── */}
-        <div className="relative z-10 flex-1 min-h-0 md:flex-none flex items-center justify-center px-5 py-2 md:px-6 md:py-0 md:-mt-20 overflow-hidden md:overflow-visible">
+      {/* ── FORMULARIO ── */}
+      <div className="relative z-10 flex-1 min-h-0 md:min-h-dvh flex items-center justify-center px-5 py-2 md:px-6 md:py-10 overflow-hidden md:overflow-visible">
         <motion.div
           initial={{ opacity: 0, y: 22 }}
           animate={{ opacity: 1, y: 0 }}
@@ -345,8 +345,7 @@ function LoginForm() {
           <p className="text-center text-[12px] text-zinc-500 mt-1.5 md:mt-3">
             <Link href="/" className="hover:text-zinc-300 underline">{t("continueBrowsing")}</Link>
           </p>
-          </motion.div>
-        </div>
+        </motion.div>
       </div>
     </main>
   );
