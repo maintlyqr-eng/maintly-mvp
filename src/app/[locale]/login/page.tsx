@@ -6,42 +6,34 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Link } from "@/i18n/navigation";
 import { useTranslations } from "next-intl";
 import { motion, AnimatePresence } from "framer-motion";
-import { Mail, Lock, Eye, EyeOff, User, AlertCircle } from "lucide-react";
+import { Mail, Lock, Eye, EyeOff, AlertCircle, ShieldCheck, Clock, BarChart3, QrCode } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 
 // 28 jul 2026 — primera pantalla rediseñada con el nuevo sistema visual
 // "industrial" (ver el comment de globals.css).
-// 27 jul 2026 (segunda pasada) — Facu subió 5 imágenes nuevas hechas con
-// ChatGPT para esta pantalla (desktop + mobile, versión clara y oscura de
-// cada una). Las de escritorio "claras/con vehículos" (login-hero-desktop-
-// light.png y la variante oscura con vehículos, -dark-alt.png) tienen la
-// moto y la camioneta pegadas contra la esquina inferior derecha — justo
-// donde el form vivía fijo (38% de ancho, pegado a la derecha) — así que
-// meterlas tal cual hacía que el form quedara tapando la moto. La quinta
-// imagen (login-hero-desktop-dark.png) es una versión oscura "limpia", sin
-// vehículos, con un espacio abierto enorme en el centro — esa sí permite
-// centrar el form sin riesgo de choque en ningún ancho de pantalla. Por eso
-// esta pasada además pasa toda la pantalla a tema oscuro (carbón), no solo
-// por estética: es la única imagen del lote que el form puede flotar
-// encima con seguridad. Se guardan las otras 3 (light desktop/mobile y el
-// alterno oscuro con vehículos) en public/images para una futura pantalla
-// con más espacio dedicado (o un toggle claro/oscuro) — no se usan acá.
-//   1. Mobile usa login-hero-mobile-dark.png (recorte vertical hecho a
-//      medida), en una franja fija de 125px arriba + tarjeta del form
-//      compacta debajo, todo dentro de una sola pantalla (h-dvh +
-//      overflow-hidden, sin scroll — pedido explícito de Facu).
-//   2. Desktop usa login-hero-desktop-dark.png de fondo, full-bleed
-//      (absolute inset-0) con object-CONTAIN (no cover) — así el
-//      engranaje/mapa nunca queda cortado, sea cual sea el ancho/alto de
-//      la ventana — y el form flota centrado encima, simple. (Se probó un
-//      panel contenido con la tarjeta "enganchada" arriba/abajo, pero no
-//      entraba en una ventana de laptop común sin forzar scroll y el
-//      "enganche" no se leía bien visualmente — se volvió a este approach
-//      más simple.)
-//   3. La tarjeta del form pasa de blanca a un panel carbón claro
-//      (shadow-industrial-dark, el token pensado justamente para esto),
-//      con inputs/textos adaptados a fondo oscuro. El botón de Google
-//      se mantiene blanco a propósito (así se ve en cualquier fondo).
+// 27 jul 2026 (4ta vuelta) — Facu mandó un mockup de referencia (hecho con
+// ChatGPT) de cómo quería que quedara esto, y es un enfoque bastante
+// distinto a las 3 vueltas anteriores:
+//   - El logo completo (engranaje+QR + wordmark "MAINTLYQR" + el tagline
+//     "MAINTENANCE · TRACKED") vive DENTRO de la tarjeta, arriba del
+//     título — usando el archivo real /images/maintly-logo-full.png (el
+//     mismo logo que ya se usa en otros lados de la app), no un ícono
+//     genérico ni un dibujo de fondo.
+//   - El fondo deja de depender de una imagen "hero" con vehículos/mapa —
+//     ahora es 100% CSS (una grilla de puntos sutil + un par de
+//     resplandores rojos difuminados). Esto elimina de raíz el problema de
+//     las últimas 3 vueltas (recortes del engranaje, paneles vacíos que
+//     alinear, scroll que no entraba) porque ya no hay ninguna imagen que
+//     alinear con nada — el fondo se ve igual de bien en cualquier tamaño
+//     de pantalla, siempre.
+//   - La tarjeta suma un borde rojo visible (además del glow de
+//     shadow-industrial-dark), como en la referencia.
+//   - Se agrega una barra de 4 "features" (Seguro/Confiable/Inteligente/
+//     Simple) debajo de la tarjeta — solo en desktop (oculta en mobile a
+//     propósito, para no comerse el alto en una pantalla chica; ese
+//     contenido no es crítico para poder loguearse).
+// Las imágenes login-hero-*.png (de las vueltas 1 y 2) quedan guardadas en
+// public/images sin usarse por ahora, por si sirven para otra pantalla.
 // Ningún cambio de lógica (auth, sanitizeRedirect, handlers) — solo la
 // capa visual.
 
@@ -74,6 +66,29 @@ function sanitizeRedirect(value: string | null): string {
     return "/dashboard";
   }
   return value;
+}
+
+// Un ítem de la barra de features de abajo (icono + título + descripción
+// corta). Extraído como componente propio solo para no repetir el mismo
+// bloque de JSX 4 veces.
+function FeatureItem({
+  icon: Icon,
+  title,
+  desc,
+}: {
+  icon: typeof ShieldCheck;
+  title: string;
+  desc: string;
+}) {
+  return (
+    <div className="flex items-center gap-2.5 min-w-0">
+      <Icon size={18} className="text-red-500 shrink-0" />
+      <div className="min-w-0">
+        <div className="text-[12px] font-bold text-white leading-tight">{title}</div>
+        <div className="text-[10.5px] text-zinc-500 leading-tight truncate">{desc}</div>
+      </div>
+    </div>
+  );
 }
 
 function LoginForm() {
@@ -165,72 +180,48 @@ function LoginForm() {
   }
 
   return (
-    <main className="relative h-dvh md:h-auto md:min-h-dvh bg-carbon overflow-hidden md:overflow-x-hidden md:overflow-y-visible flex flex-col md:block">
+    <main className="relative min-h-dvh bg-carbon overflow-x-hidden flex items-center justify-center px-5 py-8 md:px-6 md:py-10">
 
-      {/* ── HERO MOBILE (< md) — esto quedó bien, no se tocó: recorte
-          vertical hecho a medida (login-hero-mobile-dark.png). ── */}
-      <div className="md:hidden relative h-[125px] shrink-0 overflow-hidden bg-carbon">
-        <Image
-          src="/images/login-hero-mobile-dark.png"
-          alt="MaintlyQR"
-          fill
-          priority
-          sizes="100vw"
-          style={{ objectFit: "cover", objectPosition: "50% 8%" }}
+      {/* ── FONDO ATMOSFÉRICO (100% CSS, sin imágenes) — grilla de puntos
+          sutil + resplandores rojos difuminados. Ver comment de arriba:
+          esto reemplaza la imagen "hero" de las vueltas anteriores. ── */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div
+          className="absolute inset-0 opacity-[0.35]"
+          style={{
+            backgroundImage: "radial-gradient(rgba(255,255,255,0.35) 1px, transparent 1px)",
+            backgroundSize: "26px 26px",
+          }}
         />
-        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-carbon" />
+        <div className="absolute -top-24 -left-24 w-[520px] h-[520px] bg-red-600/20 rounded-full blur-[130px]" />
+        <div className="absolute -bottom-32 -right-16 w-[560px] h-[560px] bg-red-600/15 rounded-full blur-[140px]" />
+        <div className="absolute top-1/3 right-1/4 w-[300px] h-[300px] bg-red-600/10 rounded-full blur-[100px]" />
       </div>
 
-      {/* ── IMAGEN DE FONDO (desktop). Facu (27 jul 2026, 3ra vuelta): el
-          panel contenido con la tarjeta "enganchada" (intento anterior) no
-          funcionó — el enganche no se notaba (se veía como un hueco entre
-          la imagen y la tarjeta) y la suma panel+tarjeta no entraba en una
-          ventana de laptop común, forzaba scroll. Vuelta a un fondo
-          full-bleed simple, pero con object-CONTAIN en vez de object-cover:
-          así la imagen entera (incluido el engranaje) se ve siempre
-          completa, sin que ningún recorte la corte por arriba, sea cual
-          sea el ancho/alto de la ventana. Si la ventana no calza exacto con
-          el aspect-ratio de la imagen, sobra un margen parejo a los
-          costados o arriba/abajo — pero al ser del mismo color carbón que
-          el fondo de la página, no se nota como "espacio vacío", se funde
-          con la página. ── */}
-      <div className="hidden md:block absolute inset-0 z-0 bg-carbon">
-        <Image
-          src="/images/login-hero-desktop-dark.png"
-          alt="MaintlyQR"
-          fill
-          priority
-          sizes="100vw"
-          className="object-contain object-center"
-        />
-      </div>
-
-      {/* ── FORMULARIO ── */}
-      <div className="relative z-10 flex-1 min-h-0 md:min-h-dvh flex items-center justify-center px-5 py-2 md:px-6 md:py-10 overflow-hidden md:overflow-visible">
+      {/* ── CONTENIDO ── */}
+      <div className="relative z-10 w-full max-w-[440px] flex flex-col items-center">
         <motion.div
           initial={{ opacity: 0, y: 22 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.55, ease: "easeOut" }}
-          className="w-full max-w-[420px] relative bg-carbon-light rounded-[28px] shadow-industrial-dark px-5 py-4 md:px-8 md:py-9 overflow-hidden"
+          className="w-full relative bg-carbon-light rounded-[28px] border border-red-500/40 shadow-industrial-dark px-6 py-7 md:px-8 md:py-9 overflow-hidden"
         >
-          {/* Línea de acento — el único "brillo metálico" de la tarjeta */}
-          <div className="absolute top-0 inset-x-0 h-[3px] bg-gradient-to-r from-transparent via-maintly-red to-transparent" />
-
-          <div className="text-center mb-3 md:mb-7">
-            <motion.div
-              className="hidden md:inline-flex items-center justify-center w-14 h-14 rounded-full border border-red-500/30 bg-red-500/10 mb-4"
-              animate={{ boxShadow: ["0 0 0 0 rgba(220,38,38,0.25)", "0 0 0 8px rgba(220,38,38,0)", "0 0 0 0 rgba(220,38,38,0)"] }}
-              transition={{ duration: 2.6, repeat: Infinity, ease: "easeOut" }}
-            >
-              <User size={24} className="text-red-400" />
-            </motion.div>
-            <h2 className="text-[19px] md:text-[26px] font-black text-white">{t("welcomeBack")}</h2>
-            <p className="hidden md:block text-[13px] text-zinc-400 mt-1">{t("subtitle")}</p>
+          <div className="text-center mb-5 md:mb-7">
+            <Image
+              src="/images/maintly-logo-full.png"
+              alt="MaintlyQR"
+              width={220}
+              height={65}
+              priority
+              className="h-9 md:h-10 w-auto mx-auto mb-4"
+            />
+            <h2 className="text-[21px] md:text-[26px] font-black text-white">{t("welcomeBack")}</h2>
+            <p className="text-[13px] text-zinc-400 mt-1">{t("subtitle")}</p>
           </div>
 
           <form onSubmit={handleLogin}>
           {/* Email */}
-          <div className="mb-2.5 md:mb-4">
+          <div className="mb-4">
             <label className="text-[12px] font-bold text-zinc-300">{t("emailLabel")}</label>
             <div className="relative mt-1">
               <Mail size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
@@ -240,13 +231,13 @@ function LoginForm() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder={t("emailPlaceholder")}
-                className="w-full rounded-xl border border-zinc-700 bg-carbon text-white placeholder:text-zinc-500 pl-10 pr-3 py-[9px] md:py-[12px] text-[14px] outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500/20 transition-all"
+                className="w-full rounded-xl border border-zinc-700 bg-carbon text-white placeholder:text-zinc-500 pl-10 pr-3 py-[12px] text-[14px] outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500/20 transition-all"
               />
             </div>
           </div>
 
           {/* Password */}
-          <div className="mb-2 md:mb-3">
+          <div className="mb-3">
             <label className="text-[12px] font-bold text-zinc-300">{t("passwordLabel")}</label>
             <div className="relative mt-1">
               <Lock size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
@@ -256,7 +247,7 @@ function LoginForm() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder={t("passwordPlaceholder")}
-                className="w-full rounded-xl border border-zinc-700 bg-carbon text-white placeholder:text-zinc-500 pl-10 pr-10 py-[9px] md:py-[12px] text-[14px] outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500/20 transition-all"
+                className="w-full rounded-xl border border-zinc-700 bg-carbon text-white placeholder:text-zinc-500 pl-10 pr-10 py-[12px] text-[14px] outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500/20 transition-all"
               />
               <button
                 type="button"
@@ -269,7 +260,7 @@ function LoginForm() {
           </div>
 
           {/* Remember + forgot */}
-          <div className="flex items-center justify-between mb-2.5 md:mb-5">
+          <div className="flex items-center justify-between mb-5">
             <label className="flex items-center gap-2 text-[12px] text-zinc-400 cursor-pointer">
               <input type="checkbox" className="rounded border-zinc-600 bg-carbon text-red-600 focus:ring-red-500" />
               {t("rememberMe")}
@@ -299,14 +290,14 @@ function LoginForm() {
             whileTap={{ scale: loading ? 1 : 0.98 }}
             type="submit"
             disabled={loading}
-            className="w-full bg-red-600 hover:bg-red-500 disabled:opacity-60 disabled:cursor-not-allowed transition-colors text-white font-bold py-[10px] md:py-[13px] rounded-xl text-[14px] tracking-wide uppercase shadow-industrial-dark"
+            className="w-full bg-red-600 hover:bg-red-500 disabled:opacity-60 disabled:cursor-not-allowed transition-colors text-white font-bold py-[13px] rounded-xl text-[14px] tracking-wide uppercase shadow-industrial-dark"
           >
             {loading ? t("loggingIn") : t("loginButton")}
           </motion.button>
           </form>
 
           {/* Divider */}
-          <div className="flex items-center gap-3 my-2.5 md:my-5">
+          <div className="flex items-center gap-3 my-5">
             <div className="flex-1 h-[1px] bg-zinc-700" />
             <span className="text-[11px] text-zinc-500">{t("orDivider")}</span>
             <div className="flex-1 h-[1px] bg-zinc-700" />
@@ -320,7 +311,7 @@ function LoginForm() {
             type="button"
             onClick={handleGoogleSignIn}
             disabled={googleLoading}
-            className="w-full flex items-center justify-center gap-3 border border-zinc-300 bg-white hover:bg-zinc-50 hover:border-zinc-400 hover:shadow-sm disabled:opacity-60 disabled:cursor-not-allowed transition-colors duration-150 py-[9px] md:py-[12px] rounded-xl text-[13px] font-semibold text-zinc-700"
+            className="w-full flex items-center justify-center gap-3 border border-zinc-300 bg-white hover:bg-zinc-50 hover:border-zinc-400 hover:shadow-sm disabled:opacity-60 disabled:cursor-not-allowed transition-colors duration-150 py-[12px] rounded-xl text-[13px] font-semibold text-zinc-700"
           >
             {googleLoading ? (
               <div className="w-[18px] h-[18px] border-2 border-zinc-300 border-t-zinc-600 rounded-full animate-spin" />
@@ -336,15 +327,30 @@ function LoginForm() {
           </motion.button>
 
           {/* Create account */}
-          <p className="text-center text-[13px] text-zinc-400 mt-3 md:mt-6">
+          <p className="text-center text-[13px] text-zinc-400 mt-6">
             {t("newToMaintly")}{" "}
             <Link href="/register" className="text-red-400 hover:text-red-300 font-bold">{t("createAccountLink")}</Link>
           </p>
 
           {/* Browse without account */}
-          <p className="text-center text-[12px] text-zinc-500 mt-1.5 md:mt-3">
+          <p className="text-center text-[12px] text-zinc-500 mt-3">
             <Link href="/" className="hover:text-zinc-300 underline">{t("continueBrowsing")}</Link>
           </p>
+        </motion.div>
+
+        {/* ── Barra de features — solo desktop. En mobile la sacamos a
+            propósito para no comerse el alto de una pantalla chica: no es
+            contenido crítico para poder loguearse. ── */}
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.55, delay: 0.15, ease: "easeOut" }}
+          className="hidden md:grid grid-cols-4 gap-4 w-full mt-5 bg-carbon-light/60 border border-zinc-800 rounded-2xl px-6 py-4"
+        >
+          <FeatureItem icon={ShieldCheck} title={t("featureSecureTitle")} desc={t("featureSecureDesc")} />
+          <FeatureItem icon={Clock} title={t("featureReliableTitle")} desc={t("featureReliableDesc")} />
+          <FeatureItem icon={BarChart3} title={t("featureSmartTitle")} desc={t("featureSmartDesc")} />
+          <FeatureItem icon={QrCode} title={t("featureSimpleTitle")} desc={t("featureSimpleDesc")} />
         </motion.div>
       </div>
     </main>

@@ -284,7 +284,15 @@
     "newToMaintly": "New to MaintlyQR?",
     "createAccountLink": "Create an account",
     "continueBrowsing": "Continue browsing without an account",
-    "deletedError": "This account has been deleted. Contact support if you think this is a mistake."
+    "deletedError": "This account has been deleted. Contact support if you think this is a mistake.",
+    "featureSecureTitle": "Secure",
+    "featureSecureDesc": "Your data is protected",
+    "featureReliableTitle": "Reliable",
+    "featureReliableDesc": "99.9% uptime",
+    "featureSmartTitle": "Smart",
+    "featureSmartDesc": "Data-driven decisions",
+    "featureSimpleTitle": "Simple",
+    "featureSimpleDesc": "All your maintenance, in one QR"
   },
   "RegisterPage": {
     "checkEmailTitle": "Check your email",

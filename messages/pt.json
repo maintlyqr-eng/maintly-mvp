@@ -284,7 +284,15 @@
     "newToMaintly": "Novo na MaintlyQR?",
     "createAccountLink": "Criar uma conta",
     "continueBrowsing": "Continuar navegando sem uma conta",
-    "deletedError": "Esta conta foi excluída. Entre em contato com o suporte se achar que isso é um engano."
+    "deletedError": "Esta conta foi excluída. Entre em contato com o suporte se achar que isso é um engano.",
+    "featureSecureTitle": "Seguro",
+    "featureSecureDesc": "Seus dados estão protegidos",
+    "featureReliableTitle": "Confiável",
+    "featureReliableDesc": "99,9% de disponibilidade",
+    "featureSmartTitle": "Inteligente",
+    "featureSmartDesc": "Decisões baseadas em dados",
+    "featureSimpleTitle": "Simples",
+    "featureSimpleDesc": "Toda sua manutenção, em um QR"
   },
   "RegisterPage": {
     "checkEmailTitle": "Verifique seu email",
