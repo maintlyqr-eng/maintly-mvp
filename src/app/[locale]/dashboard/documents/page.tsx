@@ -344,19 +344,32 @@ export default function DocumentsPage() {
           <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm">
             {loading ? (
               <p className="text-[13px] text-zinc-400 text-center py-12">{t("loadingDocuments")}</p>
+            ) : filtered.length === 0 && documents.length === 0 ? (
+              // 26 jul 2026: genuinely zero documents uploaded — was a plain
+              // sentence + text-only link (the UX audit's "make it a real
+              // button" item). openUploadModal() was already wired to this
+              // link, so only the visual treatment changes here, matching
+              // the same icon/title/description/button pattern used on the
+              // Activos and Servicios Programados empty states.
+              <div className="text-center py-16 px-6">
+                <div className="inline-flex items-center justify-center w-14 h-14 rounded-full border border-red-100 bg-red-50 mb-4">
+                  <FolderOpen size={24} className="text-red-500" />
+                </div>
+                <h2 className="text-[16px] font-black text-zinc-900 mb-1">{t("noDocumentsYet")}</h2>
+                <p className="text-[13px] text-zinc-500 mb-5 max-w-sm mx-auto">{t("documentsEmptyDesc")}</p>
+                <button
+                  onClick={openUploadModal}
+                  className="inline-flex items-center gap-2 bg-red-600 hover:bg-red-500 transition-all text-white text-[13px] font-bold px-5 py-[11px] rounded-xl"
+                >
+                  <Plus size={15} /> {t("uploadFirstDocument")}
+                </button>
+              </div>
             ) : filtered.length === 0 ? (
               <div className="text-center py-16">
                 <div className="inline-flex items-center justify-center w-12 h-12 rounded-full border border-red-100 bg-red-50 mb-3">
                   <FolderOpen size={20} className="text-red-500" />
                 </div>
-                <p className="text-[13px] text-zinc-400 mb-3">
-                  {documents.length === 0 ? t("noDocumentsYet") : t("noDocumentsMatch")}
-                </p>
-                {documents.length === 0 && (
-                  <button onClick={openUploadModal} className="text-[12px] font-bold text-red-600 hover:text-red-700">
-                    {t("uploadFirstDocument")}
-                  </button>
-                )}
+                <p className="text-[13px] text-zinc-400">{t("noDocumentsMatch")}</p>
               </div>
             ) : (
               <div className="overflow-x-auto overscroll-x-contain">

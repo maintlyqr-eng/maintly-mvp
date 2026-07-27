@@ -841,7 +841,7 @@
     "loadingDocuments": "Loading documents...",
     "noDocumentsYet": "No documents yet.",
     "noDocumentsMatch": "No documents match this search/filter.",
-    "uploadFirstDocument": "Upload your first document →",
+    "uploadFirstDocument": "Upload your first document",
     "columnFile": "File",
     "columnLinkedTo": "Linked to",
     "columnSize": "Size",
@@ -876,7 +876,8 @@
     "notesPlaceholder": "e.g. Invoice #4021, or warranty until 2027",
     "cancel": "Cancel",
     "uploading": "Uploading...",
-    "upload": "Upload"
+    "upload": "Upload",
+    "documentsEmptyDesc": "Upload invoices, certificates, or manuals and link them to an asset or customer."
   },
   "DashboardCustomersPage": {
     "title": "Customers",

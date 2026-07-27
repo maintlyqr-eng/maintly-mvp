@@ -841,7 +841,7 @@
     "loadingDocuments": "Cargando documentos...",
     "noDocumentsYet": "Todavía no hay documentos.",
     "noDocumentsMatch": "Ningún documento coincide con esta búsqueda/filtro.",
-    "uploadFirstDocument": "Subí tu primer documento →",
+    "uploadFirstDocument": "Subí tu primer documento",
     "columnFile": "Archivo",
     "columnLinkedTo": "Vinculado a",
     "columnSize": "Tamaño",
@@ -876,7 +876,8 @@
     "notesPlaceholder": "ej. Factura #4021, o garantía hasta 2027",
     "cancel": "Cancelar",
     "uploading": "Subiendo...",
-    "upload": "Subir"
+    "upload": "Subir",
+    "documentsEmptyDesc": "Subí facturas, certificados o manuales y quedan vinculados a un activo o cliente."
   },
   "DashboardCustomersPage": {
     "title": "Clientes",

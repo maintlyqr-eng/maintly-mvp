@@ -841,7 +841,7 @@
     "loadingDocuments": "Carregando documentos...",
     "noDocumentsYet": "Ainda não há documentos.",
     "noDocumentsMatch": "Nenhum documento corresponde a esta busca/filtro.",
-    "uploadFirstDocument": "Envie seu primeiro documento →",
+    "uploadFirstDocument": "Envie seu primeiro documento",
     "columnFile": "Arquivo",
     "columnLinkedTo": "Vinculado a",
     "columnSize": "Tamanho",
@@ -876,7 +876,8 @@
     "notesPlaceholder": "ex. Fatura #4021, ou garantia até 2027",
     "cancel": "Cancelar",
     "uploading": "Enviando...",
-    "upload": "Enviar"
+    "upload": "Enviar",
+    "documentsEmptyDesc": "Envie notas fiscais, certificados ou manuais e vincule-os a um ativo ou cliente."
   },
   "DashboardCustomersPage": {
     "title": "Clientes",
