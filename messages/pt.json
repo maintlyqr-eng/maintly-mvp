@@ -1154,7 +1154,7 @@
     "filterStatusCompleted": "Concluído",
     "filterStatusScheduled": "Agendado",
     "filterStatusOverdue": "Atrasado",
-    "searchPlaceholder": "Buscar por ativo, QR, placa, modelo, notas...",
+    "searchPlaceholder": "Buscar ativo, QR, placa...",
     "qrLabel": "QR {code}",
     "tileAssets": "Ativos",
     "tileServices": "Serviços",

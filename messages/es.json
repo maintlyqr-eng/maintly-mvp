@@ -19,7 +19,7 @@
     "heroTitleLine2Prefix": "Tiene una ",
     "heroTitleHighlight": "Historia.",
     "heroSubtitleHighlight": "Un QR.",
-    "heroSubtitleRest": "Historial de Mantenimiento de por Vida.",
+    "heroSubtitleRest": "Historial de Mantenimiento de por vida.",
     "heroDescription": "Escanea cualquier código QR y accede al instante al historial completo de mantenimiento de cualquier máquina, en cualquier parte del mundo.",
     "scanCardTitle": "Escanear QR",
     "scanCardDescriptionLine1": "Usa tu cámara para",
@@ -193,7 +193,7 @@
     "verifiedRecordsLabel": "Registros Verificados",
     "sealVerified": "Verificado",
     "footerTagline1": "Confiado por profesionales de todo el mundo.",
-    "footerTagline2": "Un QR. Historial de Mantenimiento de por Vida."
+    "footerTagline2": "Un QR. Historial de Mantenimiento de por vida."
   },
   "MaintlerPage": {
     "loading": "Cargando perfil de Maintler...",
@@ -1154,7 +1154,7 @@
     "filterStatusCompleted": "Completado",
     "filterStatusScheduled": "Programado",
     "filterStatusOverdue": "Vencido",
-    "searchPlaceholder": "Buscar por activo, QR, matrícula, modelo, notas...",
+    "searchPlaceholder": "Buscar activo, QR, matrícula...",
     "qrLabel": "QR {code}",
     "tileAssets": "Activos",
     "tileServices": "Servicios",

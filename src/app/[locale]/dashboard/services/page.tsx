@@ -827,7 +827,13 @@ function ServicesPageInner() {
             <div className="flex items-center gap-2.5 flex-wrap flex-1 min-w-0">
               {/* Facu (17 jul 2026): "es probablemente lo primero que haría
                   un usuario con 300 servicios" — searches asset name, QR
-                  code, plate/matrícula, model and notes all at once. */}
+                  code, plate/matrícula, model and notes all at once.
+                  26 jul 2026: the old placeholder spelled out all 5 fields
+                  ("Buscar por activo, QR, matrícula, modelo, notas...") —
+                  at 230px/12px that text is wider than the box itself, so
+                  it rendered visibly cut off mid-word (flagged in the UX
+                  audit). Shortened the copy and widened the box so the
+                  full placeholder actually fits in all 3 locales. */}
               <div className="relative">
                 <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-300" />
                 <input
@@ -835,7 +841,7 @@ function ServicesPageInner() {
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder={t("searchPlaceholder")}
-                  className="w-[230px] rounded-xl border border-zinc-200 bg-white pl-8 pr-3 py-[9px] text-[12px] outline-none focus:border-red-400"
+                  className="w-[260px] rounded-xl border border-zinc-200 bg-white pl-8 pr-3 py-[9px] text-[12px] outline-none focus:border-red-400"
                 />
               </div>
               <select

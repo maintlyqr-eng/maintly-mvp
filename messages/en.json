@@ -1154,7 +1154,7 @@
     "filterStatusCompleted": "Completed",
     "filterStatusScheduled": "Scheduled",
     "filterStatusOverdue": "Overdue",
-    "searchPlaceholder": "Search by asset, QR, plate, model, notes...",
+    "searchPlaceholder": "Search asset, QR, plate...",
     "qrLabel": "QR {code}",
     "tileAssets": "Assets",
     "tileServices": "Services",
