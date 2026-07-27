@@ -161,21 +161,26 @@ function LoginForm() {
   }
 
   return (
-    <main className="relative min-h-dvh bg-carbon overflow-x-hidden flex flex-col md:block">
+    <main className="relative h-dvh md:min-h-dvh bg-carbon overflow-hidden md:overflow-x-hidden md:overflow-y-visible flex flex-col md:block">
 
       {/* ── HERO MOBILE (< md): recorte vertical hecho a medida
           (login-hero-mobile-dark.png), ya no un crop forzado de una imagen
           horizontal. object-position mantiene el círculo QR/engranaje
           visible; el degradé hacia carbón funde el borde inferior de la
-          imagen con el resto de la página (ahora también carbón). ── */}
-      <div className="md:hidden relative h-[190px] shrink-0 overflow-hidden bg-carbon">
+          imagen con el resto de la página (ahora también carbón).
+          Facu (27 jul 2026): en el celu esto hacía scroll — el <main> pasó
+          de min-h-dvh a h-dvh + overflow-hidden (una sola pantalla, sin
+          scroll) y esta franja + toda la tarjeta de abajo se comprimieron
+          (menos alto acá, menos padding/separación en el form) para que
+          entren juntas en el alto real del viewport. Desktop no se tocó. ── */}
+      <div className="md:hidden relative h-[125px] shrink-0 overflow-hidden bg-carbon">
         <Image
           src="/images/login-hero-mobile-dark.png"
           alt="MaintlyQR"
           fill
           priority
           sizes="100vw"
-          style={{ objectFit: "cover", objectPosition: "50% 12%" }}
+          style={{ objectFit: "cover", objectPosition: "50% 8%" }}
         />
         <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-carbon" />
       </div>
@@ -199,31 +204,31 @@ function LoginForm() {
       </div>
 
       {/* ── FORMULARIO ── */}
-      <div className="relative z-10 flex-1 md:min-h-dvh flex items-center justify-center px-6 py-8">
+      <div className="relative z-10 flex-1 min-h-0 md:min-h-dvh flex items-center justify-center px-5 py-2 md:px-0 md:py-0 overflow-hidden md:overflow-visible">
         <motion.div
           initial={{ opacity: 0, y: 22 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.55, ease: "easeOut" }}
-          className="w-full max-w-[420px] relative bg-carbon-light rounded-[28px] shadow-industrial-dark px-7 py-8 md:px-8 md:py-9 overflow-hidden"
+          className="w-full max-w-[420px] relative bg-carbon-light rounded-[28px] shadow-industrial-dark px-5 py-4 md:px-8 md:py-9 overflow-hidden"
         >
           {/* Línea de acento — el único "brillo metálico" de la tarjeta */}
           <div className="absolute top-0 inset-x-0 h-[3px] bg-gradient-to-r from-transparent via-maintly-red to-transparent" />
 
-          <div className="text-center mb-7">
+          <div className="text-center mb-3 md:mb-7">
             <motion.div
-              className="inline-flex items-center justify-center w-14 h-14 rounded-full border border-red-500/30 bg-red-500/10 mb-4"
+              className="hidden md:inline-flex items-center justify-center w-14 h-14 rounded-full border border-red-500/30 bg-red-500/10 mb-4"
               animate={{ boxShadow: ["0 0 0 0 rgba(220,38,38,0.25)", "0 0 0 8px rgba(220,38,38,0)", "0 0 0 0 rgba(220,38,38,0)"] }}
               transition={{ duration: 2.6, repeat: Infinity, ease: "easeOut" }}
             >
               <User size={24} className="text-red-400" />
             </motion.div>
-            <h2 className="text-[26px] font-black text-white">{t("welcomeBack")}</h2>
-            <p className="text-[13px] text-zinc-400 mt-1">{t("subtitle")}</p>
+            <h2 className="text-[19px] md:text-[26px] font-black text-white">{t("welcomeBack")}</h2>
+            <p className="hidden md:block text-[13px] text-zinc-400 mt-1">{t("subtitle")}</p>
           </div>
 
           <form onSubmit={handleLogin}>
           {/* Email */}
-          <div className="mb-4">
+          <div className="mb-2.5 md:mb-4">
             <label className="text-[12px] font-bold text-zinc-300">{t("emailLabel")}</label>
             <div className="relative mt-1">
               <Mail size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
@@ -233,13 +238,13 @@ function LoginForm() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder={t("emailPlaceholder")}
-                className="w-full rounded-xl border border-zinc-700 bg-carbon text-white placeholder:text-zinc-500 pl-10 pr-3 py-[12px] text-[14px] outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500/20 transition-all"
+                className="w-full rounded-xl border border-zinc-700 bg-carbon text-white placeholder:text-zinc-500 pl-10 pr-3 py-[9px] md:py-[12px] text-[14px] outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500/20 transition-all"
               />
             </div>
           </div>
 
           {/* Password */}
-          <div className="mb-3">
+          <div className="mb-2 md:mb-3">
             <label className="text-[12px] font-bold text-zinc-300">{t("passwordLabel")}</label>
             <div className="relative mt-1">
               <Lock size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
@@ -249,7 +254,7 @@ function LoginForm() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder={t("passwordPlaceholder")}
-                className="w-full rounded-xl border border-zinc-700 bg-carbon text-white placeholder:text-zinc-500 pl-10 pr-10 py-[12px] text-[14px] outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500/20 transition-all"
+                className="w-full rounded-xl border border-zinc-700 bg-carbon text-white placeholder:text-zinc-500 pl-10 pr-10 py-[9px] md:py-[12px] text-[14px] outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500/20 transition-all"
               />
               <button
                 type="button"
@@ -262,7 +267,7 @@ function LoginForm() {
           </div>
 
           {/* Remember + forgot */}
-          <div className="flex items-center justify-between mb-5">
+          <div className="flex items-center justify-between mb-2.5 md:mb-5">
             <label className="flex items-center gap-2 text-[12px] text-zinc-400 cursor-pointer">
               <input type="checkbox" className="rounded border-zinc-600 bg-carbon text-red-600 focus:ring-red-500" />
               {t("rememberMe")}
@@ -292,14 +297,14 @@ function LoginForm() {
             whileTap={{ scale: loading ? 1 : 0.98 }}
             type="submit"
             disabled={loading}
-            className="w-full bg-red-600 hover:bg-red-500 disabled:opacity-60 disabled:cursor-not-allowed transition-colors text-white font-bold py-[13px] rounded-xl text-[14px] tracking-wide uppercase shadow-industrial-dark"
+            className="w-full bg-red-600 hover:bg-red-500 disabled:opacity-60 disabled:cursor-not-allowed transition-colors text-white font-bold py-[10px] md:py-[13px] rounded-xl text-[14px] tracking-wide uppercase shadow-industrial-dark"
           >
             {loading ? t("loggingIn") : t("loginButton")}
           </motion.button>
           </form>
 
           {/* Divider */}
-          <div className="flex items-center gap-3 my-5">
+          <div className="flex items-center gap-3 my-2.5 md:my-5">
             <div className="flex-1 h-[1px] bg-zinc-700" />
             <span className="text-[11px] text-zinc-500">{t("orDivider")}</span>
             <div className="flex-1 h-[1px] bg-zinc-700" />
@@ -313,7 +318,7 @@ function LoginForm() {
             type="button"
             onClick={handleGoogleSignIn}
             disabled={googleLoading}
-            className="w-full flex items-center justify-center gap-3 border border-zinc-300 bg-white hover:bg-zinc-50 hover:border-zinc-400 hover:shadow-sm disabled:opacity-60 disabled:cursor-not-allowed transition-colors duration-150 py-[12px] rounded-xl text-[13px] font-semibold text-zinc-700"
+            className="w-full flex items-center justify-center gap-3 border border-zinc-300 bg-white hover:bg-zinc-50 hover:border-zinc-400 hover:shadow-sm disabled:opacity-60 disabled:cursor-not-allowed transition-colors duration-150 py-[9px] md:py-[12px] rounded-xl text-[13px] font-semibold text-zinc-700"
           >
             {googleLoading ? (
               <div className="w-[18px] h-[18px] border-2 border-zinc-300 border-t-zinc-600 rounded-full animate-spin" />
@@ -329,13 +334,13 @@ function LoginForm() {
           </motion.button>
 
           {/* Create account */}
-          <p className="text-center text-[13px] text-zinc-400 mt-6">
+          <p className="text-center text-[13px] text-zinc-400 mt-3 md:mt-6">
             {t("newToMaintly")}{" "}
             <Link href="/register" className="text-red-400 hover:text-red-300 font-bold">{t("createAccountLink")}</Link>
           </p>
 
           {/* Browse without account */}
-          <p className="text-center text-[12px] text-zinc-500 mt-3">
+          <p className="text-center text-[12px] text-zinc-500 mt-1.5 md:mt-3">
             <Link href="/" className="hover:text-zinc-300 underline">{t("continueBrowsing")}</Link>
           </p>
         </motion.div>
