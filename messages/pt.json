@@ -292,7 +292,17 @@
     "featureSmartTitle": "Inteligente",
     "featureSmartDesc": "Decisões baseadas em dados",
     "featureSimpleTitle": "Simples",
-    "featureSimpleDesc": "Toda sua manutenção, em um QR"
+    "featureSimpleDesc": "Toda sua manutenção, em um QR",
+    "heroHeadlinePre": "Todo o seu ",
+    "heroHeadlineAccent": "histórico de manutenção",
+    "heroHeadlinePost": ", em um único QR.",
+    "heroTagline": "Escaneie · Registre · Confie",
+    "heroFeatureGlobalTitle": "Alcance mundial",
+    "heroFeatureGlobalDesc": "Serviço em qualquer país",
+    "heroFeatureAnyTitle": "Qualquer máquina",
+    "heroFeatureAnyDesc": "Carros, motos, indústria e mais",
+    "heroFeatureQrTitle": "Tudo em um QR",
+    "heroFeatureQrDesc": "Escaneie e acesse na hora"
   },
   "RegisterPage": {
     "checkEmailTitle": "Verifique seu email",

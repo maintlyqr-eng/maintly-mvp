@@ -6,7 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Link } from "@/i18n/navigation";
 import { useTranslations } from "next-intl";
 import { motion, AnimatePresence } from "framer-motion";
-import { Mail, Lock, Eye, EyeOff, AlertCircle } from "lucide-react";
+import { Mail, Lock, Eye, EyeOff, AlertCircle, Globe, Wrench, QrCode } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 
 // 28 jul 2026 — primera pantalla rediseñada con el nuevo sistema visual
@@ -144,6 +144,30 @@ function sanitizeRedirect(value: string | null): string {
     return "/dashboard";
   }
   return value;
+}
+
+// 28 jul 2026 (17va vuelta) — ítem de la franja de features de abajo a la
+// izquierda (sobre la imagen, ver comment de heroFeatures más abajo).
+// Texto blanco porque vive sobre el degradé oscuro que se agrega detrás,
+// no sobre la imagen clara directamente.
+function HeroFeature({
+  icon: Icon,
+  title,
+  desc,
+}: {
+  icon: typeof Globe;
+  title: string;
+  desc: string;
+}) {
+  return (
+    <div className="flex items-start gap-2.5 min-w-0">
+      <Icon size={18} className="text-red-500 shrink-0 mt-[1px]" />
+      <div className="min-w-0">
+        <div className="text-[13px] font-bold text-white leading-tight">{title}</div>
+        <div className="text-[11.5px] text-zinc-300 leading-snug mt-0.5">{desc}</div>
+      </div>
+    </div>
+  );
 }
 
 function LoginForm() {
@@ -471,7 +495,39 @@ function LoginForm() {
           uniforme en el eje horizontal, este porcentaje se mantiene
           exacto sea cual sea el ancho de la ventana. ── */}
       <div className="hidden md:flex relative z-10 flex-1 min-h-0">
-        <div className="w-[63%] shrink-0" />
+        {/* ── CONTENIDO SOBRE LA IMAGEN (17va vuelta) — Facu: "agregá abajo
+            a la izquierda algo de contenido... y arriba a la izquierda
+            también, algo que represente a MaintlyQR, así el que va a
+            loguearse entiende de qué se trata". Arriba: un headline en una
+            línea (texto oscuro — esta zona de la imagen es clara, mapa
+            sobre fondo blanco, así que no hace falta ningún degradé para
+            que se lea bien). Abajo: 3 features cortos con ícono, en blanco,
+            sobre un degradé oscuro propio (de transparente a negro) que
+            nace pegado a este bloque — a diferencia de la barra sólida que
+            sacamos en la 12va vuelta ("el rectángulo negro feo"), acá no
+            hay ninguna caja con bordes duros: el texto flota directo sobre
+            la imagen oscurecida gradualmente, se funde con la foto en vez
+            de tapar un pedazo con un cartel. ── */}
+        <div className="w-[63%] shrink-0 relative flex flex-col justify-between px-10 lg:px-14 pt-10 lg:pt-14">
+          <div className="max-w-[540px]">
+            <h1 className="text-[26px] lg:text-[32px] font-black leading-[1.2] text-zinc-900">
+              {t("heroHeadlinePre")}
+              <span className="text-red-600">{t("heroHeadlineAccent")}</span>
+              {t("heroHeadlinePost")}
+            </h1>
+            <p className="mt-2 text-[11px] lg:text-[12px] tracking-[0.25em] text-zinc-500 uppercase font-bold">
+              {t("heroTagline")}
+            </p>
+          </div>
+
+          <div className="relative -mx-10 lg:-mx-14 pt-28 lg:pt-32 pb-8 lg:pb-10 px-10 lg:px-14 bg-gradient-to-t from-black/70 via-black/25 to-transparent">
+            <div className="flex flex-wrap gap-x-9 gap-y-3 max-w-[560px]">
+              <HeroFeature icon={Globe} title={t("heroFeatureGlobalTitle")} desc={t("heroFeatureGlobalDesc")} />
+              <HeroFeature icon={Wrench} title={t("heroFeatureAnyTitle")} desc={t("heroFeatureAnyDesc")} />
+              <HeroFeature icon={QrCode} title={t("heroFeatureQrTitle")} desc={t("heroFeatureQrDesc")} />
+            </div>
+          </div>
+        </div>
         <div className="flex items-center w-[37%] pr-[5%]">
           <div className="w-full max-w-[420px] mx-auto">
             {card}

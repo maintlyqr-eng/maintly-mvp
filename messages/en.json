@@ -292,7 +292,17 @@
     "featureSmartTitle": "Smart",
     "featureSmartDesc": "Data-driven decisions",
     "featureSimpleTitle": "Simple",
-    "featureSimpleDesc": "All your maintenance, in one QR"
+    "featureSimpleDesc": "All your maintenance, in one QR",
+    "heroHeadlinePre": "Your entire ",
+    "heroHeadlineAccent": "maintenance history",
+    "heroHeadlinePost": ", in one QR.",
+    "heroTagline": "Scan · Track · Trust",
+    "heroFeatureGlobalTitle": "Worldwide reach",
+    "heroFeatureGlobalDesc": "Service history in any country",
+    "heroFeatureAnyTitle": "Any machine",
+    "heroFeatureAnyDesc": "Cars, bikes, industrial gear & more",
+    "heroFeatureQrTitle": "All in one QR",
+    "heroFeatureQrDesc": "Scan and access instantly"
   },
   "RegisterPage": {
     "checkEmailTitle": "Check your email",
