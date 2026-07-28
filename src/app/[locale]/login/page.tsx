@@ -510,6 +510,15 @@ function LoginForm() {
             de tapar un pedazo con un cartel. ── */}
         <div className="w-[63%] shrink-0 relative flex flex-col justify-between px-10 lg:px-14 pt-10 lg:pt-14">
           <div className="max-w-[620px]">
+            {/* 19na vuelta: Facu — "que el Escaneá Registrá Confiá vaya
+                arriba del todo tu historial, en vez de abajo" — se invierte
+                el orden (tagline primero, headline después) y el margen
+                pasa de estar arriba del headline (mt-3 en la tagline) a
+                estar debajo de ella (mb-3), para separarla del bloque
+                grande de abajo. */}
+            <p className="mb-3 text-[12px] lg:text-[13px] tracking-[0.25em] text-zinc-500 uppercase font-bold">
+              {t("heroTagline")}
+            </p>
             {/* 18va vuelta: Facu — "me gustaría que tenga más presencia,
                 osea más grande" — de 26/32px a 38/48px. */}
             <h1 className="text-[38px] lg:text-[48px] font-black leading-[1.15] text-zinc-900">
@@ -517,9 +526,6 @@ function LoginForm() {
               <span className="text-red-600">{t("heroHeadlineAccent")}</span>
               {t("heroHeadlinePost")}
             </h1>
-            <p className="mt-3 text-[12px] lg:text-[13px] tracking-[0.25em] text-zinc-500 uppercase font-bold">
-              {t("heroTagline")}
-            </p>
           </div>
 
           <div className="relative -mx-10 lg:-mx-14 pt-28 lg:pt-32 pb-8 lg:pb-10 px-10 lg:px-14 bg-gradient-to-t from-black/70 via-black/25 to-transparent">
