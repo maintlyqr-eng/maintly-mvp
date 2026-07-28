@@ -52,6 +52,19 @@ import { supabase } from "@/lib/supabase";
 // Las imágenes login-hero-desktop-dark.png / -light.png / -mobile-light.png
 // (del primer lote) quedan guardadas en public/images sin usarse por
 // ahora, por si sirven para otra pantalla.
+// 27 jul 2026 (7ma vuelta) — dos problemas más reportados sobre la 6ta:
+//   - "el logo está horrible": maintly-logo-full.png es un render 3D con
+//     mucho detalle fino (reflejos metálicos, sombras) que no escala bien
+//     a un tamaño chico dentro de la tarjeta — se veía borroso/aplastado.
+//     Se reemplazó por un lockup hecho 100% con texto real (span) + un
+//     ícono simple (QrCode de lucide en un círculo con borde rojo) — nunca
+//     se pixela ni se ve borroso, sea cual sea el tamaño de pantalla.
+//   - "tiene escrol": el total (imagen + tarjeta + barra de features) no
+//     entraba en una ventana de laptop común. Se recortó el padding del
+//     <main> (py-10→py-5), el padding vertical de la tarjeta (py-9→py-7) y
+//     el de la barra de features (py-5→py-3.5, sin margin-bottom extra),
+//     además de varios márgenes internos del form — debería entrar sin
+//     scroll en pantallas de laptop normales ahora.
 // Ningún cambio de lógica (auth, sanitizeRedirect, handlers) — solo la
 // capa visual.
 
@@ -198,7 +211,7 @@ function LoginForm() {
   }
 
   return (
-    <main className="relative h-dvh md:h-auto md:min-h-dvh bg-carbon overflow-hidden md:overflow-x-hidden md:overflow-y-visible flex flex-col md:items-center md:justify-center px-0 md:px-6 py-0 md:py-10">
+    <main className="relative h-dvh md:h-auto md:min-h-dvh bg-carbon overflow-hidden md:overflow-x-hidden md:overflow-y-visible flex flex-col md:items-center md:justify-center px-0 md:px-6 py-0 md:py-5">
 
       {/* ── FONDO (desktop): Facu (27 jul 2026, 6ta vuelta) — "me gusta
           una imagen con vehículos como la del ejemplo" — vuelve a haber
@@ -245,18 +258,28 @@ function LoginForm() {
           initial={{ opacity: 0, y: 22 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.55, ease: "easeOut" }}
-          className="w-full relative bg-carbon-light rounded-[28px] border border-red-500/40 shadow-industrial-dark px-5 py-4 md:px-8 md:py-9 overflow-hidden"
+          className="w-full relative bg-carbon-light rounded-[28px] border border-red-500/40 shadow-industrial-dark px-5 py-4 md:px-8 md:py-7 overflow-hidden"
         >
-          <div className="text-center mb-3 md:mb-7">
-            <Image
-              src="/images/maintly-logo-full.png"
-              alt="MaintlyQR"
-              width={220}
-              height={65}
-              priority
-              className="hidden md:block h-14 md:h-16 w-auto mx-auto mb-4"
-            />
-            <h2 className="text-[19px] md:text-[26px] font-black text-white">{t("welcomeBack")}</h2>
+          <div className="text-center mb-3 md:mb-5">
+            {/* Facu (27 jul 2026, 7ma vuelta): "el logo está horrible" —
+                sacamos el archivo maintly-logo-full.png (un render 3D con
+                mucho detalle fino que no escala bien a este tamaño chico,
+                se veía borroso/aplastado) y lo reemplazamos por un lockup
+                hecho con texto real + un ícono simple — se ve nítido a
+                cualquier tamaño porque no depende de una imagen rasterizada,
+                y usa los mismos colores de marca (blanco + rojo). ── */}
+            <div className="hidden md:flex items-center justify-center gap-2 mb-1">
+              <div className="w-8 h-8 rounded-full bg-carbon border-2 border-red-500 flex items-center justify-center shrink-0">
+                <QrCode size={16} className="text-red-500" />
+              </div>
+              <span className="text-[22px] font-black tracking-tight">
+                <span className="text-white">MAINTLY</span><span className="text-red-500">QR</span>
+              </span>
+            </div>
+            <p className="hidden md:block text-[9.5px] tracking-[0.25em] text-zinc-500 uppercase mb-3">
+              Maintenance · Tracked
+            </p>
+            <h2 className="text-[19px] md:text-[24px] font-black text-white">{t("welcomeBack")}</h2>
             <p className="hidden md:block text-[13px] text-zinc-400 mt-1">{t("subtitle")}</p>
           </div>
 
@@ -301,7 +324,7 @@ function LoginForm() {
           </div>
 
           {/* Remember + forgot */}
-          <div className="flex items-center justify-between mb-2.5 md:mb-5">
+          <div className="flex items-center justify-between mb-2.5 md:mb-4">
             <label className="flex items-center gap-2 text-[12px] text-zinc-400 cursor-pointer">
               <input type="checkbox" className="rounded border-zinc-600 bg-carbon text-red-600 focus:ring-red-500" />
               {t("rememberMe")}
@@ -338,7 +361,7 @@ function LoginForm() {
           </form>
 
           {/* Divider */}
-          <div className="flex items-center gap-3 my-2.5 md:my-5">
+          <div className="flex items-center gap-3 my-2.5 md:my-4">
             <div className="flex-1 h-[1px] bg-zinc-700" />
             <span className="text-[11px] text-zinc-500">{t("orDivider")}</span>
             <div className="flex-1 h-[1px] bg-zinc-700" />
@@ -368,7 +391,7 @@ function LoginForm() {
           </motion.button>
 
           {/* Create account */}
-          <p className="text-center text-[13px] text-zinc-400 mt-3 md:mt-6">
+          <p className="text-center text-[13px] text-zinc-400 mt-3 md:mt-5">
             {t("newToMaintly")}{" "}
             <Link href="/register" className="text-red-400 hover:text-red-300 font-bold">{t("createAccountLink")}</Link>
           </p>
@@ -389,7 +412,7 @@ function LoginForm() {
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.55, delay: 0.15, ease: "easeOut" }}
-          className="hidden md:grid grid-cols-4 gap-5 w-full mt-6 mb-6 bg-carbon-light/60 border border-zinc-800 rounded-2xl px-7 py-5"
+          className="hidden md:grid grid-cols-4 gap-5 w-full mt-4 bg-carbon-light/60 border border-zinc-800 rounded-2xl px-7 py-3.5"
         >
           <FeatureItem icon={ShieldCheck} title={t("featureSecureTitle")} desc={t("featureSecureDesc")} />
           <FeatureItem icon={Clock} title={t("featureReliableTitle")} desc={t("featureReliableDesc")} />
