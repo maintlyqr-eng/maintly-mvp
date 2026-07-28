@@ -6,7 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Link } from "@/i18n/navigation";
 import { useTranslations } from "next-intl";
 import { motion, AnimatePresence } from "framer-motion";
-import { Mail, Lock, Eye, EyeOff, AlertCircle, ShieldCheck, Clock, BarChart3, QrCode } from "lucide-react";
+import { Mail, Lock, Eye, EyeOff, AlertCircle, QrCode } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 
 // 28 jul 2026 — primera pantalla rediseñada con el nuevo sistema visual
@@ -144,29 +144,6 @@ function sanitizeRedirect(value: string | null): string {
     return "/dashboard";
   }
   return value;
-}
-
-// Un ítem de la barra de features de abajo (icono + título + descripción
-// corta). Extraído como componente propio solo para no repetir el mismo
-// bloque de JSX 4 veces.
-function FeatureItem({
-  icon: Icon,
-  title,
-  desc,
-}: {
-  icon: typeof ShieldCheck;
-  title: string;
-  desc: string;
-}) {
-  return (
-    <div className="flex items-start gap-2.5 min-w-0">
-      <Icon size={18} className="text-red-500 shrink-0 mt-[1px]" />
-      <div className="min-w-0">
-        <div className="text-[12.5px] font-bold text-white leading-tight">{title}</div>
-        <div className="text-[11px] text-zinc-500 leading-snug mt-0.5">{desc}</div>
-      </div>
-    </div>
-  );
 }
 
 function LoginForm() {
@@ -412,28 +389,13 @@ function LoginForm() {
     </motion.div>
   );
 
-  // Barra de features (Seguro/Confiable/Inteligente/Simple) — solo
-  // desktop. 9na vuelta: Facu — "eso que dice Seguro, Confiable,
-  // Inteligente, etc, quiero que esté abajo a la izquierda, tipo eso que
-  // te pasé" (el mockup de referencia tiene la fila de features abajo a
-  // la izquierda, sobre el panel de contenido, no al lado de la
-  // tarjeta) — se mueve de "debajo de la tarjeta" a superpuesta sobre la
-  // imagen, abajo a la izquierda. Es un panel opaco (igual que la
-  // tarjeta) así que no necesita una zona vacía dedicada de la imagen
-  // para leerse bien.
-  const featureBar = (
-    <motion.div
-      initial={{ opacity: 0, y: 12 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.55, delay: 0.15, ease: "easeOut" }}
-      className="absolute left-8 right-8 lg:right-auto bottom-8 lg:left-12 lg:bottom-10 lg:w-[560px] grid grid-cols-2 gap-4 bg-carbon-light border border-zinc-800 rounded-2xl px-6 py-4 shadow-industrial-dark"
-    >
-      <FeatureItem icon={ShieldCheck} title={t("featureSecureTitle")} desc={t("featureSecureDesc")} />
-      <FeatureItem icon={Clock} title={t("featureReliableTitle")} desc={t("featureReliableDesc")} />
-      <FeatureItem icon={BarChart3} title={t("featureSmartTitle")} desc={t("featureSmartDesc")} />
-      <FeatureItem icon={QrCode} title={t("featureSimpleTitle")} desc={t("featureSimpleDesc")} />
-    </motion.div>
-  );
+  // 28 jul 2026 (12va vuelta) — Facu: "le mandaste el rectángulo negro ese
+  // feo con Confiable y no sé qué... ese te voy a pasar yo una imagen, así
+  // la montás ahí arriba". Se saca la barra de features por completo (el
+  // panel armado con ícono+título+descripción de Lucide) — cuando mande
+  // la imagen para esa zona se monta en su lugar. FeatureItem y los íconos
+  // ShieldCheck/Clock/BarChart3 quedaban sin uso al sacar esto, así que
+  // también se sacaron sus imports de arriba.
 
   return (
     <main className="relative h-dvh bg-carbon overflow-hidden flex flex-col">
@@ -461,42 +423,40 @@ function LoginForm() {
         </div>
       </div>
 
-      {/* ── DESKTOP (11ava vuelta) — Facu: "cada vez peor" con el truco del
-          blur (se veía como una franja vacía arriba/abajo, porque esa
-          parte de la imagen ya es de por sí bien clara/blanca — al
-          desenfocarla quedaba lisa, no se notaba que había "algo" ahí).
-          Diagnóstico real del problema: la columna de la imagen (ancho de
-          la pantalla menos la tarjeta) NO tiene la misma proporción que la
-          foto (16:9) — es más angosta en relación a su alto. Con
-          object-cover puro eso obliga a recortar de los costados para
-          llenar el alto completo. La vez pasada ese recorte quedó
-          centrado (object-position "center"), así que se comía por igual
-          de la izquierda (donde están las máquinas) y de la derecha —
-          ahí es donde Facu vio que "se corrió la imagen".
-          Fix real: en vez de recortar del centro, anclar el recorte a la
-          IZQUIERDA (object-position "0% ...") — la imagen ya tiene ~38%
-          de su ancho reservado como panel vacío del lado derecho (pensado
-          para que la tarjeta se enganche ahí), así que lo que se recorta
-          cuando hace falta es esa franja vacía de la derecha, nunca el
-          contenido (mapa + máquinas), que queda siempre 100% visible
-          pegado a la izquierda. Con esto alcanza una sola capa de
-          object-cover — se saca el truco del blur, que ya no hace falta.
-          ── */}
-      <div className="hidden md:flex relative z-10 flex-1 min-h-0">
-        <div className="relative flex-1 min-w-0 overflow-hidden bg-carbon">
-          <Image
-            src="/images/login-hero-desktop-worldmap.png"
-            alt="MaintlyQR"
-            fill
-            priority
-            sizes="100vw"
-            style={{ objectFit: "cover", objectPosition: "0% 35%" }}
-          />
-          {featureBar}
-        </div>
-        <div className="w-[460px] shrink-0 flex items-center justify-center bg-[#e9eaec] px-6">
-          <div className="w-full max-w-[420px]">
-            {card}
+      {/* ── FONDO (desktop, 12va vuelta) — Facu: "la idea es usar el fondo
+          entero de fondo y montar encima el cuadro de login en la parte
+          de la imagen donde hay un vacío... vos ahí recortaste la imagen
+          de fondo y quedo mal". Se saca el recorte (object-cover) y se
+          vuelve a object-contain: la imagen se ve SIEMPRE completa, nunca
+          se pierde ni un pixel de ella. Si en alguna ventana queda alguna
+          franja de letterbox, se mezcla con el gris clarito de fondo
+          (bg-[#e9eaec]) en vez de mostrar barras oscuras. ── */}
+      <div className="hidden md:block absolute inset-0 z-0 bg-[#e9eaec]">
+        <Image
+          src="/images/login-hero-desktop-worldmap.png"
+          alt="MaintlyQR"
+          fill
+          priority
+          sizes="100vw"
+          className="object-contain object-center"
+        />
+      </div>
+
+      {/* ── CONTENIDO (desktop, 12va vuelta) — la tarjeta se "engancha"
+          en la zona vacía real de la imagen (su ~38% derecho) con el
+          mismo truco que ya funciona en Register: un contenedor con el
+          MISMO aspect-ratio (1672:941) y el mismo max-width que la
+          imagen de fondo — al escalarse y centrarse exactamente igual
+          que la imagen (misma lógica de "contain"), la tarjeta siempre
+          cae sobre la parte vacía real, sea cual sea el tamaño de
+          ventana, en vez de flotar centrada por su cuenta. ── */}
+      <div className="hidden md:flex relative z-10 flex-1 min-h-0 items-center justify-center overflow-hidden">
+        <div className="w-full flex max-w-[1672px] aspect-[1672/941]">
+          <div className="flex-1" />
+          <div className="flex items-center w-[38%] pr-[5%]">
+            <div className="w-full max-w-[420px] mx-auto">
+              {card}
+            </div>
           </div>
         </div>
       </div>
