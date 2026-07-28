@@ -268,13 +268,21 @@ function LoginForm() {
       initial={{ opacity: 0, y: 22 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.55, ease: "easeOut" }}
-      className="w-full relative bg-gradient-to-b from-zinc-50 via-zinc-200 to-zinc-300 border border-zinc-400/50 shadow-industrial-light rounded-[28px] px-5 py-4 md:px-8 md:py-7 overflow-hidden"
+      className="w-full relative bg-gradient-to-b from-zinc-50 via-zinc-200 to-zinc-300 border border-zinc-400/50 shadow-industrial-light rounded-[28px] px-5 py-4 md:px-10 md:py-9 overflow-hidden"
     >
           {/* Filo rojo arriba — el único acento de marca sobre el metal,
               igual que en Register. */}
           <div className="absolute top-0 inset-x-0 h-[3px] bg-gradient-to-r from-transparent via-maintly-red to-transparent" />
 
-          <div className="text-center mb-3 md:mb-5">
+          {/* 20va vuelta: Facu — "todo esto podría ser más grande, hay
+              espacio" (la tarjeta de desktop, viendo que la columna tiene
+              lugar de sobra). Se agranda SOLO con clases md: — la versión
+              de mobile (que ya había quedado aprobada) no se toca: el
+              contenedor pasó de max-w-[420px] a max-w-[480px] (ver más
+              abajo), el padding de la tarjeta de px-8/py-7 a px-10/py-9, y
+              acá abajo el logo, los títulos, inputs y botones suben un
+              escalón de tamaño en desktop. ── */}
+          <div className="text-center mb-3 md:mb-6">
             {/* Facu (28 jul 2026, 14va/15va/16va vuelta): "montale el logo
                 de maintly arriba del Bienvenido" — el archivo original
                 (logo-maintlyqr.png) tenía fondo blanco sólido, no
@@ -290,24 +298,24 @@ function LoginForm() {
                 Se recortó el archivo a su bounding box real (con un
                 margen chico) — ahora el 100% del alto del contenedor es
                 logo de verdad, no aire. ── */}
-            <div className="hidden md:flex justify-center mb-2">
+            <div className="hidden md:flex justify-center mb-3">
               <Image
                 src="/images/logo-maintlyqr-transparent.png"
                 alt="MaintlyQR"
                 width={1610}
                 height={407}
                 priority
-                className="h-20 w-auto"
+                className="h-24 w-auto"
               />
             </div>
-            <h2 className="text-[19px] md:text-[24px] font-black text-zinc-900">{t("welcomeBack")}</h2>
-            <p className="hidden md:block text-[13px] text-zinc-600 mt-1">{t("subtitle")}</p>
+            <h2 className="text-[19px] md:text-[27px] font-black text-zinc-900">{t("welcomeBack")}</h2>
+            <p className="hidden md:block text-[15px] text-zinc-600 mt-1.5">{t("subtitle")}</p>
           </div>
 
           <form onSubmit={handleLogin}>
           {/* Email */}
-          <div className="mb-2.5 md:mb-4">
-            <label className="text-[12px] font-bold text-zinc-700">{t("emailLabel")}</label>
+          <div className="mb-2.5 md:mb-5">
+            <label className="text-[12px] md:text-[13px] font-bold text-zinc-700">{t("emailLabel")}</label>
             <div className="relative mt-1">
               <Mail size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
               <input
@@ -316,14 +324,14 @@ function LoginForm() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder={t("emailPlaceholder")}
-                className="w-full rounded-xl border border-zinc-300 bg-white text-zinc-900 placeholder:text-zinc-400 pl-10 pr-3 py-[9px] md:py-[12px] text-[14px] outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500/20 transition-all"
+                className="w-full rounded-xl border border-zinc-300 bg-white text-zinc-900 placeholder:text-zinc-400 pl-10 pr-3 py-[9px] md:py-[15px] text-[14px] md:text-[15px] outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500/20 transition-all"
               />
             </div>
           </div>
 
           {/* Password */}
-          <div className="mb-2 md:mb-3">
-            <label className="text-[12px] font-bold text-zinc-700">{t("passwordLabel")}</label>
+          <div className="mb-2 md:mb-4">
+            <label className="text-[12px] md:text-[13px] font-bold text-zinc-700">{t("passwordLabel")}</label>
             <div className="relative mt-1">
               <Lock size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
               <input
@@ -332,7 +340,7 @@ function LoginForm() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder={t("passwordPlaceholder")}
-                className="w-full rounded-xl border border-zinc-300 bg-white text-zinc-900 placeholder:text-zinc-400 pl-10 pr-10 py-[9px] md:py-[12px] text-[14px] outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500/20 transition-all"
+                className="w-full rounded-xl border border-zinc-300 bg-white text-zinc-900 placeholder:text-zinc-400 pl-10 pr-10 py-[9px] md:py-[15px] text-[14px] md:text-[15px] outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500/20 transition-all"
               />
               <button
                 type="button"
@@ -345,12 +353,12 @@ function LoginForm() {
           </div>
 
           {/* Remember + forgot */}
-          <div className="flex items-center justify-between mb-2.5 md:mb-4">
-            <label className="flex items-center gap-2 text-[12px] text-zinc-600 cursor-pointer">
+          <div className="flex items-center justify-between mb-2.5 md:mb-5">
+            <label className="flex items-center gap-2 text-[12px] md:text-[13px] text-zinc-600 cursor-pointer">
               <input type="checkbox" className="rounded border-zinc-400 bg-white text-red-600 focus:ring-red-500" />
               {t("rememberMe")}
             </label>
-            <a href="#" className="text-[12px] text-red-600 hover:text-red-700 font-semibold">{t("forgotPassword")}</a>
+            <a href="#" className="text-[12px] md:text-[13px] text-red-600 hover:text-red-700 font-semibold">{t("forgotPassword")}</a>
           </div>
 
           {/* Error */}
@@ -361,7 +369,7 @@ function LoginForm() {
                 animate={{ opacity: 1, height: "auto", marginBottom: 16 }}
                 exit={{ opacity: 0, height: 0, marginBottom: 0 }}
                 transition={{ duration: 0.2 }}
-                className="rounded-lg bg-red-50 border border-red-300 px-3 py-2 flex items-center gap-2 text-[12px] text-red-700 overflow-hidden"
+                className="rounded-lg bg-red-50 border border-red-300 px-3 py-2 flex items-center gap-2 text-[12px] md:text-[13px] text-red-700 overflow-hidden"
               >
                 <AlertCircle size={14} className="shrink-0" />
                 {error}
@@ -375,16 +383,16 @@ function LoginForm() {
             whileTap={{ scale: loading ? 1 : 0.98 }}
             type="submit"
             disabled={loading}
-            className="w-full bg-red-600 hover:bg-red-500 disabled:opacity-60 disabled:cursor-not-allowed transition-colors text-white font-bold py-[10px] md:py-[13px] rounded-xl text-[14px] tracking-wide uppercase shadow-industrial-dark"
+            className="w-full bg-red-600 hover:bg-red-500 disabled:opacity-60 disabled:cursor-not-allowed transition-colors text-white font-bold py-[10px] md:py-[16px] rounded-xl text-[14px] md:text-[15px] tracking-wide uppercase shadow-industrial-dark"
           >
             {loading ? t("loggingIn") : t("loginButton")}
           </motion.button>
           </form>
 
           {/* Divider */}
-          <div className="flex items-center gap-3 my-2.5 md:my-4">
+          <div className="flex items-center gap-3 my-2.5 md:my-5">
             <div className="flex-1 h-[1px] bg-zinc-300" />
-            <span className="text-[11px] text-zinc-500">{t("orDivider")}</span>
+            <span className="text-[11px] md:text-[12px] text-zinc-500">{t("orDivider")}</span>
             <div className="flex-1 h-[1px] bg-zinc-300" />
           </div>
 
@@ -399,7 +407,7 @@ function LoginForm() {
             type="button"
             onClick={handleGoogleSignIn}
             disabled={googleLoading}
-            className="w-full flex items-center justify-center gap-3 border border-zinc-400 bg-white hover:bg-zinc-50 hover:border-zinc-500 hover:shadow-sm disabled:opacity-60 disabled:cursor-not-allowed transition-colors duration-150 py-[9px] md:py-[12px] rounded-xl text-[13px] font-semibold text-zinc-700"
+            className="w-full flex items-center justify-center gap-3 border border-zinc-400 bg-white hover:bg-zinc-50 hover:border-zinc-500 hover:shadow-sm disabled:opacity-60 disabled:cursor-not-allowed transition-colors duration-150 py-[9px] md:py-[14px] rounded-xl text-[13px] md:text-[14.5px] font-semibold text-zinc-700"
           >
             {googleLoading ? (
               <div className="w-[18px] h-[18px] border-2 border-zinc-300 border-t-zinc-600 rounded-full animate-spin" />
@@ -415,13 +423,13 @@ function LoginForm() {
           </motion.button>
 
           {/* Create account */}
-          <p className="text-center text-[13px] text-zinc-600 mt-3 md:mt-5">
+          <p className="text-center text-[13px] md:text-[14px] text-zinc-600 mt-3 md:mt-6">
             {t("newToMaintly")}{" "}
             <Link href="/register" className="text-red-600 hover:text-red-700 font-bold">{t("createAccountLink")}</Link>
           </p>
 
           {/* Browse without account */}
-          <p className="text-center text-[12px] text-zinc-500 mt-1.5 md:mt-3">
+          <p className="text-center text-[12px] md:text-[13px] text-zinc-500 mt-1.5 md:mt-3">
             <Link href="/" className="hover:text-zinc-700 underline">{t("continueBrowsing")}</Link>
           </p>
     </motion.div>
@@ -543,7 +551,7 @@ function LoginForm() {
           </div>
         </div>
         <div className="flex items-center w-[37%] pr-[5%]">
-          <div className="w-full max-w-[420px] mx-auto">
+          <div className="w-full max-w-[480px] mx-auto">
             {card}
           </div>
         </div>
