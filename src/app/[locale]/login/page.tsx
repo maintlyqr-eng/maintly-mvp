@@ -461,41 +461,36 @@ function LoginForm() {
         </div>
       </div>
 
-      {/* ── DESKTOP (10ma vuelta) — layout de 2 columnas a pantalla
-          completa. Facu (9na vuelta) pidió "que complete la pantalla",
-          pero object-cover recortaba los costados de la imagen (que es
-          justo lo que NO quería — "te pasé esa imagen para que la uses
-          toda... la corriste hacia la izquierda"). La columna de la
-          imagen es más angosta que alta (le queda el ancho del viewport
-          menos la tarjeta), así que un object-contain/object-cover puro
-          siempre iba a tener que elegir entre "se ve completa" o "llena
-          la pantalla" — nunca las dos al mismo tiempo, porque la relación
-          de aspecto de la columna no es la misma que la de la imagen.
-          Solución: dos capas superpuestas, la misma imagen en las dos.
-          Atrás, una copia bien agrandada (scale-125) y desenfocada
-          (blur-3xl) con object-cover — esa sí llena todos los rincones de
-          la columna de punta a punta, ninguna franja vacía. Encima, la
-          imagen real con object-contain (nunca recorta nada) — se ve
-          completa, tal cual la mandó Facu. El resultado: la imagen entera
-          siempre visible, y ni un pixel de la columna sin cubrir. ── */}
+      {/* ── DESKTOP (11ava vuelta) — Facu: "cada vez peor" con el truco del
+          blur (se veía como una franja vacía arriba/abajo, porque esa
+          parte de la imagen ya es de por sí bien clara/blanca — al
+          desenfocarla quedaba lisa, no se notaba que había "algo" ahí).
+          Diagnóstico real del problema: la columna de la imagen (ancho de
+          la pantalla menos la tarjeta) NO tiene la misma proporción que la
+          foto (16:9) — es más angosta en relación a su alto. Con
+          object-cover puro eso obliga a recortar de los costados para
+          llenar el alto completo. La vez pasada ese recorte quedó
+          centrado (object-position "center"), así que se comía por igual
+          de la izquierda (donde están las máquinas) y de la derecha —
+          ahí es donde Facu vio que "se corrió la imagen".
+          Fix real: en vez de recortar del centro, anclar el recorte a la
+          IZQUIERDA (object-position "0% ...") — la imagen ya tiene ~38%
+          de su ancho reservado como panel vacío del lado derecho (pensado
+          para que la tarjeta se enganche ahí), así que lo que se recorta
+          cuando hace falta es esa franja vacía de la derecha, nunca el
+          contenido (mapa + máquinas), que queda siempre 100% visible
+          pegado a la izquierda. Con esto alcanza una sola capa de
+          object-cover — se saca el truco del blur, que ya no hace falta.
+          ── */}
       <div className="hidden md:flex relative z-10 flex-1 min-h-0">
         <div className="relative flex-1 min-w-0 overflow-hidden bg-carbon">
-          <Image
-            src="/images/login-hero-desktop-worldmap.png"
-            alt=""
-            aria-hidden="true"
-            fill
-            priority
-            sizes="100vw"
-            className="object-cover object-center scale-125 blur-3xl opacity-90"
-          />
           <Image
             src="/images/login-hero-desktop-worldmap.png"
             alt="MaintlyQR"
             fill
             priority
             sizes="100vw"
-            className="object-contain object-center"
+            style={{ objectFit: "cover", objectPosition: "0% 35%" }}
           />
           {featureBar}
         </div>
