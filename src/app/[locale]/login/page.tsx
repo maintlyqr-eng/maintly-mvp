@@ -257,67 +257,18 @@ function LoginForm() {
     }
   }
 
-  return (
-    <main className="relative h-dvh bg-carbon md:bg-[#e9eaec] overflow-hidden flex flex-col">
-
-      {/* ── HERO MOBILE (< md) — esto ya había quedado bien antes, se
-          mantiene tal cual: recorte vertical hecho a medida
-          (login-hero-mobile-dark.png). Los "glows" rojos de CSS que vivían
-          acá al lado (sin scopear a md:) eran el origen del rectángulo rojo
-          que apareció en el fondo del celular — ya no existen, esta franja
-          es lo único que hay de fondo en mobile. ── */}
-      <div className="md:hidden relative z-10 h-[125px] shrink-0 overflow-hidden bg-carbon">
-        <Image
-          src="/images/login-hero-mobile-dark.png"
-          alt="MaintlyQR"
-          fill
-          priority
-          sizes="100vw"
-          style={{ objectFit: "cover", objectPosition: "50% 8%" }}
-        />
-        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-carbon" />
-      </div>
-
-      {/* ── FONDO (desktop, 8va vuelta): imagen nueva de Facu (mapa del
-          mundo con líneas de alcance global + cluster de máquinas de todo
-          tipo), con un panel vacío real en su ~38% derecho pensado a
-          propósito para que la tarjeta se "enganche" ahí — mismo patrón
-          que register-hero-desktop-dark.png en Register. object-contain
-          para no recortar nunca nada. ── */}
-      <div className="hidden md:block absolute inset-0 z-0">
-        <Image
-          src="/images/login-hero-desktop-worldmap.png"
-          alt="MaintlyQR"
-          fill
-          priority
-          sizes="100vw"
-          className="object-contain object-center"
-        />
-      </div>
-
-      {/* ── CONTENIDO ──
-          Mobile: columna simple centrada (como antes).
-          Desktop (8va vuelta): contenedor con el MISMO aspect-ratio y
-          max-width que la imagen de fondo (1672:941) — spacer invisible
-          (61.6%, calca la zona con contenido de la imagen) + columna
-          angosta (38%, calca la zona vacía) donde vive la tarjeta + la
-          barra de features. Al compartir exactamente la misma lógica de
-          "contain + centrado" que la imagen, quedan siempre alineadas
-          entre sí sea cual sea el tamaño de ventana — ya no flotan cada
-          una centrada por su cuenta. ── */}
-      <div className="relative z-10 flex-1 min-h-0 flex items-center justify-center px-5 py-2 md:px-0 md:py-0 overflow-hidden">
-        <div className="w-full h-full flex flex-col items-center justify-center md:h-auto md:flex-row md:items-stretch md:max-w-[1672px] md:aspect-[1672/941]">
-          {/* Spacer — invisible, solo existe en desktop para empujar la
-              columna del form hacia la zona vacía real de la imagen. */}
-          <div className="hidden md:block md:flex-1" />
-
-          <div className="w-full max-w-[440px] md:max-w-[440px] flex flex-col items-center justify-center md:w-[38%] md:pr-[5%] mx-auto">
-        <motion.div
-          initial={{ opacity: 0, y: 22 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.55, ease: "easeOut" }}
-          className="w-full relative bg-carbon-light rounded-[28px] border border-red-500/40 shadow-industrial-dark px-5 py-4 md:px-8 md:py-7 overflow-hidden"
-        >
+  // 28 jul 2026 (9na vuelta): la tarjeta se extrae a una variable porque
+  // ahora mobile y desktop usan estructuras de layout totalmente distintas
+  // (ver comment más abajo) y necesitan montarla cada uno en su propio
+  // contenedor — el contenido de la tarjeta en sí (header, form, Google,
+  // links) no cambió nada, es exactamente el mismo JSX de antes.
+  const card = (
+    <motion.div
+      initial={{ opacity: 0, y: 22 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.55, ease: "easeOut" }}
+      className="w-full relative bg-carbon-light rounded-[28px] border border-red-500/40 shadow-industrial-dark px-5 py-4 md:px-8 md:py-7 overflow-hidden"
+    >
           <div className="text-center mb-3 md:mb-5">
             {/* Facu (27 jul 2026, 7ma vuelta): "el logo está horrible" —
                 sacamos el archivo maintly-logo-full.png (un render 3D con
@@ -458,24 +409,87 @@ function LoginForm() {
           <p className="text-center text-[12px] text-zinc-500 mt-1.5 md:mt-3">
             <Link href="/" className="hover:text-zinc-300 underline">{t("continueBrowsing")}</Link>
           </p>
-        </motion.div>
+    </motion.div>
+  );
 
-        {/* ── Barra de features — solo desktop (oculta en mobile para no
-            comerse el alto de una pantalla chica). 8va vuelta: ahora vive
-            sobre la zona clara de la imagen (antes era sobre el fondo
-            oscuro), así que pasa de semi-transparente (bg-carbon-light/60)
-            a opaca — si no, se leía mal contra un fondo claro detrás. ── */}
-        <motion.div
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.55, delay: 0.15, ease: "easeOut" }}
-          className="hidden md:grid grid-cols-2 gap-4 w-full mt-4 bg-carbon-light border border-zinc-800 rounded-2xl px-6 py-4 shadow-industrial-dark"
-        >
-          <FeatureItem icon={ShieldCheck} title={t("featureSecureTitle")} desc={t("featureSecureDesc")} />
-          <FeatureItem icon={Clock} title={t("featureReliableTitle")} desc={t("featureReliableDesc")} />
-          <FeatureItem icon={BarChart3} title={t("featureSmartTitle")} desc={t("featureSmartDesc")} />
-          <FeatureItem icon={QrCode} title={t("featureSimpleTitle")} desc={t("featureSimpleDesc")} />
-        </motion.div>
+  // Barra de features (Seguro/Confiable/Inteligente/Simple) — solo
+  // desktop. 9na vuelta: Facu — "eso que dice Seguro, Confiable,
+  // Inteligente, etc, quiero que esté abajo a la izquierda, tipo eso que
+  // te pasé" (el mockup de referencia tiene la fila de features abajo a
+  // la izquierda, sobre el panel de contenido, no al lado de la
+  // tarjeta) — se mueve de "debajo de la tarjeta" a superpuesta sobre la
+  // imagen, abajo a la izquierda. Es un panel opaco (igual que la
+  // tarjeta) así que no necesita una zona vacía dedicada de la imagen
+  // para leerse bien.
+  const featureBar = (
+    <motion.div
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.55, delay: 0.15, ease: "easeOut" }}
+      className="absolute left-8 right-8 lg:right-auto bottom-8 lg:left-12 lg:bottom-10 lg:w-[560px] grid grid-cols-2 gap-4 bg-carbon-light border border-zinc-800 rounded-2xl px-6 py-4 shadow-industrial-dark"
+    >
+      <FeatureItem icon={ShieldCheck} title={t("featureSecureTitle")} desc={t("featureSecureDesc")} />
+      <FeatureItem icon={Clock} title={t("featureReliableTitle")} desc={t("featureReliableDesc")} />
+      <FeatureItem icon={BarChart3} title={t("featureSmartTitle")} desc={t("featureSmartDesc")} />
+      <FeatureItem icon={QrCode} title={t("featureSimpleTitle")} desc={t("featureSimpleDesc")} />
+    </motion.div>
+  );
+
+  return (
+    <main className="relative h-dvh bg-carbon overflow-hidden flex flex-col">
+
+      {/* ── HERO MOBILE (< md) — esto ya había quedado bien antes, se
+          mantiene tal cual: recorte vertical hecho a medida
+          (login-hero-mobile-dark.png). ── */}
+      <div className="md:hidden relative z-10 h-[125px] shrink-0 overflow-hidden bg-carbon">
+        <Image
+          src="/images/login-hero-mobile-dark.png"
+          alt="MaintlyQR"
+          fill
+          priority
+          sizes="100vw"
+          style={{ objectFit: "cover", objectPosition: "50% 8%" }}
+        />
+        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-carbon" />
+      </div>
+
+      {/* ── CONTENIDO MOBILE — sin cambios, la tarjeta centrada tal cual
+          ya había quedado aprobada ("en el celu quedó perfecto"). ── */}
+      <div className="md:hidden relative z-10 flex-1 min-h-0 flex flex-col items-center justify-center px-5 py-2 overflow-hidden">
+        <div className="w-full max-w-[440px] mx-auto">
+          {card}
+        </div>
+      </div>
+
+      {/* ── DESKTOP (9na vuelta) — layout de 2 columnas a pantalla
+          completa. Facu: "la imagen queda cortada en los costados, quiero
+          que complete la pantalla" — antes el fondo usaba object-contain
+          (nunca recorta, pero puede dejar franjas vacías si la ventana no
+          es 16:9 exacto) alineado con una caja del mismo aspect-ratio.
+          Ahora la columna de la imagen usa object-cover a pantalla
+          completa de punta a punta: llena siempre toda su columna, sin
+          ningún margen muerto. El trade-off es que puede recortar un poco
+          los bordes en ventanas con una proporción muy distinta a 16:9
+          (el formato en el que está hecha esta imagen) — eso es
+          justamente lo que se pidió. La tarjeta pasa a una columna de
+          ancho fijo al lado (ya no calcada a la zona vacía de la imagen),
+          y la barra de features se superpone abajo a la izquierda sobre
+          la imagen (ver comment de featureBar arriba). ── */}
+      <div className="hidden md:flex relative z-10 flex-1 min-h-0">
+        <div className="relative flex-1 min-w-0 overflow-hidden bg-carbon">
+          <Image
+            src="/images/login-hero-desktop-worldmap.png"
+            alt="MaintlyQR"
+            fill
+            priority
+            sizes="100vw"
+            style={{ objectFit: "cover", objectPosition: "center 38%" }}
+          />
+          {featureBar}
+        </div>
+        <div className="w-[460px] shrink-0 flex items-center justify-center bg-[#e9eaec] px-6">
+          <div className="w-full max-w-[420px]">
+            {card}
           </div>
         </div>
       </div>
