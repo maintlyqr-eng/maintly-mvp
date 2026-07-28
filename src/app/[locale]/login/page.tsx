@@ -423,40 +423,44 @@ function LoginForm() {
         </div>
       </div>
 
-      {/* ── FONDO (desktop, 12va vuelta) — Facu: "la idea es usar el fondo
-          entero de fondo y montar encima el cuadro de login en la parte
-          de la imagen donde hay un vacío... vos ahí recortaste la imagen
-          de fondo y quedo mal". Se saca el recorte (object-cover) y se
-          vuelve a object-contain: la imagen se ve SIEMPRE completa, nunca
-          se pierde ni un pixel de ella. Si en alguna ventana queda alguna
-          franja de letterbox, se mezcla con el gris clarito de fondo
-          (bg-[#e9eaec]) en vez de mostrar barras oscuras. ── */}
-      <div className="hidden md:block absolute inset-0 z-0 bg-[#e9eaec]">
+      {/* ── FONDO (desktop, 13va vuelta) — Facu: "tiene dos franjas a los
+          costados, estaría bueno que la imagen se estire para ocupar
+          todo". object-contain (11va/12va vuelta) nunca recorta, pero en
+          ventanas que no son EXACTAMENTE 16:9 deja esas franjas de
+          letterbox a los costados que se ven acá. Cambiamos a
+          object-fit: fill — estira la imagen para llenar el 100% del
+          ancho y el 100% del alto siempre, sin recortar nada y sin dejar
+          ninguna franja vacía. El costo es una distorsión mínima (la
+          imagen deja de ser exactamente 16:9), pero como la mayoría de
+          las pantallas ya son bastante cercanas a esa proporción, en la
+          práctica no se nota. ── */}
+      <div className="hidden md:block absolute inset-0 z-0">
         <Image
           src="/images/login-hero-desktop-worldmap.png"
           alt="MaintlyQR"
           fill
           priority
           sizes="100vw"
-          className="object-contain object-center"
+          style={{ objectFit: "fill" }}
         />
       </div>
 
-      {/* ── CONTENIDO (desktop, 12va vuelta) — la tarjeta se "engancha"
-          en la zona vacía real de la imagen (su ~38% derecho) con el
-          mismo truco que ya funciona en Register: un contenedor con el
-          MISMO aspect-ratio (1672:941) y el mismo max-width que la
-          imagen de fondo — al escalarse y centrarse exactamente igual
-          que la imagen (misma lógica de "contain"), la tarjeta siempre
-          cae sobre la parte vacía real, sea cual sea el tamaño de
-          ventana, en vez de flotar centrada por su cuenta. ── */}
-      <div className="hidden md:flex relative z-10 flex-1 min-h-0 items-center justify-center overflow-hidden">
-        <div className="w-full flex max-w-[1672px] aspect-[1672/941]">
-          <div className="flex-1" />
-          <div className="flex items-center w-[38%] pr-[5%]">
-            <div className="w-full max-w-[420px] mx-auto">
-              {card}
-            </div>
+      {/* ── CONTENIDO (desktop, 13va vuelta) — como ahora la imagen se
+          estira para calzar exacto con el 100% del ancho/alto de <main>
+          (ya no hay una caja "contain" propia con su propio
+          aspect-ratio), la tarjeta se posiciona con porcentajes directos
+          del ancho total: el 63% de la izquierda es la zona con
+          contenido real de la imagen (mapa + máquinas, medido a mano
+          sobre la imagen — llega como máximo a ~62% en su punto más
+          ancho), y el 37% de la derecha es la zona vacía real donde
+          siempre cae la tarjeta. Al estirarse la imagen de forma
+          uniforme en el eje horizontal, este porcentaje se mantiene
+          exacto sea cual sea el ancho de la ventana. ── */}
+      <div className="hidden md:flex relative z-10 flex-1 min-h-0">
+        <div className="w-[63%] shrink-0" />
+        <div className="flex items-center w-[37%] pr-[5%]">
+          <div className="w-full max-w-[420px] mx-auto">
+            {card}
           </div>
         </div>
       </div>
