@@ -6,7 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Link } from "@/i18n/navigation";
 import { useTranslations } from "next-intl";
 import { motion, AnimatePresence } from "framer-motion";
-import { Mail, Lock, Eye, EyeOff, AlertCircle, QrCode } from "lucide-react";
+import { Mail, Lock, Eye, EyeOff, AlertCircle } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 
 // 28 jul 2026 — primera pantalla rediseñada con el nuevo sistema visual
@@ -244,65 +244,72 @@ function LoginForm() {
       initial={{ opacity: 0, y: 22 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.55, ease: "easeOut" }}
-      className="w-full relative bg-carbon-light rounded-[28px] border border-red-500/40 shadow-industrial-dark px-5 py-4 md:px-8 md:py-7 overflow-hidden"
+      className="w-full relative bg-gradient-to-b from-zinc-50 via-zinc-200 to-zinc-300 border border-zinc-400/50 shadow-industrial-light rounded-[28px] px-5 py-4 md:px-8 md:py-7 overflow-hidden"
     >
+          {/* Filo rojo arriba — el único acento de marca sobre el metal,
+              igual que en Register. */}
+          <div className="absolute top-0 inset-x-0 h-[3px] bg-gradient-to-r from-transparent via-maintly-red to-transparent" />
+
           <div className="text-center mb-3 md:mb-5">
-            {/* Facu (27 jul 2026, 7ma vuelta): "el logo está horrible" —
-                sacamos el archivo maintly-logo-full.png (un render 3D con
-                mucho detalle fino que no escala bien a este tamaño chico,
-                se veía borroso/aplastado) y lo reemplazamos por un lockup
-                hecho con texto real + un ícono simple — se ve nítido a
-                cualquier tamaño porque no depende de una imagen rasterizada,
-                y usa los mismos colores de marca (blanco + rojo). ── */}
-            <div className="hidden md:flex items-center justify-center gap-2 mb-1">
-              <div className="w-8 h-8 rounded-full bg-carbon border-2 border-red-500 flex items-center justify-center shrink-0">
-                <QrCode size={16} className="text-red-500" />
-              </div>
-              <span className="text-[22px] font-black tracking-tight">
-                <span className="text-white">MAINTLY</span><span className="text-red-500">QR</span>
-              </span>
+            {/* Facu (28 jul 2026, 14va vuelta): "montale el logo de maintly
+                arriba del Bienvenido, el logo del que hablo se llama logo
+                maintlyqr" — reemplaza el lockup de texto+ícono (7ma vuelta)
+                por el archivo real que mandó (logo-maintlyqr.png, el
+                engranaje metalizado + QR + wordmark). De paso la tarjeta
+                entera pasa de negro carbón a un gradiente metalizado
+                (zinc-50→zinc-300 + shadow-industrial-light, que ya trae un
+                highlight interno blanco pensado justo para esto) — pidió
+                "que lo que es negro se vea más metalizado, plateado o
+                gris". Todos los textos/inputs de acá abajo se invirtieron
+                de claro-sobre-oscuro a oscuro-sobre-claro. ── */}
+            <div className="hidden md:flex justify-center mb-2">
+              <Image
+                src="/images/logo-maintlyqr.png"
+                alt="MaintlyQR"
+                width={1774}
+                height={887}
+                priority
+                className="h-14 w-auto"
+              />
             </div>
-            <p className="hidden md:block text-[9.5px] tracking-[0.25em] text-zinc-500 uppercase mb-3">
-              Maintenance · Tracked
-            </p>
-            <h2 className="text-[19px] md:text-[24px] font-black text-white">{t("welcomeBack")}</h2>
-            <p className="hidden md:block text-[13px] text-zinc-400 mt-1">{t("subtitle")}</p>
+            <h2 className="text-[19px] md:text-[24px] font-black text-zinc-900">{t("welcomeBack")}</h2>
+            <p className="hidden md:block text-[13px] text-zinc-600 mt-1">{t("subtitle")}</p>
           </div>
 
           <form onSubmit={handleLogin}>
           {/* Email */}
           <div className="mb-2.5 md:mb-4">
-            <label className="text-[12px] font-bold text-zinc-300">{t("emailLabel")}</label>
+            <label className="text-[12px] font-bold text-zinc-700">{t("emailLabel")}</label>
             <div className="relative mt-1">
-              <Mail size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
+              <Mail size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
               <input
                 type="email"
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder={t("emailPlaceholder")}
-                className="w-full rounded-xl border border-zinc-700 bg-carbon text-white placeholder:text-zinc-500 pl-10 pr-3 py-[9px] md:py-[12px] text-[14px] outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500/20 transition-all"
+                className="w-full rounded-xl border border-zinc-300 bg-white text-zinc-900 placeholder:text-zinc-400 pl-10 pr-3 py-[9px] md:py-[12px] text-[14px] outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500/20 transition-all"
               />
             </div>
           </div>
 
           {/* Password */}
           <div className="mb-2 md:mb-3">
-            <label className="text-[12px] font-bold text-zinc-300">{t("passwordLabel")}</label>
+            <label className="text-[12px] font-bold text-zinc-700">{t("passwordLabel")}</label>
             <div className="relative mt-1">
-              <Lock size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
+              <Lock size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
               <input
                 type={showPassword ? "text" : "password"}
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder={t("passwordPlaceholder")}
-                className="w-full rounded-xl border border-zinc-700 bg-carbon text-white placeholder:text-zinc-500 pl-10 pr-10 py-[9px] md:py-[12px] text-[14px] outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500/20 transition-all"
+                className="w-full rounded-xl border border-zinc-300 bg-white text-zinc-900 placeholder:text-zinc-400 pl-10 pr-10 py-[9px] md:py-[12px] text-[14px] outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500/20 transition-all"
               />
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600"
               >
                 {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
               </button>
@@ -311,11 +318,11 @@ function LoginForm() {
 
           {/* Remember + forgot */}
           <div className="flex items-center justify-between mb-2.5 md:mb-4">
-            <label className="flex items-center gap-2 text-[12px] text-zinc-400 cursor-pointer">
-              <input type="checkbox" className="rounded border-zinc-600 bg-carbon text-red-600 focus:ring-red-500" />
+            <label className="flex items-center gap-2 text-[12px] text-zinc-600 cursor-pointer">
+              <input type="checkbox" className="rounded border-zinc-400 bg-white text-red-600 focus:ring-red-500" />
               {t("rememberMe")}
             </label>
-            <a href="#" className="text-[12px] text-red-400 hover:text-red-300 font-semibold">{t("forgotPassword")}</a>
+            <a href="#" className="text-[12px] text-red-600 hover:text-red-700 font-semibold">{t("forgotPassword")}</a>
           </div>
 
           {/* Error */}
@@ -326,7 +333,7 @@ function LoginForm() {
                 animate={{ opacity: 1, height: "auto", marginBottom: 16 }}
                 exit={{ opacity: 0, height: 0, marginBottom: 0 }}
                 transition={{ duration: 0.2 }}
-                className="rounded-lg bg-red-500/10 border border-red-500/30 px-3 py-2 flex items-center gap-2 text-[12px] text-red-300 overflow-hidden"
+                className="rounded-lg bg-red-50 border border-red-300 px-3 py-2 flex items-center gap-2 text-[12px] text-red-700 overflow-hidden"
               >
                 <AlertCircle size={14} className="shrink-0" />
                 {error}
@@ -348,20 +355,23 @@ function LoginForm() {
 
           {/* Divider */}
           <div className="flex items-center gap-3 my-2.5 md:my-4">
-            <div className="flex-1 h-[1px] bg-zinc-700" />
+            <div className="flex-1 h-[1px] bg-zinc-300" />
             <span className="text-[11px] text-zinc-500">{t("orDivider")}</span>
-            <div className="flex-1 h-[1px] bg-zinc-700" />
+            <div className="flex-1 h-[1px] bg-zinc-300" />
           </div>
 
           {/* Google — se mantiene blanco a propósito (así se lee bien sobre
-              cualquier fondo, es la convención habitual del botón de Google) */}
+              cualquier fondo, es la convención habitual del botón de
+              Google). Sobre la tarjeta metalizada el borde se oscurece un
+              poco más (zinc-400) para que siga leyéndose como un botón
+              separado de la superficie, no que se funda con ella. ── */}
           <motion.button
             whileHover={{ scale: googleLoading ? 1 : 1.015 }}
             whileTap={{ scale: googleLoading ? 1 : 0.98 }}
             type="button"
             onClick={handleGoogleSignIn}
             disabled={googleLoading}
-            className="w-full flex items-center justify-center gap-3 border border-zinc-300 bg-white hover:bg-zinc-50 hover:border-zinc-400 hover:shadow-sm disabled:opacity-60 disabled:cursor-not-allowed transition-colors duration-150 py-[9px] md:py-[12px] rounded-xl text-[13px] font-semibold text-zinc-700"
+            className="w-full flex items-center justify-center gap-3 border border-zinc-400 bg-white hover:bg-zinc-50 hover:border-zinc-500 hover:shadow-sm disabled:opacity-60 disabled:cursor-not-allowed transition-colors duration-150 py-[9px] md:py-[12px] rounded-xl text-[13px] font-semibold text-zinc-700"
           >
             {googleLoading ? (
               <div className="w-[18px] h-[18px] border-2 border-zinc-300 border-t-zinc-600 rounded-full animate-spin" />
@@ -377,14 +387,14 @@ function LoginForm() {
           </motion.button>
 
           {/* Create account */}
-          <p className="text-center text-[13px] text-zinc-400 mt-3 md:mt-5">
+          <p className="text-center text-[13px] text-zinc-600 mt-3 md:mt-5">
             {t("newToMaintly")}{" "}
-            <Link href="/register" className="text-red-400 hover:text-red-300 font-bold">{t("createAccountLink")}</Link>
+            <Link href="/register" className="text-red-600 hover:text-red-700 font-bold">{t("createAccountLink")}</Link>
           </p>
 
           {/* Browse without account */}
           <p className="text-center text-[12px] text-zinc-500 mt-1.5 md:mt-3">
-            <Link href="/" className="hover:text-zinc-300 underline">{t("continueBrowsing")}</Link>
+            <Link href="/" className="hover:text-zinc-700 underline">{t("continueBrowsing")}</Link>
           </p>
     </motion.div>
   );
