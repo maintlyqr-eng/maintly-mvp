@@ -251,23 +251,27 @@ function LoginForm() {
           <div className="absolute top-0 inset-x-0 h-[3px] bg-gradient-to-r from-transparent via-maintly-red to-transparent" />
 
           <div className="text-center mb-3 md:mb-5">
-            {/* Facu (28 jul 2026, 14va/15va vuelta): "montale el logo de
-                maintly arriba del Bienvenido" — el archivo original
+            {/* Facu (28 jul 2026, 14va/15va/16va vuelta): "montale el logo
+                de maintly arriba del Bienvenido" — el archivo original
                 (logo-maintlyqr.png) tenía fondo blanco sólido, no
-                transparente ("debería tener fondo transparente"). Se
-                proceso una copia con flood-fill desde los bordes (el fondo
-                es un blanco muy uniforme, ~254/254/254, así que se pudo
-                quitar limpio sin comerse ni un pixel del logo — el círculo
-                blanco del QR queda intacto porque está encerrado por el
-                aro rojo/negro, nunca conectado al fondo exterior) —
-                logo-maintlyqr-transparent.png. También se agrandó
-                (h-14→h-20) porque "quedó chico". ── */}
+                transparente. Se procesó una copia con flood-fill desde los
+                bordes (el fondo es un blanco muy uniforme, ~254/254/254,
+                así que se pudo quitar limpio sin comerse ni un pixel del
+                logo) — logo-maintlyqr-transparent.png.
+                16va vuelta: "quedó chico" — el motivo real era que el PNG
+                transparente tenía un montón de aire vacío arriba y abajo
+                horneado en el lienzo (el logo ocupaba solo ~42% del alto
+                total de la imagen), así que aunque el contenedor creciera
+                (h-14→h-20), el logo visible adentro seguía siendo chico.
+                Se recortó el archivo a su bounding box real (con un
+                margen chico) — ahora el 100% del alto del contenedor es
+                logo de verdad, no aire. ── */}
             <div className="hidden md:flex justify-center mb-2">
               <Image
                 src="/images/logo-maintlyqr-transparent.png"
                 alt="MaintlyQR"
-                width={1774}
-                height={887}
+                width={1610}
+                height={407}
                 priority
                 className="h-20 w-auto"
               />

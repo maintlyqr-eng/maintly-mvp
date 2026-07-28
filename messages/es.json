@@ -283,7 +283,7 @@
     "googleSignInError": "No pudimos iniciar el inicio de sesión con Google. Probá de nuevo.",
     "newToMaintly": "¿Nuevo en MaintlyQR?",
     "createAccountLink": "Creá una cuenta",
-    "continueBrowsing": "Continuar navegando sin una cuenta",
+    "continueBrowsing": "Volver al inicio",
     "deletedError": "Esta cuenta fue eliminada. Contactá a soporte si pensás que esto es un error.",
     "featureSecureTitle": "Seguro",
     "featureSecureDesc": "Tus datos están protegidos",
@@ -321,7 +321,7 @@
     "deletedError": "Esta cuenta fue eliminada. Contactá a soporte si pensás que esto es un error.",
     "alreadyHaveAccount": "¿Ya tenés una cuenta?",
     "loginLink": "Iniciar Sesión",
-    "continueBrowsing": "Continuar navegando sin una cuenta"
+    "continueBrowsing": "Volver al inicio"
   },
   "ProductPage": {
     "eyebrow": "Producto",

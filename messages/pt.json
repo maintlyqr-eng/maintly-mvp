@@ -283,7 +283,7 @@
     "googleSignInError": "Não foi possível iniciar o login com o Google. Tente novamente.",
     "newToMaintly": "Novo na MaintlyQR?",
     "createAccountLink": "Criar uma conta",
-    "continueBrowsing": "Continuar navegando sem uma conta",
+    "continueBrowsing": "Voltar ao início",
     "deletedError": "Esta conta foi excluída. Entre em contato com o suporte se achar que isso é um engano.",
     "featureSecureTitle": "Seguro",
     "featureSecureDesc": "Seus dados estão protegidos",
@@ -321,7 +321,7 @@
     "deletedError": "Esta conta foi excluída. Entre em contato com o suporte se achar que isso é um engano.",
     "alreadyHaveAccount": "Já tem uma conta?",
     "loginLink": "Entrar",
-    "continueBrowsing": "Continuar navegando sem uma conta"
+    "continueBrowsing": "Voltar ao início"
   },
   "ProductPage": {
     "eyebrow": "Produto",

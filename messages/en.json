@@ -283,7 +283,7 @@
     "googleSignInError": "Couldn't start Google sign-in. Please try again.",
     "newToMaintly": "New to MaintlyQR?",
     "createAccountLink": "Create an account",
-    "continueBrowsing": "Continue browsing without an account",
+    "continueBrowsing": "Back to home",
     "deletedError": "This account has been deleted. Contact support if you think this is a mistake.",
     "featureSecureTitle": "Secure",
     "featureSecureDesc": "Your data is protected",
@@ -321,7 +321,7 @@
     "deletedError": "This account has been deleted. Contact support if you think this is a mistake.",
     "alreadyHaveAccount": "Already have an account?",
     "loginLink": "Login",
-    "continueBrowsing": "Continue browsing without an account"
+    "continueBrowsing": "Back to home"
   },
   "ProductPage": {
     "eyebrow": "Product",
