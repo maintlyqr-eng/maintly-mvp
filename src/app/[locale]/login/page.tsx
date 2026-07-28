@@ -65,6 +65,53 @@ import { supabase } from "@/lib/supabase";
 //     el de la barra de features (py-5→py-3.5, sin margin-bottom extra),
 //     además de varios márgenes internos del form — debería entrar sin
 //     scroll en pantallas de laptop normales ahora.
+// 28 jul 2026 (8va vuelta) — cambio de fondo: "todo está al medio y se ve
+// feo, quiero usar más pantalla" + Facu subió una imagen nueva hecha a
+// medida (mapa del mundo con líneas rojas de "alcance global" + un cluster
+// de máquinas/vehículos/electrodomésticos de todo tipo — auto, moto,
+// excavadora, heladera, lavarropas, generador, bomba, taladro) y mandó
+// aparte un mockup de referencia (SOLO de estilo, no para copiar literal)
+// mostrando un layout asimétrico de 2 columnas que usa toda la pantalla.
+//   - Diagnóstico de la 6ta/7ma vuelta: el fondo usaba object-contain
+//     centrado en TODO el <main>, mientras la tarjeta se centraba por su
+//     cuenta en el viewport completo -- son dos lógicas de centrado
+//     independientes, así que en cualquier ventana que no fuera
+//     *exactamente* 16:9 (proporción de la imagen) la imagen quedaba
+//     achicada+centrada por un lado, y la tarjeta centrada en otro punto
+//     por el otro lado -- de ahí el "todo está al medio", en realidad
+//     imagen y tarjeta ni siquiera estaban alineadas entre sí.
+//   - Fix: se adopta el mismo patrón que ya funciona en Register (ver su
+//     comment) -- la imagen nueva SÍ tiene un panel vacío real de fondo
+//     claro en su ~38% derecho (a propósito, para que la tarjeta se
+//     "enganche" ahí), así que el contenido (spacer invisible + columna
+//     angosta con la tarjeta) vive dentro de un contenedor con el MISMO
+//     aspect-ratio (1672:941) y el mismo max-width que la imagen de fondo
+//     -- las dos cosas escalan y se centran exactamente igual sea cual sea
+//     el tamaño de ventana, así que la tarjeta siempre cae sobre la zona
+//     vacía real de la imagen en vez de flotar centrada en el medio de la
+//     nada.
+//   - Se sacaron los dos "glows" rojos de CSS (blur-red) que vivían en un
+//     div sin scopear a `md:` -- ese era el origen del "apareció un
+//     rectángulo rojo en el fondo" que Facu vio en el celular. Ya no hacen
+//     falta: ahora hay una imagen real de fondo.
+//   - El fondo de <main> pasa a un gris muy claro (md:bg-[#e9eaec]) SOLO en
+//     desktop, para que si queda alguna franja de "letterbox" arriba/abajo
+//     de la imagen se mezcle con el gris clarito de la imagen en vez de
+//     mostrar barras negras (bg-carbon) contra una imagen clara. Mobile no
+//     se toca -- sigue siendo la franja hero oscura que ya había quedado
+//     bien aprobada.
+//   - La tarjeta y la barra de features quedan igual que la 7ma vuelta
+//     (mismo logo-lockup de texto, mismos campos) -- lo único que cambió
+//     acá es DÓNDE caen dentro de la pantalla, no su contenido.
+//   - Pendiente/a confirmar con Facu: esta imagen no trae el logo de
+//     MaintlyQR "horneado" adentro (a diferencia del mockup de referencia,
+//     que sí tenía un teléfono con la app + QR grande) -- por ahora el
+//     único texto de marca visible en desktop es el logo-lockup adentro de
+//     la tarjeta. Si Facu quiere más presencia de marca superpuesta sobre
+//     la imagen (título grande, tagline, etc.) eso se suma en otra vuelta
+//     una vez que confirme posición/tamaño, para no repetir el error de
+//     adivinar texto encima de una imagen que no tiene un espacio pensado
+//     para eso.
 // Ningún cambio de lógica (auth, sanitizeRedirect, handlers) — solo la
 // capa visual.
 
@@ -211,35 +258,14 @@ function LoginForm() {
   }
 
   return (
-    <main className="relative h-dvh md:h-auto md:min-h-dvh bg-carbon overflow-hidden md:overflow-x-hidden md:overflow-y-visible flex flex-col md:items-center md:justify-center px-0 md:px-6 py-0 md:py-5">
-
-      {/* ── FONDO (desktop): Facu (27 jul 2026, 6ta vuelta) — "me gusta
-          una imagen con vehículos como la del ejemplo" — vuelve a haber
-          una foto de fondo (login-hero-desktop-dark-alt.png, la variante
-          oscura CON vehículos del primer lote que había quedado guardada
-          sin usar), en vez del placeholder de puntitos. object-contain
-          para que nunca recorte nada (mismo fix de la 3ra vuelta), más un
-          par de resplandores rojos suaves encima para reforzar la
-          atmósfera. La tarjeta ya trae su propio logo grande adentro, así
-          que no hace falta que el fondo cargue esa parte. ── */}
-      <div className="hidden md:block absolute inset-0 z-0 bg-carbon">
-        <Image
-          src="/images/login-hero-desktop-dark-alt.png"
-          alt="MaintlyQR"
-          fill
-          priority
-          sizes="100vw"
-          className="object-contain object-center"
-        />
-      </div>
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-32 -left-32 w-[600px] h-[600px] bg-red-600/15 rounded-full blur-[140px]" />
-        <div className="absolute -bottom-40 -right-24 w-[650px] h-[650px] bg-red-600/12 rounded-full blur-[150px]" />
-      </div>
+    <main className="relative h-dvh bg-carbon md:bg-[#e9eaec] overflow-hidden flex flex-col">
 
       {/* ── HERO MOBILE (< md) — esto ya había quedado bien antes, se
-          restaura tal cual: recorte vertical hecho a medida
-          (login-hero-mobile-dark.png). ── */}
+          mantiene tal cual: recorte vertical hecho a medida
+          (login-hero-mobile-dark.png). Los "glows" rojos de CSS que vivían
+          acá al lado (sin scopear a md:) eran el origen del rectángulo rojo
+          que apareció en el fondo del celular — ya no existen, esta franja
+          es lo único que hay de fondo en mobile. ── */}
       <div className="md:hidden relative z-10 h-[125px] shrink-0 overflow-hidden bg-carbon">
         <Image
           src="/images/login-hero-mobile-dark.png"
@@ -252,8 +278,40 @@ function LoginForm() {
         <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-carbon" />
       </div>
 
-      {/* ── CONTENIDO ── */}
-      <div className="relative z-10 w-full max-w-[440px] flex-1 min-h-0 md:flex-none flex flex-col items-center justify-center md:justify-start px-5 py-2 md:px-0 md:py-0 overflow-hidden md:overflow-visible mx-auto">
+      {/* ── FONDO (desktop, 8va vuelta): imagen nueva de Facu (mapa del
+          mundo con líneas de alcance global + cluster de máquinas de todo
+          tipo), con un panel vacío real en su ~38% derecho pensado a
+          propósito para que la tarjeta se "enganche" ahí — mismo patrón
+          que register-hero-desktop-dark.png en Register. object-contain
+          para no recortar nunca nada. ── */}
+      <div className="hidden md:block absolute inset-0 z-0">
+        <Image
+          src="/images/login-hero-desktop-worldmap.png"
+          alt="MaintlyQR"
+          fill
+          priority
+          sizes="100vw"
+          className="object-contain object-center"
+        />
+      </div>
+
+      {/* ── CONTENIDO ──
+          Mobile: columna simple centrada (como antes).
+          Desktop (8va vuelta): contenedor con el MISMO aspect-ratio y
+          max-width que la imagen de fondo (1672:941) — spacer invisible
+          (61.6%, calca la zona con contenido de la imagen) + columna
+          angosta (38%, calca la zona vacía) donde vive la tarjeta + la
+          barra de features. Al compartir exactamente la misma lógica de
+          "contain + centrado" que la imagen, quedan siempre alineadas
+          entre sí sea cual sea el tamaño de ventana — ya no flotan cada
+          una centrada por su cuenta. ── */}
+      <div className="relative z-10 flex-1 min-h-0 flex items-center justify-center px-5 py-2 md:px-0 md:py-0 overflow-hidden">
+        <div className="w-full h-full flex flex-col items-center justify-center md:h-auto md:flex-row md:items-stretch md:max-w-[1672px] md:aspect-[1672/941]">
+          {/* Spacer — invisible, solo existe en desktop para empujar la
+              columna del form hacia la zona vacía real de la imagen. */}
+          <div className="hidden md:block md:flex-1" />
+
+          <div className="w-full max-w-[440px] md:max-w-[440px] flex flex-col items-center justify-center md:w-[38%] md:pr-[5%] mx-auto">
         <motion.div
           initial={{ opacity: 0, y: 22 }}
           animate={{ opacity: 1, y: 0 }}
@@ -403,22 +461,23 @@ function LoginForm() {
         </motion.div>
 
         {/* ── Barra de features — solo desktop (oculta en mobile para no
-            comerse el alto de una pantalla chica). Facu (27 jul 2026, 5ta
-            vuelta): la vuelta anterior quedó pegada al borde de la ventana
-            y con los textos cortados a la mitad (truncate) — ahora tiene
-            su propio margen abajo, más padding interno, y el texto envuelve
-            en dos líneas en vez de cortarse. ── */}
+            comerse el alto de una pantalla chica). 8va vuelta: ahora vive
+            sobre la zona clara de la imagen (antes era sobre el fondo
+            oscuro), así que pasa de semi-transparente (bg-carbon-light/60)
+            a opaca — si no, se leía mal contra un fondo claro detrás. ── */}
         <motion.div
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.55, delay: 0.15, ease: "easeOut" }}
-          className="hidden md:grid grid-cols-4 gap-5 w-full mt-4 bg-carbon-light/60 border border-zinc-800 rounded-2xl px-7 py-3.5"
+          className="hidden md:grid grid-cols-2 gap-4 w-full mt-4 bg-carbon-light border border-zinc-800 rounded-2xl px-6 py-4 shadow-industrial-dark"
         >
           <FeatureItem icon={ShieldCheck} title={t("featureSecureTitle")} desc={t("featureSecureDesc")} />
           <FeatureItem icon={Clock} title={t("featureReliableTitle")} desc={t("featureReliableDesc")} />
           <FeatureItem icon={BarChart3} title={t("featureSmartTitle")} desc={t("featureSmartDesc")} />
           <FeatureItem icon={QrCode} title={t("featureSimpleTitle")} desc={t("featureSimpleDesc")} />
         </motion.div>
+          </div>
+        </div>
       </div>
     </main>
   );
