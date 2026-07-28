@@ -509,19 +509,27 @@ function LoginForm() {
             la imagen oscurecida gradualmente, se funde con la foto en vez
             de tapar un pedazo con un cartel. ── */}
         <div className="w-[63%] shrink-0 relative flex flex-col justify-between px-10 lg:px-14 pt-10 lg:pt-14">
-          <div className="max-w-[540px]">
-            <h1 className="text-[26px] lg:text-[32px] font-black leading-[1.2] text-zinc-900">
+          <div className="max-w-[620px]">
+            {/* 18va vuelta: Facu — "me gustaría que tenga más presencia,
+                osea más grande" — de 26/32px a 38/48px. */}
+            <h1 className="text-[38px] lg:text-[48px] font-black leading-[1.15] text-zinc-900">
               {t("heroHeadlinePre")}
               <span className="text-red-600">{t("heroHeadlineAccent")}</span>
               {t("heroHeadlinePost")}
             </h1>
-            <p className="mt-2 text-[11px] lg:text-[12px] tracking-[0.25em] text-zinc-500 uppercase font-bold">
+            <p className="mt-3 text-[12px] lg:text-[13px] tracking-[0.25em] text-zinc-500 uppercase font-bold">
               {t("heroTagline")}
             </p>
           </div>
 
           <div className="relative -mx-10 lg:-mx-14 pt-28 lg:pt-32 pb-8 lg:pb-10 px-10 lg:px-14 bg-gradient-to-t from-black/70 via-black/25 to-transparent">
-            <div className="flex flex-wrap gap-x-9 gap-y-3 max-w-[560px]">
+            {/* 18va vuelta: Facu — "quedaron dos arriba y uno abajo, se ve
+                raro... deberían estar uno al lado del otro" — el
+                flex-wrap + max-w-[560px] hacía que el tercer ítem no
+                entrara y se cayera a una segunda fila. Se saca el wrap y
+                el tope de ancho: esta columna tiene de sobra (63% de la
+                pantalla), así que los 3 caben cómodos en una sola fila. ── */}
+            <div className="flex flex-nowrap gap-x-10">
               <HeroFeature icon={Globe} title={t("heroFeatureGlobalTitle")} desc={t("heroFeatureGlobalDesc")} />
               <HeroFeature icon={Wrench} title={t("heroFeatureAnyTitle")} desc={t("heroFeatureAnyDesc")} />
               <HeroFeature icon={QrCode} title={t("heroFeatureQrTitle")} desc={t("heroFeatureQrDesc")} />
