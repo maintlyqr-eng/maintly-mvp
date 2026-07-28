@@ -461,29 +461,41 @@ function LoginForm() {
         </div>
       </div>
 
-      {/* ── DESKTOP (9na vuelta) — layout de 2 columnas a pantalla
-          completa. Facu: "la imagen queda cortada en los costados, quiero
-          que complete la pantalla" — antes el fondo usaba object-contain
-          (nunca recorta, pero puede dejar franjas vacías si la ventana no
-          es 16:9 exacto) alineado con una caja del mismo aspect-ratio.
-          Ahora la columna de la imagen usa object-cover a pantalla
-          completa de punta a punta: llena siempre toda su columna, sin
-          ningún margen muerto. El trade-off es que puede recortar un poco
-          los bordes en ventanas con una proporción muy distinta a 16:9
-          (el formato en el que está hecha esta imagen) — eso es
-          justamente lo que se pidió. La tarjeta pasa a una columna de
-          ancho fijo al lado (ya no calcada a la zona vacía de la imagen),
-          y la barra de features se superpone abajo a la izquierda sobre
-          la imagen (ver comment de featureBar arriba). ── */}
+      {/* ── DESKTOP (10ma vuelta) — layout de 2 columnas a pantalla
+          completa. Facu (9na vuelta) pidió "que complete la pantalla",
+          pero object-cover recortaba los costados de la imagen (que es
+          justo lo que NO quería — "te pasé esa imagen para que la uses
+          toda... la corriste hacia la izquierda"). La columna de la
+          imagen es más angosta que alta (le queda el ancho del viewport
+          menos la tarjeta), así que un object-contain/object-cover puro
+          siempre iba a tener que elegir entre "se ve completa" o "llena
+          la pantalla" — nunca las dos al mismo tiempo, porque la relación
+          de aspecto de la columna no es la misma que la de la imagen.
+          Solución: dos capas superpuestas, la misma imagen en las dos.
+          Atrás, una copia bien agrandada (scale-125) y desenfocada
+          (blur-3xl) con object-cover — esa sí llena todos los rincones de
+          la columna de punta a punta, ninguna franja vacía. Encima, la
+          imagen real con object-contain (nunca recorta nada) — se ve
+          completa, tal cual la mandó Facu. El resultado: la imagen entera
+          siempre visible, y ni un pixel de la columna sin cubrir. ── */}
       <div className="hidden md:flex relative z-10 flex-1 min-h-0">
         <div className="relative flex-1 min-w-0 overflow-hidden bg-carbon">
+          <Image
+            src="/images/login-hero-desktop-worldmap.png"
+            alt=""
+            aria-hidden="true"
+            fill
+            priority
+            sizes="100vw"
+            className="object-cover object-center scale-125 blur-3xl opacity-90"
+          />
           <Image
             src="/images/login-hero-desktop-worldmap.png"
             alt="MaintlyQR"
             fill
             priority
             sizes="100vw"
-            style={{ objectFit: "cover", objectPosition: "center 38%" }}
+            className="object-contain object-center"
           />
           {featureBar}
         </div>
