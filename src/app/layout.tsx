@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "MaintlyQR",
-  description: "One QR. Lifetime maintenance history for any machine, anywhere in the world.",
+  description: "One QR. Lifetime maintenance history for any asset, anywhere in the world.",
   // Favicon: served automatically by Next.js from src/app/icon.png — no
   // need to declare it here. (The old reference pointed at a 1MB image in
   // /public, which is likely why the tab icon was slow/inconsistent.)

@@ -147,7 +147,7 @@ export default function HomePage() {
   }
 
   return (
-    <main className="relative min-h-dvh md:h-dvh overflow-x-hidden md:overflow-hidden bg-white text-zinc-900 flex flex-col">
+    <main className="relative h-dvh overflow-hidden bg-white text-zinc-900 flex flex-col">
 
       {/* ── BACKGROUND ── */}
       <div className="absolute inset-0 z-0">
@@ -230,19 +230,18 @@ export default function HomePage() {
       )}
 
       {/* ════ HERO ════ */}
-      <section className="relative z-10 flex flex-col items-center text-center px-4 flex-1 pb-8 md:pb-0" style={{paddingTop:'1vh'}}>
+      <section className="relative z-10 flex flex-col items-center justify-center md:justify-start text-center px-4 flex-1 min-h-0 pb-2 md:pb-0" style={{paddingTop:'1vh'}}>
 
         <a href="/" aria-label={t("homeAriaLabel")} className="transition-transform duration-300 ease-out hover:scale-[1.3] active:scale-95">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src="/images/qr-gear-real.png"
             alt="MaintlyQR"
-            className="object-contain drop-shadow-[0_8px_24px_rgba(0,0,0,0.15)] cursor-pointer"
-            style={{ width: 'clamp(130px,min(19vw,22.5vh),300px)', height: 'clamp(130px,min(19vw,22.5vh),300px)', marginBottom: '0.6vh' }}
+            className="object-contain drop-shadow-[0_8px_24px_rgba(0,0,0,0.15)] cursor-pointer w-[90px] h-[90px] mb-[0.5vh] md:w-[clamp(130px,min(19vw,22.5vh),300px)] md:h-[clamp(130px,min(19vw,22.5vh),300px)] md:mb-[0.6vh]"
           />
         </a>
 
-        <h1 className="font-black leading-[0.98] tracking-tighter text-zinc-900 uppercase" style={{fontSize:'clamp(36px,min(7.2vw,8.8vh),74px)'}}>
+        <h1 className="font-black leading-[0.98] tracking-tighter text-zinc-900 uppercase text-[30px] md:text-[clamp(36px,min(7.2vw,8.8vh),74px)]">
           {t("heroTitleLine1")}<br />{t("heroTitleLine2Prefix")}<span className="text-red-600">{t("heroTitleHighlight")}</span>
         </h1>
 
@@ -256,10 +255,10 @@ export default function HomePage() {
         </p>
 
         {/* ── ACTION CARDS ── */}
-        <div className="flex flex-col md:flex-row items-stretch w-full max-w-[680px] rounded-2xl overflow-hidden shadow-[0_8px_50px_rgba(0,0,0,0.13)] border border-zinc-200/80" style={{marginTop:'0.8vh'}}>
+        <div className="flex flex-row items-stretch w-full max-w-[680px] rounded-2xl overflow-hidden shadow-[0_8px_50px_rgba(0,0,0,0.13)] border border-zinc-200/80" style={{marginTop:'0.8vh'}}>
 
           {/* SCAN QR */}
-          <div className="flex-1 bg-zinc-900 flex flex-col items-center text-center px-7 rounded-t-2xl md:rounded-t-none md:rounded-l-2xl" style={{paddingTop:'0.9vh', paddingBottom:'0.9vh'}}>
+          <div className="flex-1 min-w-0 bg-zinc-900 flex flex-col items-center text-center px-3 md:px-7 rounded-l-2xl" style={{paddingTop:'0.9vh', paddingBottom:'0.9vh'}}>
             <div className="rounded-full bg-red-600/15 border border-red-600/30 flex items-center justify-center mb-3" style={{width:'clamp(40px,4vw,56px)', height:'clamp(40px,4vw,56px)'}}>
               <Camera className="text-red-500" style={{width:'clamp(18px,1.8vw,26px)', height:'clamp(18px,1.8vw,26px)'}} />
             </div>
@@ -277,16 +276,16 @@ export default function HomePage() {
           </div>
 
           {/* OR */}
-          <div className="flex flex-row md:flex-col items-center justify-center bg-white px-3 md:px-3 py-3 md:py-0 shrink-0 gap-2">
-            <div className="h-[1px] w-auto md:h-auto md:w-[1px] flex-1 bg-zinc-200" />
+          <div className="flex flex-col items-center justify-center bg-white px-3 py-3 md:py-0 shrink-0 gap-2">
+            <div className="h-auto w-[1px] flex-1 bg-zinc-200" />
             <div className="rounded-full border-2 border-zinc-200 bg-white flex items-center justify-center shrink-0" style={{width:'clamp(28px,2.5vw,36px)', height:'clamp(28px,2.5vw,36px)'}}>
               <span className="text-zinc-400 font-black" style={{fontSize:'clamp(8px,0.65vw,10px)'}}>{t("or")}</span>
             </div>
-            <div className="h-[1px] w-auto md:h-auto md:w-[1px] flex-1 bg-zinc-200" />
+            <div className="h-auto w-[1px] flex-1 bg-zinc-200" />
           </div>
 
           {/* ENTER QR */}
-          <div className="flex-1 bg-white flex flex-col items-center text-center px-7 rounded-b-2xl md:rounded-b-none md:rounded-r-2xl" style={{paddingTop:'0.9vh', paddingBottom:'0.9vh'}}>
+          <div className="flex-1 min-w-0 bg-white flex flex-col items-center text-center px-3 md:px-7 rounded-r-2xl" style={{paddingTop:'0.9vh', paddingBottom:'0.9vh'}}>
             <div className="rounded-full bg-zinc-100 border border-zinc-200 flex items-center justify-center mb-3" style={{width:'clamp(40px,4vw,56px)', height:'clamp(40px,4vw,56px)'}}>
               <Keyboard className="text-zinc-500" style={{width:'clamp(16px,1.5vw,22px)', height:'clamp(16px,1.5vw,22px)'}} />
             </div>
