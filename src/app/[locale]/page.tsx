@@ -183,19 +183,40 @@ export default function HomePage() {
             </div>
           ) : (
             <div className="flex items-center gap-2.5">
-              <Link href="/login" className="flex items-center gap-2 text-zinc-700 hover:text-zinc-900 font-black tracking-wide rounded-xl transition-all border border-zinc-300 hover:border-zinc-400 uppercase px-4 py-2" style={{fontSize:'clamp(10px,0.75vw,12px)'}}>
+              <Link href="/login" className="flex items-center gap-2 bg-red-600 hover:bg-red-500 text-white font-black tracking-wide rounded-xl transition-all uppercase px-4 py-2 shadow-md shadow-red-900/20" style={{fontSize:'clamp(10px,0.75vw,12px)'}}>
                 <User size={13} /> {tNav("login")}
               </Link>
             </div>
           )}
         </div>
 
-        <button
-          onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-          className="md:hidden text-zinc-700 hover:text-zinc-900 p-2"
-        >
-          {mobileMenuOpen ? <X size={22} /> : <Menu size={22} />}
-        </button>
+        {/* Incremento 21 (Facu): en mobile quiere el botón de login/dashboard
+            visible de una, sin tener que abrir el menú hamburguesa. Este
+            bloque vive SIEMPRE al lado del botón hamburguesa (md:hidden en
+            este wrapper solo oculta el control de auth en desktop, donde ya
+            existe el bloque equivalente más arriba) -- así el <nav> sigue
+            teniendo nada más 2 hijos visibles en mobile (logo + este grupo),
+            y el justify-between de la nav los sigue empujando a los extremos
+            igual que antes. */}
+        <div className="flex items-center gap-2">
+          <div className="md:hidden flex items-center">
+            {loggedIn ? (
+              <a href="/dashboard" className="flex items-center gap-1.5 bg-zinc-900 hover:bg-zinc-800 text-white font-black tracking-wide rounded-lg transition-all shadow-md px-3 py-1.5 text-[11px]">
+                <LayoutGrid size={12} /> {userName}
+              </a>
+            ) : (
+              <Link href="/login" className="flex items-center gap-1.5 bg-red-600 hover:bg-red-500 text-white font-black tracking-wide rounded-lg transition-all uppercase px-3 py-1.5 text-[11px] shadow-md shadow-red-900/20">
+                <User size={12} /> {tNav("login")}
+              </Link>
+            )}
+          </div>
+          <button
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            className="md:hidden text-zinc-700 hover:text-zinc-900 p-2"
+          >
+            {mobileMenuOpen ? <X size={22} /> : <Menu size={22} />}
+          </button>
+        </div>
       </nav>
 
       {mobileMenuOpen && (
@@ -205,27 +226,14 @@ export default function HomePage() {
               {label}
             </a>
           ))}
-          <div className="py-2 border-b border-zinc-100">
+          <div className="py-2">
             <LanguageSwitcher />
           </div>
-          <div className="pt-3">
-            {loggedIn ? (
-              <div className="flex flex-col gap-2">
-                <a href="/dashboard" onClick={() => setMobileMenuOpen(false)} className="flex items-center justify-center gap-2 bg-zinc-900 hover:bg-zinc-800 text-white font-black tracking-wide rounded-xl transition-all shadow-md px-4 py-3 text-[13px]">
-                  <LayoutGrid size={14} /> {userName}
-                </a>
-                <button onClick={() => { handleLogout(); setMobileMenuOpen(false); }} className="flex items-center justify-center gap-1.5 text-zinc-500 hover:text-red-600 transition-colors border border-zinc-200 rounded-xl px-3 py-3 text-[13px]">
-                  <LogOut size={14} /> {tNav("logout")}
-                </button>
-              </div>
-            ) : (
-              <div className="flex flex-col gap-2">
-                <Link href="/login" onClick={() => setMobileMenuOpen(false)} className="flex items-center justify-center gap-2 text-zinc-700 font-black tracking-wide rounded-xl transition-all border border-zinc-300 uppercase px-5 py-3 text-[13px]">
-                  <User size={14} /> {tNav("login")}
-                </Link>
-              </div>
-            )}
-          </div>
+          {loggedIn && (
+            <button onClick={() => { handleLogout(); setMobileMenuOpen(false); }} className="flex items-center justify-center gap-1.5 text-zinc-500 hover:text-red-600 transition-colors border border-zinc-200 rounded-xl px-3 py-3 text-[13px] mt-2">
+              <LogOut size={14} /> {tNav("logout")}
+            </button>
+          )}
         </div>
       )}
 
@@ -300,7 +308,7 @@ export default function HomePage() {
                 onChange={(e) => setQrCode(e.target.value)}
                 onKeyDown={handleKeyDown}
                 placeholder={t("enterCardPlaceholder")}
-                className="flex-1 rounded-xl bg-zinc-50 border border-zinc-200 focus:border-red-500 outline-none px-3 text-zinc-700 placeholder:text-zinc-400 transition-all"
+                className="flex-1 min-w-0 rounded-xl bg-zinc-50 border border-zinc-200 focus:border-red-500 outline-none px-3 text-zinc-700 placeholder:text-zinc-400 transition-all text-ellipsis"
                 style={{fontSize:'clamp(9px,0.7vw,11px)', padding:'clamp(7px,0.9vh,11px) 12px'}}
               />
               <button
