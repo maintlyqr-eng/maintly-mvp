@@ -32,8 +32,26 @@ import { supabase } from "@/lib/supabase";
 //     Simple) debajo de la tarjeta — solo en desktop (oculta en mobile a
 //     propósito, para no comerse el alto en una pantalla chica; ese
 //     contenido no es crítico para poder loguearse).
-// Las imágenes login-hero-*.png (de las vueltas 1 y 2) quedan guardadas en
-// public/images sin usarse por ahora, por si sirven para otra pantalla.
+// 27 jul 2026 (5ta vuelta) — ajustes después de ver la 4ta en producción:
+//   - El logo (36-40px de alto) se veía borroso/chico — se agrandó a
+//     56-64px, y se volvió a ocultar en mobile (como el ícono viejo) para
+//     no perder espacio en una pantalla chica.
+//   - Se restauró la franja hero de mobile (login-hero-mobile-dark.png)
+//     que ya había quedado bien antes de esta ronda de cambios — esa parte
+//     nunca debió tocarse.
+//   - La barra de features quedaba pegada al borde de la ventana con el
+//     texto cortado a la mitad (truncate) — ahora tiene margen propio y el
+//     texto envuelve en dos líneas en vez de cortarse.
+// 27 jul 2026 (6ta vuelta) — Facu prefirió mantener vehículos en el fondo
+// ("me gusta una imagen con vehículos como la del ejemplo"), así que en vez
+// de pedir una imagen nueva "mapa solo" se volvió a usar una de las 5 del
+// primer lote: login-hero-desktop-dark-alt.png (la variante oscura CON
+// vehículos), con object-contain para que nunca recorte nada, más un par
+// de resplandores rojos de CSS encima para reforzar la atmósfera. La
+// tarjeta sigue con su logo grande adentro (de la 5ta vuelta).
+// Las imágenes login-hero-desktop-dark.png / -light.png / -mobile-light.png
+// (del primer lote) quedan guardadas en public/images sin usarse por
+// ahora, por si sirven para otra pantalla.
 // Ningún cambio de lógica (auth, sanitizeRedirect, handlers) — solo la
 // capa visual.
 
@@ -81,11 +99,11 @@ function FeatureItem({
   desc: string;
 }) {
   return (
-    <div className="flex items-center gap-2.5 min-w-0">
-      <Icon size={18} className="text-red-500 shrink-0" />
+    <div className="flex items-start gap-2.5 min-w-0">
+      <Icon size={18} className="text-red-500 shrink-0 mt-[1px]" />
       <div className="min-w-0">
-        <div className="text-[12px] font-bold text-white leading-tight">{title}</div>
-        <div className="text-[10.5px] text-zinc-500 leading-tight truncate">{desc}</div>
+        <div className="text-[12.5px] font-bold text-white leading-tight">{title}</div>
+        <div className="text-[11px] text-zinc-500 leading-snug mt-0.5">{desc}</div>
       </div>
     </div>
   );
@@ -180,48 +198,71 @@ function LoginForm() {
   }
 
   return (
-    <main className="relative min-h-dvh bg-carbon overflow-x-hidden flex items-center justify-center px-5 py-8 md:px-6 md:py-10">
+    <main className="relative h-dvh md:h-auto md:min-h-dvh bg-carbon overflow-hidden md:overflow-x-hidden md:overflow-y-visible flex flex-col md:items-center md:justify-center px-0 md:px-6 py-0 md:py-10">
 
-      {/* ── FONDO ATMOSFÉRICO (100% CSS, sin imágenes) — grilla de puntos
-          sutil + resplandores rojos difuminados. Ver comment de arriba:
-          esto reemplaza la imagen "hero" de las vueltas anteriores. ── */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div
-          className="absolute inset-0 opacity-[0.35]"
-          style={{
-            backgroundImage: "radial-gradient(rgba(255,255,255,0.35) 1px, transparent 1px)",
-            backgroundSize: "26px 26px",
-          }}
+      {/* ── FONDO (desktop): Facu (27 jul 2026, 6ta vuelta) — "me gusta
+          una imagen con vehículos como la del ejemplo" — vuelve a haber
+          una foto de fondo (login-hero-desktop-dark-alt.png, la variante
+          oscura CON vehículos del primer lote que había quedado guardada
+          sin usar), en vez del placeholder de puntitos. object-contain
+          para que nunca recorte nada (mismo fix de la 3ra vuelta), más un
+          par de resplandores rojos suaves encima para reforzar la
+          atmósfera. La tarjeta ya trae su propio logo grande adentro, así
+          que no hace falta que el fondo cargue esa parte. ── */}
+      <div className="hidden md:block absolute inset-0 z-0 bg-carbon">
+        <Image
+          src="/images/login-hero-desktop-dark-alt.png"
+          alt="MaintlyQR"
+          fill
+          priority
+          sizes="100vw"
+          className="object-contain object-center"
         />
-        <div className="absolute -top-24 -left-24 w-[520px] h-[520px] bg-red-600/20 rounded-full blur-[130px]" />
-        <div className="absolute -bottom-32 -right-16 w-[560px] h-[560px] bg-red-600/15 rounded-full blur-[140px]" />
-        <div className="absolute top-1/3 right-1/4 w-[300px] h-[300px] bg-red-600/10 rounded-full blur-[100px]" />
+      </div>
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute -top-32 -left-32 w-[600px] h-[600px] bg-red-600/15 rounded-full blur-[140px]" />
+        <div className="absolute -bottom-40 -right-24 w-[650px] h-[650px] bg-red-600/12 rounded-full blur-[150px]" />
+      </div>
+
+      {/* ── HERO MOBILE (< md) — esto ya había quedado bien antes, se
+          restaura tal cual: recorte vertical hecho a medida
+          (login-hero-mobile-dark.png). ── */}
+      <div className="md:hidden relative z-10 h-[125px] shrink-0 overflow-hidden bg-carbon">
+        <Image
+          src="/images/login-hero-mobile-dark.png"
+          alt="MaintlyQR"
+          fill
+          priority
+          sizes="100vw"
+          style={{ objectFit: "cover", objectPosition: "50% 8%" }}
+        />
+        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-carbon" />
       </div>
 
       {/* ── CONTENIDO ── */}
-      <div className="relative z-10 w-full max-w-[440px] flex flex-col items-center">
+      <div className="relative z-10 w-full max-w-[440px] flex-1 min-h-0 md:flex-none flex flex-col items-center justify-center md:justify-start px-5 py-2 md:px-0 md:py-0 overflow-hidden md:overflow-visible mx-auto">
         <motion.div
           initial={{ opacity: 0, y: 22 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.55, ease: "easeOut" }}
-          className="w-full relative bg-carbon-light rounded-[28px] border border-red-500/40 shadow-industrial-dark px-6 py-7 md:px-8 md:py-9 overflow-hidden"
+          className="w-full relative bg-carbon-light rounded-[28px] border border-red-500/40 shadow-industrial-dark px-5 py-4 md:px-8 md:py-9 overflow-hidden"
         >
-          <div className="text-center mb-5 md:mb-7">
+          <div className="text-center mb-3 md:mb-7">
             <Image
               src="/images/maintly-logo-full.png"
               alt="MaintlyQR"
               width={220}
               height={65}
               priority
-              className="h-9 md:h-10 w-auto mx-auto mb-4"
+              className="hidden md:block h-14 md:h-16 w-auto mx-auto mb-4"
             />
-            <h2 className="text-[21px] md:text-[26px] font-black text-white">{t("welcomeBack")}</h2>
-            <p className="text-[13px] text-zinc-400 mt-1">{t("subtitle")}</p>
+            <h2 className="text-[19px] md:text-[26px] font-black text-white">{t("welcomeBack")}</h2>
+            <p className="hidden md:block text-[13px] text-zinc-400 mt-1">{t("subtitle")}</p>
           </div>
 
           <form onSubmit={handleLogin}>
           {/* Email */}
-          <div className="mb-4">
+          <div className="mb-2.5 md:mb-4">
             <label className="text-[12px] font-bold text-zinc-300">{t("emailLabel")}</label>
             <div className="relative mt-1">
               <Mail size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
@@ -231,13 +272,13 @@ function LoginForm() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder={t("emailPlaceholder")}
-                className="w-full rounded-xl border border-zinc-700 bg-carbon text-white placeholder:text-zinc-500 pl-10 pr-3 py-[12px] text-[14px] outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500/20 transition-all"
+                className="w-full rounded-xl border border-zinc-700 bg-carbon text-white placeholder:text-zinc-500 pl-10 pr-3 py-[9px] md:py-[12px] text-[14px] outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500/20 transition-all"
               />
             </div>
           </div>
 
           {/* Password */}
-          <div className="mb-3">
+          <div className="mb-2 md:mb-3">
             <label className="text-[12px] font-bold text-zinc-300">{t("passwordLabel")}</label>
             <div className="relative mt-1">
               <Lock size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
@@ -247,7 +288,7 @@ function LoginForm() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder={t("passwordPlaceholder")}
-                className="w-full rounded-xl border border-zinc-700 bg-carbon text-white placeholder:text-zinc-500 pl-10 pr-10 py-[12px] text-[14px] outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500/20 transition-all"
+                className="w-full rounded-xl border border-zinc-700 bg-carbon text-white placeholder:text-zinc-500 pl-10 pr-10 py-[9px] md:py-[12px] text-[14px] outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500/20 transition-all"
               />
               <button
                 type="button"
@@ -260,7 +301,7 @@ function LoginForm() {
           </div>
 
           {/* Remember + forgot */}
-          <div className="flex items-center justify-between mb-5">
+          <div className="flex items-center justify-between mb-2.5 md:mb-5">
             <label className="flex items-center gap-2 text-[12px] text-zinc-400 cursor-pointer">
               <input type="checkbox" className="rounded border-zinc-600 bg-carbon text-red-600 focus:ring-red-500" />
               {t("rememberMe")}
@@ -290,14 +331,14 @@ function LoginForm() {
             whileTap={{ scale: loading ? 1 : 0.98 }}
             type="submit"
             disabled={loading}
-            className="w-full bg-red-600 hover:bg-red-500 disabled:opacity-60 disabled:cursor-not-allowed transition-colors text-white font-bold py-[13px] rounded-xl text-[14px] tracking-wide uppercase shadow-industrial-dark"
+            className="w-full bg-red-600 hover:bg-red-500 disabled:opacity-60 disabled:cursor-not-allowed transition-colors text-white font-bold py-[10px] md:py-[13px] rounded-xl text-[14px] tracking-wide uppercase shadow-industrial-dark"
           >
             {loading ? t("loggingIn") : t("loginButton")}
           </motion.button>
           </form>
 
           {/* Divider */}
-          <div className="flex items-center gap-3 my-5">
+          <div className="flex items-center gap-3 my-2.5 md:my-5">
             <div className="flex-1 h-[1px] bg-zinc-700" />
             <span className="text-[11px] text-zinc-500">{t("orDivider")}</span>
             <div className="flex-1 h-[1px] bg-zinc-700" />
@@ -311,7 +352,7 @@ function LoginForm() {
             type="button"
             onClick={handleGoogleSignIn}
             disabled={googleLoading}
-            className="w-full flex items-center justify-center gap-3 border border-zinc-300 bg-white hover:bg-zinc-50 hover:border-zinc-400 hover:shadow-sm disabled:opacity-60 disabled:cursor-not-allowed transition-colors duration-150 py-[12px] rounded-xl text-[13px] font-semibold text-zinc-700"
+            className="w-full flex items-center justify-center gap-3 border border-zinc-300 bg-white hover:bg-zinc-50 hover:border-zinc-400 hover:shadow-sm disabled:opacity-60 disabled:cursor-not-allowed transition-colors duration-150 py-[9px] md:py-[12px] rounded-xl text-[13px] font-semibold text-zinc-700"
           >
             {googleLoading ? (
               <div className="w-[18px] h-[18px] border-2 border-zinc-300 border-t-zinc-600 rounded-full animate-spin" />
@@ -327,25 +368,28 @@ function LoginForm() {
           </motion.button>
 
           {/* Create account */}
-          <p className="text-center text-[13px] text-zinc-400 mt-6">
+          <p className="text-center text-[13px] text-zinc-400 mt-3 md:mt-6">
             {t("newToMaintly")}{" "}
             <Link href="/register" className="text-red-400 hover:text-red-300 font-bold">{t("createAccountLink")}</Link>
           </p>
 
           {/* Browse without account */}
-          <p className="text-center text-[12px] text-zinc-500 mt-3">
+          <p className="text-center text-[12px] text-zinc-500 mt-1.5 md:mt-3">
             <Link href="/" className="hover:text-zinc-300 underline">{t("continueBrowsing")}</Link>
           </p>
         </motion.div>
 
-        {/* ── Barra de features — solo desktop. En mobile la sacamos a
-            propósito para no comerse el alto de una pantalla chica: no es
-            contenido crítico para poder loguearse. ── */}
+        {/* ── Barra de features — solo desktop (oculta en mobile para no
+            comerse el alto de una pantalla chica). Facu (27 jul 2026, 5ta
+            vuelta): la vuelta anterior quedó pegada al borde de la ventana
+            y con los textos cortados a la mitad (truncate) — ahora tiene
+            su propio margen abajo, más padding interno, y el texto envuelve
+            en dos líneas en vez de cortarse. ── */}
         <motion.div
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.55, delay: 0.15, ease: "easeOut" }}
-          className="hidden md:grid grid-cols-4 gap-4 w-full mt-5 bg-carbon-light/60 border border-zinc-800 rounded-2xl px-6 py-4"
+          className="hidden md:grid grid-cols-4 gap-5 w-full mt-6 mb-6 bg-carbon-light/60 border border-zinc-800 rounded-2xl px-7 py-5"
         >
           <FeatureItem icon={ShieldCheck} title={t("featureSecureTitle")} desc={t("featureSecureDesc")} />
           <FeatureItem icon={Clock} title={t("featureReliableTitle")} desc={t("featureReliableDesc")} />
