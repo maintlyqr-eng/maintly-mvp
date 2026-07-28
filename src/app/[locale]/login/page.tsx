@@ -251,25 +251,25 @@ function LoginForm() {
           <div className="absolute top-0 inset-x-0 h-[3px] bg-gradient-to-r from-transparent via-maintly-red to-transparent" />
 
           <div className="text-center mb-3 md:mb-5">
-            {/* Facu (28 jul 2026, 14va vuelta): "montale el logo de maintly
-                arriba del Bienvenido, el logo del que hablo se llama logo
-                maintlyqr" — reemplaza el lockup de texto+ícono (7ma vuelta)
-                por el archivo real que mandó (logo-maintlyqr.png, el
-                engranaje metalizado + QR + wordmark). De paso la tarjeta
-                entera pasa de negro carbón a un gradiente metalizado
-                (zinc-50→zinc-300 + shadow-industrial-light, que ya trae un
-                highlight interno blanco pensado justo para esto) — pidió
-                "que lo que es negro se vea más metalizado, plateado o
-                gris". Todos los textos/inputs de acá abajo se invirtieron
-                de claro-sobre-oscuro a oscuro-sobre-claro. ── */}
+            {/* Facu (28 jul 2026, 14va/15va vuelta): "montale el logo de
+                maintly arriba del Bienvenido" — el archivo original
+                (logo-maintlyqr.png) tenía fondo blanco sólido, no
+                transparente ("debería tener fondo transparente"). Se
+                proceso una copia con flood-fill desde los bordes (el fondo
+                es un blanco muy uniforme, ~254/254/254, así que se pudo
+                quitar limpio sin comerse ni un pixel del logo — el círculo
+                blanco del QR queda intacto porque está encerrado por el
+                aro rojo/negro, nunca conectado al fondo exterior) —
+                logo-maintlyqr-transparent.png. También se agrandó
+                (h-14→h-20) porque "quedó chico". ── */}
             <div className="hidden md:flex justify-center mb-2">
               <Image
-                src="/images/logo-maintlyqr.png"
+                src="/images/logo-maintlyqr-transparent.png"
                 alt="MaintlyQR"
                 width={1774}
                 height={887}
                 priority
-                className="h-14 w-auto"
+                className="h-20 w-auto"
               />
             </div>
             <h2 className="text-[19px] md:text-[24px] font-black text-zinc-900">{t("welcomeBack")}</h2>
