@@ -1,11 +1,11 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Link } from "@/i18n/navigation";
 import { useTranslations } from "next-intl";
-import { ArrowRight, ShieldCheck, Camera, Keyboard, User, Globe, Clock, TrendingUp, LogOut, LayoutGrid, X, Menu, Wrench, FileText, ExternalLink, ChevronDown } from "lucide-react";
+import { ArrowRight, ShieldCheck, Camera, Keyboard, User, Globe, Clock, TrendingUp, LogOut, LayoutGrid, X, Menu, Wrench, FileText, ExternalLink } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import QRScannerModal from "@/components/QRScannerModal";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
@@ -28,11 +28,10 @@ export default function HomePage() {
 
   // Incremento 22 (Facu): en mobile el Home ahora es un diseño propio,
   // distinto al de desktop (mismo criterio que ya usamos en Login/Register)
-  // -- una foto a pantalla completa con lo esencial (marca + las 2 acciones)
-  // sin scroll, y el contenido secundario (sellos, stats, pilares, footer)
-  // en una sección aparte más abajo, a la que se llega con un toque de
-  // scroll. Este ref apunta a esa sección para el botón "Ver más".
-  const moreRef = useRef<HTMLDivElement>(null);
+  // -- una foto a pantalla completa con TODO el contenido (marca, acciones,
+  // stats, sellos, pilares y footer) comprimido dentro de una sola sección
+  // de altura fija, sin scroll alguno (pedido explícito de Facu: "no quiero
+  // escrol").
 
   // Incremento 20: cuando Google vuelve acá con la sesión en el hash de la
   // URL (#access_token=...), pasa un par de segundos entre que la página
@@ -343,10 +342,14 @@ export default function HomePage() {
 
       {/* ════ MOBILE HERO — diseño propio, foto a pantalla completa ════
           Incremento 22 (Facu): "en el celu se puede usar otro diseño...
-          como hicimos con el login". Altura fija = 100dvh menos la navbar
-          (h-16 = 4rem), así siempre se ve como "una pantalla completa" sin
-          importar cuánto contenido haya más abajo -- lo secundario vive en
-          la sección aparte que sigue, y esa sí puede scrollear. */}
+          como hicimos con el login". Incremento 23: Facu probó la primera
+          versión (con una sección secundaria más abajo, alcanzable con
+          scroll) y fue tajante -- "no quiero scrol", ni siquiera un poquito.
+          Esta versión mete TODO (stats, sellos, pilares, footer) adentro de
+          esta misma pantalla, usando el hueco que la foto deja libre entre
+          el título y los botones (ahí solo se veían los vehículos de fondo,
+          sin nada útil). Altura fija = 100dvh menos la navbar (h-16 = 4rem),
+          así entra exactamente una pantalla, siempre, sin excepción. */}
       <section className="md:hidden relative shrink-0 overflow-hidden" style={{height:'calc(100dvh - 4rem)'}}>
         <div className="absolute inset-0 z-0">
           <Image src="/images/login-hero-mobile-light.png" alt="MaintlyQR" fill priority sizes="100vw" className="object-cover object-top" />
@@ -355,78 +358,116 @@ export default function HomePage() {
         {/* La foto ya trae su propio ícono de engranaje+QR arriba, así que
             acá no se repite un logo aparte -- el texto va directamente en
             la franja vacía de la imagen (mapa mundial de fondo, sin
-            vehículos todavía). */}
-        <div className="absolute left-0 right-0 z-10 text-center px-5" style={{top:'29%'}}>
-          <h1 className="font-black leading-[1.02] tracking-tighter text-zinc-900 uppercase text-[28px]">
+            vehículos todavía). Sin el párrafo de descripción larga (que sí
+            tiene desktop) -- acá no entraba sin apretar todo lo de abajo. */}
+        <div className="absolute left-0 right-0 z-10 text-center px-5" style={{top:'25%'}}>
+          <h1 className="font-black leading-[1.0] tracking-tighter text-zinc-900 uppercase text-[24px]">
             {t("heroTitleLine1")}<br />{t("heroTitleLine2Prefix")}<span className="text-red-600">{t("heroTitleHighlight")}</span>
           </h1>
-          <div className="w-12 h-[3px] bg-red-600 rounded-full mx-auto" style={{marginTop:'0.7vh', marginBottom:'0.7vh'}} />
-          <p className="font-bold text-zinc-800 text-[13.5px]">
+          <div className="w-10 h-[3px] bg-red-600 rounded-full mx-auto" style={{marginTop:'0.5vh', marginBottom:'0.5vh'}} />
+          <p className="font-bold text-zinc-800 text-[11.5px]">
             <span className="text-red-600 font-black">{t("heroSubtitleHighlight")}</span> {t("heroSubtitleRest")}
-          </p>
-          <p className="text-zinc-600 text-[11.5px] leading-[1.35] mt-1 max-w-[300px] mx-auto">
-            {t("heroDescription")}
           </p>
         </div>
 
-        {/* Scrim para que los botones de abajo (que ya son sólidos, no
-            necesitan esto para leerse) asienten prolijo sobre los vehículos
-            de la foto en vez de cortar de golpe. */}
-        <div className="absolute left-0 right-0 bottom-0 z-0 pointer-events-none" style={{height:'34%', background:'linear-gradient(to top, rgba(255,255,255,0.88), rgba(255,255,255,0))'}} />
+        {/* Scrim para que el bloque de abajo (stats + botones + sellos +
+            pilares + footer, todo junto ahora) asiente prolijo sobre los
+            vehículos de la foto en vez de cortar de golpe. */}
+        <div className="absolute left-0 right-0 bottom-0 z-0 pointer-events-none" style={{height:'56%', background:'linear-gradient(to top, rgba(255,255,255,0.94), rgba(255,255,255,0))'}} />
 
-        <div className="absolute left-0 right-0 z-10 px-5" style={{bottom:'3vh'}}>
-          <div className="flex flex-row gap-2.5 w-full">
+        <div className="absolute left-0 right-0 z-10 px-4" style={{bottom:'1.2vh'}}>
+          {/* Stats en vivo — antes vivían en la sección secundaria; ahora
+              entran acá arriba de los botones, en el hueco de la foto. */}
+          <div className="w-full grid grid-cols-4 rounded-xl overflow-hidden bg-zinc-900/95" style={{marginBottom:'0.55vh'}}>
+            {[
+              { value: stats ? stats.machines.toLocaleString() : "—", label: t("statMachines") },
+              { value: stats ? stats.services.toLocaleString() : "—", label: t("statServices") },
+              { value: stats ? stats.mechanics.toLocaleString() : "—", label: t("statMechanics") },
+              { value: null, label: t("statGrowing") },
+            ].map(({ value, label }, i) => (
+              <div key={label} className={["flex flex-col items-center justify-center gap-px py-[5px] px-0.5 border-white/15", i < 3 ? "border-r" : ""].join(" ")}>
+                {value !== null && <p className="font-black text-white leading-none text-[12px]">{value}</p>}
+                <p className="text-zinc-400 font-semibold uppercase tracking-wide leading-[1.1] text-[6px] text-center">{label}</p>
+              </div>
+            ))}
+          </div>
+
+          <div className="flex flex-row gap-[7px] w-full" style={{marginBottom:'0.55vh'}}>
             <button
               onClick={openCamera}
-              className="flex-1 min-w-0 flex flex-col items-center justify-center gap-0.5 rounded-2xl bg-red-600 active:scale-[0.98] transition-all text-white shadow-lg shadow-red-900/30 py-3.5 px-2"
+              className="flex-1 min-w-0 flex items-center justify-center gap-1.5 rounded-xl bg-red-600 active:scale-[0.98] transition-all text-white shadow-lg shadow-red-900/30 font-black uppercase tracking-wide text-[11px] py-[9px] px-1.5"
             >
-              <span className="flex items-center gap-1.5 font-black uppercase tracking-wide text-[12.5px]">
-                <Camera size={14} /> {t("scanCardTitle")}
-              </span>
-              <span className="text-[9.5px] font-medium text-red-100">{t("scanCardDescriptionLine1")}</span>
+              <Camera size={13} /> {t("scanCardTitle")}
             </button>
 
-            <div className="flex-1 min-w-0 flex items-center gap-1.5 rounded-2xl bg-white/95 border border-zinc-200 shadow-md py-1.5 pl-3 pr-1.5">
-              <Keyboard size={14} className="text-zinc-400 shrink-0" />
+            <div className="flex-1 min-w-0 flex items-center gap-1 rounded-xl bg-white/97 border border-zinc-200 shadow-md py-[5px] pl-2.5 pr-[5px]">
+              <Keyboard size={13} className="text-zinc-400 shrink-0" />
               <input
                 type="text"
                 value={qrCode}
                 onChange={(e) => setQrCode(e.target.value)}
                 onKeyDown={handleKeyDown}
                 placeholder={t("enterCardPlaceholder")}
-                className="flex-1 min-w-0 bg-transparent outline-none text-[12px] text-zinc-700 placeholder:text-zinc-400 text-ellipsis"
+                className="flex-1 min-w-0 bg-transparent outline-none text-[10.5px] text-zinc-700 placeholder:text-zinc-400 text-ellipsis"
               />
               <button
                 onClick={handleGoToAsset}
                 disabled={!qrCode.trim()}
                 aria-label={t("enterCardTitle")}
-                className="rounded-xl bg-red-600 disabled:opacity-40 disabled:cursor-not-allowed transition-all p-2 flex items-center justify-center shrink-0"
+                className="rounded-lg bg-red-600 disabled:opacity-40 disabled:cursor-not-allowed transition-all p-[6px] flex items-center justify-center shrink-0"
               >
-                <ArrowRight size={13} className="text-white" />
+                <ArrowRight size={12} className="text-white" />
               </button>
             </div>
           </div>
 
-          <button
-            onClick={() => moreRef.current?.scrollIntoView({ behavior: "smooth" })}
-            className="flex flex-col items-center gap-0.5 text-zinc-600/80 mx-auto"
-            style={{marginTop:'1vh'}}
-          >
-            <span className="text-[9px] font-bold uppercase tracking-[0.15em]">{t("scrollForMore")}</span>
-            <ChevronDown size={14} />
-          </button>
-        </div>
-      </section>
+          {/* Sellos de confianza — versión compacta de una sola línea. */}
+          <div className="flex flex-nowrap items-center justify-center gap-1.5 text-zinc-500 overflow-hidden" style={{marginBottom:'0.5vh'}}>
+            <ShieldCheck className="text-red-500 shrink-0" size={10} />
+            <span className="text-[8px] whitespace-nowrap">{t("trustBarText")}</span>
+            <div className="flex -space-x-1.5 shrink-0">
+              {["#dc2626","#1d4ed8","#16a34a","#d97706","#7c3aed"].map((color, i) => (
+                <div key={i} className="rounded-full border border-white" style={{background:color, width:'13px', height:'13px'}} />
+              ))}
+            </div>
+            <a
+              href="/asset/demogen001"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-black uppercase tracking-wide text-white bg-red-600 rounded-full whitespace-nowrap shrink-0 text-[7.5px] px-2 py-[3px]"
+            >
+              {t("viewLiveExample")}
+            </a>
+          </div>
 
-      {/* ════ MOBILE — CONTENIDO SECUNDARIO (con scroll) ════
-          Sellos de confianza, stats en vivo, pilares y footer -- ya no
-          compiten por espacio en la pantalla principal, así que quedan acá
-          abajo, alcanzables con un toque de scroll. */}
-      <section ref={moreRef} className="md:hidden relative z-10 bg-white px-4 pt-6 pb-6 flex flex-col items-center gap-3">
-        {trustBar}
-        {statsGrid}
-        {pillarsGrid}
-        {footerLinks}
+          {/* Pilares — 2x2, versión compacta. */}
+          <div className="w-full grid grid-cols-2 rounded-lg overflow-hidden border border-zinc-200 bg-white/95" style={{marginBottom:'0.4vh'}}>
+            {[
+              { icon: ShieldCheck, title: t("pillarSecure") },
+              { icon: Globe, title: t("pillarAccess") },
+              { icon: Clock, title: t("pillarHistory") },
+              { icon: TrendingUp, title: t("pillarGrow") },
+            ].map(({ icon: Icon, title }, i) => (
+              <div key={title} className={["flex flex-row items-center justify-center gap-1 py-[4px] px-1 border-zinc-200", i % 2 === 0 ? "border-r" : "", i < 2 ? "border-b" : ""].filter(Boolean).join(" ")}>
+                <div className="rounded-full border border-red-200 bg-red-50 flex items-center justify-center text-red-500 shrink-0" style={{width:'12px', height:'12px'}}>
+                  <Icon size={7} />
+                </div>
+                <p className="font-black text-zinc-800 uppercase leading-[1.1] text-[6.5px] text-center">{title}</p>
+              </div>
+            ))}
+          </div>
+
+          {/* Footer — versión mínima, solo lo esencial (marca + legales). */}
+          <div className="flex justify-center items-center gap-1.5 flex-wrap">
+            <span className="tracking-wide text-zinc-400 font-semibold uppercase text-[6px]">{t("footerBrand")}</span>
+            <span className="text-red-400 text-[6px]">•</span>
+            <Link href="/terms" className="tracking-wide text-zinc-400 font-semibold uppercase text-[6px]">{t("footerTerms")}</Link>
+            <span className="text-red-400 text-[6px]">•</span>
+            <Link href="/privacy" className="tracking-wide text-zinc-400 font-semibold uppercase text-[6px]">{t("footerPrivacy")}</Link>
+            <span className="text-red-400 text-[6px]">•</span>
+            <Link href="/cookies" className="tracking-wide text-zinc-400 font-semibold uppercase text-[6px]">{t("footerCookies")}</Link>
+          </div>
+        </div>
       </section>
 
       {/* ════ DESKTOP HERO ════ (sin cambios de diseño — Facu ya aprobó
