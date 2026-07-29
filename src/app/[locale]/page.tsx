@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useLayoutEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Link } from "@/i18n/navigation";
 import { useTranslations } from "next-intl";
@@ -45,9 +45,25 @@ export default function HomePage() {
   // renderizó el servidor, así que no hay mismatch de hidratación -- recién
   // cambia del lado del cliente, después del primer render.
   const [authRedirecting, setAuthRedirecting] = useState(false);
+  // Incremento 25 (Facu): "cuando estoy logueado y vuelvo al home, se queda
+  // un rato y vuelve al dashboard" -- en desktop y en celu. Esto pasaba en
+  // visitas NORMALES a Home ya logueado, no solo volviendo de Google. Causa:
+  // el listener de abajo confiaba en el nombre del evento ("SIGNED_IN") para
+  // decidir si redirigir, pero el cliente de Supabase puede re-emitir
+  // "SIGNED_IN" bastante después de cargar la página (por ej. al refrescar
+  // el token en segundo plano, o al volver a poner foco en la pestaña) aun
+  // cuando la sesión ya estaba activa de antes -- de ahí el "se queda un
+  // rato y vuelve", no era instantáneo. authRedirectingRef guarda en un ref
+  // (no en el estado, porque el listener de abajo se suscribe una sola vez
+  // al montar y quedaría con el valor viejo si usáramos el estado) si
+  // realmente estamos en medio de un regreso de Google con el token en el
+  // hash de la URL. Ahora el redirect de seguridad solo se dispara en ESE
+  // caso puntual, nunca en una visita común a Home ya logueado.
+  const authRedirectingRef = useRef(false);
   useLayoutEffect(() => {
     if (typeof window !== "undefined" && window.location.hash.includes("access_token")) {
       setAuthRedirecting(true);
+      authRedirectingRef.current = true;
     }
   }, []);
 
@@ -70,10 +86,15 @@ export default function HomePage() {
       // la lista de "Redirect URLs" configurada en Supabase, typo de
       // www/no-www, etc.) Supabase termina mandando al usuario acá a Home
       // en cambio, sin esto se quedaría logueado pero mirando la landing
-      // pública. Se filtra específicamente por el evento "SIGNED_IN" (no
-      // "INITIAL_SESSION") para no redirigir a alguien que ya estaba
-      // logueado y simplemente entró a mirar la home a propósito.
-      if (event === "SIGNED_IN" && session) {
+      // pública.
+      // Incremento 25: además de filtrar por el evento "SIGNED_IN", ahora
+      // también exigimos authRedirectingRef.current -- es decir, que
+      // realmente hayamos detectado el hash de Google en la URL al cargar
+      // esta página. Así el redirect de seguridad sigue funcionando para el
+      // caso que lo motivó (login con Google mal redirigido a Home), pero
+      // ya no dispara en una visita común y silvestre a Home estando
+      // logueado, sin importar qué evento reporte Supabase de fondo.
+      if (event === "SIGNED_IN" && session && authRedirectingRef.current) {
         const { data: m } = await supabase.from("mechanics").select("suspended, deleted_at, profession").eq("id", session.user.id).maybeSingle();
         if (m?.deleted_at || m?.suspended) return; // el listener de Login ya muestra el error si vino de ahí; acá no hay dónde mostrarlo, así que no forzamos nada más.
         router.push(m?.profession ? "/dashboard" : "/register/profession");
