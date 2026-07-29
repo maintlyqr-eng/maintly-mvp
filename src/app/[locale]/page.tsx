@@ -359,13 +359,19 @@ export default function HomePage() {
             acá no se repite un logo aparte -- el texto va directamente en
             la franja vacía de la imagen (mapa mundial de fondo, sin
             vehículos todavía). Sin el párrafo de descripción larga (que sí
-            tiene desktop) -- acá no entraba sin apretar todo lo de abajo. */}
-        <div className="absolute left-0 right-0 z-10 text-center px-5" style={{top:'25%'}}>
-          <h1 className="font-black leading-[1.0] tracking-tighter text-zinc-900 uppercase text-[24px]">
+            tiene desktop) -- acá no entraba sin apretar todo lo de abajo.
+            Incremento 24 (Facu): "quedo la frase montada arriba del logo y
+            mucho espacio vacio" -- el ícono engranaje+QR de la foto ocupa
+            hasta ~26% de la altura de la imagen, y el top:25% de antes
+            quedaba justo en ese límite (sin margen, así que en su celular
+            real se solapaban). Lo bajamos a 34% para que quede un margen
+            de sobra debajo del ícono en cualquier dispositivo. */}
+        <div className="absolute left-0 right-0 z-10 text-center px-5" style={{top:'34%'}}>
+          <h1 className="font-black leading-[1.0] tracking-tighter text-zinc-900 uppercase text-[26px]">
             {t("heroTitleLine1")}<br />{t("heroTitleLine2Prefix")}<span className="text-red-600">{t("heroTitleHighlight")}</span>
           </h1>
-          <div className="w-10 h-[3px] bg-red-600 rounded-full mx-auto" style={{marginTop:'0.5vh', marginBottom:'0.5vh'}} />
-          <p className="font-bold text-zinc-800 text-[11.5px]">
+          <div className="w-11 h-[3px] bg-red-600 rounded-full mx-auto" style={{marginTop:'1vh', marginBottom:'1vh'}} />
+          <p className="font-bold text-zinc-800 text-[13px]">
             <span className="text-red-600 font-black">{t("heroSubtitleHighlight")}</span> {t("heroSubtitleRest")}
           </p>
         </div>
@@ -373,99 +379,106 @@ export default function HomePage() {
         {/* Scrim para que el bloque de abajo (stats + botones + sellos +
             pilares + footer, todo junto ahora) asiente prolijo sobre los
             vehículos de la foto en vez de cortar de golpe. */}
-        <div className="absolute left-0 right-0 bottom-0 z-0 pointer-events-none" style={{height:'56%', background:'linear-gradient(to top, rgba(255,255,255,0.94), rgba(255,255,255,0))'}} />
+        <div className="absolute left-0 right-0 bottom-0 z-0 pointer-events-none" style={{height:'52%', background:'linear-gradient(to top, rgba(255,255,255,0.94), rgba(255,255,255,0))'}} />
 
-        <div className="absolute left-0 right-0 z-10 px-4" style={{bottom:'1.2vh'}}>
+        {/* Incremento 24: con el texto bajado para no pisar el ícono, quedaba
+            un hueco vacío grande entre el subtítulo y este bloque. En vez de
+            dejarlo vacío, agrandamos todo lo de acá abajo (stats, botones,
+            sellos, pilares) -- ya habíamos verificado con capturas reales
+            que sobraba mucho margen (200-400px), así que hay lugar de sobra
+            para textos e iconos más grandes sin arriesgar el "no quiero
+            escrol". */}
+        <div className="absolute left-0 right-0 z-10 px-4" style={{bottom:'1.5vh'}}>
           {/* Stats en vivo — antes vivían en la sección secundaria; ahora
               entran acá arriba de los botones, en el hueco de la foto. */}
-          <div className="w-full grid grid-cols-4 rounded-xl overflow-hidden bg-zinc-900/95" style={{marginBottom:'0.55vh'}}>
+          <div className="w-full grid grid-cols-4 rounded-xl overflow-hidden bg-zinc-900/95" style={{marginBottom:'1.2vh'}}>
             {[
               { value: stats ? stats.machines.toLocaleString() : "—", label: t("statMachines") },
               { value: stats ? stats.services.toLocaleString() : "—", label: t("statServices") },
               { value: stats ? stats.mechanics.toLocaleString() : "—", label: t("statMechanics") },
               { value: null, label: t("statGrowing") },
             ].map(({ value, label }, i) => (
-              <div key={label} className={["flex flex-col items-center justify-center gap-px py-[5px] px-0.5 border-white/15", i < 3 ? "border-r" : ""].join(" ")}>
-                {value !== null && <p className="font-black text-white leading-none text-[12px]">{value}</p>}
-                <p className="text-zinc-400 font-semibold uppercase tracking-wide leading-[1.1] text-[6px] text-center">{label}</p>
+              <div key={label} className={["flex flex-col items-center justify-center gap-px py-[9px] px-0.5 border-white/15", i < 3 ? "border-r" : ""].join(" ")}>
+                {value !== null && <p className="font-black text-white leading-none text-[16px]">{value}</p>}
+                <p className="text-zinc-400 font-semibold uppercase tracking-wide leading-[1.15] text-[7.5px] text-center">{label}</p>
               </div>
             ))}
           </div>
 
-          <div className="flex flex-row gap-[7px] w-full" style={{marginBottom:'0.55vh'}}>
+          <div className="flex flex-row gap-2 w-full" style={{marginBottom:'1.2vh'}}>
             <button
               onClick={openCamera}
-              className="flex-1 min-w-0 flex items-center justify-center gap-1.5 rounded-xl bg-red-600 active:scale-[0.98] transition-all text-white shadow-lg shadow-red-900/30 font-black uppercase tracking-wide text-[11px] py-[9px] px-1.5"
+              className="flex-1 min-w-0 flex items-center justify-center gap-1.5 rounded-xl bg-red-600 active:scale-[0.98] transition-all text-white shadow-lg shadow-red-900/30 font-black uppercase tracking-wide text-[13px] py-[13px] px-1.5"
             >
-              <Camera size={13} /> {t("scanCardTitle")}
+              <Camera size={15} /> {t("scanCardTitle")}
             </button>
 
-            <div className="flex-1 min-w-0 flex items-center gap-1 rounded-xl bg-white/97 border border-zinc-200 shadow-md py-[5px] pl-2.5 pr-[5px]">
-              <Keyboard size={13} className="text-zinc-400 shrink-0" />
+            <div className="flex-1 min-w-0 flex items-center gap-1.5 rounded-xl bg-white/97 border border-zinc-200 shadow-md py-2 pl-3 pr-2">
+              <Keyboard size={15} className="text-zinc-400 shrink-0" />
               <input
                 type="text"
                 value={qrCode}
                 onChange={(e) => setQrCode(e.target.value)}
                 onKeyDown={handleKeyDown}
                 placeholder={t("enterCardPlaceholder")}
-                className="flex-1 min-w-0 bg-transparent outline-none text-[10.5px] text-zinc-700 placeholder:text-zinc-400 text-ellipsis"
+                className="flex-1 min-w-0 bg-transparent outline-none text-[12px] text-zinc-700 placeholder:text-zinc-400 text-ellipsis"
               />
               <button
                 onClick={handleGoToAsset}
                 disabled={!qrCode.trim()}
                 aria-label={t("enterCardTitle")}
-                className="rounded-lg bg-red-600 disabled:opacity-40 disabled:cursor-not-allowed transition-all p-[6px] flex items-center justify-center shrink-0"
+                className="rounded-lg bg-red-600 disabled:opacity-40 disabled:cursor-not-allowed transition-all p-[7px] flex items-center justify-center shrink-0"
               >
-                <ArrowRight size={12} className="text-white" />
+                <ArrowRight size={13} className="text-white" />
               </button>
             </div>
           </div>
 
           {/* Sellos de confianza — versión compacta de una sola línea. */}
-          <div className="flex flex-nowrap items-center justify-center gap-1.5 text-zinc-500 overflow-hidden" style={{marginBottom:'0.5vh'}}>
-            <ShieldCheck className="text-red-500 shrink-0" size={10} />
-            <span className="text-[8px] whitespace-nowrap">{t("trustBarText")}</span>
+          <div className="flex flex-nowrap items-center justify-center gap-[5px] text-zinc-500 overflow-hidden" style={{marginBottom:'1.1vh'}}>
+            <ShieldCheck className="text-red-500 shrink-0" size={11} />
+            <span className="text-[8.5px] whitespace-nowrap">{t("trustBarText")}</span>
             <div className="flex -space-x-1.5 shrink-0">
               {["#dc2626","#1d4ed8","#16a34a","#d97706","#7c3aed"].map((color, i) => (
-                <div key={i} className="rounded-full border border-white" style={{background:color, width:'13px', height:'13px'}} />
+                <div key={i} className="rounded-full border border-white" style={{background:color, width:'14px', height:'14px'}} />
               ))}
             </div>
             <a
               href="/asset/demogen001"
               target="_blank"
               rel="noopener noreferrer"
-              className="font-black uppercase tracking-wide text-white bg-red-600 rounded-full whitespace-nowrap shrink-0 text-[7.5px] px-2 py-[3px]"
+              className="font-black uppercase tracking-wide text-white bg-red-600 rounded-full whitespace-nowrap shrink-0 text-[8px] px-2 py-[3.5px]"
             >
               {t("viewLiveExample")}
             </a>
           </div>
 
           {/* Pilares — 2x2, versión compacta. */}
-          <div className="w-full grid grid-cols-2 rounded-lg overflow-hidden border border-zinc-200 bg-white/95" style={{marginBottom:'0.4vh'}}>
+          <div className="w-full grid grid-cols-2 rounded-lg overflow-hidden border border-zinc-200 bg-white/95" style={{marginBottom:'1vh'}}>
             {[
               { icon: ShieldCheck, title: t("pillarSecure") },
               { icon: Globe, title: t("pillarAccess") },
               { icon: Clock, title: t("pillarHistory") },
               { icon: TrendingUp, title: t("pillarGrow") },
             ].map(({ icon: Icon, title }, i) => (
-              <div key={title} className={["flex flex-row items-center justify-center gap-1 py-[4px] px-1 border-zinc-200", i % 2 === 0 ? "border-r" : "", i < 2 ? "border-b" : ""].filter(Boolean).join(" ")}>
-                <div className="rounded-full border border-red-200 bg-red-50 flex items-center justify-center text-red-500 shrink-0" style={{width:'12px', height:'12px'}}>
-                  <Icon size={7} />
+              <div key={title} className={["flex flex-row items-center justify-center gap-1.5 py-[7px] px-1 border-zinc-200", i % 2 === 0 ? "border-r" : "", i < 2 ? "border-b" : ""].filter(Boolean).join(" ")}>
+                <div className="rounded-full border border-red-200 bg-red-50 flex items-center justify-center text-red-500 shrink-0" style={{width:'14px', height:'14px'}}>
+                  <Icon size={8} />
                 </div>
-                <p className="font-black text-zinc-800 uppercase leading-[1.1] text-[6.5px] text-center">{title}</p>
+                <p className="font-black text-zinc-800 uppercase leading-[1.15] text-[7.5px] text-center">{title}</p>
               </div>
             ))}
           </div>
 
           {/* Footer — versión mínima, solo lo esencial (marca + legales). */}
           <div className="flex justify-center items-center gap-1.5 flex-wrap">
-            <span className="tracking-wide text-zinc-400 font-semibold uppercase text-[6px]">{t("footerBrand")}</span>
-            <span className="text-red-400 text-[6px]">•</span>
-            <Link href="/terms" className="tracking-wide text-zinc-400 font-semibold uppercase text-[6px]">{t("footerTerms")}</Link>
-            <span className="text-red-400 text-[6px]">•</span>
-            <Link href="/privacy" className="tracking-wide text-zinc-400 font-semibold uppercase text-[6px]">{t("footerPrivacy")}</Link>
-            <span className="text-red-400 text-[6px]">•</span>
-            <Link href="/cookies" className="tracking-wide text-zinc-400 font-semibold uppercase text-[6px]">{t("footerCookies")}</Link>
+            <span className="tracking-wide text-zinc-400 font-semibold uppercase text-[7px]">{t("footerBrand")}</span>
+            <span className="text-red-400 text-[7px]">•</span>
+            <Link href="/terms" className="tracking-wide text-zinc-400 font-semibold uppercase text-[7px]">{t("footerTerms")}</Link>
+            <span className="text-red-400 text-[7px]">•</span>
+            <Link href="/privacy" className="tracking-wide text-zinc-400 font-semibold uppercase text-[7px]">{t("footerPrivacy")}</Link>
+            <span className="text-red-400 text-[7px]">•</span>
+            <Link href="/cookies" className="tracking-wide text-zinc-400 font-semibold uppercase text-[7px]">{t("footerCookies")}</Link>
           </div>
         </div>
       </section>
