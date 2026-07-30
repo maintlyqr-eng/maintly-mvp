@@ -8,7 +8,8 @@
     "api": "API",
     "about": "Acerca de",
     "login": "Iniciar Sesión",
-    "logout": "Cerrar Sesión"
+    "logout": "Cerrar Sesión",
+    "contactUs": "Hablemos"
   },
   "LanguageSwitcher": {
     "changeLanguage": "Cambiar idioma"
@@ -2120,6 +2121,24 @@
     "sendingButton": "Enviando...",
     "successTitle": "¡Gracias por avisarnos!",
     "successDesc": "Tu reporte fue enviado al equipo de MaintlyQR. Lo vamos a revisar a la brevedad.",
+    "done": "Listo"
+  },
+  "ContactUsModal": {
+    "title": "Hablemos",
+    "intro": "¿Sos una empresa o un taller y querés entender de qué se trata MaintlyQR? Dejanos tu mensaje y tu contacto, y te escribimos nosotros.",
+    "nameLabel": "Tu nombre (opcional)",
+    "namePlaceholder": "Juan Pérez",
+    "contactLabel": "Email o teléfono",
+    "contactPlaceholder": "vos@email.com",
+    "messageLabel": "Tu consulta",
+    "messagePlaceholder": "Contanos en qué podemos ayudarte...",
+    "errorContactRequired": "Dejanos un email o teléfono para poder contactarte.",
+    "errorMessageRequired": "Contanos brevemente tu consulta antes de enviar.",
+    "errorSaving": "No pudimos enviar tu mensaje. Probá de nuevo.",
+    "submitButton": "Enviar consulta",
+    "sendingButton": "Enviando...",
+    "successTitle": "¡Gracias por escribirnos!",
+    "successDesc": "Recibimos tu consulta. El equipo de MaintlyQR te va a contactar a la brevedad.",
     "done": "Listo"
   },
   "RegisterProfessionPage": {

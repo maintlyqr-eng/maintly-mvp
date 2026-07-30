@@ -8,7 +8,8 @@
     "api": "API",
     "about": "About",
     "login": "Login",
-    "logout": "Log out"
+    "logout": "Log out",
+    "contactUs": "Let's Talk"
   },
   "LanguageSwitcher": {
     "changeLanguage": "Change language"
@@ -2120,6 +2121,24 @@
     "sendingButton": "Sending...",
     "successTitle": "Thanks for letting us know!",
     "successDesc": "Your report was sent to the MaintlyQR team. We'll review it shortly.",
+    "done": "Done"
+  },
+  "ContactUsModal": {
+    "title": "Let's Talk",
+    "intro": "Are you a business or a workshop trying to understand what MaintlyQR is about? Leave us your message and your contact info, and we'll reach out to you.",
+    "nameLabel": "Your name (optional)",
+    "namePlaceholder": "Jane Doe",
+    "contactLabel": "Email or phone",
+    "contactPlaceholder": "you@email.com",
+    "messageLabel": "Your question",
+    "messagePlaceholder": "Tell us how we can help...",
+    "errorContactRequired": "Leave us an email or phone number so we can reach you.",
+    "errorMessageRequired": "Tell us briefly what you'd like to ask before sending.",
+    "errorSaving": "We couldn't send your message. Please try again.",
+    "submitButton": "Send message",
+    "sendingButton": "Sending...",
+    "successTitle": "Thanks for reaching out!",
+    "successDesc": "We received your message. The MaintlyQR team will contact you shortly.",
     "done": "Done"
   },
   "RegisterProfessionPage": {

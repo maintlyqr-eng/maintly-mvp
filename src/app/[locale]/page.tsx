@@ -5,10 +5,11 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Link } from "@/i18n/navigation";
 import { useTranslations } from "next-intl";
-import { ArrowRight, ShieldCheck, Camera, Keyboard, User, Globe, Clock, TrendingUp, LogOut, LayoutGrid, X, Menu, Wrench, FileText, ExternalLink } from "lucide-react";
+import { ArrowRight, ShieldCheck, Camera, Keyboard, User, Globe, Clock, TrendingUp, LogOut, LayoutGrid, X, Menu, Wrench, FileText, ExternalLink, MessageCircle } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import QRScannerModal from "@/components/QRScannerModal";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
+import ContactUsModal from "@/components/ContactUsModal";
 
 type PublicStats = { machines: number; services: number; mechanics: number };
 
@@ -25,6 +26,11 @@ export default function HomePage() {
   // Camera scanner — the actual camera/jsQR logic lives in QRScannerModal,
   // shared with the "link existing asset" flows in the dashboard.
   const [showCamera, setShowCamera] = useState(false);
+
+  // Incremento 26 (Facu): botón "Hablemos" en la navbar, visible para
+  // cualquiera (logueado o no) en desktop y mobile -- ver el comentario
+  // completo en ContactUsModal.tsx.
+  const [showContactUs, setShowContactUs] = useState(false);
 
   // Incremento 22 (Facu): en mobile el Home ahora es un diseño propio,
   // distinto al de desktop (mismo criterio que ya usamos en Login/Register)
@@ -291,6 +297,25 @@ export default function HomePage() {
 
         <div className="hidden md:flex items-center gap-4">
           <LanguageSwitcher />
+          {/* Incremento 26 (Facu): "no veo como a simple vista la posibilidad
+              de contactar a alguien de maintlyqr" -- para una empresa o un
+              taller que recién llega y no sabe a quién preguntarle. Estilo
+              outline (no rojo) a propósito, para no competir con el CTA de
+              Iniciar Sesión -- este es el botón secundario de la navbar.
+              El texto "Hablemos" se esconde entre md y xl (queda solo el
+              ícono) -- confirmé con una maqueta que la navbar de escritorio
+              actual ya se queda sin lugar entre 768-1024px con los 7 links +
+              selector de idioma + este botón + login todos con su texto
+              completo; el rediseño de escritorio (próximo) va a resolver el
+              layout entero, pero mientras tanto esto evita que ESTE botón
+              agregue una regresión nueva ahí. */}
+          <button
+            onClick={() => setShowContactUs(true)}
+            className="flex items-center gap-2 border border-zinc-300 bg-white/70 text-zinc-700 hover:border-red-300 hover:text-red-600 font-black tracking-wide rounded-xl transition-all px-3 xl:px-4 py-2"
+            style={{fontSize:'clamp(10px,0.75vw,12px)'}}
+          >
+            <MessageCircle size={13} /> <span className="hidden xl:inline">{tNav("contactUs")}</span>
+          </button>
           {loggedIn ? (
             <div className="flex items-center gap-2">
               <a href="/dashboard" className="flex items-center gap-2 bg-zinc-900 hover:bg-zinc-800 text-white font-black tracking-wide rounded-xl transition-all shadow-md px-4 py-2" style={{fontSize:'clamp(10px,0.75vw,12px)'}}>
@@ -334,6 +359,16 @@ export default function HomePage() {
               </Link>
             )}
           </div>
+          {/* Incremento 26: mismo botón "Hablemos" que en desktop, acá solo
+              el ícono (sin lugar para el texto) -- siempre visible al lado
+              del login, sin necesidad de abrir el menú hamburguesa. */}
+          <button
+            onClick={() => setShowContactUs(true)}
+            aria-label={tNav("contactUs")}
+            className="text-zinc-700 hover:text-red-600 p-2"
+          >
+            <MessageCircle size={20} />
+          </button>
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
             className="text-zinc-700 hover:text-zinc-900 p-2"
@@ -345,6 +380,12 @@ export default function HomePage() {
 
       {mobileMenuOpen && (
         <div className="md:hidden relative z-40 bg-white border-b border-zinc-200 shadow-lg flex flex-col px-5 py-4 gap-1">
+          <button
+            onClick={() => { setShowContactUs(true); setMobileMenuOpen(false); }}
+            className="flex items-center justify-center gap-1.5 border border-zinc-300 text-zinc-700 hover:border-red-300 hover:text-red-600 font-black tracking-wide rounded-xl transition-all px-3 py-2.5 text-[13px] mb-2"
+          >
+            <MessageCircle size={14} /> {tNav("contactUs")}
+          </button>
           {navLinks.map(({ label, href }) => (
             <a key={href} href={href} onClick={() => setMobileMenuOpen(false)} className="text-zinc-700 hover:text-zinc-900 font-medium py-2 border-b border-zinc-100 last:border-0">
               {label}
@@ -603,6 +644,9 @@ export default function HomePage() {
       {showCamera && (
         <QRScannerModal onDetect={handleScanDetect} onClose={() => setShowCamera(false)} />
       )}
+
+      {/* ════ CONTACT US ("Hablemos") ════ Incremento 26 */}
+      <ContactUsModal open={showContactUs} onClose={() => setShowContactUs(false)} />
     </main>
   );
 }
