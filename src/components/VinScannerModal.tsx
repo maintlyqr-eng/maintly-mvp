@@ -59,9 +59,17 @@ export default function VinScannerModal({
   // useState acá adentro por la misma razón que activeRef (ver el comentario
   // grande más abajo sobre runOcrPass): son refs para que la closure
   // autoreprogramada siempre vea el valor real más reciente.
+  // Facu (31 jul 2026, segunda ronda): "no me toma ni el q esta en el
+  // parabrisas ni los q estan en la puerta" -- pedir 2 lecturas IDÉNTICAS
+  // seguidas resultó ser demasiado estricto para una chapa real (vidrio con
+  // reflejo, metal estampado con poco contraste): en vez de frenar
+  // candidatos apurados, terminó impidiendo confirmar CUALQUIER lectura.
+  // Vuelve a 1 -- la mejora real de precisión queda en el whitelist de
+  // caracteres (ver más abajo) y el respiro de 900ms para el autoenfoque,
+  // sin el costo de "nunca encuentra nada".
   const lastCandidateRef = useRef("");
   const candidateStreakRef = useRef(0);
-  const REQUIRED_CONSECUTIVE_MATCHES = 2;
+  const REQUIRED_CONSECUTIVE_MATCHES = 1;
 
   function stopCamera() {
     activeRef.current = false;
@@ -202,34 +210,36 @@ export default function VinScannerModal({
         // QRScannerModal) -- así ninguna otra página paga el costo de este
         // paquete pesado si nunca abre el escáner de VIN.
         try {
-          const { createWorker, PSM } = await import("tesseract.js");
+          const { createWorker } = await import("tesseract.js");
           const worker = await createWorker("eng");
           if (cancelled || !activeRef.current) { await worker.terminate(); return; }
 
-          // Facu (31 jul 2026): mismo pedido de "que se tome su tiempo" --
-          // por default Tesseract intenta reconocer CUALQUIER letra/número/
-          // símbolo del idioma inglés, lo que deja pasar muchas lecturas
-          // erróneas que dan la casualidad de "parecer" un VIN de 17
-          // caracteres. Restringir el alfabeto a exactamente el que usa un
-          // VIN (sin I/O/Q, ver vinValidation.ts) hace que el motor de OCR
-          // en sí mismo descarte esas confusiones en vez de dejarlas pasar
-          // para que extractVinCandidate tenga que adivinar después. PSM
-          // SINGLE_LINE también ayuda mucho acá porque la franja que se
-          // recorta (captureGuideStrip) siempre es una sola línea de texto,
-          // no una página completa -- el modo de segmentación por default
-          // está pensado para documentos, no para una chapa. El build de
-          // Vercel exige el enum PSM en vez del string "7" -- ambos
-          // representan el mismo modo, pero el chequeo de tipos de
-          // TypeScript no acepta el string suelto.
+          // Facu (31 jul 2026): por default Tesseract intenta reconocer
+          // CUALQUIER letra/número/símbolo del idioma inglés, lo que deja
+          // pasar muchas lecturas erróneas que dan la casualidad de
+          // "parecer" un VIN de 17 caracteres. Restringir el alfabeto a
+          // exactamente el que usa un VIN (sin I/O/Q, ver vinValidation.ts)
+          // hace que el motor de OCR en sí mismo descarte esas confusiones.
+          //
+          // OJO -- había además un modo de segmentación forzado a
+          // "una sola línea de texto" (PSM.SINGLE_LINE), pensado para que
+          // rinda mejor con la franja recortada (ver captureGuideStrip).
+          // En la práctica resultó demasiado rígido: si el recorte no
+          // queda perfectamente alineado sobre SOLO el VIN (típico en una
+          // chapa real, con otro texto cerca, reflejos del vidrio del
+          // parabrisas, etc.), ese modo fuerza una lectura de una sola
+          // línea de TODO ese ruido junto y nunca llega a ningún candidato
+          // válido -- exactamente el reporte de Facu de "no me toma
+          // ninguno". Se sacó, volviendo al modo de segmentación automático
+          // por default, más tolerante a un recorte imperfecto.
           try {
             await worker.setParameters({
               tessedit_char_whitelist: "ABCDEFGHJKLMNPRSTUVWXYZ0123456789",
-              tessedit_pageseg_mode: PSM.SINGLE_LINE,
             });
           } catch {
-            // Si esta versión de Tesseract.js no acepta alguno de estos
-            // parámetros, sigue funcionando con los defaults -- no es
-            // crítico, solo una mejora de precisión.
+            // Si esta versión de Tesseract.js no acepta este parámetro,
+            // sigue funcionando con los defaults -- no es crítico, solo una
+            // mejora de precisión.
           }
 
           workerRef.current = worker;

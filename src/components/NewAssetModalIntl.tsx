@@ -84,10 +84,13 @@ export default function NewAssetModalIntl({
   const [vinChecking, setVinChecking] = useState(false);
   const [vinAutoFilled, setVinAutoFilled] = useState(false);
   // Incremento 29c (Facu, 31 jul 2026): "sumar una IA como respaldo para
-  // modelo" -- a diferencia de vinAutoFilled (marca/año, de NHTSA o de la
+  // modelo/marca" -- a diferencia de vinAutoFilled (de NHTSA o de la
   // estructura del VIN, ya bastante confiables), esto es SIEMPRE una
   // sugerencia que la persona tiene que aceptar con un click ("Usar") --
-  // nunca se autocompleta solo en el campo Modelo. Ver aiVinModel.ts.
+  // nunca se autocompleta sola. Ver aiVinModel.ts. aiSuggestedMake solo
+  // aparece en el caso en que ni NHTSA ni la tabla offline reconocieron
+  // siquiera el fabricante (WMI no cubierto).
+  const [aiSuggestedMake, setAiSuggestedMake] = useState<string | null>(null);
   const [aiSuggestedModel, setAiSuggestedModel] = useState<string | null>(null);
   const vinCheckTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const vinCheckSeqRef = useRef(0);
@@ -117,6 +120,7 @@ export default function NewAssetModalIntl({
     setVinDuplicate(null);
     setVinChecking(false);
     setVinAutoFilled(false);
+    setAiSuggestedMake(null);
     setAiSuggestedModel(null);
     if (vinCheckTimerRef.current) {
       clearTimeout(vinCheckTimerRef.current);
@@ -164,6 +168,7 @@ export default function NewAssetModalIntl({
     }
     setVinDuplicate(null);
     setVinChecking(false);
+    setAiSuggestedMake(null);
     setAiSuggestedModel(null);
 
     if (!VIN_ELIGIBLE_ASSET_TYPES.includes(assetType)) return;
@@ -194,10 +199,13 @@ export default function NewAssetModalIntl({
             if (!year.trim() && json.year) { setYear(String(json.year)); filled = true; }
             if (filled) setVinAutoFilled(true);
 
-            // Sugerencia de IA para el modelo (solo cuando NHTSA no tenía
-            // ninguno) -- a diferencia de arriba, esto NUNCA se mete solo
-            // en el campo, queda como sugerencia con un botón "Usar" (ver
-            // el JSX más abajo).
+            // Sugerencia de IA para marca y/o modelo (solo cuando NHTSA + la
+            // tabla offline no resolvieron algo) -- a diferencia de arriba,
+            // esto NUNCA se mete solo en el campo, queda como sugerencia con
+            // un botón "Usar" (ver el JSX más abajo).
+            if (!json.make && json.aiSuggestedMake && !brand.trim()) {
+              setAiSuggestedMake(json.aiSuggestedMake);
+            }
             if (!json.model && json.aiSuggestedModel && !model.trim()) {
               setAiSuggestedModel(json.aiSuggestedModel);
             }
@@ -355,7 +363,26 @@ export default function NewAssetModalIntl({
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
             <div>
               <label className="text-[12px] font-bold text-zinc-700">{t("brandLabel")}</label>
-              <input type="text" required value={brand} onChange={(e) => setBrand(e.target.value)} placeholder={t("brandPlaceholder")} className="w-full mt-1 rounded-xl border border-zinc-200 px-3 py-[10px] text-[13px] outline-none focus:border-red-500" />
+              <input
+                type="text"
+                required
+                value={brand}
+                onChange={(e) => { setBrand(e.target.value); setAiSuggestedMake(null); }}
+                placeholder={t("brandPlaceholder")}
+                className="w-full mt-1 rounded-xl border border-zinc-200 px-3 py-[10px] text-[13px] outline-none focus:border-red-500"
+              />
+              {aiSuggestedMake && !brand.trim() && (
+                <button
+                  type="button"
+                  onClick={() => { setBrand(aiSuggestedMake); setAiSuggestedMake(null); }}
+                  className="mt-1.5 w-full text-left flex items-center justify-between gap-2 bg-violet-50 border border-violet-200 rounded-lg px-2.5 py-1.5 hover:bg-violet-100 transition-colors"
+                >
+                  <span className="text-[11px] text-violet-700 leading-snug">
+                    {t("aiModelSuggestionPrefix")}<span className="font-bold">{aiSuggestedMake}</span>
+                  </span>
+                  <span className="text-[11px] font-bold text-violet-700 shrink-0">{t("aiModelUseButton")}</span>
+                </button>
+              )}
             </div>
             <div>
               <label className="text-[12px] font-bold text-zinc-700">{t("modelLabel")}</label>
@@ -549,6 +576,7 @@ export default function NewAssetModalIntl({
         onConfirm={(scannedVin) => {
           setVin(scannedVin);
           setVinAutoFilled(false);
+          setAiSuggestedMake(null);
           setAiSuggestedModel(null);
           setShowVinScanner(false);
         }}

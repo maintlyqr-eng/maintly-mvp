@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isVinFormatValid, normalizeVin } from "@/lib/vinValidation";
 import { decodeVinYear, decodeWmiMake } from "@/lib/vinDecodeOffline";
-import { suggestVehicleModelFromVin } from "@/lib/aiVinModel";
+import { suggestVehicleFromVin } from "@/lib/aiVinModel";
 
 // Incremento 29 (Facu, escaneo de VIN): "mandale a todo e incluso al
 // decodificador de marca/año. asi la persona no tiene q cargar todo".
@@ -76,7 +76,26 @@ export async function GET(req: NextRequest) {
   const year = nhtsaYear || offlineYear;
   const model = nhtsaModel; // sin fuente offline posible, ver comentario de arriba
 
-  if (!make && !model && !year) {
+  // Incremento 29c (Facu, 31 jul 2026): "sumar una IA como respaldo para
+  // modelo" -- se pide UNA vez, solo cuando falta algo que ni NHTSA ni la
+  // tabla offline resolvieron. Si ya hay marca (de cualquiera de las dos
+  // fuentes) pero no modelo, se le pide solo el modelo con esa marca como
+  // contexto. Si NINGUNA fuente reconoció ni siquiera la marca (el caso
+  // "camioneta no vendida en EEUU y WMI no está en la tabla offline" que
+  // reportó Facu), se le pide que infiera marca Y modelo juntos. Nunca pisa
+  // `make`/`model` acá -- viaja en campos separados que el formulario solo
+  // usa si la persona hace click en "Usar" (ver NewAssetModalIntl.tsx).
+  let aiSuggestedMake: string | null = null;
+  let aiSuggestedModel: string | null = null;
+  if (!make || !model) {
+    const suggestion = await suggestVehicleFromVin({ vin, knownMake: make, knownYear: year });
+    if (suggestion) {
+      if (!make && suggestion.make) aiSuggestedMake = suggestion.make;
+      if (!model && suggestion.model) aiSuggestedModel = suggestion.model;
+    }
+  }
+
+  if (!make && !model && !year && !aiSuggestedMake && !aiSuggestedModel) {
     return NextResponse.json({ found: false });
   }
 
@@ -86,5 +105,7 @@ export async function GET(req: NextRequest) {
     model,
     year,
     fuelType: fuelTypePrimary,
+    aiSuggestedMake,
+    aiSuggestedModel,
   });
 }
