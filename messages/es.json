@@ -1054,7 +1054,9 @@
     "vinChecking": "Verificando…",
     "vinDuplicateWarning": "Ya hay un equipo cargado con este VIN:",
     "vinDuplicateLinkText": "Ver equipo existente",
-    "vinAutoDetectedHint": "Detectado automáticamente a partir del VIN — podés editarlo."
+    "vinAutoDetectedHint": "Detectado automáticamente a partir del VIN — podés editarlo.",
+    "aiModelSuggestionPrefix": "Sugerencia de IA (sin confirmar): ",
+    "aiModelUseButton": "Usar"
   },
   "DashboardQrCodesPage": {
     "title": "Códigos QR",

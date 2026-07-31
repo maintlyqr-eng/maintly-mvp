@@ -37,6 +37,7 @@ export default function HomePage() {
   // caso "el auto perdió su sticker de QR pero ya tiene historial cargado".
   const [showVinScanner, setShowVinScanner] = useState(false);
   const [vinNotFound, setVinNotFound] = useState(false);
+  const [notFoundVin, setNotFoundVin] = useState("");
 
   // Incremento 26 (Facu): botón "Hablemos" en la navbar, visible para
   // cualquiera (logueado o no) en desktop y mobile -- ver el comentario
@@ -173,7 +174,11 @@ export default function HomePage() {
     } else {
       // O no hay ningún equipo cargado con ese VIN, o lo hay pero sin QR
       // asignado (caso raro) -- en ambos casos no hay a dónde navegar, así
-      // que se muestra el mismo mensaje de "no lo encontramos".
+      // que se muestra el mismo mensaje de "no lo encontramos". Se guarda
+      // el VIN para que VinNotFoundModal pueda mandarlo directo al
+      // dashboard con el formulario de nuevo equipo ya precargado (ver el
+      // comentario en VinNotFoundModal.tsx, Incremento 29d).
+      setNotFoundVin(vin);
       setVinNotFound(true);
     }
   }
@@ -680,7 +685,7 @@ export default function HomePage() {
         onClose={() => setShowVinScanner(false)}
         onConfirm={handleVinConfirm}
       />
-      <VinNotFoundModal open={vinNotFound} onClose={() => setVinNotFound(false)} loggedIn={loggedIn} />
+      <VinNotFoundModal open={vinNotFound} onClose={() => setVinNotFound(false)} loggedIn={loggedIn} vin={notFoundVin} />
 
       {/* ════ CONTACT US ("Hablemos") ════ Incremento 26 */}
       <ContactUsModal open={showContactUs} onClose={() => setShowContactUs(false)} />

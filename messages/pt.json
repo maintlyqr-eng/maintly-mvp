@@ -1054,7 +1054,9 @@
     "vinChecking": "Verificando…",
     "vinDuplicateWarning": "Já existe um equipamento cadastrado com este VIN:",
     "vinDuplicateLinkText": "Ver equipamento existente",
-    "vinAutoDetectedHint": "Detectado automaticamente a partir do VIN — você pode editar."
+    "vinAutoDetectedHint": "Detectado automaticamente a partir do VIN — você pode editar.",
+    "aiModelSuggestionPrefix": "Sugestão de IA (não confirmada): ",
+    "aiModelUseButton": "Usar"
   },
   "DashboardQrCodesPage": {
     "title": "Códigos QR",

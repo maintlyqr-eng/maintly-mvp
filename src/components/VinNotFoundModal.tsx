@@ -10,14 +10,26 @@ import { Link } from "@/i18n/navigation";
 // MaintlyQR. Se ofrece el paso siguiente lógico: cargarlo, lo cual requiere
 // estar logueado como Maintler (cargar equipos es una acción del dashboard,
 // no del Home público) -- por eso la CTA cambia según `loggedIn`.
+//
+// Incremento 29d (Facu, 31 jul 2026): "cuando voy desde el home y escaneo
+// algo q no existe me dice queres agregar el equipo toco q si y me manda a
+// mi dashboard y ahi tengo q tocar de nuevo, deberia agregarmelo directo" --
+// antes la CTA de "logueado" mandaba a /dashboard a secas, dejando a la
+// persona en la pantalla principal con que volver a tocar "Agregar equipo" y
+// tipear el VIN de nuevo. Ahora manda con el VIN ya escaneado en la URL
+// (?newAssetVin=...) -- el Dashboard (ver src/app/[locale]/dashboard/
+// page.tsx) lo detecta al cargar y abre el formulario de "nuevo equipo"
+// directo, con el VIN precargado.
 export default function VinNotFoundModal({
   open,
   onClose,
   loggedIn,
+  vin,
 }: {
   open: boolean;
   onClose: () => void;
   loggedIn: boolean;
+  vin: string;
 }) {
   const t = useTranslations("VinNotFoundModal");
   if (!open) return null;
@@ -35,7 +47,7 @@ export default function VinNotFoundModal({
           <p className="text-[13px] text-zinc-500 leading-relaxed mb-6">{t("description")}</p>
           {loggedIn ? (
             <a
-              href="/dashboard"
+              href={`/dashboard?newAssetVin=${encodeURIComponent(vin)}`}
               className="block w-full bg-red-600 hover:bg-red-500 text-white font-black py-3 rounded-xl text-[13px] transition-all"
             >
               {t("dashboardCta")}

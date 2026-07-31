@@ -48,6 +48,21 @@ export default function VinScannerModal({
   const workerRef = useRef<any>(null);
   const ocrTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Facu (31 jul 2026): "es bastante celoso... no se toma su tiempo para
+  // encontrar bien el VIN" -- antes, UNA sola lectura de Tesseract que
+  // pareciera un VIN válido alcanzaba para pasar a confirmar, así que un
+  // solo cuadro fuera de foco (típico apenas se abre la cámara, mientras
+  // todavía está enfocando) podía disparar un candidato equivocado sin
+  // darle tiempo real al OCR de "asentarse". Ahora se exige que el MISMO
+  // candidato salga en 2 pasadas consecutivas antes de aceptarlo -- si
+  // cambia entre pasada y pasada, se reinicia el conteo. Nunca se lee vía
+  // useState acá adentro por la misma razón que activeRef (ver el comentario
+  // grande más abajo sobre runOcrPass): son refs para que la closure
+  // autoreprogramada siempre vea el valor real más reciente.
+  const lastCandidateRef = useRef("");
+  const candidateStreakRef = useRef(0);
+  const REQUIRED_CONSECUTIVE_MATCHES = 2;
+
   function stopCamera() {
     activeRef.current = false;
     if (streamRef.current) { streamRef.current.getTracks().forEach((tr) => tr.stop()); streamRef.current = null; }
@@ -125,16 +140,32 @@ export default function VinScannerModal({
       const { data } = await workerRef.current.recognize(strip);
       const found = extractVinCandidate(data?.text ?? "");
       if (found && activeRef.current) {
-        setCandidate(found);
-        setEditValue(found);
-        setPhase("confirm");
-        stopCamera();
-        return;
+        // Pide 2 lecturas seguidas iguales antes de aceptar (ver el
+        // comentario junto a la declaración de estos refs) -- un candidato
+        // que cambia de una pasada a la siguiente todavía no es confiable.
+        if (found === lastCandidateRef.current) {
+          candidateStreakRef.current += 1;
+        } else {
+          lastCandidateRef.current = found;
+          candidateStreakRef.current = 1;
+        }
+        if (candidateStreakRef.current >= REQUIRED_CONSECUTIVE_MATCHES) {
+          setCandidate(found);
+          setEditValue(found);
+          setPhase("confirm");
+          stopCamera();
+          return;
+        }
+      } else {
+        lastCandidateRef.current = "";
+        candidateStreakRef.current = 0;
       }
     } catch {
       // Un fallo puntual de reconocimiento no es grave -- se reintenta en
       // el próximo ciclo. Si Tesseract nunca llegó a cargar (ver el
       // catch del useEffect de abajo), esta función ni se llama.
+      lastCandidateRef.current = "";
+      candidateStreakRef.current = 0;
     }
     if (activeRef.current) {
       ocrTimerRef.current = setTimeout(runOcrPass, 1200);
@@ -149,6 +180,8 @@ export default function VinScannerModal({
     setPhase("scanning");
     setCandidate("");
     setEditValue("");
+    lastCandidateRef.current = "";
+    candidateStreakRef.current = 0;
 
     let cancelled = false;
 
@@ -172,8 +205,42 @@ export default function VinScannerModal({
           const { createWorker } = await import("tesseract.js");
           const worker = await createWorker("eng");
           if (cancelled || !activeRef.current) { await worker.terminate(); return; }
+
+          // Facu (31 jul 2026): mismo pedido de "que se tome su tiempo" --
+          // por default Tesseract intenta reconocer CUALQUIER letra/número/
+          // símbolo del idioma inglés, lo que deja pasar muchas lecturas
+          // erróneas que dan la casualidad de "parecer" un VIN de 17
+          // caracteres. Restringir el alfabeto a exactamente el que usa un
+          // VIN (sin I/O/Q, ver vinValidation.ts) hace que el motor de OCR
+          // en sí mismo descarte esas confusiones en vez de dejarlas pasar
+          // para que extractVinCandidate tenga que adivinar después. PSM 7
+          // ("single text line") también ayuda mucho acá porque la franja
+          // que se recorta (captureGuideStrip) siempre es una sola línea de
+          // texto, no una página completa -- el modo de segmentación por
+          // default está pensado para documentos, no para una chapa.
+          try {
+            await worker.setParameters({
+              tessedit_char_whitelist: "ABCDEFGHJKLMNPRSTUVWXYZ0123456789",
+              tessedit_pageseg_mode: "7",
+            });
+          } catch {
+            // Si esta versión de Tesseract.js no acepta alguno de estos
+            // parámetros, sigue funcionando con los defaults -- no es
+            // crítico, solo una mejora de precisión.
+          }
+
           workerRef.current = worker;
-          runOcrPass();
+
+          // Facu: "es bastante celoso cuando se abre la cámara... no se
+          // toma su tiempo" -- la cámara recién arranca a enfocar/exponer
+          // en el instante en que este código corre; leer el primer cuadro
+          // sin darle un respiro a la cámara para asentarse era la causa
+          // más probable de lecturas apuradas y erróneas. 900ms es
+          // imperceptible para la persona pero le da tiempo real al
+          // autoenfoque antes del primer intento de OCR.
+          ocrTimerRef.current = setTimeout(() => {
+            if (activeRef.current) runOcrPass();
+          }, 900);
         } catch {
           // No se pudo inicializar el OCR (sin conexión para bajar los
           // datos del idioma, navegador viejo, etc.) -- no rompe el
@@ -204,6 +271,8 @@ export default function VinScannerModal({
     setCandidate("");
     setEditValue("");
     activeRef.current = true;
+    lastCandidateRef.current = "";
+    candidateStreakRef.current = 0;
     // La cámara se cerró al confirmar un candidato (stopCamera en
     // runOcrPass) -- reabrir desde cero es más simple y confiable que
     // tratar de reanudar el mismo stream.
@@ -217,7 +286,11 @@ export default function VinScannerModal({
           videoRef.current.onloadedmetadata = () => {
             videoRef.current?.play();
             setScanning(true);
-            runOcrPass();
+            // Mismo respiro de 900ms para el autoenfoque que en el arranque
+            // inicial (ver el comentario grande en el useEffect de arriba).
+            ocrTimerRef.current = setTimeout(() => {
+              if (activeRef.current) runOcrPass();
+            }, 900);
           };
         }
       })

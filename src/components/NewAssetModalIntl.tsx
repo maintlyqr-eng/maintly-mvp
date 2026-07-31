@@ -34,12 +34,21 @@ export default function NewAssetModalIntl({
   mechanicId,
   onCreated,
   existingCode,
+  initialVin,
 }: {
   open: boolean;
   onClose: () => void;
   mechanicId: string;
   onCreated: (assetId: string) => void;
   existingCode?: string;
+  // Incremento 29d (Facu, 31 jul 2026): "cuando voy desde el home y escaneo
+  // algo q no existe... deberia agregarmelo directo" -- cuando el Home
+  // manda para acá después de un VIN que no encontró equipo (ver
+  // VinNotFoundModal + src/app/[locale]/dashboard/page.tsx), este prop
+  // precarga el campo VIN para que la persona no tenga que volver a
+  // escribirlo/escanearlo -- sigue siendo editable, como cualquier otro
+  // campo del formulario.
+  initialVin?: string;
 }) {
   const t = useTranslations("NewAssetModal");
   const tAssetTypes = useTranslations("AssetTypes");
@@ -74,6 +83,12 @@ export default function NewAssetModalIntl({
   const [vinDuplicate, setVinDuplicate] = useState<VinMatch | null>(null);
   const [vinChecking, setVinChecking] = useState(false);
   const [vinAutoFilled, setVinAutoFilled] = useState(false);
+  // Incremento 29c (Facu, 31 jul 2026): "sumar una IA como respaldo para
+  // modelo" -- a diferencia de vinAutoFilled (marca/año, de NHTSA o de la
+  // estructura del VIN, ya bastante confiables), esto es SIEMPRE una
+  // sugerencia que la persona tiene que aceptar con un click ("Usar") --
+  // nunca se autocompleta solo en el campo Modelo. Ver aiVinModel.ts.
+  const [aiSuggestedModel, setAiSuggestedModel] = useState<string | null>(null);
   const vinCheckTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const vinCheckSeqRef = useRef(0);
 
@@ -86,7 +101,7 @@ export default function NewAssetModalIntl({
     setBrand("");
     setModel("");
     setNickname("");
-    setVin("");
+    setVin(initialVin ? normalizeVin(initialVin) : "");
     setYear("");
     setPlate("");
     setFuelType("");
@@ -102,6 +117,7 @@ export default function NewAssetModalIntl({
     setVinDuplicate(null);
     setVinChecking(false);
     setVinAutoFilled(false);
+    setAiSuggestedModel(null);
     if (vinCheckTimerRef.current) {
       clearTimeout(vinCheckTimerRef.current);
       vinCheckTimerRef.current = null;
@@ -148,6 +164,7 @@ export default function NewAssetModalIntl({
     }
     setVinDuplicate(null);
     setVinChecking(false);
+    setAiSuggestedModel(null);
 
     if (!VIN_ELIGIBLE_ASSET_TYPES.includes(assetType)) return;
     const cleaned = normalizeVin(vin);
@@ -176,6 +193,14 @@ export default function NewAssetModalIntl({
             if (!model.trim() && json.model) { setModel(json.model); filled = true; }
             if (!year.trim() && json.year) { setYear(String(json.year)); filled = true; }
             if (filled) setVinAutoFilled(true);
+
+            // Sugerencia de IA para el modelo (solo cuando NHTSA no tenía
+            // ninguno) -- a diferencia de arriba, esto NUNCA se mete solo
+            // en el campo, queda como sugerencia con un botón "Usar" (ver
+            // el JSX más abajo).
+            if (!json.model && json.aiSuggestedModel && !model.trim()) {
+              setAiSuggestedModel(json.aiSuggestedModel);
+            }
           }
         } catch {
           // Sin conexión o el decodificador no respondió -- no rompe nada,
@@ -334,7 +359,26 @@ export default function NewAssetModalIntl({
             </div>
             <div>
               <label className="text-[12px] font-bold text-zinc-700">{t("modelLabel")}</label>
-              <input type="text" required value={model} onChange={(e) => setModel(e.target.value)} placeholder={t("modelPlaceholder")} className="w-full mt-1 rounded-xl border border-zinc-200 px-3 py-[10px] text-[13px] outline-none focus:border-red-500" />
+              <input
+                type="text"
+                required
+                value={model}
+                onChange={(e) => { setModel(e.target.value); setAiSuggestedModel(null); }}
+                placeholder={t("modelPlaceholder")}
+                className="w-full mt-1 rounded-xl border border-zinc-200 px-3 py-[10px] text-[13px] outline-none focus:border-red-500"
+              />
+              {aiSuggestedModel && !model.trim() && (
+                <button
+                  type="button"
+                  onClick={() => { setModel(aiSuggestedModel); setAiSuggestedModel(null); }}
+                  className="mt-1.5 w-full text-left flex items-center justify-between gap-2 bg-violet-50 border border-violet-200 rounded-lg px-2.5 py-1.5 hover:bg-violet-100 transition-colors"
+                >
+                  <span className="text-[11px] text-violet-700 leading-snug">
+                    {t("aiModelSuggestionPrefix")}<span className="font-bold">{aiSuggestedModel}</span>
+                  </span>
+                  <span className="text-[11px] font-bold text-violet-700 shrink-0">{t("aiModelUseButton")}</span>
+                </button>
+              )}
             </div>
           </div>
 
@@ -505,6 +549,7 @@ export default function NewAssetModalIntl({
         onConfirm={(scannedVin) => {
           setVin(scannedVin);
           setVinAutoFilled(false);
+          setAiSuggestedModel(null);
           setShowVinScanner(false);
         }}
       />

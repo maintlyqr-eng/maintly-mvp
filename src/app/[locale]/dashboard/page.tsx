@@ -2,8 +2,8 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useRef, useState, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import {
   Box, QrCode, Search,
@@ -109,8 +109,9 @@ type SearchServiceResult = {
   assetName: string;
 };
 
-export default function DashboardPage() {
+function DashboardPageInner() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const t = useTranslations("DashboardHomePage");
   // Month/weekday labels for the calendar hover-preview reuse the full
   // Calendar page's own namespace (DashboardCalendarPage already has
@@ -176,6 +177,13 @@ export default function DashboardPage() {
   // identically everywhere — see src/components/{AddAssetChooserIntl,
   // NewAssetModalIntl,LinkExistingAssetModalIntl}.tsx.
   const [addStep, setAddStep] = useState<"closed" | "choose" | "new" | "existing">("closed");
+  // Incremento 29d (Facu, 31 jul 2026): "cuando voy desde el home y escaneo
+  // algo q no existe... deberia agregarmelo directo" -- ver el efecto más
+  // abajo que lee ?newAssetVin= de la URL (puesto ahí por VinNotFoundModal)
+  // y abre el formulario de nuevo equipo directo con este valor precargado,
+  // sin pasar por el selector "nuevo vs. vincular existente" ni obligar a
+  // tipear el VIN de nuevo.
+  const [pendingVin, setPendingVin] = useState("");
 
   async function refreshTotalAssets(uid: string) {
     const { count } = await supabase
@@ -437,6 +445,25 @@ export default function DashboardPage() {
     return () => { active = false; listener.subscription.unsubscribe(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router]);
+
+  // Incremento 29d (Facu, 31 jul 2026): "deberia agregarmelo directo" --
+  // corre recién cuando authChecked pasa a true (mechanicId ya está seteado
+  // y NewAssetModalIntl lo necesita), lee ?newAssetVin= una sola vez, y
+  // limpia el query param de la URL sin disparar una navegación (así un
+  // refresh de la página no vuelve a abrir el modal solo).
+  useEffect(() => {
+    if (!authChecked) return;
+    const vin = searchParams.get("newAssetVin");
+    if (!vin) return;
+
+    setPendingVin(vin);
+    setAddStep("new");
+
+    const url = new URL(window.location.href);
+    url.searchParams.delete("newAssetVin");
+    window.history.replaceState({}, "", url.toString());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authChecked]);
 
   // ── Live search: services (debounced, searches full history, not just the recent 6) ──
   useEffect(() => {
@@ -1335,6 +1362,7 @@ export default function DashboardPage() {
         onClose={() => setAddStep("closed")}
         mechanicId={mechanicId}
         onCreated={() => refreshTotalAssets(mechanicId)}
+        initialVin={pendingVin || undefined}
       />
       <LinkExistingAssetModalIntl
         open={addStep === "existing"}
@@ -1344,5 +1372,21 @@ export default function DashboardPage() {
       />
 
     </div>
+  );
+}
+
+// useSearchParams() (para el deep link ?newAssetVin= desde VinNotFoundModal,
+// Incremento 29d) saca a la página del renderizado estático salvo que esté
+// envuelta en un límite de Suspense -- mismo patrón ya usado por
+// dashboard/services/page.tsx, team-chat/page.tsx y login/page.tsx.
+export default function DashboardPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center bg-zinc-50">
+        <div className="w-8 h-8 border-4 border-red-600 border-t-transparent rounded-full animate-spin" />
+      </div>
+    }>
+      <DashboardPageInner />
+    </Suspense>
   );
 }
