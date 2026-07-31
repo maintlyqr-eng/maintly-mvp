@@ -78,9 +78,18 @@ Respond with ONLY a JSON object, no other text, no markdown fences:
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
           contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: { maxOutputTokens: 200 },
+          // thinkingBudget: 0 -- gemini-2.5-flash "piensa" internamente antes
+          // de responder por defecto, y esos tokens de pensamiento salen del
+          // mismo presupuesto que maxOutputTokens. Sin esto, con un límite
+          // chico (necesario para que esto sea rápido y barato) el modelo
+          // gastaba TODO el presupuesto pensando y devolvía texto vacío --
+          // por eso nunca aparecía la sugerencia de marca/modelo aunque la
+          // clave estuviera bien configurada. No hace falta "pensar" para
+          // esta tarea (identificar un fabricante a partir de un patrón de
+          // caracteres), así que se desactiva por completo.
+          generationConfig: { maxOutputTokens: 300, thinkingConfig: { thinkingBudget: 0 } },
         }),
-        signal: AbortSignal.timeout(6000),
+        signal: AbortSignal.timeout(8000),
       }
     );
     if (!res.ok) return null;
