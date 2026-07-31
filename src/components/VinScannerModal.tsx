@@ -89,6 +89,40 @@ export default function VinScannerModal({
     }
   }
 
+  // Facu (31 jul, tercera ronda): "la camara no agarra bien el VIN, como q
+  // lo lee bastante mal". El umbral fijo de blanco/negro (antes: gris > 130
+  // = blanco) funciona mal apenas cambia la luz o hay reflejo en la chapa --
+  // lo que es exactamente "iluminación variable de una chapa de auto real".
+  // Se reemplaza por el método de Otsu: calcula el umbral ÓPTIMO para cada
+  // imagen en base a su propio histograma de grises, en vez de adivinar un
+  // número fijo que sirve para algunas fotos y para otras no. Es una técnica
+  // estándar de procesamiento de imágenes (no un ajuste a ojo), así que no
+  // tiene el riesgo de "sobre-ajustar a mi propia intuición" que tuvo el
+  // cambio de PSM/consenso anterior.
+  function otsuThreshold(hist: number[], total: number): number {
+    let sum = 0;
+    for (let i = 0; i < 256; i++) sum += i * hist[i];
+    let sumB = 0;
+    let weightBg = 0;
+    let maxVariance = 0;
+    let threshold = 130; // respaldo razonable si el cálculo no encuentra nada mejor
+    for (let t = 0; t < 256; t++) {
+      weightBg += hist[t];
+      if (weightBg === 0) continue;
+      const weightFg = total - weightBg;
+      if (weightFg === 0) break;
+      sumB += t * hist[t];
+      const meanBg = sumB / weightBg;
+      const meanFg = (sum - sumB) / weightFg;
+      const variance = weightBg * weightFg * (meanBg - meanFg) * (meanBg - meanFg);
+      if (variance > maxVariance) {
+        maxVariance = variance;
+        threshold = t;
+      }
+    }
+    return threshold;
+  }
+
   // Recorta solo la franja central (donde está la guía en pantalla) en vez
   // de mandarle el cuadro entero a Tesseract -- más rápido, y el OCR
   // rinde mejor cuando el texto ocupa la mayor parte de la imagen en vez
@@ -117,14 +151,44 @@ export default function VinScannerModal({
 
     // Blanco y negro a puro contraste -- ayuda bastante al OCR con texto
     // grabado/estampado en metal, que suele tener poco contraste de por sí.
+    // El umbral ya no es un número fijo (ver otsuThreshold arriba).
     const imgData = ctx.getImageData(0, 0, stripW, stripH);
     const d = imgData.data;
-    for (let i = 0; i < d.length; i += 4) {
-      const gray = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
-      const bw = gray > 130 ? 255 : 0;
+    const pixelCount = stripW * stripH;
+    const gray = new Uint8ClampedArray(pixelCount);
+    const hist = new Array(256).fill(0);
+    for (let i = 0, p = 0; i < d.length; i += 4, p++) {
+      const g = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
+      gray[p] = g;
+      hist[gray[p]]++;
+    }
+    const threshold = otsuThreshold(hist, pixelCount);
+    for (let i = 0, p = 0; i < d.length; i += 4, p++) {
+      const bw = gray[p] > threshold ? 255 : 0;
       d[i] = d[i + 1] = d[i + 2] = bw;
     }
     ctx.putImageData(imgData, 0, 0);
+
+    // Si la franja recortada queda con poca altura real en píxeles (típico
+    // si la persona sostiene el teléfono lejos de la chapa), Tesseract lee
+    // mucho peor letras chiquitas -- es una limitación conocida de OCR en
+    // general, no algo específico de este VIN. Se agranda la imagen antes
+    // de mandarla (con "vecino más cercano", no suavizado, para no volver
+    // borrosos los bordes ya binarizados en blanco/negro).
+    const MIN_STRIP_HEIGHT = 200;
+    if (stripH < MIN_STRIP_HEIGHT) {
+      const scale = MIN_STRIP_HEIGHT / stripH;
+      const upscaled = document.createElement("canvas");
+      upscaled.width = Math.round(stripW * scale);
+      upscaled.height = Math.round(stripH * scale);
+      const upCtx = upscaled.getContext("2d");
+      if (upCtx) {
+        upCtx.imageSmoothingEnabled = false;
+        upCtx.drawImage(canvas, 0, 0, upscaled.width, upscaled.height);
+        return upscaled;
+      }
+    }
+
     return canvas;
   }
 
@@ -198,8 +262,13 @@ export default function VinScannerModal({
 
     let cancelled = false;
 
+    // 1920x1080 en vez de 1280x720 (pedido "ideal", el navegador da lo más
+    // cercano que la cámara soporte): más resolución real de origen = más
+    // píxeles reales por letra del VIN una vez recortada la franja central,
+    // que es justo lo que más ayuda al OCR con texto chico (ver también el
+    // reescalado en captureGuideStrip más abajo).
     navigator.mediaDevices
-      .getUserMedia({ video: { facingMode: { ideal: "environment" }, width: { ideal: 1280 }, height: { ideal: 720 } } })
+      .getUserMedia({ video: { facingMode: { ideal: "environment" }, width: { ideal: 1920 }, height: { ideal: 1080 } } })
       .then(async (stream) => {
         if (!activeRef.current || cancelled) { stream.getTracks().forEach((tr) => tr.stop()); return; }
         streamRef.current = stream;
@@ -295,7 +364,7 @@ export default function VinScannerModal({
     // runOcrPass) -- reabrir desde cero es más simple y confiable que
     // tratar de reanudar el mismo stream.
     navigator.mediaDevices
-      .getUserMedia({ video: { facingMode: { ideal: "environment" }, width: { ideal: 1280 }, height: { ideal: 720 } } })
+      .getUserMedia({ video: { facingMode: { ideal: "environment" }, width: { ideal: 1920 }, height: { ideal: 1080 } } })
       .then((stream) => {
         if (!activeRef.current) { stream.getTracks().forEach((tr) => tr.stop()); return; }
         streamRef.current = stream;
