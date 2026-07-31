@@ -10,6 +10,9 @@ import { supabase } from "@/lib/supabase";
 import QRScannerModal from "@/components/QRScannerModal";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
 import ContactUsModal from "@/components/ContactUsModal";
+import VinScannerModal from "@/components/VinScannerModal";
+import VinNotFoundModal from "@/components/VinNotFoundModal";
+import { findAssetByVin } from "@/lib/vinLookup";
 
 type PublicStats = { machines: number; services: number; mechanics: number };
 
@@ -26,6 +29,14 @@ export default function HomePage() {
   // Camera scanner — the actual camera/jsQR logic lives in QRScannerModal,
   // shared with the "link existing asset" flows in the dashboard.
   const [showCamera, setShowCamera] = useState(false);
+
+  // Incremento 29 (Facu, escaneo de VIN): "que con la camara podamos leer
+  // el vin de la puerta del auto y q tambien nos mande al mismo equipo" --
+  // escanear el QR sigue siendo el camino principal, esto es un accesorio
+  // ofrecido desde adentro de QRScannerModal (ver onVinFallback) para el
+  // caso "el auto perdió su sticker de QR pero ya tiene historial cargado".
+  const [showVinScanner, setShowVinScanner] = useState(false);
+  const [vinNotFound, setVinNotFound] = useState(false);
 
   // Incremento 26 (Facu): botón "Hablemos" en la navbar, visible para
   // cualquiera (logueado o no) en desktop y mobile -- ver el comentario
@@ -150,6 +161,21 @@ export default function HomePage() {
   function handleScanDetect(code: string) {
     setShowCamera(false);
     router.push(`/asset/${code}`);
+  }
+
+  // ── VIN SCANNER (find existing equipment) ───────────────────────────────
+
+  async function handleVinConfirm(vin: string) {
+    const match = await findAssetByVin(vin);
+    setShowVinScanner(false);
+    if (match?.qrCode) {
+      router.push(`/asset/${match.qrCode}`);
+    } else {
+      // O no hay ningún equipo cargado con ese VIN, o lo hay pero sin QR
+      // asignado (caso raro) -- en ambos casos no hay a dónde navegar, así
+      // que se muestra el mismo mensaje de "no lo encontramos".
+      setVinNotFound(true);
+    }
   }
 
   // Nav links below all point at pages that haven't been migrated under
@@ -642,8 +668,19 @@ export default function HomePage() {
 
       {/* ════ CAMERA OVERLAY ════ */}
       {showCamera && (
-        <QRScannerModal onDetect={handleScanDetect} onClose={() => setShowCamera(false)} />
+        <QRScannerModal
+          onDetect={handleScanDetect}
+          onClose={() => setShowCamera(false)}
+          onVinFallback={() => { setShowCamera(false); setShowVinScanner(true); }}
+        />
       )}
+
+      <VinScannerModal
+        open={showVinScanner}
+        onClose={() => setShowVinScanner(false)}
+        onConfirm={handleVinConfirm}
+      />
+      <VinNotFoundModal open={vinNotFound} onClose={() => setVinNotFound(false)} loggedIn={loggedIn} />
 
       {/* ════ CONTACT US ("Hablemos") ════ Incremento 26 */}
       <ContactUsModal open={showContactUs} onClose={() => setShowContactUs(false)} />

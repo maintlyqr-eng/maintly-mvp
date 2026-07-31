@@ -1049,7 +1049,12 @@
     "errorCouldNotUploadPhoto": "Não foi possível enviar a foto.",
     "errorCouldNotAssignQr": "Não foi possível atribuir este código QR.",
     "errorAssetCreatedNoQr": "Ativo criado, mas não foi possível gerar o QR: {message}",
-    "errorAssetCreatedNoPhoto": "Ativo criado, mas não foi possível enviar a foto: {message}. Você pode tentar novamente em Editar Ativo."
+    "errorAssetCreatedNoPhoto": "Ativo criado, mas não foi possível enviar a foto: {message}. Você pode tentar novamente em Editar Ativo.",
+    "vinScanTooltip": "Escanear VIN com a câmera",
+    "vinChecking": "Verificando…",
+    "vinDuplicateWarning": "Já existe um equipamento cadastrado com este VIN:",
+    "vinDuplicateLinkText": "Ver equipamento existente",
+    "vinAutoDetectedHint": "Detectado automaticamente a partir do VIN — você pode editar."
   },
   "DashboardQrCodesPage": {
     "title": "Códigos QR",
@@ -2149,7 +2154,28 @@
     "qrDetected": "QR Detectado!",
     "cameraUnavailable": "Câmera indisponível",
     "cameraDeniedMessage": "Acesso à câmera negado. Habilite o acesso à câmera nas configurações do seu navegador e tente novamente.",
-    "goBack": "Voltar"
+    "goBack": "Voltar",
+    "vinFallbackHint": "É um veículo? Escaneie o VIN"
+  },
+  "VinScannerModal": {
+    "title": "Escanear VIN",
+    "cameraDeniedMessage": "Acesso à câmera negado. Habilite o acesso à câmera nas configurações do seu navegador e tente novamente.",
+    "cameraUnavailable": "Câmera indisponível",
+    "goBack": "Voltar",
+    "startingCamera": "Iniciando câmera…",
+    "instructions": "Aponte para o VIN gravado na porta ou no painel",
+    "holdSteady": "Mantenha firme — pode levar alguns segundos",
+    "typeManually": "Digitar o VIN manualmente",
+    "confirmTitle": "É este o VIN?",
+    "confirmSubtitle": "Confira bem antes de continuar — o OCR às vezes confunde algum caractere.",
+    "manualTitle": "Digitar VIN manualmente",
+    "manualSubtitle": "Digite os 17 caracteres do VIN do veículo.",
+    "vinFieldLabel": "VIN",
+    "vinFieldPlaceholder": "1HGCM82633A123456",
+    "hintFormat": "Um VIN tem 17 caracteres ({count}/17)",
+    "checksumHint": "Não conseguimos confirmar este VIN automaticamente. Isso é normal em veículos que não são do mercado dos EUA — apenas confira se está escrito corretamente antes de continuar.",
+    "retryButton": "Tentar novamente",
+    "confirmButton": "Confirmar"
   },
   "AssetMetadata": {
     "genericTitle": "MaintlyQR — Histórico de Manutenção",
@@ -2212,5 +2238,12 @@
     "scanOrShare": "Escaneie ou compartilhe com qualquer pessoa.",
     "shareText": "Escaneie meu cartão Maintler do MaintlyQR",
     "printWindowTitle": "Cartão Maintler"
+  },
+  "VinNotFoundModal": {
+    "title": "Não encontramos",
+    "description": "Ainda não há histórico de manutenção cadastrado para este veículo no MaintlyQR. Quer ser o primeiro a cadastrar?",
+    "loginCta": "Fazer login para cadastrar",
+    "dashboardCta": "Ir ao painel para cadastrar",
+    "close": "Fechar"
   }
 }

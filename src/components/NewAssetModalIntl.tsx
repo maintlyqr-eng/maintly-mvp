@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { X, Camera } from "lucide-react";
+import { X, Camera, ScanLine, AlertTriangle } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { supabase } from "@/lib/supabase";
 import { authedFetch } from "@/lib/apiAuth";
@@ -9,6 +9,10 @@ import { validateImageFile } from "@/lib/imageValidation";
 import { uploadAssetPhoto, genAssetQrCode } from "@/lib/uploadAssetPhoto";
 import { assetTypeOptions, fuelTypeOptions } from "@/lib/assetTypes";
 import CustomerPickerIntl, { CustomerOption } from "@/components/CustomerPickerIntl";
+import VinScannerModal from "@/components/VinScannerModal";
+import { VIN_ELIGIBLE_ASSET_TYPES, isVinFormatValid, normalizeVin } from "@/lib/vinValidation";
+import { findAssetByVin, VinMatch } from "@/lib/vinLookup";
+import { Link } from "@/i18n/navigation";
 
 // Localized twin of src/components/NewAssetModal.tsx. Every dashboard page
 // is migrated now, but the plain (non-Intl) NewAssetModal is deliberately
@@ -59,6 +63,20 @@ export default function NewAssetModalIntl({
   const submitBusyRef = useRef(false);
   const photoPreviewUrlRef = useRef<string | null>(null);
 
+  // Incremento 29 (Facu, escaneo de VIN): "esta genial q no haya
+  // duplicados, esa es la idea" + "mandale a todo e incluso al
+  // decodificador de marca/año". showVinScanner abre VinScannerModal desde
+  // el botón de cámara junto al campo VIN; vinDuplicate/vinChecking son el
+  // resultado del chequeo contra assets existentes (debounced, ver el
+  // useEffect de abajo); vinAutoFilled solo controla si se muestra el
+  // cartelito "detectado automáticamente".
+  const [showVinScanner, setShowVinScanner] = useState(false);
+  const [vinDuplicate, setVinDuplicate] = useState<VinMatch | null>(null);
+  const [vinChecking, setVinChecking] = useState(false);
+  const [vinAutoFilled, setVinAutoFilled] = useState(false);
+  const vinCheckTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const vinCheckSeqRef = useRef(0);
+
   useEffect(() => {
     if (!open) return;
     submitBusyRef.current = false;
@@ -80,6 +98,14 @@ export default function NewAssetModalIntl({
     }
     setPhotoPreview("");
     setCustomerId("");
+    setShowVinScanner(false);
+    setVinDuplicate(null);
+    setVinChecking(false);
+    setVinAutoFilled(false);
+    if (vinCheckTimerRef.current) {
+      clearTimeout(vinCheckTimerRef.current);
+      vinCheckTimerRef.current = null;
+    }
 
     supabase
       .from("customers")
@@ -97,6 +123,76 @@ export default function NewAssetModalIntl({
       }
     };
   }, []);
+
+  // Incremento 29 (Facu, escaneo de VIN): apenas el VIN llega a los 17
+  // caracteres válidos (tipeado a mano o confirmado desde el escáner de
+  // cámara), se dispara -- con un debounce de 500ms para no pegarle a la
+  // base en cada tecla -- (1) el chequeo de duplicados contra `assets` vía
+  // findAssetByVin, y (2) si no hay duplicado, un intento de autocompletar
+  // marca/modelo/año contra /api/decode-vin, PERO solo pisando los campos
+  // que la persona todavía dejó vacíos (nunca sobreescribe algo ya
+  // cargado a mano). vinCheckSeqRef descarta respuestas que ya quedaron
+  // obsoletas (por ej. si la persona sigue editando el VIN mientras el
+  // pedido anterior todavía estaba en vuelo).
+  //
+  // brand/model/year quedan afuera de las deps a propósito: si se
+  // incluyeran, el propio autocompletado (que las modifica) volvería a
+  // disparar este efecto en un vaivén innecesario. El efecto solo necesita
+  // reaccionar a cambios de VIN o de tipo de activo -- lee el valor más
+  // reciente de brand/model/year en el momento en que corre cada vez que
+  // el VIN cambia, que es exactamente cuándo importa.
+  useEffect(() => {
+    if (vinCheckTimerRef.current) {
+      clearTimeout(vinCheckTimerRef.current);
+      vinCheckTimerRef.current = null;
+    }
+    setVinDuplicate(null);
+    setVinChecking(false);
+
+    if (!VIN_ELIGIBLE_ASSET_TYPES.includes(assetType)) return;
+    const cleaned = normalizeVin(vin);
+    if (!isVinFormatValid(cleaned)) return;
+
+    const seq = ++vinCheckSeqRef.current;
+    setVinChecking(true);
+
+    vinCheckTimerRef.current = setTimeout(() => {
+      (async () => {
+        const match = await findAssetByVin(cleaned);
+        if (vinCheckSeqRef.current !== seq) return;
+        setVinChecking(false);
+        setVinDuplicate(match);
+
+        if (match) return;
+        if (brand.trim() && model.trim() && year.trim()) return;
+
+        try {
+          const res = await fetch(`/api/decode-vin?vin=${encodeURIComponent(cleaned)}`);
+          if (vinCheckSeqRef.current !== seq) return;
+          const json = await res.json();
+          if (json?.found) {
+            let filled = false;
+            if (!brand.trim() && json.make) { setBrand(json.make); filled = true; }
+            if (!model.trim() && json.model) { setModel(json.model); filled = true; }
+            if (!year.trim() && json.year) { setYear(String(json.year)); filled = true; }
+            if (filled) setVinAutoFilled(true);
+          }
+        } catch {
+          // Sin conexión o el decodificador no respondió -- no rompe nada,
+          // la persona simplemente carga marca/modelo/año a mano como
+          // siempre.
+        }
+      })();
+    }, 500);
+
+    return () => {
+      if (vinCheckTimerRef.current) {
+        clearTimeout(vinCheckTimerRef.current);
+        vinCheckTimerRef.current = null;
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [vin, assetType]);
 
   if (!open) return null;
 
@@ -119,6 +215,14 @@ export default function NewAssetModalIntl({
       return;
     }
 
+    // Red de seguridad además del botón deshabilitado en la UI -- por si el
+    // chequeo de duplicados todavía está en vuelo (debounce) cuando alguien
+    // manda el formulario igual.
+    if (vinDuplicate) {
+      setFormError(`${t("vinDuplicateWarning")} ${vinDuplicate.displayName}`);
+      return;
+    }
+
     const currentYear = new Date().getFullYear();
     if (year && parseInt(year, 10) > currentYear) {
       setFormError(t("errorYearFuture", { year: currentYear }));
@@ -135,7 +239,12 @@ export default function NewAssetModalIntl({
         brand: brand.trim(),
         model: model.trim(),
         nickname: nickname.trim() || null,
-        vin_serial: vin.trim() || null,
+        // Para automotive/motorcycle se guarda normalizado (mayúsculas, sin
+        // espacios/guiones) -- mismo formato que espera findAssetByVin y que
+        // graba VinScannerModal -- para el resto de los tipos (generador,
+        // maquinaria, etc.) este campo es un número de serie genérico, así
+        // que se respeta tal cual lo cargó la persona.
+        vin_serial: (VIN_ELIGIBLE_ASSET_TYPES.includes(assetType) ? normalizeVin(vin) : vin.trim()) || null,
         year: year ? parseInt(year, 10) : null,
         plate: plate.trim() || null,
         fuel_type: fuelType || null,
@@ -234,16 +343,63 @@ export default function NewAssetModalIntl({
             <input type="text" value={nickname} onChange={(e) => setNickname(e.target.value)} placeholder={t("nicknamePlaceholder")} className="w-full mt-1 rounded-xl border border-zinc-200 px-3 py-[10px] text-[13px] outline-none focus:border-red-500" />
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-1">
             <div>
               <label className="text-[12px] font-bold text-zinc-700">{t("vinLabel")}</label>
-              <input type="text" value={vin} onChange={(e) => setVin(e.target.value)} className="w-full mt-1 rounded-xl border border-zinc-200 px-3 py-[10px] text-[13px] outline-none focus:border-red-500" />
+              <div className="mt-1 flex items-center gap-1.5">
+                <input
+                  type="text"
+                  value={vin}
+                  onChange={(e) => { setVin(e.target.value); setVinAutoFilled(false); }}
+                  // Solo se limita a 17 (largo exacto de un VIN real) para
+                  // automotive/motorcycle -- para el resto de los tipos este
+                  // campo es un número de serie genérico (generador,
+                  // maquinaria, etc.) que puede ser más largo o más corto,
+                  // así que no se le pone tope ahí.
+                  maxLength={VIN_ELIGIBLE_ASSET_TYPES.includes(assetType) ? 17 : undefined}
+                  className={`w-full rounded-xl border border-zinc-200 px-3 py-[10px] text-[13px] outline-none focus:border-red-500 ${VIN_ELIGIBLE_ASSET_TYPES.includes(assetType) ? "uppercase" : ""}`}
+                />
+                {VIN_ELIGIBLE_ASSET_TYPES.includes(assetType) && (
+                  <button
+                    type="button"
+                    onClick={() => setShowVinScanner(true)}
+                    title={t("vinScanTooltip")}
+                    aria-label={t("vinScanTooltip")}
+                    className="shrink-0 w-[38px] h-[38px] rounded-xl border border-zinc-200 hover:border-red-400 hover:text-red-600 text-zinc-500 flex items-center justify-center transition-colors"
+                  >
+                    <ScanLine size={16} />
+                  </button>
+                )}
+              </div>
             </div>
             <div>
               <label className="text-[12px] font-bold text-zinc-700">{t("yearLabel")}</label>
               <input type="number" max={new Date().getFullYear()} value={year} onChange={(e) => setYear(e.target.value)} placeholder={t("yearPlaceholder")} className="w-full mt-1 rounded-xl border border-zinc-200 px-3 py-[10px] text-[13px] outline-none focus:border-red-500" />
             </div>
           </div>
+
+          {vinChecking && (
+            <p className="text-[11px] text-zinc-400 mb-3">{t("vinChecking")}</p>
+          )}
+          {!vinChecking && vinDuplicate && (
+            <div className="flex items-start gap-1.5 mb-3 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+              <AlertTriangle size={13} className="text-red-500 shrink-0 mt-0.5" />
+              <p className="text-[11px] text-red-700 leading-snug">
+                {t("vinDuplicateWarning")} <span className="font-bold">{vinDuplicate.displayName}</span>
+                {vinDuplicate.qrCode && (
+                  <>
+                    {" — "}
+                    <Link href={`/asset/${vinDuplicate.qrCode}`} target="_blank" className="underline font-bold hover:text-red-900">
+                      {t("vinDuplicateLinkText")}
+                    </Link>
+                  </>
+                )}
+              </p>
+            </div>
+          )}
+          {!vinChecking && !vinDuplicate && vinAutoFilled && (
+            <p className="text-[11px] text-green-600 mb-3">{t("vinAutoDetectedHint")}</p>
+          )}
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
             <div>
@@ -336,12 +492,22 @@ export default function NewAssetModalIntl({
 
           <div className="flex gap-3">
             <button type="button" onClick={onClose} className="flex-1 border border-zinc-200 text-zinc-700 font-bold py-[11px] rounded-xl text-[13px] hover:bg-zinc-50">{t("cancel")}</button>
-            <button type="submit" disabled={saving} className="flex-1 bg-red-600 hover:bg-red-500 disabled:opacity-60 transition-all text-white font-bold py-[11px] rounded-xl text-[13px]">
+            <button type="submit" disabled={saving || !!vinDuplicate} className="flex-1 bg-red-600 hover:bg-red-500 disabled:opacity-60 transition-all text-white font-bold py-[11px] rounded-xl text-[13px]">
               {saving ? t("saving") : existingCode ? t("createAndAssign") : t("createAndGenerateQr")}
             </button>
           </div>
         </form>
       </div>
+
+      <VinScannerModal
+        open={showVinScanner}
+        onClose={() => setShowVinScanner(false)}
+        onConfirm={(scannedVin) => {
+          setVin(scannedVin);
+          setVinAutoFilled(false);
+          setShowVinScanner(false);
+        }}
+      />
     </div>
   );
 }

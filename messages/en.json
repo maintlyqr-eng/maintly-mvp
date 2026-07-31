@@ -1049,7 +1049,12 @@
     "errorCouldNotUploadPhoto": "Could not upload the photo.",
     "errorCouldNotAssignQr": "Couldn't assign this QR code.",
     "errorAssetCreatedNoQr": "Asset created, but QR could not be generated: {message}",
-    "errorAssetCreatedNoPhoto": "Asset created, but the photo could not be uploaded: {message}. You can try again from Edit Asset."
+    "errorAssetCreatedNoPhoto": "Asset created, but the photo could not be uploaded: {message}. You can try again from Edit Asset.",
+    "vinScanTooltip": "Scan VIN with camera",
+    "vinChecking": "Checking…",
+    "vinDuplicateWarning": "There is already equipment registered with this VIN:",
+    "vinDuplicateLinkText": "View existing equipment",
+    "vinAutoDetectedHint": "Auto-detected from the VIN — you can edit it."
   },
   "DashboardQrCodesPage": {
     "title": "QR Codes",
@@ -2149,13 +2154,34 @@
     "qrDetected": "QR Detected!",
     "cameraUnavailable": "Camera unavailable",
     "cameraDeniedMessage": "Camera access denied. Please allow camera access in your browser settings and try again.",
-    "goBack": "Go back"
+    "goBack": "Go back",
+    "vinFallbackHint": "Is it a vehicle? Scan the VIN"
   },
   "AssetMetadata": {
     "genericTitle": "MaintlyQR — Maintenance History",
     "genericDescription": "One QR. Lifetime maintenance history for any asset, anywhere in the world.",
     "assetTitle": "{name} · Maintenance History — MaintlyQR",
     "assetDescription": "Check the full service history of this {type} — verified maintenance, always available with a scan."
+  },
+  "VinScannerModal": {
+    "title": "Scan VIN",
+    "cameraDeniedMessage": "Camera access denied. Please allow camera access in your browser settings and try again.",
+    "cameraUnavailable": "Camera unavailable",
+    "goBack": "Go back",
+    "startingCamera": "Starting camera…",
+    "instructions": "Point at the VIN on the door jamb or dashboard",
+    "holdSteady": "Hold steady — this can take a few seconds",
+    "typeManually": "Type the VIN by hand",
+    "confirmTitle": "Is this the VIN?",
+    "confirmSubtitle": "Double-check it before continuing — OCR sometimes mixes up a character.",
+    "manualTitle": "Enter VIN by hand",
+    "manualSubtitle": "Type the vehicle's 17-character VIN.",
+    "vinFieldLabel": "VIN",
+    "vinFieldPlaceholder": "1HGCM82633A123456",
+    "hintFormat": "A VIN has 17 characters ({count}/17)",
+    "checksumHint": "We couldn't automatically confirm this VIN. That's normal for vehicles outside the US market — just double-check it's typed correctly before continuing.",
+    "retryButton": "Retry",
+    "confirmButton": "Confirm"
   },
   "RegisterProfessionPage": {
     "pageTitle": "Want to be a Verified Maintler?",
@@ -2212,5 +2238,12 @@
     "scanOrShare": "Scan or share with anyone.",
     "shareText": "Scan my MaintlyQR Maintler card",
     "printWindowTitle": "Maintler Card"
+  },
+  "VinNotFoundModal": {
+    "title": "We couldn't find it",
+    "description": "There's no maintenance history logged for this vehicle in MaintlyQR yet. Want to be the first to add it?",
+    "loginCta": "Log in to add it",
+    "dashboardCta": "Go to dashboard to add it",
+    "close": "Close"
   }
 }
