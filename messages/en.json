@@ -2181,7 +2181,6 @@
     "vinFieldLabel": "VIN",
     "vinFieldPlaceholder": "1HGCM82633A123456",
     "hintFormat": "A VIN has 17 characters ({count}/17)",
-    "checksumHint": "We couldn't automatically confirm this VIN. That's normal for vehicles outside the US market — just double-check it's typed correctly before continuing.",
     "retryButton": "Retry",
     "confirmButton": "Confirm"
   },

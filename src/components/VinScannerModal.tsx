@@ -2,8 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
-import { Car, X, Keyboard, CheckCircle2, RotateCcw, AlertTriangle } from "lucide-react";
-import { extractVinCandidate, isVinChecksumPlausible, isVinFormatValid, normalizeVin } from "@/lib/vinValidation";
+import { Car, X, Keyboard, CheckCircle2, RotateCcw } from "lucide-react";
+import { extractVinCandidate, isVinFormatValid, normalizeVin } from "@/lib/vinValidation";
 
 // Incremento 29 (Facu, escaneo de VIN): "que con la camara podamos leer el
 // vin de la puerta del auto". A diferencia de QRScannerModal (que usa jsQR,
@@ -11,17 +11,22 @@ import { extractVinCandidate, isVinChecksumPlausible, isVinFormatValid, normaliz
 // estamos leyendo texto impreso con OCR genérico (Tesseract.js, corre
 // entero en el navegador, la foto nunca sale del teléfono) -- mucho menos
 // confiable que un QR: le afectan el reflejo de la chapa metálica, el
-// ángulo, la luz, el desgaste. Por eso el diseño de este componente parte
-// de la base de que el OCR se va a equivocar seguido, y arma una red de
-// seguridad en dos capas:
-//   1. Nunca confirma solo -- apenas "cree" haber encontrado un VIN, para
-//      de escanear y se lo muestra a la persona en un campo editable para
-//      que confirme o corrija antes de seguir.
-//   2. isVinChecksumPlausible (ver vinValidation.ts) da una pista extra,
-//      pero NUNCA bloquea -- muchos VIN de autos de mercado
-//      argentino/latinoamericano no van a pasar esa cuenta aunque estén
-//      perfectos, porque ese dígito verificador es una exigencia de EEUU,
-//      no un estándar universal.
+// ángulo, la luz, el desgaste. Por eso el diseño de este componente NUNCA
+// confirma solo -- apenas "cree" haber encontrado un VIN, para de escanear
+// y se lo muestra a la persona en un campo editable para que confirme o
+// corrija antes de seguir.
+//
+// Incremento 29e (Facu, 31 jul 2026): "no me gusta ese cartel q dice algo
+// de los vehiculos de eeuu, no quiero cartelitos q puedan confundir.
+// hagamos simple todo" -- antes había acá un aviso amarillo cuando
+// isVinChecksumPlausible (ver vinValidation.ts) no podía confirmar el
+// dígito verificador, explicando que eso es normal fuera de EEUU. Aunque
+// técnicamente correcto, era un detalle que no le sirve a la persona que
+// está cargando un vehículo -- se sacó ese cartel por completo (la función
+// isVinChecksumPlausible en sí sigue existiendo por si hace falta en el
+// futuro, simplemente no se muestra nada con su resultado acá). El único
+// chequeo que sigue importando para la persona es el de FORMATO (17
+// caracteres válidos) -- ver hintFormat más abajo.
 //
 // Siempre hay, además, un link para escribir el VIN a mano sin cámara --
 // para cuando la chapa está en mal estado o el OCR simplemente no da.
@@ -326,7 +331,6 @@ export default function VinScannerModal({
 
   const normalizedEdit = normalizeVin(editValue);
   const formatOk = isVinFormatValid(normalizedEdit);
-  const checksumOk = formatOk && isVinChecksumPlausible(normalizedEdit);
 
   return (
     <div className="fixed inset-0 z-[100] bg-black flex flex-col">
@@ -419,12 +423,6 @@ export default function VinScannerModal({
 
               {editValue.length > 0 && !formatOk && (
                 <p className="text-[11px] text-zinc-400 mt-1.5">{t("hintFormat", { count: normalizedEdit.length })}</p>
-              )}
-              {formatOk && !checksumOk && (
-                <div className="flex items-start gap-1.5 mt-2 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
-                  <AlertTriangle size={13} className="text-amber-500 shrink-0 mt-0.5" />
-                  <p className="text-[11px] text-amber-700 leading-snug">{t("checksumHint")}</p>
-                </div>
               )}
 
               <div className="flex gap-2 mt-5">
