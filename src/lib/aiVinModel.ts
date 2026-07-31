@@ -17,10 +17,15 @@
 // autocompleta solo -- requiere un click explícito de la persona ("Usar")
 // para pasar al campo correspondiente. Ver NewAssetModalIntl.tsx.
 //
-// Requiere la variable de entorno ANTHROPIC_API_KEY (mismo patrón que
-// RESEND_API_KEY: sin configurar, esto no rompe nada, simplemente nunca
-// hay sugerencia de IA disponible).
-const MODEL = "claude-haiku-4-5"; // rápido y barato -- alcanza de sobra para esto, no hace falta un modelo más grande
+// Incremento 29d (Facu, 31 jul 2026): "quiero q usemos el q sea mas liviano
+// o facil... si no tengo q estar pagando o abriendo cuentas es mejor" --
+// se cambió de Anthropic (Claude) a Gemini (Google) porque la API de
+// Gemini tiene un nivel gratuito real: no pide tarjeta ni cargar crédito,
+// solo una cuenta de Google (que Facu ya tiene, es su Gmail). Anthropic en
+// cambio exige cargar crédito mínimo antes de poder usar la API. Mismo
+// patrón de siempre: sin la variable de entorno GEMINI_API_KEY configurada,
+// esto no rompe nada, simplemente nunca hay sugerencia de IA disponible.
+const MODEL = "gemini-2.5-flash"; // modelo estable de Google con nivel gratuito, alcanza de sobra para esto
 
 export type AiVinSuggestion = {
   make: string | null;
@@ -39,7 +44,7 @@ export async function suggestVehicleFromVin(params: {
   knownMake: string | null;
   knownYear: number | null;
 }): Promise<AiVinSuggestion | null> {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
+  const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) return null;
 
   const { vin, knownMake, knownYear } = params;
@@ -66,24 +71,22 @@ Respond with ONLY a JSON object, no other text, no markdown fences:
 {"make": "<manufacturer name or null if not reasonably confident>", "model": "<model name or null if not reasonably confident>", "confidence": "high" | "medium" | "low"}`;
 
   try {
-    const res = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01",
-      },
-      body: JSON.stringify({
-        model: MODEL,
-        max_tokens: 150,
-        messages: [{ role: "user", content: prompt }],
-      }),
-      signal: AbortSignal.timeout(6000),
-    });
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${apiKey}`,
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: { maxOutputTokens: 200 },
+        }),
+        signal: AbortSignal.timeout(6000),
+      }
+    );
     if (!res.ok) return null;
 
     const json = await res.json();
-    const text: string = json?.content?.[0]?.text ?? "";
+    const text: string = json?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
     // Por si el modelo agrega fences de markdown a pesar de que se le pidió
     // que no lo haga -- más robusto que fallar directamente.
     const cleaned = text.trim().replace(/^```(?:json)?/i, "").replace(/```$/, "").trim();
