@@ -27,11 +27,41 @@
 // esto no rompe nada, simplemente nunca hay sugerencia de IA disponible.
 const MODEL = "gemini-2.5-flash"; // modelo estable de Google con nivel gratuito, alcanza de sobra para esto
 
+// Incremento 29f (Facu, 31 jul 2026): "sigue sin encontrar la marca y
+// modelo" incluso ya con GEMINI_API_KEY configurada y el bug de
+// thinkingBudget resuelto. Causa más probable: se descartaba de entrada
+// cualquier respuesta con confidence "low" -- pero un WMI realmente no
+// cubierto por NHTSA NI por la tabla offline (justo el caso para el que
+// existe este respaldo) es, casi por definición, un caso donde a la IA
+// tampoco le va a sobrar confianza. El diseño original terminaba
+// descartando la sugerencia exactamente en los casos donde más falta
+// hacía. Como esto NUNCA se autocompleta solo (siempre requiere el click
+// "Usar" del NewAssetModalIntl.tsx), no hay riesgo real en mostrar también
+// una sugerencia de baja confianza -- la persona la ve, decide si le
+// sirve o no. Se deja de usar confidence como filtro de todo o nada.
 export type AiVinSuggestion = {
   make: string | null;
   model: string | null;
-  confidence: "high" | "medium";
+  confidence: "high" | "medium" | "low";
 };
+
+// Best-effort, nunca puede romper el flujo de decode-vin -- ver el catch
+// interno de logServerError, que ya está pensado para esto.
+async function logAiVinFailure(message: string, detail: string) {
+  try {
+    const { logServerError } = await import("@/lib/errorLog");
+    await logServerError({
+      source: "server",
+      severity: "warning",
+      message: `[aiVinModel] ${message}`,
+      stack: detail || null,
+      route: "/api/decode-vin",
+    });
+  } catch {
+    // Si ni siquiera esto funciona (por ejemplo Supabase caído), no hay
+    // nada más que hacer -- ya de por sí es un caso best-effort.
+  }
+}
 
 // `knownMake` es opcional a propósito: si ya la sabemos (NHTSA o la tabla
 // offline de WMI) se le da como contexto y solo se le pide MODELO -- pero si
@@ -92,7 +122,16 @@ Respond with ONLY a JSON object, no other text, no markdown fences:
         signal: AbortSignal.timeout(8000),
       }
     );
-    if (!res.ok) return null;
+    if (!res.ok) {
+      // Se guarda en el mismo panel de Errores que ya usa el resto de la
+      // app (ver errorLog.ts) -- así, si esto vuelve a fallar en
+      // producción, hay una forma real de ver por qué (clave inválida,
+      // cuota agotada, modelo no disponible para esa clave, etc.) en vez
+      // de tener que adivinar a ciegas como esta vez.
+      const bodyText = await res.text().catch(() => "");
+      void logAiVinFailure(`Gemini respondió ${res.status}`, bodyText.slice(0, 500));
+      return null;
+    }
 
     const json = await res.json();
     const text: string = json?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
@@ -100,22 +139,26 @@ Respond with ONLY a JSON object, no other text, no markdown fences:
     // que no lo haga -- más robusto que fallar directamente.
     const cleaned = text.trim().replace(/^```(?:json)?/i, "").replace(/```$/, "").trim();
 
-    const parsed = JSON.parse(cleaned);
-    if (!parsed || (parsed.confidence !== "high" && parsed.confidence !== "medium")) {
-      // "low" (o ausente) se descarta a propósito -- si ni la IA está
-      // segura, no vale la pena mostrárselo a la persona como sugerencia.
+    if (!cleaned) {
+      void logAiVinFailure("Gemini devolvió texto vacío", JSON.stringify(json).slice(0, 500));
       return null;
     }
+
+    const parsed = JSON.parse(cleaned);
+    if (!parsed) return null;
 
     const make = knownMake || (typeof parsed.make === "string" && parsed.make.trim() ? parsed.make.trim() : null);
     const model = typeof parsed.model === "string" && parsed.model.trim() ? parsed.model.trim() : null;
     if (!make && !model) return null;
 
-    return { make, model, confidence: parsed.confidence };
-  } catch {
+    const confidence: AiVinSuggestion["confidence"] =
+      parsed.confidence === "high" || parsed.confidence === "medium" ? parsed.confidence : "low";
+    return { make, model, confidence };
+  } catch (err) {
     // Timeout, JSON inválido, API caída, etc. -- nunca debe romper el
     // formulario de creación de equipo, así que simplemente no hay
-    // sugerencia esta vez.
+    // sugerencia esta vez. Igual que arriba, queda registrado.
+    void logAiVinFailure("Excepción al llamar a Gemini", err instanceof Error ? err.message : String(err));
     return null;
   }
 }
