@@ -15,11 +15,14 @@ type FoundAsset = { name: string; id: string; assetId: string; type: string };
 // rollout instead of being edited in place. Shared by the dashboard home
 // page AND the Assets page.
 //
-// NOTE: QRScannerModal itself keeps its original hardcoded English text
-// (it's not wrapped in an Intl variant here) — this mirrors the existing,
-// already-shipped behavior of src/app/[locale]/page.tsx from Phase 1, which
-// also imports the plain QRScannerModal unmodified. Not introduced by this
-// migration; left consistent with that precedent.
+// NOTE (updated, Incremento 27): QRScannerModal used to keep its own
+// hardcoded English text regardless of the active locale — Facu reported
+// this ("veo q se pone en ingles aunque este en español la plataforma") and
+// it's now fixed directly in QRScannerModal.tsx itself (useTranslations
+// added there, no separate "*Intl" twin needed since every current caller
+// already lives under [locale]). No changes needed here — this component
+// already passed its own `instructions` override via t("scannerInstructions"),
+// which still works exactly the same.
 export default function LinkExistingAssetModalIntl({
   open,
   onClose,

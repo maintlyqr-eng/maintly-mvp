@@ -2141,6 +2141,22 @@
     "successDesc": "We received your message. The MaintlyQR team will contact you shortly.",
     "done": "Done"
   },
+  "QRScannerModal": {
+    "title": "Scan QR Code",
+    "defaultInstructions": "Point at a MaintlyQR code",
+    "holdSteady": "Hold steady — detection is automatic",
+    "startingCamera": "Starting camera…",
+    "qrDetected": "QR Detected!",
+    "cameraUnavailable": "Camera unavailable",
+    "cameraDeniedMessage": "Camera access denied. Please allow camera access in your browser settings and try again.",
+    "goBack": "Go back"
+  },
+  "AssetMetadata": {
+    "genericTitle": "MaintlyQR — Maintenance History",
+    "genericDescription": "One QR. Lifetime maintenance history for any asset, anywhere in the world.",
+    "assetTitle": "{name} · Maintenance History — MaintlyQR",
+    "assetDescription": "Check the full service history of this {type} — verified maintenance, always available with a scan."
+  },
   "RegisterProfessionPage": {
     "pageTitle": "Want to be a Verified Maintler?",
     "pageSubtitle": "Totally optional. Declare your profession and upload a certificate to earn a verified badge on every service you log — or skip and do this later from Settings.",

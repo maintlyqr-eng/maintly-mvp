@@ -2141,6 +2141,22 @@
     "successDesc": "Recibimos tu consulta. El equipo de MaintlyQR te va a contactar a la brevedad.",
     "done": "Listo"
   },
+  "QRScannerModal": {
+    "title": "Escanear Código QR",
+    "defaultInstructions": "Apuntá a un código MaintlyQR",
+    "holdSteady": "Mantené firme — la detección es automática",
+    "startingCamera": "Iniciando cámara…",
+    "qrDetected": "¡QR Detectado!",
+    "cameraUnavailable": "Cámara no disponible",
+    "cameraDeniedMessage": "Acceso a la cámara denegado. Habilitá el acceso a la cámara en la configuración de tu navegador y probá de nuevo.",
+    "goBack": "Volver"
+  },
+  "AssetMetadata": {
+    "genericTitle": "MaintlyQR — Historial de Mantenimiento",
+    "genericDescription": "Un QR. Historial de mantenimiento de por vida para cualquier equipo, en cualquier parte del mundo.",
+    "assetTitle": "{name} · Historial de Mantenimiento — MaintlyQR",
+    "assetDescription": "Consultá el historial completo de service de este {type} — mantenimiento verificado, siempre disponible con un escaneo."
+  },
   "RegisterProfessionPage": {
     "pageTitle": "¿Querés ser un Maintler Verificado?",
     "pageSubtitle": "Totalmente opcional. Declará tu profesión y subí un certificado para ganar una insignia de verificado en cada servicio que registres — o saltealo y hacelo más adelante desde Ajustes.",

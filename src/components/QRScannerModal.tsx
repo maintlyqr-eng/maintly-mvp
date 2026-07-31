@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useTranslations } from "next-intl";
 import { Camera, X, ZoomIn } from "lucide-react";
 
 // Full-screen camera QR scanner. Extracted from the homepage's scanner so
@@ -12,15 +13,27 @@ import { Camera, X, ZoomIn } from "lucide-react";
 // encodes a full URL (e.g. https://maintlyqr.com/asset/MTLY-AB12-CD34), only
 // the last path segment is passed through, so callers always get just the
 // code itself.
+//
+// Incremento 27 (Facu): "veo q se pone en ingles aunque este en español la
+// plataforma" — hasta acá este componente tenía todo su texto en inglés
+// hardcodeado (ver la nota vieja en LinkExistingAssetModalIntl.tsx: era
+// precedente conocido, no un bug nuevo). Se agrega useTranslations acá
+// mismo, sin crear un twin "*Intl" -- a diferencia de otros componentes
+// compartidos de esta app, TODOS los que usan QRScannerModal hoy
+// (src/app/[locale]/page.tsx, LinkExistingAssetModalIntl, NewAssetModalIntl)
+// viven bajo [locale], así que siempre hay un NextIntlClientProvider arriba
+// y no hace falta la variante legacy.
 export default function QRScannerModal({
   onDetect,
   onClose,
-  instructions = "Point at a MaintlyQR code",
+  instructions,
 }: {
   onDetect: (code: string) => void;
   onClose: () => void;
   instructions?: string;
 }) {
+  const t = useTranslations("QRScannerModal");
+  const displayInstructions = instructions || t("defaultInstructions");
   const [camError, setCamError] = useState("");
   const [scanning, setScanning] = useState(false);
   const [detected, setDetected] = useState("");
@@ -102,7 +115,7 @@ export default function QRScannerModal({
         }
       })
       .catch(() => {
-        setCamError("Camera access denied. Please allow camera access in your browser settings and try again.");
+        setCamError(t("cameraDeniedMessage"));
       });
 
     return () => { stopCamera(); };
@@ -117,7 +130,7 @@ export default function QRScannerModal({
   return (
     <div className="fixed inset-0 z-[100] bg-black flex flex-col">
       <div className="shrink-0 flex items-center justify-between px-5 py-4" style={{ paddingTop: "max(env(safe-area-inset-top), 16px)" }}>
-        <p className="text-white font-black text-[15px]">Scan QR Code</p>
+        <p className="text-white font-black text-[15px]">{t("title")}</p>
         <button
           onClick={handleClose}
           className="w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 active:scale-95 flex items-center justify-center transition-all"
@@ -149,7 +162,7 @@ export default function QRScannerModal({
             <div className="w-20 h-20 rounded-full bg-green-500 flex items-center justify-center mb-4 animate-[pop_0.3s_ease-out]">
               <ZoomIn size={36} className="text-white" />
             </div>
-            <p className="text-white font-black text-[18px]">QR Detected!</p>
+            <p className="text-white font-black text-[18px]">{t("qrDetected")}</p>
           </div>
         )}
 
@@ -158,10 +171,10 @@ export default function QRScannerModal({
             <div className="w-16 h-16 rounded-full bg-red-600/20 border border-red-500/40 flex items-center justify-center mb-4">
               <Camera size={28} className="text-red-400" />
             </div>
-            <p className="text-white font-bold text-[16px] mb-2">Camera unavailable</p>
+            <p className="text-white font-bold text-[16px] mb-2">{t("cameraUnavailable")}</p>
             <p className="text-white/60 text-[13px] leading-relaxed mb-6">{camError}</p>
             <button onClick={handleClose} className="bg-white text-zinc-900 font-bold px-6 py-3 rounded-xl text-[14px]">
-              Go back
+              {t("goBack")}
             </button>
           </div>
         )}
@@ -169,15 +182,15 @@ export default function QRScannerModal({
 
       {scanning && !detected && !camError && (
         <div className="shrink-0 flex flex-col items-center gap-2 py-8 px-6 text-center" style={{ paddingBottom: "max(env(safe-area-inset-bottom), 32px)" }}>
-          <p className="text-white font-bold text-[16px]">{instructions}</p>
-          <p className="text-white/50 text-[13px]">Hold steady — detection is automatic</p>
+          <p className="text-white font-bold text-[16px]">{displayInstructions}</p>
+          <p className="text-white/50 text-[13px]">{t("holdSteady")}</p>
         </div>
       )}
 
       {!scanning && !camError && (
         <div className="shrink-0 flex flex-col items-center gap-3 py-8 px-6">
           <div className="w-8 h-8 rounded-full border-2 border-white/30 border-t-white animate-spin" />
-          <p className="text-white/60 text-[13px]">Starting camera…</p>
+          <p className="text-white/60 text-[13px]">{t("startingCamera")}</p>
         </div>
       )}
 
