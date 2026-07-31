@@ -44,7 +44,6 @@ export default function QRScannerModal({
   const [camError, setCamError] = useState("");
   const [scanning, setScanning] = useState(false);
   const [detected, setDetected] = useState("");
-  const [showVinHint, setShowVinHint] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -130,18 +129,6 @@ export default function QRScannerModal({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Incremento 29 (Facu, escaneo de VIN): "cuando uno escanea un vin se va a
-  // dar cuenta q ya tiene historial de mantenimiento maintlyqr". El link de
-  // "¿Es un vehículo? Escaneá el VIN" solo aparece después de un rato sin
-  // detectar ningún QR -- así no compite visualmente con el flujo principal
-  // (que sigue siendo escanear el QR físico) para la enorme mayoría de
-  // escaneos, que sí encuentran uno enseguida.
-  useEffect(() => {
-    if (!onVinFallback || !scanning || detected || camError) return;
-    const timer = setTimeout(() => setShowVinHint(true), 4000);
-    return () => clearTimeout(timer);
-  }, [onVinFallback, scanning, detected, camError]);
-
   function handleClose() {
     stopCamera();
     onClose();
@@ -204,7 +191,13 @@ export default function QRScannerModal({
         <div className="shrink-0 flex flex-col items-center gap-2 py-8 px-6 text-center" style={{ paddingBottom: "max(env(safe-area-inset-bottom), 32px)" }}>
           <p className="text-white font-bold text-[16px]">{displayInstructions}</p>
           <p className="text-white/50 text-[13px]">{t("holdSteady")}</p>
-          {onVinFallback && showVinHint && (
+          {/* Facu (31 jul 2026): "deberia estar de entrada... si es un msj
+              no mas ahi abajo" -- antes este link recién aparecía después de
+              4s sin detectar ningún QR (para no competir visualmente con el
+              flujo principal). Facu prefiere que esté siempre visible desde
+              el arranque, como un mensaje más de la pantalla -- es chico y
+              no estorba, y así no hay que esperar para verlo. */}
+          {onVinFallback && (
             <button
               onClick={() => { stopCamera(); onVinFallback(); }}
               className="text-white/70 hover:text-white text-[13px] font-semibold underline underline-offset-2 mt-2"
