@@ -202,7 +202,7 @@ export default function VinScannerModal({
         // QRScannerModal) -- así ninguna otra página paga el costo de este
         // paquete pesado si nunca abre el escáner de VIN.
         try {
-          const { createWorker } = await import("tesseract.js");
+          const { createWorker, PSM } = await import("tesseract.js");
           const worker = await createWorker("eng");
           if (cancelled || !activeRef.current) { await worker.terminate(); return; }
 
@@ -213,15 +213,18 @@ export default function VinScannerModal({
           // caracteres. Restringir el alfabeto a exactamente el que usa un
           // VIN (sin I/O/Q, ver vinValidation.ts) hace que el motor de OCR
           // en sí mismo descarte esas confusiones en vez de dejarlas pasar
-          // para que extractVinCandidate tenga que adivinar después. PSM 7
-          // ("single text line") también ayuda mucho acá porque la franja
-          // que se recorta (captureGuideStrip) siempre es una sola línea de
-          // texto, no una página completa -- el modo de segmentación por
-          // default está pensado para documentos, no para una chapa.
+          // para que extractVinCandidate tenga que adivinar después. PSM
+          // SINGLE_LINE también ayuda mucho acá porque la franja que se
+          // recorta (captureGuideStrip) siempre es una sola línea de texto,
+          // no una página completa -- el modo de segmentación por default
+          // está pensado para documentos, no para una chapa. El build de
+          // Vercel exige el enum PSM en vez del string "7" -- ambos
+          // representan el mismo modo, pero el chequeo de tipos de
+          // TypeScript no acepta el string suelto.
           try {
             await worker.setParameters({
               tessedit_char_whitelist: "ABCDEFGHJKLMNPRSTUVWXYZ0123456789",
-              tessedit_pageseg_mode: "7",
+              tessedit_pageseg_mode: PSM.SINGLE_LINE,
             });
           } catch {
             // Si esta versión de Tesseract.js no acepta alguno de estos
