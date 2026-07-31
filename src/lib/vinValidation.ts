@@ -54,11 +54,16 @@ export function isVinChecksumPlausible(vin: string): boolean {
   return vin[8] === expected;
 }
 
-// Usado por el OCR (VinScannerModal) para extraer un candidato de VIN de
-// texto reconocido que puede venir con basura alrededor (saltos de línea,
-// otros caracteres de la chapita, confusión O/0 o I/1). No es magia -- solo
-// junta letras/dígitos válidos y recorta a 17, así que sigue dependiendo de
-// que la persona confirme antes de guardar (ver VinScannerModal.tsx).
+// Limpia y extrae un candidato de VIN de un texto que puede venir con
+// basura alrededor. Originalmente pensado para el resultado de Tesseract
+// (OCR genérico) en VinScannerModal; ese componente pasó a usar
+// reconocimiento por foto vía Gemini (/api/scan-vin-photo/route.ts,
+// incremento 29h), pero esta misma limpieza se sigue reutilizando ahí para
+// normalizar lo que la IA devuelve -- útil en cualquier caso porque ningún
+// resultado, sea de OCR o de un modelo de visión, debería asumirse
+// perfecto sin pasar por esto. No es magia -- solo junta letras/dígitos
+// válidos y recorta a 17, así que sigue dependiendo de que la persona
+// confirme antes de guardar (ver VinScannerModal.tsx).
 export function extractVinCandidate(ocrText: string): string | null {
   const cleaned = normalizeVin(ocrText).replace(/[^A-Z0-9]/g, "");
 
@@ -67,11 +72,11 @@ export function extractVinCandidate(ocrText: string): string | null {
   const direct = cleaned.match(new RegExp(`[${VIN_CHARSET}]{17}`));
   if (direct) return direct[0];
 
-  // Segundo intento: el OCR es tesseract genérico (no entrenado
-  // específicamente para VIN), así que confunde bastante seguido O~0, I~1,
-  // Q~0 -- son justo las 3 letras que el estándar excluye. Se busca
-  // cualquier corrida de 17 alfanuméricos comunes y se corrigen esas 3
-  // confusiones antes de descartarla.
+  // Segundo intento: confusión típica O~0, I~1, Q~0 -- son justo las 3
+  // letras que el estándar excluye, y tanto un OCR genérico como (más
+  // raramente) un modelo de visión pueden confundirlas. Se busca cualquier
+  // corrida de 17 alfanuméricos comunes y se corrigen esas 3 confusiones
+  // antes de descartarla.
   const loose = cleaned.match(/[A-Z0-9]{17}/);
   if (!loose) return null;
   const corrected = loose[0].replace(/O/g, "0").replace(/I/g, "1").replace(/Q/g, "0");

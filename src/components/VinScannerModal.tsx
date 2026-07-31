@@ -3,33 +3,36 @@
 import { useEffect, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 import { Car, X, Keyboard, CheckCircle2, RotateCcw } from "lucide-react";
-import { extractVinCandidate, isVinFormatValid, normalizeVin } from "@/lib/vinValidation";
+import { isVinFormatValid, normalizeVin } from "@/lib/vinValidation";
 
 // Incremento 29 (Facu, escaneo de VIN): "que con la camara podamos leer el
-// vin de la puerta del auto". A diferencia de QRScannerModal (que usa jsQR,
-// un lector de códigos hecho para eso, casi sin margen de error), acá
-// estamos leyendo texto impreso con OCR genérico (Tesseract.js, corre
-// entero en el navegador, la foto nunca sale del teléfono) -- mucho menos
-// confiable que un QR: le afectan el reflejo de la chapa metálica, el
-// ángulo, la luz, el desgaste. Por eso el diseño de este componente NUNCA
-// confirma solo -- apenas "cree" haber encontrado un VIN, para de escanear
-// y se lo muestra a la persona en un campo editable para que confirme o
-// corrija antes de seguir.
+// vin de la puerta del auto".
 //
-// Incremento 29e (Facu, 31 jul 2026): "no me gusta ese cartel q dice algo
-// de los vehiculos de eeuu, no quiero cartelitos q puedan confundir.
-// hagamos simple todo" -- antes había acá un aviso amarillo cuando
-// isVinChecksumPlausible (ver vinValidation.ts) no podía confirmar el
-// dígito verificador, explicando que eso es normal fuera de EEUU. Aunque
-// técnicamente correcto, era un detalle que no le sirve a la persona que
-// está cargando un vehículo -- se sacó ese cartel por completo (la función
-// isVinChecksumPlausible en sí sigue existiendo por si hace falta en el
-// futuro, simplemente no se muestra nada con su resultado acá). El único
-// chequeo que sigue importando para la persona es el de FORMATO (17
-// caracteres válidos) -- ver hintFormat más abajo.
+// Incremento 29h (Facu, 31 jul 2026): "poder sacarle una foto con la
+// camara y q la IA haga todo el laburo de reconocer q es VIN... yo cuando
+// le saco una foto a algo chatgpt o gemini se da cuenta cual es el VIN y
+// me lo busca". Tenía razón -- hasta acá esto usaba Tesseract.js, un OCR
+// GENÉRICO que lee letras a ciegas sin entender la imagen (no distingue la
+// chapa del resto, no interpreta reflejos/ángulo/contexto). Eso explica
+// por qué era tan poco confiable pase lo que pase se le ajustara. Se
+// reemplaza por completo: ahora se le manda la foto entera a Gemini (misma
+// API/clave que ya usa aiVinModel.ts para marca/modelo), que SÍ entiende
+// la foto como foto y encuentra el VIN aunque no esté perfectamente
+// encuadrado -- ver /api/scan-vin-photo/route.ts.
+//
+// Trade-off que se le explicó a Facu antes de este cambio (eligió "Sí,
+// cambiar a Gemini" entre 3 opciones): la foto ya NO se queda 100% en el
+// teléfono como con Tesseract -- viaja al servidor y de ahí a Gemini para
+// ser analizada. A cambio, el reconocimiento es muchísimo más capaz.
+//
+// El diseño de "nunca confirmar solo" se mantiene igual que antes -- ya
+// sea un OCR genérico o un modelo de visión real, ESTE componente nunca
+// guarda un VIN sin que la persona lo vea en un campo editable y confirme
+// o corrija primero. Eso no cambia con el motor de reconocimiento.
 //
 // Siempre hay, además, un link para escribir el VIN a mano sin cámara --
-// para cuando la chapa está en mal estado o el OCR simplemente no da.
+// para cuando la chapa está en mal estado o el reconocimiento simplemente
+// no da (sin conexión, Gemini no disponible, etc.).
 export default function VinScannerModal({
   open,
   onClose,
@@ -50,84 +53,29 @@ export default function VinScannerModal({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const activeRef = useRef(false);
-  const workerRef = useRef<any>(null);
-  const ocrTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const scanTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Facu (31 jul 2026): "es bastante celoso... no se toma su tiempo para
-  // encontrar bien el VIN" -- antes, UNA sola lectura de Tesseract que
-  // pareciera un VIN válido alcanzaba para pasar a confirmar, así que un
-  // solo cuadro fuera de foco (típico apenas se abre la cámara, mientras
-  // todavía está enfocando) podía disparar un candidato equivocado sin
-  // darle tiempo real al OCR de "asentarse". Ahora se exige que el MISMO
-  // candidato salga en 2 pasadas consecutivas antes de aceptarlo -- si
-  // cambia entre pasada y pasada, se reinicia el conteo. Nunca se lee vía
-  // useState acá adentro por la misma razón que activeRef (ver el comentario
-  // grande más abajo sobre runOcrPass): son refs para que la closure
-  // autoreprogramada siempre vea el valor real más reciente.
-  // Facu (31 jul 2026, segunda ronda): "no me toma ni el q esta en el
-  // parabrisas ni los q estan en la puerta" -- pedir 2 lecturas IDÉNTICAS
-  // seguidas resultó ser demasiado estricto para una chapa real (vidrio con
-  // reflejo, metal estampado con poco contraste): en vez de frenar
-  // candidatos apurados, terminó impidiendo confirmar CUALQUIER lectura.
-  // Vuelve a 1 -- la mejora real de precisión queda en el whitelist de
-  // caracteres (ver más abajo) y el respiro de 900ms para el autoenfoque,
-  // sin el costo de "nunca encuentra nada".
-  const lastCandidateRef = useRef("");
-  const candidateStreakRef = useRef(0);
-  const REQUIRED_CONSECUTIVE_MATCHES = 1;
+  // Cuánto se espera entre una foto y la siguiente mientras no se encontró
+  // nada todavía. Un llamado a Gemini tarda bastante más que una pasada
+  // local de Tesseract (viaje de ida y vuelta por internet), así que el
+  // intervalo es más largo que el que tenía el OCR local -- no tiene
+  // sentido (ni es gratis) mandar una foto nueva cada 1.2s.
+  const SCAN_INTERVAL_MS = 2500;
+  const CAMERA_SETTLE_MS = 900; // le da tiempo real al autoenfoque antes de la primera foto
 
   function stopCamera() {
     activeRef.current = false;
     if (streamRef.current) { streamRef.current.getTracks().forEach((tr) => tr.stop()); streamRef.current = null; }
-    if (ocrTimerRef.current) { clearTimeout(ocrTimerRef.current); ocrTimerRef.current = null; }
+    if (scanTimerRef.current) { clearTimeout(scanTimerRef.current); scanTimerRef.current = null; }
   }
 
-  async function stopWorker() {
-    if (workerRef.current) {
-      try { await workerRef.current.terminate(); } catch { /* ya terminado o nunca llegó a inicializar */ }
-      workerRef.current = null;
-    }
-  }
-
-  // Facu (31 jul, tercera ronda): "la camara no agarra bien el VIN, como q
-  // lo lee bastante mal". El umbral fijo de blanco/negro (antes: gris > 130
-  // = blanco) funciona mal apenas cambia la luz o hay reflejo en la chapa --
-  // lo que es exactamente "iluminación variable de una chapa de auto real".
-  // Se reemplaza por el método de Otsu: calcula el umbral ÓPTIMO para cada
-  // imagen en base a su propio histograma de grises, en vez de adivinar un
-  // número fijo que sirve para algunas fotos y para otras no. Es una técnica
-  // estándar de procesamiento de imágenes (no un ajuste a ojo), así que no
-  // tiene el riesgo de "sobre-ajustar a mi propia intuición" que tuvo el
-  // cambio de PSM/consenso anterior.
-  function otsuThreshold(hist: number[], total: number): number {
-    let sum = 0;
-    for (let i = 0; i < 256; i++) sum += i * hist[i];
-    let sumB = 0;
-    let weightBg = 0;
-    let maxVariance = 0;
-    let threshold = 130; // respaldo razonable si el cálculo no encuentra nada mejor
-    for (let t = 0; t < 256; t++) {
-      weightBg += hist[t];
-      if (weightBg === 0) continue;
-      const weightFg = total - weightBg;
-      if (weightFg === 0) break;
-      sumB += t * hist[t];
-      const meanBg = sumB / weightBg;
-      const meanFg = (sum - sumB) / weightFg;
-      const variance = weightBg * weightFg * (meanBg - meanFg) * (meanBg - meanFg);
-      if (variance > maxVariance) {
-        maxVariance = variance;
-        threshold = t;
-      }
-    }
-    return threshold;
-  }
-
-  // Recorta solo la franja central (donde está la guía en pantalla) en vez
-  // de mandarle el cuadro entero a Tesseract -- más rápido, y el OCR
-  // rinde mejor cuando el texto ocupa la mayor parte de la imagen en vez
-  // de ser una franja chiquita perdida en medio de una foto grande.
-  function captureGuideStrip(): HTMLCanvasElement | null {
+  // Captura el cuadro ENTERO de la cámara (no solo la franja guía como
+  // antes) -- a diferencia de un OCR genérico, Gemini entiende contexto,
+  // así que darle más de la imagen (dónde está la chapa en relación al
+  // resto del auto) ayuda en vez de estorbar. Se reescala a un ancho
+  // manejable antes de convertir a JPEG: ni hace falta la resolución nativa
+  // para que Gemini lea el texto, y una imagen más chica viaja más rápido.
+  function captureFrameAsJpeg(): string | null {
     const video = videoRef.current;
     const canvas = canvasRef.current;
     if (!video || !canvas || video.readyState < video.HAVE_ENOUGH_DATA) return null;
@@ -136,116 +84,54 @@ export default function VinScannerModal({
     const vh = video.videoHeight;
     if (!vw || !vh) return null;
 
-    // Misma proporción que el recuadro guía renderizado abajo (86% ancho,
-    // banda angosta al centro).
-    const stripW = vw * 0.86;
-    const stripH = vh * 0.22;
-    const sx = (vw - stripW) / 2;
-    const sy = (vh - stripH) / 2;
-
-    canvas.width = stripW;
-    canvas.height = stripH;
+    const MAX_WIDTH = 1024;
+    const scale = vw > MAX_WIDTH ? MAX_WIDTH / vw : 1;
+    canvas.width = Math.round(vw * scale);
+    canvas.height = Math.round(vh * scale);
     const ctx = canvas.getContext("2d");
     if (!ctx) return null;
-    ctx.drawImage(video, sx, sy, stripW, stripH, 0, 0, stripW, stripH);
-
-    // Blanco y negro a puro contraste -- ayuda bastante al OCR con texto
-    // grabado/estampado en metal, que suele tener poco contraste de por sí.
-    // El umbral ya no es un número fijo (ver otsuThreshold arriba).
-    const imgData = ctx.getImageData(0, 0, stripW, stripH);
-    const d = imgData.data;
-    const pixelCount = stripW * stripH;
-    const gray = new Uint8ClampedArray(pixelCount);
-    const hist = new Array(256).fill(0);
-    for (let i = 0, p = 0; i < d.length; i += 4, p++) {
-      const g = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
-      gray[p] = g;
-      hist[gray[p]]++;
-    }
-    const threshold = otsuThreshold(hist, pixelCount);
-    for (let i = 0, p = 0; i < d.length; i += 4, p++) {
-      const bw = gray[p] > threshold ? 255 : 0;
-      d[i] = d[i + 1] = d[i + 2] = bw;
-    }
-    ctx.putImageData(imgData, 0, 0);
-
-    // Si la franja recortada queda con poca altura real en píxeles (típico
-    // si la persona sostiene el teléfono lejos de la chapa), Tesseract lee
-    // mucho peor letras chiquitas -- es una limitación conocida de OCR en
-    // general, no algo específico de este VIN. Se agranda la imagen antes
-    // de mandarla (con "vecino más cercano", no suavizado, para no volver
-    // borrosos los bordes ya binarizados en blanco/negro).
-    const MIN_STRIP_HEIGHT = 200;
-    if (stripH < MIN_STRIP_HEIGHT) {
-      const scale = MIN_STRIP_HEIGHT / stripH;
-      const upscaled = document.createElement("canvas");
-      upscaled.width = Math.round(stripW * scale);
-      upscaled.height = Math.round(stripH * scale);
-      const upCtx = upscaled.getContext("2d");
-      if (upCtx) {
-        upCtx.imageSmoothingEnabled = false;
-        upCtx.drawImage(canvas, 0, 0, upscaled.width, upscaled.height);
-        return upscaled;
-      }
-    }
-
-    return canvas;
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    return canvas.toDataURL("image/jpeg", 0.82);
   }
 
-  // IMPORTANTE: esta función se auto-reprograma con setTimeout(runOcrPass,
+  // IMPORTANTE: esta función se auto-reprograma con setTimeout(runScanPass,
   // ...) -- es la MISMA closure la que se vuelve a llamar a sí misma en
   // cada ciclo, nunca una versión "fresca" ligada al render más reciente.
   // Por eso el único gate que puede usar de forma confiable es activeRef
-  // (un ref, siempre lee el valor actual) -- si acá adentro se llegara a
-  // leer `phase` (estado de React) para decidir si seguir, quedaría
-  // pegado para siempre al valor que tenía la primera vez que se creó esta
-  // closure (por ejemplo, después de un Reintentar el estado ya volvió a
-  // "scanning" pero esta función seguiría viendo "confirm" y se cortaría
-  // sola sin volver a escanear). activeRef.current ya se pone en false
-  // exactamente en los 3 casos donde este loop tiene que parar (VIN
-  // encontrado, se pasó a carga manual, o se cerró el modal), así que
-  // alcanza como único gate.
-  async function runOcrPass() {
+  // (un ref, siempre lee el valor actual) -- ver el comentario histórico
+  // de este mismo patrón que ya existía acá con el OCR local: sigue
+  // aplicando igual con el nuevo motor de reconocimiento.
+  async function runScanPass() {
     if (!activeRef.current) return;
-    const strip = captureGuideStrip();
-    if (!strip || !workerRef.current) {
-      if (activeRef.current) ocrTimerRef.current = setTimeout(runOcrPass, 700);
+    const photo = captureFrameAsJpeg();
+    if (!photo) {
+      if (activeRef.current) scanTimerRef.current = setTimeout(runScanPass, 700);
       return;
     }
 
     try {
-      const { data } = await workerRef.current.recognize(strip);
-      const found = extractVinCandidate(data?.text ?? "");
-      if (found && activeRef.current) {
-        // Pide 2 lecturas seguidas iguales antes de aceptar (ver el
-        // comentario junto a la declaración de estos refs) -- un candidato
-        // que cambia de una pasada a la siguiente todavía no es confiable.
-        if (found === lastCandidateRef.current) {
-          candidateStreakRef.current += 1;
-        } else {
-          lastCandidateRef.current = found;
-          candidateStreakRef.current = 1;
-        }
-        if (candidateStreakRef.current >= REQUIRED_CONSECUTIVE_MATCHES) {
-          setCandidate(found);
-          setEditValue(found);
-          setPhase("confirm");
-          stopCamera();
-          return;
-        }
-      } else {
-        lastCandidateRef.current = "";
-        candidateStreakRef.current = 0;
+      const res = await fetch("/api/scan-vin-photo", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ image: photo }),
+      });
+      const json = await res.json();
+      if (!activeRef.current) return;
+
+      if (json?.found && json?.vin) {
+        setCandidate(json.vin);
+        setEditValue(json.vin);
+        setPhase("confirm");
+        stopCamera();
+        return;
       }
     } catch {
-      // Un fallo puntual de reconocimiento no es grave -- se reintenta en
-      // el próximo ciclo. Si Tesseract nunca llegó a cargar (ver el
-      // catch del useEffect de abajo), esta función ni se llama.
-      lastCandidateRef.current = "";
-      candidateStreakRef.current = 0;
+      // Sin conexión, timeout, Gemini no disponible, etc. -- no es grave,
+      // se reintenta en el próximo ciclo. La persona siempre tiene el link
+      // de escribir el VIN a mano si esto no da resultado.
     }
     if (activeRef.current) {
-      ocrTimerRef.current = setTimeout(runOcrPass, 1200);
+      scanTimerRef.current = setTimeout(runScanPass, SCAN_INTERVAL_MS);
     }
   }
 
@@ -257,19 +143,16 @@ export default function VinScannerModal({
     setPhase("scanning");
     setCandidate("");
     setEditValue("");
-    lastCandidateRef.current = "";
-    candidateStreakRef.current = 0;
 
     let cancelled = false;
 
-    // 1920x1080 en vez de 1280x720 (pedido "ideal", el navegador da lo más
-    // cercano que la cámara soporte): más resolución real de origen = más
-    // píxeles reales por letra del VIN una vez recortada la franja central,
-    // que es justo lo que más ayuda al OCR con texto chico (ver también el
-    // reescalado en captureGuideStrip más abajo).
+    // 1920x1080 pedido "ideal" (el navegador da lo más cercano que la
+    // cámara soporte) -- más resolución real de origen para que, incluso
+    // reescalada antes de subir (ver captureFrameAsJpeg), la foto llegue
+    // con buen detalle.
     navigator.mediaDevices
       .getUserMedia({ video: { facingMode: { ideal: "environment" }, width: { ideal: 1920 }, height: { ideal: 1080 } } })
-      .then(async (stream) => {
+      .then((stream) => {
         if (!activeRef.current || cancelled) { stream.getTracks().forEach((tr) => tr.stop()); return; }
         streamRef.current = stream;
         if (videoRef.current) {
@@ -277,62 +160,10 @@ export default function VinScannerModal({
           videoRef.current.onloadedmetadata = () => {
             videoRef.current?.play();
             setScanning(true);
+            scanTimerRef.current = setTimeout(() => {
+              if (activeRef.current) runScanPass();
+            }, CAMERA_SETTLE_MS);
           };
-        }
-
-        // Tesseract se carga dinámicamente (igual que jsQR en
-        // QRScannerModal) -- así ninguna otra página paga el costo de este
-        // paquete pesado si nunca abre el escáner de VIN.
-        try {
-          const { createWorker } = await import("tesseract.js");
-          const worker = await createWorker("eng");
-          if (cancelled || !activeRef.current) { await worker.terminate(); return; }
-
-          // Facu (31 jul 2026): por default Tesseract intenta reconocer
-          // CUALQUIER letra/número/símbolo del idioma inglés, lo que deja
-          // pasar muchas lecturas erróneas que dan la casualidad de
-          // "parecer" un VIN de 17 caracteres. Restringir el alfabeto a
-          // exactamente el que usa un VIN (sin I/O/Q, ver vinValidation.ts)
-          // hace que el motor de OCR en sí mismo descarte esas confusiones.
-          //
-          // OJO -- había además un modo de segmentación forzado a
-          // "una sola línea de texto" (PSM.SINGLE_LINE), pensado para que
-          // rinda mejor con la franja recortada (ver captureGuideStrip).
-          // En la práctica resultó demasiado rígido: si el recorte no
-          // queda perfectamente alineado sobre SOLO el VIN (típico en una
-          // chapa real, con otro texto cerca, reflejos del vidrio del
-          // parabrisas, etc.), ese modo fuerza una lectura de una sola
-          // línea de TODO ese ruido junto y nunca llega a ningún candidato
-          // válido -- exactamente el reporte de Facu de "no me toma
-          // ninguno". Se sacó, volviendo al modo de segmentación automático
-          // por default, más tolerante a un recorte imperfecto.
-          try {
-            await worker.setParameters({
-              tessedit_char_whitelist: "ABCDEFGHJKLMNPRSTUVWXYZ0123456789",
-            });
-          } catch {
-            // Si esta versión de Tesseract.js no acepta este parámetro,
-            // sigue funcionando con los defaults -- no es crítico, solo una
-            // mejora de precisión.
-          }
-
-          workerRef.current = worker;
-
-          // Facu: "es bastante celoso cuando se abre la cámara... no se
-          // toma su tiempo" -- la cámara recién arranca a enfocar/exponer
-          // en el instante en que este código corre; leer el primer cuadro
-          // sin darle un respiro a la cámara para asentarse era la causa
-          // más probable de lecturas apuradas y erróneas. 900ms es
-          // imperceptible para la persona pero le da tiempo real al
-          // autoenfoque antes del primer intento de OCR.
-          ocrTimerRef.current = setTimeout(() => {
-            if (activeRef.current) runOcrPass();
-          }, 900);
-        } catch {
-          // No se pudo inicializar el OCR (sin conexión para bajar los
-          // datos del idioma, navegador viejo, etc.) -- no rompe el
-          // escáner, simplemente nunca va a "encontrar" nada solo, y la
-          // persona igual tiene el link de escribirlo a mano.
         }
       })
       .catch(() => {
@@ -342,14 +173,12 @@ export default function VinScannerModal({
     return () => {
       cancelled = true;
       stopCamera();
-      stopWorker();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
   function handleClose() {
     stopCamera();
-    stopWorker();
     onClose();
   }
 
@@ -358,10 +187,8 @@ export default function VinScannerModal({
     setCandidate("");
     setEditValue("");
     activeRef.current = true;
-    lastCandidateRef.current = "";
-    candidateStreakRef.current = 0;
     // La cámara se cerró al confirmar un candidato (stopCamera en
-    // runOcrPass) -- reabrir desde cero es más simple y confiable que
+    // runScanPass) -- reabrir desde cero es más simple y confiable que
     // tratar de reanudar el mismo stream.
     navigator.mediaDevices
       .getUserMedia({ video: { facingMode: { ideal: "environment" }, width: { ideal: 1920 }, height: { ideal: 1080 } } })
@@ -373,11 +200,9 @@ export default function VinScannerModal({
           videoRef.current.onloadedmetadata = () => {
             videoRef.current?.play();
             setScanning(true);
-            // Mismo respiro de 900ms para el autoenfoque que en el arranque
-            // inicial (ver el comentario grande en el useEffect de arriba).
-            ocrTimerRef.current = setTimeout(() => {
-              if (activeRef.current) runOcrPass();
-            }, 900);
+            scanTimerRef.current = setTimeout(() => {
+              if (activeRef.current) runScanPass();
+            }, CAMERA_SETTLE_MS);
           };
         }
       })
