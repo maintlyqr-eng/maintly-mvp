@@ -17,4 +17,13 @@ jobs:
     steps:
       - name: Ping MaintlyQR (touches Supabase so the free-tier project stays active)
         run: |
-          curl -sS -o /dev/null -w "Ping response: %{http_code}\n" "https://maintlyqr.com/asset/keepalive-ping/report"
+          # 21/10/2026: se apunta a www y se agrega -L. Sin eso, el apex devolvía
+          # un 308 (redirect a www) y el ping nunca llegaba a Supabase -- el
+          # job decía "Success" igual. Ahora falla si no recibe 200, así GitHub
+          # avisa por mail cuando se rompa.
+          code=$(curl -sS -L -o /dev/null -w "%{http_code}" "https://www.maintlyqr.com/asset/keepalive-ping/report")
+          echo "Ping response: $code"
+          if [ "$code" != "200" ]; then
+            echo "::error::El ping no devolvió 200 (devolvió $code) -- Supabase NO fue tocado"
+            exit 1
+          fi
