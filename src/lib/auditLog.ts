@@ -19,6 +19,7 @@ export type AdminAuditAction =
   | "account.delete_permanent"
   | "asset.delete"
   | "asset.restore"
+  | "asset.unmerge"
   | "asset.delete_permanent"
   | "asset.update"
   | "service.delete"

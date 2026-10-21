@@ -1563,7 +1563,8 @@
     "vinAutoDetectedHint": "Detectado automáticamente a partir del VIN — podés editarlo.",
     "vinMismatchWarning": "Este VIN corresponde a otro vehículo:",
     "vinMismatchApply": "Actualizar marca, modelo y año",
-    "vinMismatchKeep": "Mantener lo cargado"
+    "vinMismatchKeep": "Mantener lo cargado",
+    "vinMergeButton": "Fusionar historiales"
   },
   "DashboardTeamChatPage": {
     "loadingAuth": "Cargando...",
@@ -2108,7 +2109,23 @@
     "errorsReopenButton": "Reabrir",
     "errorLoadErrorLogs": "No se pudo cargar el registro de errores.",
     "errorLogResolved": "Marcado como resuelto.",
-    "errorLogReopened": "Reabierto."
+    "errorLogReopened": "Reabierto.",
+    "navMerges": "Fusiones",
+    "mergesIntro": "Cada vez que un Maintler fusiona dos activos que comparten VIN (un solo historial, los dos QR se conservan). Al fusionar no se borra nada; si una fusión fue un error, un Super Admin puede deshacerla desde acá y todo vuelve a donde estaba.",
+    "mergesRefresh": "Actualizar",
+    "mergesEmpty": "Todavía no hay fusiones.",
+    "mergesColBy": "Fusionó",
+    "mergesColPrimary": "Activo principal",
+    "mergesColDuplicate": "Duplicado",
+    "mergesColMoved": "Movido",
+    "mergesMovedSummary": "{services} servicios · {qr} QR",
+    "mergesStatusActive": "Vigente",
+    "mergesStatusUndone": "Deshecha",
+    "mergesUndo": "Deshacer",
+    "mergesUndoConfirm": "¿Deshacer esta fusión?",
+    "mergesUndoYes": "Sí, deshacer",
+    "mergesUndoing": "Deshaciendo…",
+    "mergesSnapshot": "Snapshot (lo que se movió)"
   },
   "ReportIssueModal": {
     "title": "Reportar un problema",
@@ -2254,5 +2271,26 @@
     "loginCta": "Iniciar sesión para cargarlo",
     "dashboardCta": "Ir al panel para cargarlo",
     "close": "Cerrar"
+  },
+  "MergeAssetsModal": {
+    "title": "Fusionar historiales",
+    "intro": "Dos activos comparten el VIN <b>{vin}</b>. Fusionarlos los combina en un solo historial. No se borra nada.",
+    "primaryLabel": "Activo principal (se conserva)",
+    "duplicateLabel": "Duplicado (se fusiona)",
+    "servicesShort": "servicios",
+    "createdOn": "Cargado el {date}",
+    "swap": "Invertir cuál es el principal",
+    "bullet1": "Todos los servicios, documentos, tareas y mensajes del duplicado pasan al principal.",
+    "bullet2": "Los dos códigos QR siguen funcionando: ahora abren el mismo historial.",
+    "bullet3": "Todos los vinculados a cualquiera de los dos activos siguen vinculados. Nadie pierde acceso.",
+    "bullet4": "Los campos vacíos del principal se completan con los del duplicado. No se pisa nada ya cargado.",
+    "notice": "Los otros Maintlers vinculados a estos activos van a recibir un aviso. Si esta fusión resulta un error, el soporte de MaintlyQR puede deshacerla.",
+    "errorPrefix": "No se pudo fusionar:",
+    "cancel": "Cancelar",
+    "confirm": "Fusionar historiales",
+    "merging": "Fusionando…",
+    "doneTitle": "Historiales fusionados",
+    "doneDesc": "El activo ahora tiene un único historial completo. Los dos códigos QR apuntan a él.",
+    "doneButton": "Listo"
   }
 }

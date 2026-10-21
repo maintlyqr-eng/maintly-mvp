@@ -11,7 +11,7 @@ import {
   Ban, ShieldCheck, ShieldOff, Trash2, KeyRound, UserCog,
   UserPlus, UserMinus, Plus, Link2Off, ScanLine, ClipboardList,
   LifeBuoy, Send, MessageCircle, Flag, History, ChevronDown, ChevronRight,
-  Trash, RotateCcw, TrendingUp, MapPin, Calendar, Pencil, Download, Settings, AlertTriangle, Bug, Undo2, CheckCircle2,
+  Trash, RotateCcw, TrendingUp, MapPin, Calendar, Pencil, Download, Settings, AlertTriangle, Bug, Undo2, CheckCircle2, GitMerge,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { formatDateDMY } from "@/lib/date";
@@ -22,6 +22,7 @@ import ErrorLogger from "@/components/ErrorLogger";
 // para el criterio (JSX movido tal cual, estado/lógica se quedan acá).
 import AuditLogSection from "./_sections/AuditLogSection";
 import ErrorsSection from "./_sections/ErrorsSection";
+import MergesSection from "./_sections/MergesSection";
 import AnalyticsSection from "./_sections/AnalyticsSection";
 import ModerationSection from "./_sections/ModerationSection";
 import TeamChatSection from "./_sections/TeamChatSection";
@@ -208,7 +209,7 @@ export type ActivityEvent = {
 // verificación pendiente) — ahora es una sola sección "accounts" (label
 // "Maintlers" en el sidebar) con pestañas internas, ver `maintlersTab` más
 // abajo.
-type Section = "dashboard" | "accounts" | "assets" | "services" | "delete-requests" | "qr" | "support" | "team-chat" | "moderation" | "analytics" | "audit-log" | "trash" | "admins" | "system" | "errors";
+type Section = "dashboard" | "accounts" | "assets" | "services" | "delete-requests" | "qr" | "support" | "team-chat" | "moderation" | "analytics" | "audit-log" | "trash" | "admins" | "system" | "errors" | "merges";
 
 // Incremento 11 (14 jul 2026, roles y permisos): rol de un admin del panel
 // y las capacidades que devuelve /api/admin/session — mismo tipo/nombres
@@ -283,6 +284,10 @@ const SECTION_CAPABILITY: Partial<Record<Section, string>> = {
   // plataforma, mismo nivel de sensibilidad (solo Super Admin hoy), y
   // evita sumar un capability nuevo a src/lib/adminRoles.ts solo para esto.
   errors: "audit_logs",
+  // Fusión de historiales (migración 046, 21/10/2026): ver la lista es
+  // parte de la gestión de activos; deshacer una fusión está gateado
+  // aparte con "critical_actions" dentro de la propia ruta.
+  merges: "assets",
 };
 
 function canSeeSection(id: Section, capabilities: string[]): boolean {
@@ -309,7 +314,7 @@ function canSeeSection(id: Section, capabilities: string[]): boolean {
 // fallback defensivo, no debería activarse con los 4 roles actuales.
 const SECTION_LANDING_ORDER: Section[] = [
   "dashboard", "accounts", "assets", "services", "delete-requests",
-  "qr", "support", "team-chat", "moderation", "analytics", "audit-log", "trash", "admins", "system", "errors",
+  "qr", "support", "team-chat", "moderation", "analytics", "audit-log", "trash", "admins", "system", "errors", "merges",
 ];
 
 function landingSection(capabilities: string[]): Section {
@@ -2697,13 +2702,14 @@ export default function AdminPage() {
     { id: "admins",    label: t("navAdmins"),    icon: UserCog  },
     { id: "system",    label: t("navSystem"),    icon: Settings },
     { id: "errors",    label: t("navErrors"),    icon: Bug      },
+    { id: "merges",    label: t("navMerges"),    icon: GitMerge },
   ];
   const navItems = ALL_NAV_ITEMS.filter(({ id }) => canSeeSection(id, adminCapabilities));
   const sectionLabels: Record<Section, string> = {
     dashboard: t("navDashboard"), accounts: t("navMaintlers"),
     assets: t("navAssets"), services: t("navServices"), "delete-requests": t("navDeleteRequests"), qr: t("navQr"), support: t("navSupport"), "team-chat": t("navTeamChat"),
     moderation: t("navModeration"), analytics: t("navAnalytics"), "audit-log": t("navAuditLog"), trash: t("navTrash"),
-    admins: t("navAdmins"), system: t("navSystem"), errors: t("navErrors"),
+    admins: t("navAdmins"), system: t("navSystem"), errors: t("navErrors"), merges: t("navMerges"),
   };
   const REPORT_TYPE_LABEL: Record<string, string> = {
     incorrect_info: t("reportTypeIncorrectInfo"),
@@ -3162,6 +3168,9 @@ export default function AdminPage() {
               errorLogBusyId={errorLogBusyId} toggleErrorLogResolved={toggleErrorLogResolved}
               handleErrorLogsTouchStart={handleErrorLogsTouchStart} handleErrorLogsTouchEnd={handleErrorLogsTouchEnd}
             />
+          )}
+          {section === "merges" && (
+            <MergesSection t={t} locale={locale} canUndo={adminCapabilities.includes("critical_actions") && !adminReadOnly} />
           )}
 
           <p className="text-center text-[10px] text-zinc-300 mt-12 font-medium">{t("mainFooterNote")}</p>

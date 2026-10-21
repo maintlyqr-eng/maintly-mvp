@@ -1563,7 +1563,8 @@
     "vinAutoDetectedHint": "Auto-detected from the VIN — you can edit it.",
     "vinMismatchWarning": "This VIN decodes as a different vehicle:",
     "vinMismatchApply": "Update make, model & year",
-    "vinMismatchKeep": "Keep what I entered"
+    "vinMismatchKeep": "Keep what I entered",
+    "vinMergeButton": "Merge histories"
   },
   "DashboardTeamChatPage": {
     "loadingAuth": "Loading...",
@@ -2108,7 +2109,23 @@
     "errorsReopenButton": "Reopen",
     "errorLoadErrorLogs": "Couldn't load the error log.",
     "errorLogResolved": "Marked as resolved.",
-    "errorLogReopened": "Reopened."
+    "errorLogReopened": "Reopened.",
+    "navMerges": "Merges",
+    "mergesIntro": "Every time a Maintler merges two assets that share a VIN (one history, both QR codes kept). Nothing is deleted when merging; if a merge was a mistake, a Super Admin can undo it here and everything goes back to where it was.",
+    "mergesRefresh": "Refresh",
+    "mergesEmpty": "No merges yet.",
+    "mergesColBy": "Merged by",
+    "mergesColPrimary": "Main asset",
+    "mergesColDuplicate": "Duplicate",
+    "mergesColMoved": "Moved",
+    "mergesMovedSummary": "{services} services · {qr} QR",
+    "mergesStatusActive": "Active",
+    "mergesStatusUndone": "Undone",
+    "mergesUndo": "Undo",
+    "mergesUndoConfirm": "Undo this merge?",
+    "mergesUndoYes": "Yes, undo",
+    "mergesUndoing": "Undoing…",
+    "mergesSnapshot": "Snapshot (what was moved)"
   },
   "ReportIssueModal": {
     "title": "Report an issue",
@@ -2254,5 +2271,26 @@
     "loginCta": "Log in to add it",
     "dashboardCta": "Go to dashboard to add it",
     "close": "Close"
+  },
+  "MergeAssetsModal": {
+    "title": "Merge histories",
+    "intro": "Two assets share the VIN <b>{vin}</b>. Merging combines them into one history. Nothing is deleted.",
+    "primaryLabel": "Main asset (kept)",
+    "duplicateLabel": "Duplicate (merged in)",
+    "servicesShort": "services",
+    "createdOn": "Added {date}",
+    "swap": "Swap which one is the main asset",
+    "bullet1": "All services, documents, tasks and messages from the duplicate move to the main asset.",
+    "bullet2": "Both QR codes keep working — they will now open the same history.",
+    "bullet3": "Everyone linked to either asset stays linked. Nobody loses access.",
+    "bullet4": "Empty fields on the main asset are filled in from the duplicate. Nothing already entered is overwritten.",
+    "notice": "Other Maintlers linked to these assets will be notified. If this merge turns out to be a mistake, MaintlyQR support can undo it.",
+    "errorPrefix": "Could not merge:",
+    "cancel": "Cancel",
+    "confirm": "Merge histories",
+    "merging": "Merging…",
+    "doneTitle": "Histories merged",
+    "doneDesc": "The asset now has a single, complete history. Both QR codes point to it.",
+    "doneButton": "Done"
   }
 }

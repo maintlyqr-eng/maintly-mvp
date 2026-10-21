@@ -1563,7 +1563,8 @@
     "vinAutoDetectedHint": "Detectado automaticamente a partir do VIN — você pode editar.",
     "vinMismatchWarning": "Este VIN corresponde a outro veículo:",
     "vinMismatchApply": "Atualizar marca, modelo e ano",
-    "vinMismatchKeep": "Manter o que digitei"
+    "vinMismatchKeep": "Manter o que digitei",
+    "vinMergeButton": "Unir históricos"
   },
   "DashboardTeamChatPage": {
     "loadingAuth": "Carregando...",
@@ -2108,7 +2109,23 @@
     "errorsReopenButton": "Reabrir",
     "errorLoadErrorLogs": "Não foi possível carregar o registro de erros.",
     "errorLogResolved": "Marcado como resolvido.",
-    "errorLogReopened": "Reaberto."
+    "errorLogReopened": "Reaberto.",
+    "navMerges": "Uniões",
+    "mergesIntro": "Cada vez que um Maintler une dois equipamentos que compartilham VIN (um único histórico, os dois QR são mantidos). Ao unir nada é apagado; se uma união foi um erro, um Super Admin pode desfazê-la aqui e tudo volta para onde estava.",
+    "mergesRefresh": "Atualizar",
+    "mergesEmpty": "Ainda não há uniões.",
+    "mergesColBy": "Uniu",
+    "mergesColPrimary": "Equipamento principal",
+    "mergesColDuplicate": "Duplicado",
+    "mergesColMoved": "Movido",
+    "mergesMovedSummary": "{services} serviços · {qr} QR",
+    "mergesStatusActive": "Vigente",
+    "mergesStatusUndone": "Desfeita",
+    "mergesUndo": "Desfazer",
+    "mergesUndoConfirm": "Desfazer esta união?",
+    "mergesUndoYes": "Sim, desfazer",
+    "mergesUndoing": "Desfazendo…",
+    "mergesSnapshot": "Snapshot (o que foi movido)"
   },
   "ReportIssueModal": {
     "title": "Reportar um problema",
@@ -2254,5 +2271,26 @@
     "loginCta": "Fazer login para cadastrar",
     "dashboardCta": "Ir ao painel para cadastrar",
     "close": "Fechar"
+  },
+  "MergeAssetsModal": {
+    "title": "Unir históricos",
+    "intro": "Dois equipamentos compartilham o VIN <b>{vin}</b>. Uni-los combina tudo em um único histórico. Nada é apagado.",
+    "primaryLabel": "Equipamento principal (mantido)",
+    "duplicateLabel": "Duplicado (incorporado)",
+    "servicesShort": "serviços",
+    "createdOn": "Cadastrado em {date}",
+    "swap": "Inverter qual é o principal",
+    "bullet1": "Todos os serviços, documentos, tarefas e mensagens do duplicado passam para o principal.",
+    "bullet2": "Os dois códigos QR continuam funcionando: agora abrem o mesmo histórico.",
+    "bullet3": "Todos os vinculados a qualquer um dos dois continuam vinculados. Ninguém perde acesso.",
+    "bullet4": "Os campos vazios do principal são preenchidos com os do duplicado. Nada já preenchido é sobrescrito.",
+    "notice": "Os outros Maintlers vinculados a estes equipamentos receberão um aviso. Se esta união for um erro, o suporte da MaintlyQR pode desfazê-la.",
+    "errorPrefix": "Não foi possível unir:",
+    "cancel": "Cancelar",
+    "confirm": "Unir históricos",
+    "merging": "Unindo…",
+    "doneTitle": "Históricos unidos",
+    "doneDesc": "O equipamento agora tem um único histórico completo. Os dois códigos QR apontam para ele.",
+    "doneButton": "Pronto"
   }
 }

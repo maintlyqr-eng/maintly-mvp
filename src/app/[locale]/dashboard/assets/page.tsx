@@ -21,6 +21,7 @@ import { getUnitKind } from "@/lib/units";
 import { validateImageFile } from "@/lib/imageValidation";
 import NewAssetModalIntl from "@/components/NewAssetModalIntl";
 import VinScannerModal from "@/components/VinScannerModal";
+import MergeAssetsModal from "@/components/MergeAssetsModal";
 import { VIN_ELIGIBLE_ASSET_TYPES, isVinFormatValid, normalizeVin } from "@/lib/vinValidation";
 import { findAssetByVin, VinMatch } from "@/lib/vinLookup";
 import LinkExistingAssetModalIntl from "@/components/LinkExistingAssetModalIntl";
@@ -248,6 +249,9 @@ export default function AssetsPage() {
   const [editVinAutoFilled, setEditVinAutoFilled] = useState(false);
   const [editVinMismatch, setEditVinMismatch] = useState<{ make: string | null; model: string | null; year: number | null } | null>(null);
   const editVinSeqRef = useRef(0);
+  // Fusión de historiales (21/10/2026): se abre desde el aviso de VIN
+  // duplicado del form de edición. Ver MergeAssetsModal.tsx y migración 046.
+  const [showMergeModal, setShowMergeModal] = useState(false);
   const editVinTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [editYear, setEditYear] = useState("");
   const [editPlate, setEditPlate] = useState("");
@@ -1167,6 +1171,30 @@ export default function AssetsPage() {
         onChooseNew={() => setAddStep("new")}
         onChooseExisting={() => setAddStep("existing")}
       />
+      <MergeAssetsModal
+        open={showMergeModal}
+        onClose={() => setShowMergeModal(false)}
+        vin={normalizeVin(editVin)}
+        mine={editingAsset ? {
+          id: editingAsset.id,
+          name: assetDisplayName(editingAsset),
+          assetType: editingAsset.asset_type,
+          qrCode: getQrCode(editingAsset),
+        } : null}
+        other={editVinDuplicate ? {
+          id: editVinDuplicate.assetId,
+          name: editVinDuplicate.displayName,
+          assetType: editVinDuplicate.assetType,
+          qrCode: editVinDuplicate.qrCode,
+        } : null}
+        onMerged={async () => {
+          setShowMergeModal(false);
+          setShowEditForm(false);
+          setEditVinDuplicate(null);
+          await loadAssets(mechanicId);
+        }}
+      />
+
       <VinScannerModal
         open={showEditVinScanner}
         onClose={() => setShowEditVinScanner(false)}
@@ -1264,6 +1292,14 @@ export default function AssetsPage() {
                         </Link>
                       </>
                     )}
+                    <br />
+                    <button
+                      type="button"
+                      onClick={() => setShowMergeModal(true)}
+                      className="mt-1.5 inline-flex items-center gap-1 text-[11px] font-bold bg-red-600 hover:bg-red-500 text-white px-2.5 py-1 rounded-lg transition-colors"
+                    >
+                      {t("vinMergeButton")}
+                    </button>
                   </p>
                 </div>
               )}
