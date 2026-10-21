@@ -2291,6 +2291,7 @@
     "merging": "Merging…",
     "doneTitle": "Histories merged",
     "doneDesc": "The asset now has a single, complete history. Both QR codes point to it.",
-    "doneButton": "Done"
+    "doneButton": "Done",
+    "oldVinReplaced": "Current VIN \"{oldVin}\" will be replaced."
   }
 }

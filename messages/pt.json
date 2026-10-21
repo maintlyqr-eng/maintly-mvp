@@ -2291,6 +2291,7 @@
     "merging": "Unindo…",
     "doneTitle": "Históricos unidos",
     "doneDesc": "O equipamento agora tem um único histórico completo. Os dois códigos QR apontam para ele.",
-    "doneButton": "Pronto"
+    "doneButton": "Pronto",
+    "oldVinReplaced": "O VIN atual \"{oldVin}\" será substituído."
   }
 }

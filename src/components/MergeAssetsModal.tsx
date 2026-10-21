@@ -36,6 +36,7 @@ type SideDetails = {
   model: string | null;
   year: number | null;
   createdAt: string | null;
+  vinSerial: string | null;
   services: number;
   qrCodes: number;
 };
@@ -80,7 +81,7 @@ export default function MergeAssetsModal({
     (async () => {
       const ids = [mineId, otherId];
       const [assetsRes, svcRes, qrRes] = await Promise.all([
-        supabase.from("assets").select("id, brand, model, year, created_at").in("id", ids),
+        supabase.from("assets").select("id, brand, model, year, created_at, vin_serial").in("id", ids),
         supabase.from("service_records").select("asset_id").in("asset_id", ids).is("deleted_at", null),
         supabase.from("qr_codes").select("asset_id").in("asset_id", ids),
       ]);
@@ -92,6 +93,7 @@ export default function MergeAssetsModal({
           model: (a?.model as string | null) ?? null,
           year: (a?.year as number | null) ?? null,
           createdAt: (a?.created_at as string | null) ?? null,
+          vinSerial: (a?.vin_serial as string | null) ?? null,
           services: (svcRes.data ?? []).filter((r) => r.asset_id === id).length,
           qrCodes: (qrRes.data ?? []).filter((r) => r.asset_id === id).length,
         };
@@ -149,6 +151,14 @@ export default function MergeAssetsModal({
         </div>
         {d?.createdAt && (
           <div className="text-[10px] text-zinc-400 mt-1">{t("createdOn", { date: new Date(d.createdAt).toLocaleDateString() })}</div>
+        )}
+        {/* Caso Cachirula (Facu, 21/10/2026): el duplicado tenía un valor
+            cualquiera en el campo VIN. Se avisa que ese valor se reemplaza
+            por el VIN de la fusión (queda en el snapshot para deshacer). */}
+        {!isPrimary && d?.vinSerial && d.vinSerial.replace(/[^A-Za-z0-9]/g, "").toUpperCase() !== vin && (
+          <div className="text-[10px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5 mt-1.5">
+            {t("oldVinReplaced", { oldVin: d.vinSerial })}
+          </div>
         )}
       </div>
     );

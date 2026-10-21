@@ -2291,6 +2291,7 @@
     "merging": "Fusionando…",
     "doneTitle": "Historiales fusionados",
     "doneDesc": "El activo ahora tiene un único historial completo. Los dos códigos QR apuntan a él.",
-    "doneButton": "Listo"
+    "doneButton": "Listo",
+    "oldVinReplaced": "El VIN actual \"{oldVin}\" se reemplaza."
   }
 }
