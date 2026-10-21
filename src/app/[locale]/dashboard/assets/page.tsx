@@ -5,7 +5,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import {
-  FileText, Box, Plus, X, Copy, Check,
+  FileText, Box, Plus, X,
   Wrench, Pencil, History, CheckCircle2, UserCircle2, Camera, Gauge,
   Search, MoreVertical, Trash2, Clock, CalendarClock, ListChecks, ChevronDown,
   QrCode as QrIcon, AlertTriangle,
@@ -23,6 +23,7 @@ import { validateImageFile } from "@/lib/imageValidation";
 import NewAssetModalIntl from "@/components/NewAssetModalIntl";
 import VinScannerModal from "@/components/VinScannerModal";
 import MergeAssetsModal from "@/components/MergeAssetsModal";
+import AssetQrModal from "@/components/AssetQrModal";
 import { VIN_ELIGIBLE_ASSET_TYPES, isVinFormatValid, normalizeVin } from "@/lib/vinValidation";
 import { findAssetByVin, VinMatch } from "@/lib/vinLookup";
 import LinkExistingAssetModalIntl from "@/components/LinkExistingAssetModalIntl";
@@ -77,7 +78,7 @@ const typeColors: Record<string, { bg: string; text: string }> = {
   "Brake Service": { bg: "bg-orange-100", text: "text-orange-700" },
 };
 
-type QrRow = { code: string };
+type QrRow = { code: string; theme?: string | null; label?: string | null };
 
 type MechanicInfo = { name: string };
 
@@ -119,10 +120,14 @@ type AssetAgg = {
   reminderStatus: ReminderStatus;
 };
 
-function getQrCode(row: AssetRow): string | null {
+function getQrRow(row: AssetRow): QrRow | null {
   if (!row.qr_codes) return null;
   const q = Array.isArray(row.qr_codes) ? row.qr_codes[0] : row.qr_codes;
-  return q?.code ?? null;
+  return q ?? null;
+}
+
+function getQrCode(row: AssetRow): string | null {
+  return getQrRow(row)?.code ?? null;
 }
 
 function formatDate(dateStr: string) {
@@ -182,7 +187,9 @@ export default function AssetsPage() {
 
   // ── Per-card "⋯" menu ──
   const [openCardMenuId, setOpenCardMenuId] = useState<string | null>(null);
-  const [qrOpenId, setQrOpenId] = useState<string | null>(null);
+  // 21/10/2026: el botón "QR" abre AssetQrModal (QR grande + personalizar +
+  // descargar + imprimir), en vez del panel desplegable con un QR externo.
+  const [qrModalAsset, setQrModalAsset] = useState<AssetRow | null>(null);
 
   // ── Remove from workshop ──
   const [removeTarget, setRemoveTarget] = useState<AssetRow | null>(null);
@@ -195,8 +202,6 @@ export default function AssetsPage() {
   // Shared components (also used by the dashboard's own "Add Equipment"
   // button) so creating or linking an asset behaves identically everywhere.
   const [addStep, setAddStep] = useState<"closed" | "choose" | "new" | "existing">("closed");
-  const [copiedCode, setCopiedCode] = useState("");
-  const copiedCodeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [customers, setCustomers] = useState<CustomerOption[]>([]);
 
   // ── Add Service modal ──
@@ -270,7 +275,7 @@ export default function AssetsPage() {
     // para cualquier fila que el mecánico agregó por su cuenta (escaneo propio).
     const { data } = await supabase
       .from("mechanic_assets")
-      .select("asset_id, shared_by, sharer:mechanics!mechanic_assets_shared_by_fkey(name), assets(id, asset_type, brand, model, nickname, vin_serial, year, plate, fuel_type, location, photo_url, created_at, customer_id, deleted_at, qr_codes(code))")
+      .select("asset_id, shared_by, sharer:mechanics!mechanic_assets_shared_by_fkey(name), assets(id, asset_type, brand, model, nickname, vin_serial, year, plate, fuel_type, location, photo_url, created_at, customer_id, deleted_at, qr_codes(code, theme, label))")
       .eq("mechanic_id", uid)
       .order("added_at", { ascending: false });
     const assetList = (data ?? [])
@@ -688,21 +693,6 @@ export default function AssetsPage() {
     router.replace("/login");
   }
 
-  function publicUrl(code: string) {
-    if (typeof window === "undefined") return "";
-    return `${window.location.origin}/asset/${code}`;
-  }
-
-  async function copyLink(code: string) {
-    try {
-      await navigator.clipboard.writeText(publicUrl(code));
-      setCopiedCode(code);
-      if (copiedCodeTimeoutRef.current) clearTimeout(copiedCodeTimeoutRef.current);
-      copiedCodeTimeoutRef.current = setTimeout(() => setCopiedCode(""), 1500);
-    } catch {
-      // ignore
-    }
-  }
 
   // Filtered + sorted every render otherwise (this page has a lot of other
   // state — edit-modal fields, etc. — that shouldn't force a full re-filter
@@ -976,7 +966,6 @@ export default function AssetsPage() {
                 const agg = assetAgg[a.id];
                 const statusKey = assetStatusKey(agg?.reminderStatus ?? "none");
                 const statusColor = ASSET_STATUS_COLOR[statusKey];
-                const qrOpen = qrOpenId === a.id;
                 return (
                   <div key={a.id} className="bg-white rounded-2xl border border-zinc-200 shadow-sm p-4 flex flex-col transition-all duration-200 hover:scale-[1.03] hover:shadow-lg hover:border-zinc-300 hover:z-10">
                     {/* Asset header */}
@@ -1099,7 +1088,7 @@ export default function AssetsPage() {
                         <Wrench size={12} /> {t("service")}
                       </button>
                       <button
-                        onClick={() => setQrOpenId(qrOpen ? null : a.id)}
+                        onClick={() => setQrModalAsset(a)}
                         disabled={!code}
                         className="flex items-center justify-center gap-1.5 border border-zinc-200 text-zinc-600 hover:bg-zinc-50 active:scale-[0.98] transition-all text-[11px] font-bold py-[6px] rounded-xl disabled:opacity-40 disabled:cursor-not-allowed"
                       >
@@ -1107,41 +1096,6 @@ export default function AssetsPage() {
                       </button>
                     </div>
 
-                    {/* QR section (collapsible) */}
-                    {qrOpen && (
-                      code ? (
-                        <div className="flex items-center gap-4 pt-3 mt-3 border-t border-zinc-100">
-                          <div className="w-20 h-20 rounded-lg border border-zinc-100 bg-white p-1 shrink-0">
-                            <img
-                              src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(publicUrl(code))}`}
-                              alt={`QR ${code}`}
-                              className="w-full h-full object-contain"
-                            />
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <p className="text-[10px] text-zinc-400 mb-1">{t("publicLink")}</p>
-                            <p className="text-[11px] font-mono text-zinc-600 truncate mb-2">/asset/{code}</p>
-                            <button
-                              onClick={() => copyLink(code)}
-                              className="flex items-center gap-1.5 text-[11px] font-bold text-red-600 hover:text-red-700 mb-2"
-                            >
-                              {copiedCode === code ? <Check size={12} /> : <Copy size={12} />}
-                              {copiedCode === code ? t("copied") : t("copyLink")}
-                            </button>
-                            <a
-                              href={`/asset/${code}/report`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="flex items-center gap-1.5 text-[11px] font-bold text-zinc-500 hover:text-zinc-800"
-                            >
-                              <FileText size={12} /> {t("viewReport")}
-                            </a>
-                          </div>
-                        </div>
-                      ) : (
-                        <p className="text-[11px] text-amber-600 pt-3 mt-3 border-t border-zinc-100">{t("qrNotGenerated")}</p>
-                      )
-                    )}
                   </div>
                 );
               })}
@@ -1172,6 +1126,23 @@ export default function AssetsPage() {
         onChooseNew={() => setAddStep("new")}
         onChooseExisting={() => setAddStep("existing")}
       />
+      <AssetQrModal
+        open={!!qrModalAsset}
+        onClose={() => setQrModalAsset(null)}
+        code={qrModalAsset ? getQrCode(qrModalAsset) : null}
+        assetName={qrModalAsset ? assetDisplayName(qrModalAsset) : ""}
+        theme={qrModalAsset ? (getQrRow(qrModalAsset)?.theme ?? "classic") : "classic"}
+        label={qrModalAsset ? (getQrRow(qrModalAsset)?.label ?? null) : null}
+        onSaved={(code, theme, label) => {
+          setAssets((prev) => prev.map((row) => {
+            const q = getQrRow(row);
+            if (!q || q.code !== code) return row;
+            return { ...row, qr_codes: [{ ...q, theme, label }] };
+          }));
+          setQrModalAsset((prev) => prev ? { ...prev, qr_codes: [{ code, theme, label }] } : prev);
+        }}
+      />
+
       <MergeAssetsModal
         open={showMergeModal}
         onClose={() => setShowMergeModal(false)}

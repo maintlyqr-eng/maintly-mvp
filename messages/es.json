@@ -2302,5 +2302,20 @@
     "doneDesc": "El activo ahora tiene un único historial completo. Los dos códigos QR apuntan a él.",
     "doneButton": "Listo",
     "oldVinReplaced": "El VIN actual \"{oldVin}\" se reemplaza."
+  },
+  "AssetQrModal": {
+    "title": "Código QR",
+    "copyLink": "Copiar link",
+    "copied": "Copiado",
+    "download": "Descargar",
+    "print": "Imprimir",
+    "viewReport": "Ver reporte",
+    "labelOptional": "Etiqueta (opcional)",
+    "labelPlaceholder": "ej. Camioneta del taller, Unidad 7…",
+    "look": "Diseño y estilo",
+    "discard": "Descartar",
+    "save": "Guardar cambios",
+    "saving": "Guardando…",
+    "errorSave": "No se pudieron guardar los cambios."
   }
 }

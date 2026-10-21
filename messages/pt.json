@@ -2302,5 +2302,20 @@
     "doneDesc": "O equipamento agora tem um único histórico completo. Os dois códigos QR apontam para ele.",
     "doneButton": "Pronto",
     "oldVinReplaced": "O VIN atual \"{oldVin}\" será substituído."
+  },
+  "AssetQrModal": {
+    "title": "Código QR",
+    "copyLink": "Copiar link",
+    "copied": "Copiado",
+    "download": "Baixar",
+    "print": "Imprimir",
+    "viewReport": "Ver relatório",
+    "labelOptional": "Etiqueta (opcional)",
+    "labelPlaceholder": "ex. Van da oficina, Unidade 7…",
+    "look": "Visual e estilo",
+    "discard": "Descartar",
+    "save": "Salvar alterações",
+    "saving": "Salvando…",
+    "errorSave": "Não foi possível salvar as alterações."
   }
 }

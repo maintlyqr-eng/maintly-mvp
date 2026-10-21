@@ -2302,5 +2302,20 @@
     "doneDesc": "The asset now has a single, complete history. Both QR codes point to it.",
     "doneButton": "Done",
     "oldVinReplaced": "Current VIN \"{oldVin}\" will be replaced."
+  },
+  "AssetQrModal": {
+    "title": "QR code",
+    "copyLink": "Copy link",
+    "copied": "Copied",
+    "download": "Download",
+    "print": "Print",
+    "viewReport": "View report",
+    "labelOptional": "Label (optional)",
+    "labelPlaceholder": "e.g. Workshop van, Unit 7…",
+    "look": "Look & style",
+    "discard": "Discard",
+    "save": "Save changes",
+    "saving": "Saving…",
+    "errorSave": "Could not save changes."
   }
 }
