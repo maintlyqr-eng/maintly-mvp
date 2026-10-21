@@ -2317,5 +2317,9 @@
     "save": "Salvar alterações",
     "saving": "Salvando…",
     "errorSave": "Não foi possível salvar as alterações."
+  },
+  "DashboardBottomNav": {
+    "ariaLabel": "Navegação principal",
+    "more": "Mais"
   }
 }

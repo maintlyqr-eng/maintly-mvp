@@ -1,7 +1,6 @@
 "use client";
 
 import { Link } from "@/i18n/navigation";
-import Image from "next/image";
 import { useEffect, useState } from "react";
 import { X } from "lucide-react";
 import { useTranslations } from "next-intl";
@@ -104,12 +103,23 @@ export default function DashboardSidebarIntl({
       )}
 
       {/* ════ SIDEBAR ════ */}
-      <aside className={`${className} fixed md:static inset-y-0 left-0 z-40 w-[230px] bg-white border-r border-zinc-200 flex flex-col shrink-0 transform transition-transform duration-200 md:translate-x-0 ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}`}>
-        <div className="flex items-center justify-between px-4 py-2">
-          <Link href="/" className="flex items-center">
-            <Image src="/images/maintly-logo-full.png" alt="MaintlyQR" width={244} height={72} priority style={{ objectFit: "contain" }} />
+      {/* Rediseño 21/10/2026: sidebar grafito (la pared de la oficina
+          Maintly) con el engranaje rojo y el wordmark MAINTLYQR +
+          "MAINTENANCE · TRACKED". Ítem activo con halo rojo tipo LED. */}
+      <aside className={`${className} fixed md:static inset-y-0 left-0 z-40 w-[248px] bg-graphite flex flex-col shrink-0 transform transition-transform duration-200 md:translate-x-0 relative overflow-hidden ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}`}>
+        {/* engranaje marca de agua */}
+        <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="0.8" className="pointer-events-none absolute -left-[120px] -bottom-[110px] w-[320px] h-[320px] opacity-[0.05]"><circle cx="12" cy="12" r="3.2"></circle><path d="M12 2.5v2.2M12 19.3v2.2M2.5 12h2.2M19.3 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M5.3 18.7l1.6-1.6M17.1 6.9l1.6-1.6"></path><circle cx="12" cy="12" r="7"></circle></svg>
+        <div className="relative flex items-center justify-between px-5 pt-6 pb-5">
+          <Link href="/" className="flex items-center gap-2.5">
+            <span className="w-[38px] h-[38px] rounded-full bg-graphite-2 flex items-center justify-center shrink-0 shadow-[inset_0_0_0_1px_#3A3F47,0_0_18px_rgba(224,36,43,0.25)]">
+              <svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#E0242B" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="3"></circle><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M4.9 19.1l1.8-1.8M17.3 6.7l1.8-1.8"></path><circle cx="12" cy="12" r="6.5"></circle></svg>
+            </span>
+            <span className="flex flex-col leading-none">
+              <span className="text-[17px] font-extrabold tracking-[-0.02em] text-white">MAINTLY<span className="text-brand">QR</span></span>
+              <span className="text-[9px] font-semibold tracking-[0.18em] text-steel mt-[3px]">MAINTENANCE · TRACKED</span>
+            </span>
           </Link>
-          <button onClick={onCloseSidebar} className="md:hidden text-zinc-400 hover:text-zinc-700 mr-2">
+          <button onClick={onCloseSidebar} className="md:hidden text-steel-2 hover:text-white">
             <X size={20} />
           </button>
         </div>
@@ -122,19 +132,19 @@ export default function DashboardSidebarIntl({
             sits right under the last nav item where there's actual room,
             not stranded at the bottom. `overflow-y-auto` stays as a safety
             net if the nav list ever grows past the viewport. */}
-        <nav className="px-3 overflow-y-auto">
+        <nav className="relative px-3 overflow-y-auto">
           {navItems.map((item) => (
             <Link
               key={item.key}
               href={item.href}
               onClick={onCloseSidebar}
-              className={`flex items-center gap-3 px-3 py-[9px] rounded-lg mb-1 text-[13px] font-medium transition-colors ${
+              className={`flex items-center gap-3 px-3 py-[10px] rounded-xl mb-0.5 text-[13.5px] transition-all ${
                 item.href === activeHref
-                  ? "bg-red-50 text-red-600 border-l-[3px] border-red-600 -ml-[1px]"
-                  : "text-zinc-600 hover:bg-zinc-50"
+                  ? "bg-brand/15 text-white font-semibold shadow-[inset_0_0_0_1px_rgba(224,36,43,0.35),0_0_18px_rgba(224,36,43,0.22)]"
+                  : "text-steel-2 font-medium hover:bg-graphite-2 hover:text-white"
               }`}
             >
-              <item.icon size={16} />
+              <item.icon size={17} className={item.href === activeHref ? "text-brand-glow" : ""} />
               {tNav(item.key)}
               {item.key === "messages" && unreadMessages > 0 && (
                 <span className="ml-auto bg-red-600 text-white text-[9px] font-bold rounded-full min-w-[16px] h-4 flex items-center justify-center px-1">{unreadMessages}</span>
@@ -155,15 +165,15 @@ export default function DashboardSidebarIntl({
             /pricing page rewrite: no UI anywhere should imply a future
             paywall. */}
 
-        <Link href="/dashboard/settings" className="flex items-center gap-2.5 px-4 py-3 border-t border-zinc-200 hover:bg-zinc-50 transition-colors">
+        <Link href="/dashboard/settings" className="relative mt-auto flex items-center gap-2.5 px-4 py-3 border-t border-graphite-line hover:bg-graphite-2 transition-colors">
           {photoUrl ? (
             <HoverAvatar src={photoUrl} size={32} className="shrink-0" />
           ) : (
-            <div className="w-8 h-8 rounded-full bg-red-100 flex items-center justify-center text-red-600 font-bold text-[12px] shrink-0">{initials}</div>
+            <div className="w-8 h-8 rounded-full bg-graphite-2 shadow-[inset_0_0_0_1px_#3A3F47] flex items-center justify-center text-white font-bold text-[12px] shrink-0">{initials}</div>
           )}
           <div className="flex-1 min-w-0">
-            <p className="text-[12px] font-bold text-zinc-800 leading-tight truncate">{name || email}</p>
-            <p className="text-[10px] text-zinc-400 leading-tight">{professionLabel}</p>
+            <p className="text-[12.5px] font-semibold text-white leading-tight truncate">{name || email}</p>
+            <p className="text-[10.5px] text-steel leading-tight">{professionLabel}</p>
           </div>
         </Link>
       </aside>

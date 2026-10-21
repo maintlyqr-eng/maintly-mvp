@@ -147,9 +147,9 @@ export default function ContactSupportWidgetIntl({ mechanicId, variant = "sideba
         // ("Contactar Soporte"). Rebuilt as the warmer card from his own
         // mockup: a heading + a line of reassurance, then the button, on a
         // soft warm tint instead of cold zinc gray.
-        <div className="mx-3 mb-3 mt-2 rounded-2xl bg-gradient-to-br from-red-50 to-orange-50 border border-red-100/80 p-3.5">
-          <p className="text-[12.5px] font-black text-zinc-900 leading-tight">{t("needHelpTitle")}</p>
-          <p className="text-[10.5px] text-zinc-500 leading-snug mt-1 mb-2.5">{t("needHelpDesc")}</p>
+        <div className="relative mx-3 mb-3 mt-3 rounded-2xl bg-graphite-2 shadow-[inset_0_0_0_1px_#3A3F47] p-3.5">
+          <p className="text-[12.5px] font-bold text-white leading-tight">{t("needHelpTitle")}</p>
+          <p className="text-[10.5px] text-steel leading-snug mt-1 mb-2.5">{t("needHelpDesc")}</p>
           <button
             onClick={openWidget}
             className="relative w-full flex items-center justify-center gap-2 bg-white hover:bg-red-50 active:scale-[0.98] border border-red-200 text-red-600 text-[12px] font-bold px-3 py-2.5 rounded-xl transition-all shadow-sm"

@@ -272,7 +272,7 @@ export default function DocumentsPage() {
   }
 
   return (
-    <div className="h-dvh bg-zinc-50 flex relative overflow-hidden">
+    <div className="h-dvh bg-canvas flex relative overflow-hidden">
 
       <DashboardSidebarIntl
         activeHref="/dashboard/documents"
@@ -303,7 +303,7 @@ export default function DocumentsPage() {
           onLogout={handleLogout}
         />
 
-        <div className="flex-1 overflow-y-auto px-3 md:px-4 pt-1.5 md:pt-2 pb-3 md:pb-4">
+        <div data-dashboard-scroll className="flex-1 overflow-y-auto px-3 md:px-4 pt-1.5 md:pt-2 pb-3 md:pb-4">
 
           {/* Toolbar */}
           <div className="flex items-center justify-between mb-5 -mt-2 gap-3 flex-wrap">

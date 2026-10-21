@@ -7,7 +7,7 @@ import { useTranslations } from "next-intl";
 import {
   FileText, Box, Plus, X,
   Wrench, Pencil, History, CheckCircle2, UserCircle2, Camera, Gauge,
-  Search, MoreVertical, Trash2, Clock, CalendarClock, ListChecks, ChevronDown,
+  Search, MoreVertical, Trash2, Clock, ChevronDown,
   QrCode as QrIcon, AlertTriangle,
   Share2, ChevronLeft, ChevronRight, ScanLine,
 } from "lucide-react";
@@ -61,9 +61,9 @@ function assetStatusKey(rs: ReminderStatus): "healthy" | "due_soon" | "overdue" 
 }
 
 const ASSET_STATUS_COLOR: Record<"healthy" | "due_soon" | "overdue", { bg: string; text: string; dot: string }> = {
-  healthy:  { bg: "bg-green-100", text: "text-green-700", dot: "bg-green-500" },
-  due_soon: { bg: "bg-amber-100", text: "text-amber-700", dot: "bg-amber-500" },
-  overdue:  { bg: "bg-red-100",   text: "text-red-700",   dot: "bg-red-500" },
+  healthy:  { bg: "bg-ok-bg",     text: "text-ok-text",     dot: "bg-ok shadow-[0_0_6px_#22B36B]" },
+  due_soon: { bg: "bg-warn-bg",   text: "text-warn-text",   dot: "bg-warn shadow-[0_0_6px_#F5A623]" },
+  overdue:  { bg: "bg-danger-bg", text: "text-danger-text", dot: "bg-danger shadow-[0_0_6px_#FF5A5F]" },
 };
 
 const SERVICE_TYPE_ORDER = ["Oil Change", "Service", "Repair", "Inspection", "Filter Change", "Tire Change", "Brake Service", "Other"];
@@ -794,7 +794,7 @@ export default function AssetsPage() {
   const svcAssetType = assets.find((a) => a.id === svcAssetId)?.asset_type;
 
   return (
-    <div className="h-dvh bg-zinc-50 flex relative overflow-hidden">
+    <div className="h-dvh bg-canvas flex relative overflow-hidden">
 
       <DashboardSidebarIntl
         activeHref="/dashboard/assets"
@@ -825,53 +825,46 @@ export default function AssetsPage() {
           onLogout={handleLogout}
         />
 
-        <div className="flex-1 overflow-y-auto px-3 md:px-4 pt-1.5 md:pt-2 pb-1.5 md:pb-2">
+        <div data-dashboard-scroll className="flex-1 overflow-y-auto px-3 md:px-4 pt-1.5 md:pt-2 pb-1.5 md:pb-2">
 
           {/* KPI summary bar */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-2">
-            <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm p-3">
-              <p className="text-[11px] font-semibold text-zinc-400 mb-1">{t("totalAssets")}</p>
-              <p className="text-[22px] font-black text-zinc-900">{totalAssets}</p>
+          {/* Rediseño 21/10/2026: KPIs como tarjetas sin borde con ícono en
+              placa grafito (identidad Maintly) y número grande. */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-3">
+            <div className="bg-white rounded-[20px] shadow-card p-4 flex items-center gap-3">
+              <span className="w-11 h-11 rounded-full bg-graphite shadow-steel-inset flex items-center justify-center shrink-0"><Box size={19} className="text-steel-3" /></span>
+              <div className="min-w-0"><p className="text-[12.5px] text-ink-3">{t("totalAssets")}</p><p className="text-[26px] font-bold tracking-[-0.02em] text-ink leading-tight">{totalAssets}</p></div>
             </div>
-            <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm p-3">
-              <div className="flex items-center gap-1.5 mb-1">
-                <span className="w-2 h-2 rounded-full bg-green-500" />
-                <p className="text-[11px] font-semibold text-zinc-400">{t("healthy")}</p>
-              </div>
-              <p className="text-[22px] font-black text-green-600">{healthyCount}</p>
+            <div className="bg-white rounded-[20px] shadow-card p-4 flex items-center gap-3">
+              <span className="w-11 h-11 rounded-full bg-ok-bg flex items-center justify-center shrink-0"><CheckCircle2 size={19} className="text-ok-text" /></span>
+              <div className="min-w-0"><p className="text-[12.5px] text-ink-3">{t("healthy")}</p><p className="text-[26px] font-bold tracking-[-0.02em] text-ok-text leading-tight">{healthyCount}</p></div>
             </div>
-            <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm p-3">
-              <div className="flex items-center gap-1.5 mb-1">
-                <span className="w-2 h-2 rounded-full bg-amber-500" />
-                <p className="text-[11px] font-semibold text-zinc-400">{t("dueSoon")}</p>
-              </div>
-              <p className="text-[22px] font-black text-amber-600">{dueSoonCount}</p>
+            <div className="bg-white rounded-[20px] shadow-card p-4 flex items-center gap-3">
+              <span className="w-11 h-11 rounded-full bg-warn-bg flex items-center justify-center shrink-0"><Clock size={19} className="text-warn-text" /></span>
+              <div className="min-w-0"><p className="text-[12.5px] text-ink-3">{t("dueSoon")}</p><p className="text-[26px] font-bold tracking-[-0.02em] text-warn-text leading-tight">{dueSoonCount}</p></div>
             </div>
-            <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm p-3">
-              <div className="flex items-center gap-1.5 mb-1">
-                <AlertTriangle size={11} className="text-red-500" />
-                <p className="text-[11px] font-semibold text-zinc-400">{t("overdue")}</p>
-              </div>
-              <p className="text-[22px] font-black text-red-600">{overdueCount}</p>
+            <div className="bg-white rounded-[20px] shadow-card p-4 flex items-center gap-3">
+              <span className="w-11 h-11 rounded-full bg-danger-bg flex items-center justify-center shrink-0"><AlertTriangle size={19} className="text-danger-text" /></span>
+              <div className="min-w-0"><p className="text-[12.5px] text-ink-3">{t("overdue")}</p><p className="text-[26px] font-bold tracking-[-0.02em] text-danger-text leading-tight">{overdueCount}</p></div>
             </div>
           </div>
 
           {/* Search / filter / sort + New Asset */}
           <div className="flex flex-col lg:flex-row lg:items-center gap-3 mb-2">
             <div className="relative flex-1 min-w-0">
-              <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
+              <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-steel" />
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder={t("searchPlaceholder")}
-                className="w-full pl-9 pr-3 py-[9px] rounded-xl border border-zinc-200 text-[13px] outline-none focus:border-red-500 bg-white"
+                className="w-full pl-10 pr-4 py-[11px] rounded-full bg-white shadow-card text-[14px] text-ink placeholder:text-steel outline-none focus:ring-2 focus:ring-brand/30"
               />
             </div>
             <div className="flex items-center gap-2 overflow-x-auto overscroll-x-contain pb-1 lg:pb-0">
               <button
                 onClick={() => setTypeFilter("all")}
-                className={`shrink-0 px-3 py-[7px] rounded-full text-[12px] font-bold transition-colors ${typeFilter === "all" ? "bg-zinc-900 text-white" : "bg-white border border-zinc-200 text-zinc-500 hover:bg-zinc-50"}`}
+                className={`shrink-0 px-4 py-[8px] rounded-full text-[13px] transition-colors ${typeFilter === "all" ? "bg-graphite text-white font-semibold" : "bg-white shadow-card text-ink-2 font-medium hover:bg-surface-2"}`}
               >
                 {t("all")}
               </button>
@@ -879,7 +872,7 @@ export default function AssetsPage() {
                 <button
                   key={ty}
                   onClick={() => setTypeFilter(ty)}
-                  className={`shrink-0 px-3 py-[7px] rounded-full text-[12px] font-bold transition-colors ${typeFilter === ty ? "bg-zinc-900 text-white" : "bg-white border border-zinc-200 text-zinc-500 hover:bg-zinc-50"}`}
+                  className={`shrink-0 px-4 py-[8px] rounded-full text-[13px] transition-colors ${typeFilter === ty ? "bg-graphite text-white font-semibold" : "bg-white shadow-card text-ink-2 font-medium hover:bg-surface-2"}`}
                 >
                   {tAssetTypes(ty)}
                 </button>
@@ -889,19 +882,19 @@ export default function AssetsPage() {
               <select
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value as "last_service" | "name" | "status")}
-                className="appearance-none pl-3 pr-8 py-[9px] rounded-xl border border-zinc-200 text-[12px] font-bold text-zinc-600 outline-none focus:border-red-500 bg-white"
+                className="appearance-none pl-4 pr-9 py-[10px] rounded-full bg-white shadow-card text-[13px] font-medium text-ink-2 outline-none focus:ring-2 focus:ring-brand/30"
               >
                 <option value="last_service">{t("sortLastServiced")}</option>
                 <option value="name">{t("sortName")}</option>
                 <option value="status">{t("sortStatus")}</option>
               </select>
-              <ChevronDown size={13} className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-400" />
+              <ChevronDown size={14} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-steel" />
             </div>
             <button
               onClick={() => setAddStep("choose")}
-              className="shrink-0 flex items-center justify-center gap-2 bg-red-600 hover:bg-red-500 active:scale-[0.98] transition-all text-white text-[13px] font-bold px-4 py-[10px] rounded-xl shadow-sm"
+              className="shrink-0 flex items-center justify-center gap-2 bg-brand hover:bg-[#F0343B] active:scale-[0.98] transition-all text-white text-[14px] font-semibold px-5 py-[11px] rounded-full shadow-glow-red"
             >
-              <Plus size={15} /> {t("addEquipment")}
+              <Plus size={16} strokeWidth={2.5} /> {t("addEquipment")}
             </button>
           </div>
 
@@ -912,22 +905,22 @@ export default function AssetsPage() {
           {loadingAssets ? (
             <p className="text-[13px] text-zinc-400 text-center py-12">{t("loadingAssets")}</p>
           ) : assets.length === 0 ? (
-            <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm p-12 text-center">
-              <div className="inline-flex items-center justify-center w-14 h-14 rounded-full border border-red-100 bg-red-50 mb-4">
-                <Box size={24} className="text-red-600" />
+            <div className="bg-white rounded-[20px] shadow-card p-12 text-center">
+              <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-graphite shadow-steel-inset mb-4">
+                <Box size={24} className="text-brand" />
               </div>
-              <h2 className="text-[16px] font-black text-zinc-900 mb-1">{t("noAssetsYetTitle")}</h2>
-              <p className="text-[13px] text-zinc-500 mb-5">{t("noAssetsYetDesc")}</p>
+              <h2 className="text-[17px] font-bold text-ink mb-1">{t("noAssetsYetTitle")}</h2>
+              <p className="text-[13.5px] text-ink-3 mb-5">{t("noAssetsYetDesc")}</p>
               <button
                 onClick={() => setAddStep("choose")}
-                className="inline-flex items-center gap-2 bg-red-600 hover:bg-red-500 transition-all text-white text-[13px] font-bold px-5 py-[11px] rounded-xl"
+                className="inline-flex items-center gap-2 bg-brand hover:bg-[#F0343B] transition-all text-white text-[14px] font-semibold px-5 py-[11px] rounded-full shadow-glow-red"
               >
                 <Plus size={15} /> {t("addEquipment")}
               </button>
             </div>
           ) : visibleAssets.length === 0 ? (
-            <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm p-12 text-center">
-              <p className="text-[13px] text-zinc-500">{t("noAssetsMatch")}</p>
+            <div className="bg-white rounded-[20px] shadow-card p-12 text-center">
+              <p className="text-[13.5px] text-ink-3">{t("noAssetsMatch")}</p>
             </div>
           ) : (
             <>
@@ -955,7 +948,7 @@ export default function AssetsPage() {
                 )}
               </div>
             <div
-              className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2 touch-pan-y"
+              className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 touch-pan-y"
               onTouchStart={handleAssetsTouchStart}
               onTouchEnd={handleAssetsTouchEnd}
             >
@@ -967,21 +960,21 @@ export default function AssetsPage() {
                 const statusKey = assetStatusKey(agg?.reminderStatus ?? "none");
                 const statusColor = ASSET_STATUS_COLOR[statusKey];
                 return (
-                  <div key={a.id} className="bg-white rounded-2xl border border-zinc-200 shadow-sm p-4 flex flex-col transition-all duration-200 hover:scale-[1.03] hover:shadow-lg hover:border-zinc-300 hover:z-10">
+                  <div key={a.id} className="bg-white rounded-[20px] shadow-card p-4 md:p-5 flex flex-col gap-3.5 transition-all duration-200 hover:shadow-card-hover hover:-translate-y-[2px] hover:z-10">
                     {/* Asset header */}
-                    <div className="flex items-center gap-3 mb-2">
-                      {/* Photo or icon */}
-                      <div className="w-10 h-10 rounded-xl bg-zinc-50 border border-zinc-100 flex items-center justify-center shrink-0 overflow-hidden">
+                    <div className="flex items-center gap-3">
+                      {/* Photo or icon — placa grafito con borde acero */}
+                      <div className="w-11 h-11 rounded-[14px] bg-graphite shadow-steel-inset flex items-center justify-center shrink-0 overflow-hidden">
                         {a.photo_url ? (
                           // eslint-disable-next-line @next/next/no-img-element
                           <img src={a.photo_url} alt={label} className="w-full h-full object-cover" />
                         ) : (
                           // eslint-disable-next-line @next/next/no-img-element
-                          <img src={imgSrc} alt={label} className="w-7 h-7 object-contain" />
+                          <img src={imgSrc} alt={label} className="w-7 h-7 object-contain brightness-0 invert opacity-90" />
                         )}
                       </div>
                       <div className="min-w-0 flex-1">
-                        <p className="text-[14px] font-bold text-zinc-900 leading-tight truncate">{label}</p>
+                        <p className="text-[16px] font-bold tracking-[-0.01em] text-ink leading-tight truncate">{label}</p>
                         {/* Facu (22 jul 2026): "si pongo apodo me muestra el
                             apodo arriba y abajo el vin. deberia aparecer el
                             apodo arriba y la marca y modelo abajo. el vin
@@ -990,7 +983,7 @@ export default function AssetsPage() {
                             instead of the VIN/plate; without one, `label`
                             above already falls back to brand+model, so the
                             subtitle shows the VIN/plate like before. */}
-                        <p className="text-[11px] text-zinc-400 leading-tight truncate">
+                        <p className="text-[13px] text-ink-3 leading-tight truncate mt-0.5">
                           {a.year ? a.year + " · " : ""}
                           {a.nickname ? ([a.brand, a.model].filter(Boolean).join(" ") || "—") : (a.plate || a.vin_serial || "—")}
                         </p>
@@ -1000,7 +993,7 @@ export default function AssetsPage() {
                           </p>
                         )}
                       </div>
-                      <span className={`shrink-0 flex items-center gap-1 text-[10px] font-bold px-2 py-[3px] rounded-full ${statusColor.bg} ${statusColor.text}`}>
+                      <span className={`shrink-0 flex items-center gap-1.5 text-[12px] font-semibold px-2.5 py-[5px] rounded-full ${statusColor.bg} ${statusColor.text}`}>
                         <span className={`w-1.5 h-1.5 rounded-full ${statusColor.dot}`} />
                         {ASSET_STATUS_LABEL[statusKey]}
                       </span>
@@ -1008,30 +1001,30 @@ export default function AssetsPage() {
                       <div className="relative shrink-0">
                         <button
                           onClick={() => setOpenCardMenuId(openCardMenuId === a.id ? null : a.id)}
-                          className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-700 hover:bg-zinc-50 transition-colors"
+                          className="p-1.5 rounded-full text-steel hover:text-ink hover:bg-surface-2 transition-colors"
                           title={t("moreActions")}
                         >
                           <MoreVertical size={15} />
                         </button>
                         {openCardMenuId === a.id && (
-                          <div className="absolute right-0 top-full mt-1 w-48 bg-white rounded-xl border border-zinc-200 shadow-lg z-20 py-1">
+                          <div className="absolute right-0 top-full mt-1 w-52 bg-white rounded-2xl shadow-card-hover z-20 py-1.5">
                             <button
                               onClick={() => { setOpenCardMenuId(null); openEdit(a); }}
-                              className="w-full flex items-center gap-2 px-3 py-2 text-[12px] font-semibold text-zinc-600 hover:bg-zinc-50 text-left"
+                              className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-[13px] font-medium text-ink-2 hover:bg-surface-2 text-left"
                             >
-                              <Pencil size={13} /> {t("editAsset")}
+                              <Pencil size={14} /> {t("editAsset")}
                             </button>
                             <button
                               onClick={() => { setOpenCardMenuId(null); setShareTarget(a); }}
-                              className="w-full flex items-center gap-2 px-3 py-2 text-[12px] font-semibold text-zinc-600 hover:bg-zinc-50 text-left"
+                              className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-[13px] font-medium text-ink-2 hover:bg-surface-2 text-left"
                             >
-                              <Share2 size={13} /> {t("shareEquipment")}
+                              <Share2 size={14} /> {t("shareEquipment")}
                             </button>
                             <button
                               onClick={() => { setOpenCardMenuId(null); setRemoveTarget(a); }}
-                              className="w-full flex items-center gap-2 px-3 py-2 text-[12px] font-semibold text-red-600 hover:bg-red-50 text-left"
+                              className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-[13px] font-medium text-danger-text hover:bg-danger-bg text-left"
                             >
-                              <Trash2 size={13} /> {t("removeFromWorkshop")}
+                              <Trash2 size={14} /> {t("removeFromWorkshop")}
                             </button>
                           </div>
                         )}
@@ -1039,22 +1032,16 @@ export default function AssetsPage() {
                     </div>
 
                     {/* Stat row */}
-                    <div className="grid grid-cols-3 gap-2 mb-2 pb-2 border-b border-zinc-100">
+                    <div className="grid grid-cols-3 gap-2">
                       <div className="min-w-0">
-                        <div className="flex items-center gap-1 text-zinc-400">
-                          <Clock size={11} />
-                          <p className="text-[9px] font-semibold uppercase tracking-wide">{t("lastServiced")}</p>
-                        </div>
-                        <p className="text-[12px] font-bold text-zinc-800 truncate">
+                        <p className="text-[11px] text-ink-3 truncate">{t("lastServiced")}</p>
+                        <p className="text-[14px] font-semibold text-ink truncate">
                           {agg?.lastServiceDate ? daysAgoLabel(agg.lastServiceDate) : t("noServicesYet")}
                         </p>
                       </div>
                       <div className="min-w-0">
-                        <div className="flex items-center gap-1 text-zinc-400">
-                          <CalendarClock size={11} />
-                          <p className="text-[9px] font-semibold uppercase tracking-wide">{t("nextService")}</p>
-                        </div>
-                        <p className={`text-[12px] font-bold truncate ${statusKey === "overdue" ? "text-red-600" : statusKey === "due_soon" ? "text-amber-600" : "text-zinc-800"}`}>
+                        <p className="text-[11px] text-ink-3 truncate">{t("nextService")}</p>
+                        <p className={`text-[14px] font-semibold truncate ${statusKey === "overdue" ? "text-danger-text" : statusKey === "due_soon" ? "text-warn-text" : (agg?.nextDueDate || agg?.nextDueKmHours != null) ? "text-ink" : "text-steel-2"}`}>
                           {agg?.nextDueDate
                             ? daysUntilLabel(agg.nextDueDate)
                             : agg?.nextDueKmHours != null
@@ -1063,11 +1050,8 @@ export default function AssetsPage() {
                         </p>
                       </div>
                       <div className="min-w-0">
-                        <div className="flex items-center gap-1 text-zinc-400">
-                          <ListChecks size={11} />
-                          <p className="text-[9px] font-semibold uppercase tracking-wide">{t("services")}</p>
-                        </div>
-                        <button onClick={() => openHistory(a)} className="text-[12px] font-bold text-red-600 hover:text-red-700 truncate">
+                        <p className="text-[11px] text-ink-3 truncate">{t("services")}</p>
+                        <button onClick={() => openHistory(a)} className="text-[14px] font-semibold text-ink hover:text-brand truncate">
                           {t("viewCount", { count: agg?.totalServices ?? 0 })}
                         </button>
                       </div>
@@ -1077,22 +1061,22 @@ export default function AssetsPage() {
                     <div className="grid grid-cols-3 gap-2">
                       <button
                         onClick={() => openHistory(a)}
-                        className="flex items-center justify-center gap-1.5 border border-zinc-200 text-zinc-600 hover:bg-zinc-50 active:scale-[0.98] transition-all text-[11px] font-bold py-[6px] rounded-xl"
+                        className="flex items-center justify-center gap-1.5 bg-surface-2 text-ink-2 hover:bg-[#E4E7EB] active:scale-[0.98] transition-all text-[13px] font-semibold py-[10px] rounded-xl"
                       >
-                        <History size={12} /> {t("history")}
+                        <History size={14} /> {t("history")}
                       </button>
                       <button
                         onClick={() => openAddService(a.id)}
-                        className="flex items-center justify-center gap-1.5 border border-red-200 text-red-600 hover:bg-red-50 active:scale-[0.98] transition-all text-[11px] font-bold py-[6px] rounded-xl"
+                        className="flex items-center justify-center gap-1.5 bg-brand text-white hover:bg-[#F0343B] active:scale-[0.98] transition-all text-[13px] font-semibold py-[10px] rounded-xl shadow-glow-red"
                       >
-                        <Wrench size={12} /> {t("service")}
+                        <Wrench size={14} /> {t("service")}
                       </button>
                       <button
                         onClick={() => setQrModalAsset(a)}
                         disabled={!code}
-                        className="flex items-center justify-center gap-1.5 border border-zinc-200 text-zinc-600 hover:bg-zinc-50 active:scale-[0.98] transition-all text-[11px] font-bold py-[6px] rounded-xl disabled:opacity-40 disabled:cursor-not-allowed"
+                        className="flex items-center justify-center gap-1.5 bg-surface-2 text-ink-2 hover:bg-[#E4E7EB] active:scale-[0.98] transition-all text-[13px] font-semibold py-[10px] rounded-xl disabled:opacity-40 disabled:cursor-not-allowed"
                       >
-                        <QrIcon size={12} /> {t("qr")}
+                        <QrIcon size={14} /> {t("qr")}
                       </button>
                     </div>
 

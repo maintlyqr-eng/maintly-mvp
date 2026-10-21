@@ -1,11 +1,16 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Inter, Geist_Mono } from "next/font/google";
 import { getLocale } from "next-intl/server";
 import "./globals.css";
 
-const geistSans = Geist({
+// Rediseño 21/10/2026 (dirección aprobada por Facu: Revolut/MercadoPago +
+// identidad Maintly): Inter reemplaza a Geist como tipografía de la app.
+// Se mantiene la variable --font-geist-sans para no tocar los 100+ lugares
+// que la referencian vía Tailwind (font-sans).
+const geistSans = Inter({
   variable: "--font-geist-sans",
   subsets: ["latin"],
+  display: "swap",
 });
 
 const geistMono = Geist_Mono({

@@ -8,6 +8,7 @@ import HoverAvatar from "@/components/HoverAvatar";
 import NotificationBellIntl from "@/components/NotificationBellIntl";
 import PlatformStatusBanner from "@/components/PlatformStatusBanner";
 import ErrorLogger from "@/components/ErrorLogger";
+import DashboardBottomNavIntl from "@/components/DashboardBottomNavIntl";
 import { getInitials } from "@/lib/initials";
 
 // Localized twin of src/components/DashboardHeader.tsx — same reasoning as
@@ -68,20 +69,20 @@ export default function DashboardHeaderIntl({
           had room to spare (see the pt-1.5/pt-2 split on that page's
           content container) but this specific gap was still the one he
           called out again. */}
-      <header className={`${className} flex items-center justify-between gap-3 px-4 md:px-7 py-2.5 bg-white border-b border-zinc-200`}>
+      <header className={`${className} flex items-center justify-between gap-3 px-4 md:px-7 py-3 bg-canvas`}>
         <div className="flex items-center gap-3 min-w-0">
           <button onClick={onOpenSidebar} className="md:hidden shrink-0 text-zinc-600 hover:text-zinc-900">
             <Menu size={22} />
           </button>
           <div className="min-w-0">
-            <h1 className="text-[17px] md:text-[20px] font-black text-zinc-900 truncate">{title}</h1>
-            <p className="hidden sm:block text-[12px] text-zinc-400 truncate">{subtitle}</p>
+            <h1 className="text-[20px] md:text-[24px] font-extrabold tracking-[-0.02em] text-ink truncate">{title}</h1>
+            <p className="hidden sm:block text-[13px] text-ink-3 truncate">{subtitle}</p>
           </div>
         </div>
         <div className="flex items-center gap-2 md:gap-4 shrink-0">
           {extraHeaderContent}
           <NotificationBellIntl mechanicId={mechanicId} unreadMessagesCount={unreadMessages} unreadMechanicCount={unreadMechanicMessages} />
-          <div className="flex items-center gap-3 md:pl-3 md:border-l border-zinc-200">
+          <div className="flex items-center gap-3 md:pl-3">
             <Link href={maintlerCode ? `/maintler/${maintlerCode}` : "/dashboard/settings"} className="flex items-center gap-2.5 group">
               {photoUrl ? (
                 <HoverAvatar src={photoUrl} size={36} className="shrink-0" />
@@ -105,6 +106,7 @@ export default function DashboardHeaderIntl({
       </header>
       <PlatformStatusBanner />
       <ErrorLogger />
+      <DashboardBottomNavIntl onOpenSidebar={onOpenSidebar} />
     </Fragment>
   );
 }
