@@ -332,7 +332,9 @@
     "deletedError": "Esta conta foi excluída. Entre em contato com o suporte se achar que isso é um engano.",
     "alreadyHaveAccount": "Já tem uma conta?",
     "loginLink": "Entrar",
-    "continueBrowsing": "Voltar ao início"
+    "continueBrowsing": "Voltar ao início",
+    "acceptTermsLabel": "Li e aceito os <terms>Termos de Serviço</terms> e a <privacy>Política de Privacidade</privacy>.",
+    "acceptTermsError": "Para criar a conta você precisa aceitar os Termos de Serviço e a Política de Privacidade."
   },
   "ProductPage": {
     "eyebrow": "Produto",
@@ -2125,7 +2127,9 @@
     "mergesUndoConfirm": "Desfazer esta união?",
     "mergesUndoYes": "Sim, desfazer",
     "mergesUndoing": "Desfazendo…",
-    "mergesSnapshot": "Snapshot (o que foi movido)"
+    "mergesSnapshot": "Snapshot (o que foi movido)",
+    "termsAcceptedOn": "Termos e Privacidade aceitos em {date} (versão {version})",
+    "termsNotAccepted": "Termos e Privacidade: sem registro de aceite (cadastrou-se antes de existir a caixa de seleção)"
   },
   "ReportIssueModal": {
     "title": "Reportar um problema",

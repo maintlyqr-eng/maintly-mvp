@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import { Link } from "@/i18n/navigation";
+import { TERMS_VERSION, TERMS_PENDING_STORAGE_KEY } from "@/lib/legal";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations, useLocale } from "next-intl";
@@ -40,6 +41,10 @@ export default function RegisterPage() {
 
   const [showPassword, setShowPassword] = useState(false);
   const [name, setName] = useState("");
+  // Aceptación de Términos y Privacidad (migración 048). Un solo checkbox
+  // cubre los dos caminos de alta: sin tilde no se puede crear cuenta ni
+  // continuar con Google.
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -62,7 +67,18 @@ export default function RegisterPage() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       if (!session) return;
 
-      const { data: m } = await supabase.from("mechanics").select("suspended, deleted_at, profession").eq("id", session.user.id).maybeSingle();
+      const { data: m } = await supabase.from("mechanics").select("suspended, deleted_at, profession, terms_accepted_at").eq("id", session.user.id).maybeSingle();
+      // Vuelta del alta con Google: el checkbox se tildó antes del redirect
+      // y quedó en localStorage; recién ahora hay fila en mechanics para
+      // grabarlo. Best-effort: si falla, no bloquea el ingreso.
+      if (m && !m.terms_accepted_at) {
+        let pending: string | null = null;
+        try { pending = window.localStorage.getItem(TERMS_PENDING_STORAGE_KEY); } catch {}
+        if (pending) {
+          await supabase.from("mechanics").update({ terms_accepted_at: pending, terms_version: TERMS_VERSION }).eq("id", session.user.id);
+          try { window.localStorage.removeItem(TERMS_PENDING_STORAGE_KEY); } catch {}
+        }
+      }
       if (m?.deleted_at) {
         await supabase.auth.signOut();
         setError(t("deletedError"));
@@ -85,6 +101,11 @@ export default function RegisterPage() {
 
   async function handleGoogleSignIn() {
     setError("");
+    if (!acceptedTerms) {
+      setError(t("acceptTermsError"));
+      return;
+    }
+    try { window.localStorage.setItem(TERMS_PENDING_STORAGE_KEY, new Date().toISOString()); } catch {}
     setGoogleLoading(true);
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
@@ -108,8 +129,13 @@ export default function RegisterPage() {
       setError(t("passwordTooShortError"));
       return;
     }
+    if (!acceptedTerms) {
+      setError(t("acceptTermsError"));
+      return;
+    }
 
     setLoading(true);
+    const termsAcceptedAt = new Date().toISOString();
 
     const { data, error } = await supabase.auth.signUp({
       email,
@@ -118,7 +144,9 @@ export default function RegisterPage() {
         // Incremento 20: "locale" acá es lo que permite que el trigger de
         // bienvenida (migración 039) mande el mensaje de "Messages" en el
         // idioma correcto -- sin esto, siempre caía a inglés por default.
-        data: { name, locale },
+        // terms_*: constancia de aceptación en auth.users (migración 048),
+        // independiente de la fila de mechanics.
+        data: { name, locale, terms_accepted_at: termsAcceptedAt, terms_version: TERMS_VERSION },
       },
     });
 
@@ -143,6 +171,10 @@ export default function RegisterPage() {
 
     // If Supabase requires email confirmation, there is no session yet.
     if (data.session) {
+      // Con sesión ya existe la fila de mechanics (trigger): se graba ahí
+      // también. Sin sesión (confirmación por mail), queda en los metadatos
+      // de auth y se completa en el primer login (ver login/page.tsx).
+      await supabase.from("mechanics").update({ terms_accepted_at: termsAcceptedAt, terms_version: TERMS_VERSION }).eq("id", data.session.user.id);
       router.push("/register/profession");
     } else {
       setConfirmEmailSent(true);
@@ -307,6 +339,22 @@ export default function RegisterPage() {
                     />
                   </div>
                 </div>
+
+                {/* Aceptación de Términos y Privacidad (migración 048) */}
+                <label className="flex items-start gap-2.5 mb-4 md:mb-5 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={acceptedTerms}
+                    onChange={(e) => setAcceptedTerms(e.target.checked)}
+                    className="mt-[3px] w-4 h-4 shrink-0 rounded border-zinc-600 bg-carbon accent-red-600 cursor-pointer"
+                  />
+                  <span className="text-[12px] text-zinc-400 leading-snug">
+                    {t.rich("acceptTermsLabel", {
+                      terms: (chunks) => <Link href="/terms" target="_blank" className="text-zinc-200 underline hover:text-white">{chunks}</Link>,
+                      privacy: (chunks) => <Link href="/privacy" target="_blank" className="text-zinc-200 underline hover:text-white">{chunks}</Link>,
+                    })}
+                  </span>
+                </label>
 
                 <motion.button
                   whileHover={{ scale: loading ? 1 : 1.015 }}

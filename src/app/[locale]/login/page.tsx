@@ -195,7 +195,20 @@ function LoginForm() {
       // es el único lugar donde ese usuario "aterriza" después del login,
       // así que es acá donde hay que mandarlo a completar su perfil si
       // todavía no lo hizo.
-      const { data: m } = await supabase.from("mechanics").select("suspended, deleted_at, profession").eq("id", session.user.id).maybeSingle();
+      const { data: m } = await supabase.from("mechanics").select("suspended, deleted_at, profession, terms_accepted_at").eq("id", session.user.id).maybeSingle();
+      // Migración 048: si se registró con email+contraseña y Supabase pidió
+      // confirmar el mail, no había sesión en el momento del alta y la
+      // aceptación de Términos quedó solo en los metadatos de auth. Se
+      // completa en mechanics en este primer login. Best-effort.
+      if (m && !m.terms_accepted_at) {
+        const meta = session.user.user_metadata as { terms_accepted_at?: string; terms_version?: string } | null;
+        if (meta?.terms_accepted_at) {
+          await supabase.from("mechanics").update({
+            terms_accepted_at: meta.terms_accepted_at,
+            terms_version: meta.terms_version ?? null,
+          }).eq("id", session.user.id);
+        }
+      }
       if (m?.deleted_at) {
         await supabase.auth.signOut();
         setError(t("deletedError"));

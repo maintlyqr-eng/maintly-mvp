@@ -64,6 +64,8 @@ export type AccountRow = {
   suspended: boolean;
   created_at: string;
   last_active_at: string | null;
+  terms_accepted_at?: string | null;
+  terms_version?: string | null;
   photo_url: string | null;
   profession: string | null;
   certificate_path: string | null;
@@ -3218,6 +3220,12 @@ export default function AdminPage() {
               <p className="text-[11px] text-zinc-400">
                 {t("joinedOn", { date: formatDate(detailAccount.created_at) })}
                 {detailAccount.last_active_at && ` · ${t("lastActiveOn", { date: formatDate(detailAccount.last_active_at) })}`}
+              </p>
+              {/* Migración 048: constancia de aceptación de Términos/Privacidad */}
+              <p className="text-[11px]">
+                {detailAccount.terms_accepted_at
+                  ? <span className="text-zinc-400">{t("termsAcceptedOn", { date: formatDate(detailAccount.terms_accepted_at), version: detailAccount.terms_version ?? "—" })}</span>
+                  : <span className="text-amber-600 font-semibold">{t("termsNotAccepted")}</span>}
               </p>
 
               {/* Editable fields */}
