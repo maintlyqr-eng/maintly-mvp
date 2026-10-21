@@ -25,7 +25,7 @@
 // cambio exige cargar crédito mínimo antes de poder usar la API. Mismo
 // patrón de siempre: sin la variable de entorno GEMINI_API_KEY configurada,
 // esto no rompe nada, simplemente nunca hay sugerencia de IA disponible.
-const MODEL = "gemini-3.8-flash"; // modelo estable de Google con nivel gratuito, alcanza de sobra para esto
+const MODEL = "gemini-3.5-flash-lite"; // modelo estable de Google con nivel gratuito, alcanza de sobra para esto
 
 // Incremento 29f (Facu, 31 jul 2026): "sigue sin encontrar la marca y
 // modelo" incluso ya con GEMINI_API_KEY configurada y el bug de
