@@ -23,6 +23,8 @@ import { logServerError } from "@/lib/errorLog";
 // (analizar una foto y devolver un posible VIN) sin escribir nada ni
 // exponer datos sensibles de la cuenta.
 const MODEL = "gemini-3.5-flash-lite";
+// Dos intentos de hasta 20 s + 25 s: la función necesita más que el default.
+export const maxDuration = 60;
 const MAX_IMAGE_BASE64_CHARS = 8_000_000; // ~6MB de imagen real -- de sobra para un frame de cámara, evita abuso
 
 const PROMPT = `You are looking at a photo taken by someone trying to scan a vehicle's VIN (Vehicle Identification Number) plate for a maintenance-tracking app.
@@ -60,8 +62,13 @@ export async function POST(req: NextRequest) {
   // a Gemini solo le corresponde la parte después de la coma.
   const base64Data = image.includes(",") ? image.slice(image.indexOf(",") + 1) : image;
 
-  try {
-    const res = await fetch(
+  // 21/10/2026 (Facu, escaneo desde la home que falló con "aborted due to
+  // timeout"): Google a veces tarda más de lo normal con el nivel gratuito.
+  // Se reintenta UNA vez ante timeout / 503 / 429 antes de rendirse: casi
+  // siempre el segundo intento entra. maxDuration (abajo) le da margen a
+  // la función de Vercel para los dos intentos.
+  async function callGemini(timeoutMs: number): Promise<Response> {
+    return fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${apiKey}`,
       {
         method: "POST",
@@ -80,9 +87,24 @@ export async function POST(req: NextRequest) {
           // texto vacío. Leer un VIN de una foto no necesita razonamiento.
           generationConfig: { maxOutputTokens: 300, thinkingConfig: { thinkingLevel: "minimal" } },
         }),
-        signal: AbortSignal.timeout(25000), // una foto tarda más que solo texto -- más margen que aiVinModel.ts (subido de 15s a 25s el 21/10/2026: 3.8-flash cortaba por timeout)
+        signal: AbortSignal.timeout(timeoutMs),
       }
     );
+  }
+
+  try {
+    let res: Response;
+    try {
+      res = await callGemini(20000);
+      if (res.status === 503 || res.status === 429) {
+        await new Promise((r) => setTimeout(r, 800));
+        res = await callGemini(25000);
+      }
+    } catch (firstErr) {
+      const msg = firstErr instanceof Error ? firstErr.message : String(firstErr);
+      if (!/timeout|abort/i.test(msg)) throw firstErr;
+      res = await callGemini(25000);
+    }
 
     if (!res.ok) {
       const bodyText = await res.text().catch(() => "");
