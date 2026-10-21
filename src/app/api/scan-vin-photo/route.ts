@@ -22,7 +22,7 @@ import { logServerError } from "@/lib/errorLog";
 // Deliberadamente sin auth, igual que decode-vin -- es un anexo de lectura
 // (analizar una foto y devolver un posible VIN) sin escribir nada ni
 // exponer datos sensibles de la cuenta.
-const MODEL = "gemini-2.5-flash";
+const MODEL = "gemini-3.8-flash";
 const MAX_IMAGE_BASE64_CHARS = 8_000_000; // ~6MB de imagen real -- de sobra para un frame de cámara, evita abuso
 
 const PROMPT = `You are looking at a photo taken by someone trying to scan a vehicle's VIN (Vehicle Identification Number) plate for a maintenance-tracking app.
