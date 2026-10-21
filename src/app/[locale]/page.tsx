@@ -22,6 +22,13 @@ export default function HomePage() {
   const tNav = useTranslations("Nav");
   const [loggedIn, setLoggedIn] = useState(false);
   const [userName, setUserName] = useState("");
+  // Facu (21/10/2026): "cuando actualizo y ya estoy logueado me pega un
+  // flash del botón Iniciar sesión y al toque lo convierte en el botón del
+  // usuario". El servidor no sabe quién sos (renderiza loggedIn=false) y el
+  // navegador se entera unos ms después. Hasta que Supabase responda por
+  // primera vez (evento INITIAL_SESSION), no se muestra NINGUNO de los dos
+  // botones sino un placeholder del mismo tamaño: sin parpadeo.
+  const [authReady, setAuthReady] = useState(false);
   const [qrCode, setQrCode] = useState("");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [stats, setStats] = useState<PublicStats | null>(null);
@@ -95,6 +102,7 @@ export default function HomePage() {
         setLoggedIn(false);
         setUserName("");
       }
+      setAuthReady(true);
 
       // Incremento 20: red de contención para el login con Google. Login y
       // Register ya tienen su propio listener que manda a /dashboard o
@@ -347,7 +355,9 @@ export default function HomePage() {
           >
             <MessageCircle size={13} /> <span className="hidden xl:inline">{tNav("contactUs")}</span>
           </button>
-          {loggedIn ? (
+          {!authReady ? (
+            <div aria-hidden="true" className="w-[118px] h-[34px] rounded-xl bg-zinc-100 animate-pulse" />
+          ) : loggedIn ? (
             <div className="flex items-center gap-2">
               <a href="/dashboard" className="flex items-center gap-2 bg-zinc-900 hover:bg-zinc-800 text-white font-black tracking-wide rounded-xl transition-all shadow-md px-4 py-2" style={{fontSize:'clamp(10px,0.75vw,12px)'}}>
                 <LayoutGrid size={13} /> {userName}
@@ -380,7 +390,9 @@ export default function HomePage() {
             y el <nav> vuelve a tener sus 3 elementos de siempre. */}
         <div className="md:hidden flex items-center gap-2">
           <div className="flex items-center">
-            {loggedIn ? (
+            {!authReady ? (
+              <div aria-hidden="true" className="w-[96px] h-[30px] rounded-lg bg-zinc-100 animate-pulse" />
+            ) : loggedIn ? (
               <a href="/dashboard" className="flex items-center gap-1.5 bg-zinc-900 hover:bg-zinc-800 text-white font-black tracking-wide rounded-lg transition-all shadow-md px-3 py-1.5 text-[11px]">
                 <LayoutGrid size={12} /> {userName}
               </a>
