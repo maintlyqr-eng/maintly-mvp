@@ -1555,7 +1555,8 @@
     "removeFromWorkshopTitle": "Quitar del Taller",
     "removeConfirm": "¿Quitar <b>{name}</b> de tu taller? Su historial de servicios y código QR se mantienen intactos — podés volver a vincularlo más tarde escaneando el QR de nuevo.",
     "removing": "Quitando...",
-    "remove": "Quitar"
+    "remove": "Quitar",
+    "vinScanTooltip": "Escanear VIN con la cámara"
   },
   "DashboardTeamChatPage": {
     "loadingAuth": "Cargando...",

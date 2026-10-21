@@ -1555,7 +1555,8 @@
     "removeFromWorkshopTitle": "Remove from Workshop",
     "removeConfirm": "Remove <b>{name}</b> from your workshop? Its service history and QR code stay intact — you can re-link it later by scanning the QR again.",
     "removing": "Removing...",
-    "remove": "Remove"
+    "remove": "Remove",
+    "vinScanTooltip": "Scan VIN with camera"
   },
   "DashboardTeamChatPage": {
     "loadingAuth": "Loading...",

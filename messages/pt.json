@@ -1555,7 +1555,8 @@
     "removeFromWorkshopTitle": "Remover da Oficina",
     "removeConfirm": "Remover <b>{name}</b> da sua oficina? O histórico de serviços e o código QR permanecem intactos — você pode vinculá-lo novamente mais tarde escaneando o QR de novo.",
     "removing": "Removendo...",
-    "remove": "Remover"
+    "remove": "Remover",
+    "vinScanTooltip": "Escanear VIN com a câmera"
   },
   "DashboardTeamChatPage": {
     "loadingAuth": "Carregando...",
