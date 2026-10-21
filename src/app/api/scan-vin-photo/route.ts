@@ -78,7 +78,7 @@ export async function POST(req: NextRequest) {
           // Mismo motivo que en aiVinModel.ts: sin esto, el modelo puede
           // gastar todo el presupuesto de tokens "pensando" y devolver
           // texto vacío. Leer un VIN de una foto no necesita razonamiento.
-          generationConfig: { maxOutputTokens: 150, thinkingConfig: { thinkingBudget: 0 } },
+          generationConfig: { maxOutputTokens: 300, thinkingConfig: { thinkingLevel: "minimal" } },
         }),
         signal: AbortSignal.timeout(25000), // una foto tarda más que solo texto -- más margen que aiVinModel.ts (subido de 15s a 25s el 21/10/2026: 3.8-flash cortaba por timeout)
       }

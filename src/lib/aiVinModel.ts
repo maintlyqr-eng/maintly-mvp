@@ -117,7 +117,7 @@ Respond with ONLY a JSON object, no other text, no markdown fences:
           // clave estuviera bien configurada. No hace falta "pensar" para
           // esta tarea (identificar un fabricante a partir de un patrón de
           // caracteres), así que se desactiva por completo.
-          generationConfig: { maxOutputTokens: 300, thinkingConfig: { thinkingBudget: 0 } },
+          generationConfig: { maxOutputTokens: 400, thinkingConfig: { thinkingLevel: "minimal" } },
         }),
         signal: AbortSignal.timeout(8000),
       }
