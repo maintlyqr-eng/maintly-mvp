@@ -2214,6 +2214,14 @@ export default function AdminPage() {
     setAdminsList((prev) => prev.map((a) => (a.id === id ? { ...a, ...patch } : a)));
   }
 
+  async function deleteAdmin(a: AdminUserRow) {
+    if (!confirm(t("adminDeleteConfirm", { user: a.username }))) return;
+    const res = await adminFetch("/api/admin/admins", "DELETE", { id: a.id });
+    if (!res.ok) { flash(res.error, "error"); return; }
+    setAdminsList((prev) => prev.filter((x) => x.id !== a.id));
+    flash(t("adminDeleted"));
+  }
+
   // Ficha del empleado (migración 056): nombre, tratamiento, contacto,
   // cumpleaños, notas. Devuelve true si se guardó.
   async function saveAdminProfile(id: string, profile: AdminProfilePatch): Promise<boolean> {
@@ -2738,6 +2746,7 @@ export default function AdminPage() {
     "admin_user.create": t("auditActionAdminUserCreate"),
     "admin_user.update": t("auditActionAdminUserUpdate"),
     "admin_user.reinvite": t("auditActionAdminUserReinvite"),
+    "admin_user.delete": t("auditActionAdminUserDelete"),
     "admin_user.accept_invite": t("auditActionAdminUserAcceptInvite"),
     "admin_note.create": t("auditActionAdminNoteCreate"),
     "marketing_account.reveal": t("auditActionMkReveal"),
@@ -3393,6 +3402,7 @@ export default function AdminPage() {
               creatingAdmin={creatingAdmin} createAdmin={createAdmin}
               adminsLoading={adminsLoading} adminsList={adminsList} updateAdmin={updateAdmin}
               saveAdminProfile={saveAdminProfile}
+              deleteAdmin={deleteAdmin} canDeleteAdmins={adminCapabilities.includes("critical_actions") && !viewAs}
               viewPanelAs={(a) => { setViewAs({ username: a.username, label: a.nickname || a.first_name || a.display_name || a.username, role: a.role }); setSection(landingSection(CLIENT_ROLE_CAPABILITIES[a.role])); }}
               lastInviteLink={lastInviteLink} clearInviteLink={() => setLastInviteLink(null)}
               reinviteAdmin={reinviteAdmin} viewAdminActivity={viewAdminActivity}

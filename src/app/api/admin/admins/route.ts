@@ -288,3 +288,37 @@ export async function PATCH(req: NextRequest) {
 
   return NextResponse.json({ ok: true, admin: data });
 }
+
+// DELETE { id }: eliminación definitiva (Facu, 21/10/2026: "como CEO no
+// puedo eliminar los roles que creé antes"). Solo Super Admin
+// (critical_actions), solo cuentas ya desactivadas, nunca uno mismo ni el
+// último Super Admin. El log de auditoría guarda el username en texto, así
+// que el historial de esa persona se conserva. Sus mensajes internos y
+// sesiones de trabajo también quedan (referencian el username).
+export async function DELETE(req: NextRequest) {
+  if (!adminHasCapability(req, "critical_actions")) {
+    return NextResponse.json({ error: "Not authorized." }, { status: 403 });
+  }
+  const body = await req.json().catch(() => ({}));
+  const id = typeof body.id === "string" ? body.id : "";
+  if (!id) return NextResponse.json({ error: "Missing id." }, { status: 400 });
+
+  const admin = getSupabaseAdmin();
+  const { data: target, error: fetchErr } = await admin.from("admin_users").select("id, username, role, active").eq("id", id).maybeSingle();
+  if (fetchErr) return NextResponse.json({ error: fetchErr.message }, { status: 500 });
+  if (!target) return NextResponse.json({ error: "Admin not found." }, { status: 404 });
+  if (isSelf(req, target.username)) return NextResponse.json({ error: "You can't delete your own account." }, { status: 400 });
+  if (target.active) return NextResponse.json({ error: "Deactivate the admin before deleting it." }, { status: 400 });
+
+  const { error: delErr } = await admin.from("admin_users").delete().eq("id", id);
+  if (delErr) return NextResponse.json({ error: delErr.message }, { status: 500 });
+
+  const me = getAdminUsername(req);
+  if (me) {
+    await logAdminAction({
+      adminUsername: me, action: "admin_user.delete", entityType: "admin_user", entityId: id,
+      oldValue: { username: target.username, role: target.role }, ipAddress: getRequestIp(req),
+    });
+  }
+  return NextResponse.json({ ok: true });
+}

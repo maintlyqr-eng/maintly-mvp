@@ -2294,7 +2294,12 @@
     "auditActionMkDelete": "Cuenta de red social borrada",
     "all": "Todos",
     "saved": "Guardado.",
-    "errorGeneric": "Algo salió mal."
+    "errorGeneric": "Algo salió mal.",
+    "adminDelete": "Eliminar",
+    "adminDeleteHint": "Eliminar definitivamente esta cuenta (primero hay que desactivarla).",
+    "adminDeleteConfirm": "¿Eliminar definitivamente la cuenta \"{user}\"? No se puede deshacer. Su historial en Logs de Auditoría se conserva.",
+    "adminDeleted": "Cuenta eliminada.",
+    "auditActionAdminUserDelete": "Admin eliminado"
   },
   "ReportIssueModal": {
     "title": "Reportar un problema",

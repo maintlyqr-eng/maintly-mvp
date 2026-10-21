@@ -2294,7 +2294,12 @@
     "auditActionMkDelete": "Social account deleted",
     "all": "All",
     "saved": "Saved.",
-    "errorGeneric": "Something went wrong."
+    "errorGeneric": "Something went wrong.",
+    "adminDelete": "Delete",
+    "adminDeleteHint": "Permanently delete this account (deactivate it first).",
+    "adminDeleteConfirm": "Permanently delete the account \"{user}\"? This can't be undone. Their Audit Log history is kept.",
+    "adminDeleted": "Account deleted.",
+    "auditActionAdminUserDelete": "Admin deleted"
   },
   "ReportIssueModal": {
     "title": "Report an issue",

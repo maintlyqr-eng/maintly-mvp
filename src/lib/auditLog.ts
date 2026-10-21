@@ -33,6 +33,7 @@ export type AdminAuditAction =
   | "report.update_status"
   | "admin_user.create"
   | "admin_user.reinvite"
+  | "admin_user.delete"
   | "admin_user.accept_invite"
   | "admin_note.create"
   | "marketing_account.reveal"

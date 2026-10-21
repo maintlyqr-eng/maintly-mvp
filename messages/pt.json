@@ -2294,7 +2294,12 @@
     "auditActionMkDelete": "Conta de rede social excluída",
     "all": "Todos",
     "saved": "Salvo.",
-    "errorGeneric": "Algo deu errado."
+    "errorGeneric": "Algo deu errado.",
+    "adminDelete": "Excluir",
+    "adminDeleteHint": "Excluir definitivamente esta conta (primeiro desative-a).",
+    "adminDeleteConfirm": "Excluir definitivamente a conta \"{user}\"? Não é possível desfazer. O histórico nos Logs de Auditoria é mantido.",
+    "adminDeleted": "Conta excluída.",
+    "auditActionAdminUserDelete": "Admin excluído"
   },
   "ReportIssueModal": {
     "title": "Reportar um problema",

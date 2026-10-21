@@ -13,7 +13,7 @@
 //     por persona en un período, con export CSV para liquidar tiempo.
 
 import { useState } from "react";
-import { UserCog, Copy, Check, MessageSquare, History, Link2, Download, Clock, X, Mail, Cake, IdCard, Eye } from "lucide-react";
+import { UserCog, Copy, Check, MessageSquare, History, Link2, Download, Clock, X, Mail, Cake, IdCard, Eye, Trash2 } from "lucide-react";
 import { formatDateDMY } from "@/lib/date";
 import PasswordInput from "@/components/PasswordInput";
 import { Pill, type AdminRole, type AdminUserRow, type AdminNoteRow, type TeamActivityRow, type AdminProfilePatch } from "../page";
@@ -46,6 +46,8 @@ type AdminsSectionProps = {
   updateAdmin: (id: string, patch: { role?: AdminRole; active?: boolean }) => void | Promise<void>;
   saveAdminProfile: (id: string, profile: AdminProfilePatch) => Promise<boolean>;
   viewPanelAs: (a: AdminUserRow) => void;
+  deleteAdmin: (a: AdminUserRow) => void | Promise<void>;
+  canDeleteAdmins: boolean;
 
   lastInviteLink: { username: string; link: string; emailSent?: string | null } | null;
   clearInviteLink: () => void;
@@ -93,7 +95,7 @@ export default function AdminsSection({
   newAdminFirstName, setNewAdminFirstName, newAdminLastName, setNewAdminLastName, newAdminNickname, setNewAdminNickname,
   newAdminSalutation, setNewAdminSalutation,
   newAdminRole, setNewAdminRole, creatingAdmin, createAdmin,
-  adminsLoading, adminsList, updateAdmin, saveAdminProfile, viewPanelAs,
+  adminsLoading, adminsList, updateAdmin, saveAdminProfile, viewPanelAs, deleteAdmin, canDeleteAdmins,
   lastInviteLink, clearInviteLink, reinviteAdmin, viewAdminActivity,
   notesForAdmin, openNotesFor, closeNotes, sendNote,
   teamActivity, teamActivityLoading, teamActivityRange, setTeamActivityRange,
@@ -355,6 +357,11 @@ export default function AdminsSection({
                             >
                               {a.active ? t("deactivate") : t("reactivate")}
                             </button>
+                            {!a.active && canDeleteAdmins && (
+                              <button onClick={() => deleteAdmin(a)} title={t("adminDeleteHint")} className="text-[11px] font-bold px-2.5 py-1.5 rounded-lg bg-red-600 text-white hover:bg-red-700 flex items-center gap-1">
+                                <Trash2 size={12} /> {t("adminDelete")}
+                              </button>
+                            )}
                           </div>
                         </td>
                       </tr>
