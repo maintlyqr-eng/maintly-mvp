@@ -92,18 +92,34 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  // Se anota cómo fue cada intento para que, si falla, el registro en
+  // Admin → Errores diga algo útil (cuánto tardó, qué devolvió).
+  const attempts: string[] = [];
+  const t0 = Date.now();
+  async function tryGemini(timeoutMs: number): Promise<Response> {
+    const started = Date.now();
+    try {
+      const r = await callGemini(timeoutMs);
+      attempts.push(`HTTP ${r.status} en ${Date.now() - started} ms`);
+      return r;
+    } catch (e) {
+      attempts.push(`${e instanceof Error ? e.message : String(e)} tras ${Date.now() - started} ms (límite ${timeoutMs} ms)`);
+      throw e;
+    }
+  }
+
   try {
     let res: Response;
     try {
-      res = await callGemini(20000);
+      res = await tryGemini(25000);
       if (res.status === 503 || res.status === 429) {
         await new Promise((r) => setTimeout(r, 800));
-        res = await callGemini(25000);
+        res = await tryGemini(30000);
       }
     } catch (firstErr) {
       const msg = firstErr instanceof Error ? firstErr.message : String(firstErr);
       if (!/timeout|abort/i.test(msg)) throw firstErr;
-      res = await callGemini(25000);
+      res = await tryGemini(30000);
     }
 
     if (!res.ok) {
@@ -112,7 +128,7 @@ export async function POST(req: NextRequest) {
         source: "server",
         severity: "warning",
         message: `[scan-vin-photo] Gemini respondió ${res.status}`,
-        stack: bodyText.slice(0, 500),
+        stack: `${bodyText.slice(0, 400)} | intentos: ${attempts.join(" / ")}`,
         route: "/api/scan-vin-photo",
       });
       return NextResponse.json({ found: false });
@@ -146,7 +162,7 @@ export async function POST(req: NextRequest) {
       source: "server",
       severity: "warning",
       message: "[scan-vin-photo] Excepción al llamar a Gemini",
-      stack: err instanceof Error ? err.message : String(err),
+      stack: `${err instanceof Error ? err.message : String(err)} | intentos: ${attempts.join(" / ")} | total ${Date.now() - t0} ms | imagen ${Math.round(base64Data.length / 1024)} KB`,
       route: "/api/scan-vin-photo",
     });
     return NextResponse.json({ found: false });

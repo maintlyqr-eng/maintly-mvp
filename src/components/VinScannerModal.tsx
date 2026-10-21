@@ -75,6 +75,17 @@ export default function VinScannerModal({
   // resto del auto) ayuda en vez de estorbar. Se reescala a un ancho
   // manejable antes de convertir a JPEG: ni hace falta la resolución nativa
   // para que Gemini lea el texto, y una imagen más chica viaja más rápido.
+  // Recorta la franja que la persona ve enmarcada en pantalla (el rectángulo
+  // de 86% x 22% centrado, ver el overlay más abajo) con un margen, en vez
+  // de mandar el cuadro completo. 21/10/2026 (Facu: timeouts repetidos de
+  // Gemini): ~5 veces menos píxeles = respuesta más rápida y lectura más
+  // limpia, porque el modelo no tiene que buscar el VIN entre el resto de
+  // la escena. El <video> usa object-cover, así que primero se calcula qué
+  // parte del cuadro real está visible en el contenedor.
+  const GUIDE_W = 0.86;
+  const GUIDE_H = 0.22;
+  const GUIDE_MARGIN = 0.35; // 35% extra alrededor por si el VIN quedó un poco afuera del marco
+
   function captureFrameAsJpeg(): string | null {
     const video = videoRef.current;
     const canvas = canvasRef.current;
@@ -84,13 +95,30 @@ export default function VinScannerModal({
     const vh = video.videoHeight;
     if (!vw || !vh) return null;
 
+    // Región visible del video dentro del contenedor (object-cover).
+    const cw = video.clientWidth || vw;
+    const ch = video.clientHeight || vh;
+    const scaleCover = Math.max(cw / vw, ch / vh);
+    const visW = cw / scaleCover;
+    const visH = ch / scaleCover;
+    const visX = (vw - visW) / 2;
+    const visY = (vh - visH) / 2;
+
+    // Rectángulo guía (centrado) con margen, en píxeles del video.
+    let gw = visW * GUIDE_W * (1 + GUIDE_MARGIN);
+    let gh = visH * GUIDE_H * (1 + 2 * GUIDE_MARGIN);
+    let gx = visX + (visW - gw) / 2;
+    let gy = visY + (visH - gh) / 2;
+    gx = Math.max(0, gx); gy = Math.max(0, gy);
+    gw = Math.min(gw, vw - gx); gh = Math.min(gh, vh - gy);
+
     const MAX_WIDTH = 1024;
-    const scale = vw > MAX_WIDTH ? MAX_WIDTH / vw : 1;
-    canvas.width = Math.round(vw * scale);
-    canvas.height = Math.round(vh * scale);
+    const scale = gw > MAX_WIDTH ? MAX_WIDTH / gw : 1;
+    canvas.width = Math.round(gw * scale);
+    canvas.height = Math.round(gh * scale);
     const ctx = canvas.getContext("2d");
     if (!ctx) return null;
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    ctx.drawImage(video, gx, gy, gw, gh, 0, 0, canvas.width, canvas.height);
     return canvas.toDataURL("image/jpeg", 0.82);
   }
 
