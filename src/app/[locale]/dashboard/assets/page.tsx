@@ -12,6 +12,8 @@ import {
   Share2, ChevronLeft, ChevronRight, ScanLine,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { suggestMakes, suggestModels, canonicalMake } from "@/lib/vehicleCatalog";
+import SuggestInput from "@/components/SuggestInput";
 import { useUnreadMessagesCount } from "@/lib/useUnreadMessages";
 import { useUnreadMechanicMessages } from "@/lib/useUnreadMechanicMessages";
 import CustomerPickerIntl, { CustomerOption } from "@/components/CustomerPickerIntl";
@@ -597,7 +599,7 @@ export default function AssetsPage() {
     const { error } = await supabase
       .from("assets")
       .update({
-        brand: editBrand.trim() || null,
+        brand: canonicalMake(editingAsset.asset_type, editBrand.trim()) || null,
         model: editModel.trim() || null,
         nickname: editNickname.trim() || null,
         // Mismo formato que graba el alta y que espera findAssetByVin.
@@ -1205,11 +1207,11 @@ export default function AssetsPage() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
                 <div>
                   <label className="text-[12px] font-bold text-zinc-700">{t("brand")}</label>
-                  <input type="text" value={editBrand} onChange={(e) => setEditBrand(e.target.value)} placeholder={t("brandPlaceholder")} className="w-full mt-1 rounded-xl border border-zinc-200 px-3 py-[10px] text-[13px] outline-none focus:border-red-500" />
+                  <SuggestInput value={editBrand} onChange={setEditBrand} suggestions={suggestMakes(editingAsset.asset_type, editBrand)} placeholder={t("brandPlaceholder")} className="w-full mt-1 rounded-xl border border-zinc-200 px-3 py-[10px] text-[13px] outline-none focus:border-red-500" />
                 </div>
                 <div>
                   <label className="text-[12px] font-bold text-zinc-700">{t("model")}</label>
-                  <input type="text" value={editModel} onChange={(e) => setEditModel(e.target.value)} placeholder={t("modelPlaceholder")} className="w-full mt-1 rounded-xl border border-zinc-200 px-3 py-[10px] text-[13px] outline-none focus:border-red-500" />
+                  <SuggestInput value={editModel} onChange={setEditModel} suggestions={suggestModels(editingAsset.asset_type, editBrand, editModel)} openOnFocus placeholder={t("modelPlaceholder")} className="w-full mt-1 rounded-xl border border-zinc-200 px-3 py-[10px] text-[13px] outline-none focus:border-red-500" />
                 </div>
               </div>
 

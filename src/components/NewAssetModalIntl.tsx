@@ -8,6 +8,8 @@ import { authedFetch } from "@/lib/apiAuth";
 import { validateImageFile } from "@/lib/imageValidation";
 import { uploadAssetPhoto, genAssetQrCode } from "@/lib/uploadAssetPhoto";
 import { assetTypeOptions, fuelTypeOptions } from "@/lib/assetTypes";
+import { suggestMakes, suggestModels, canonicalMake } from "@/lib/vehicleCatalog";
+import SuggestInput from "@/components/SuggestInput";
 import CustomerPickerIntl, { CustomerOption } from "@/components/CustomerPickerIntl";
 import VinScannerModal from "@/components/VinScannerModal";
 import { VIN_ELIGIBLE_ASSET_TYPES, isVinFormatValid, normalizeVin } from "@/lib/vinValidation";
@@ -269,7 +271,7 @@ export default function NewAssetModalIntl({
       .insert({
         created_by: mechanicId,
         asset_type: assetType,
-        brand: brand.trim(),
+        brand: canonicalMake(assetType, brand.trim()),
         model: model.trim(),
         nickname: nickname.trim() || null,
         // Para automotive/motorcycle se guarda normalizado (mayúsculas, sin
@@ -363,11 +365,11 @@ export default function NewAssetModalIntl({
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
             <div>
               <label className="text-[12px] font-bold text-zinc-700">{t("brandLabel")}</label>
-              <input
-                type="text"
+              <SuggestInput
                 required
                 value={brand}
-                onChange={(e) => { setBrand(e.target.value); setAiSuggestedMake(null); }}
+                onChange={(v) => { setBrand(v); setAiSuggestedMake(null); }}
+                suggestions={suggestMakes(assetType, brand)}
                 placeholder={t("brandPlaceholder")}
                 className="w-full mt-1 rounded-xl border border-zinc-200 px-3 py-[10px] text-[13px] outline-none focus:border-red-500"
               />
@@ -386,11 +388,12 @@ export default function NewAssetModalIntl({
             </div>
             <div>
               <label className="text-[12px] font-bold text-zinc-700">{t("modelLabel")}</label>
-              <input
-                type="text"
+              <SuggestInput
                 required
                 value={model}
-                onChange={(e) => { setModel(e.target.value); setAiSuggestedModel(null); }}
+                onChange={(v) => { setModel(v); setAiSuggestedModel(null); }}
+                suggestions={suggestModels(assetType, brand, model)}
+                openOnFocus
                 placeholder={t("modelPlaceholder")}
                 className="w-full mt-1 rounded-xl border border-zinc-200 px-3 py-[10px] text-[13px] outline-none focus:border-red-500"
               />
