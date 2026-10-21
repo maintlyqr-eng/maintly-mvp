@@ -53,7 +53,7 @@ export async function GET(req: NextRequest) {
     // soft-deleted rows (see migration 031) — those show up in the Papelera
     // section instead (/api/admin/trash), not in the regular admin lists.
     admin.from("mechanics")
-      .select("id, name, email, workshop_name, is_mechanic, verified, suspended, created_at, last_active_at, photo_url, profession, certificate_path, verification_status, verification_requested_at, verification_reviewed_at, verification_note, terms_accepted_at, terms_version")
+      .select("id, name, email, workshop_name, is_mechanic, verified, suspended, created_at, last_active_at, photo_url, profession, certificate_path, verification_status, verification_requested_at, verification_reviewed_at, verification_note, terms_accepted_at, terms_version, signup_country, signup_region, signup_city, last_seen_country, last_seen_region, last_seen_city, last_seen_at")
       .is("deleted_at", null)
       .order("created_at", { ascending: false })
       .limit(MECHANICS_CAP),

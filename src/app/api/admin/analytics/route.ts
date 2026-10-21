@@ -219,8 +219,39 @@ export async function GET(req: NextRequest) {
     .sort((a, b) => b[1] - a[1])
     .map(([profession, count]) => ({ profession, count }));
 
+  // Migración 060 (Facu: "a dónde Maintly empieza a tener peso"): conteos
+  // por país y por ciudad de Maintlers (lugar de registro), activos (lugar
+  // de creación) y escaneos de QR. Tres lecturas chicas aparte del
+  // Promise.all de arriba para no tocar su orden de destructuring.
+  const [geoMechRes, geoAssetRes, geoScanRes] = await Promise.all([
+    admin.from("mechanics").select("signup_country, signup_region, signup_city").is("deleted_at", null).not("signup_country", "is", null).limit(20000),
+    admin.from("assets").select("created_country, created_region, created_city").is("deleted_at", null).not("created_country", "is", null).limit(20000),
+    admin.from("qr_scans").select("country, region, city").not("country", "is", null).gte("scanned_at", from).lte("scanned_at", to).limit(50000),
+  ]);
+  type GeoRow = { country: string | null; region: string | null; city: string | null };
+  function tally(rows: GeoRow[]) {
+    const byCountry = new Map<string, number>();
+    const byCity = new Map<string, number>();
+    for (const r of rows) {
+      if (!r.country) continue;
+      byCountry.set(r.country, (byCountry.get(r.country) ?? 0) + 1);
+      const cityKey = `${r.city ?? "?"}|${r.region ?? ""}|${r.country}`;
+      byCity.set(cityKey, (byCity.get(cityKey) ?? 0) + 1);
+    }
+    return {
+      byCountry: Array.from(byCountry.entries()).map(([country, count]) => ({ country, count })).sort((a, b) => b.count - a.count).slice(0, 30),
+      byCity: Array.from(byCity.entries()).map(([k, count]) => { const [city, region, country] = k.split("|"); return { city, region, country, count }; }).sort((a, b) => b.count - a.count).slice(0, 30),
+    };
+  }
+  const geo = {
+    mechanics: tally(((geoMechRes.data ?? []) as { signup_country: string | null; signup_region: string | null; signup_city: string | null }[]).map((r) => ({ country: r.signup_country, region: r.signup_region, city: r.signup_city }))),
+    assets: tally(((geoAssetRes.data ?? []) as { created_country: string | null; created_region: string | null; created_city: string | null }[]).map((r) => ({ country: r.created_country, region: r.created_region, city: r.created_city }))),
+    scans: tally((geoScanRes.data ?? []) as GeoRow[]),
+  };
+
   return NextResponse.json({
     range: { from, to },
+    geo,
     activeToday: activeTodayRes.count ?? 0,
     activeThisWeek: activeWeekRes.count ?? 0,
     activeThisMonth: activeMonthRes.count ?? 0,

@@ -12,6 +12,7 @@ import {
   AlertCircle, ArrowRight, CalendarClock, Lightbulb, TrendingUp, Heart,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { authedFetch } from "@/lib/apiAuth";
 import { useUnreadMessagesCount } from "@/lib/useUnreadMessages";
 import { useUnreadMechanicMessages } from "@/lib/useUnreadMechanicMessages";
 import { formatDateDMY } from "@/lib/date";
@@ -203,6 +204,9 @@ function DashboardPageInner() {
 
       setMechanicId(session.user.id);
       setMechanicEmail(session.user.email ?? "");
+      // Migración 060: última ubicación desde la que entró (por IP). Si es
+      // una cuenta vieja sin ubicación de registro, también la fija.
+      authedFetch("/api/geo-stamp", { method: "POST", body: JSON.stringify({ kind: "signup" }) }).catch(() => {});
 
       // These 7 queries are all independent (none depends on another's
       // result), so they're fired concurrently instead of one after another

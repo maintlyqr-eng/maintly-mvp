@@ -2299,7 +2299,17 @@
     "adminDeleteHint": "Permanently delete this account (deactivate it first).",
     "adminDeleteConfirm": "Permanently delete the account \"{user}\"? This can't be undone. Their Audit Log history is kept.",
     "adminDeleted": "Account deleted.",
-    "auditActionAdminUserDelete": "Admin deleted"
+    "auditActionAdminUserDelete": "Admin deleted",
+    "analyticsGeoTitle": "Where Maintly is growing",
+    "analyticsGeoNote": "Approximate country and city by IP (no GPS). Maintlers: where they signed up. Assets: where they were created. Scans: where the QR was read, in the selected range. Accounts and assets from before 21/10/2026 have no location; old Maintlers get one the next time they sign in.",
+    "analyticsGeoMechanics": "Maintlers",
+    "analyticsGeoAssets": "Assets",
+    "analyticsGeoScans": "Scans",
+    "analyticsGeoEmpty": "No data yet.",
+    "analyticsGeoUnknownCity": "unknown city",
+    "geoUnknown": "Location: no data yet (recorded the next time they sign in).",
+    "geoSignup": "Signed up from {place}",
+    "geoLastSeen": "last seen from {place} ({date})"
   },
   "ReportIssueModal": {
     "title": "Report an issue",

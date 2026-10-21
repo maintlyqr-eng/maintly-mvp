@@ -9,6 +9,7 @@ import { useTranslations, useLocale } from "next-intl";
 import { motion, AnimatePresence } from "framer-motion";
 import { Mail, Lock, Eye, EyeOff, User, Wrench, AlertCircle } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { authedFetch } from "@/lib/apiAuth";
 
 // 27 jul 2026 — pantalla hermana del Login (mismo sistema visual
 // "industrial" oscuro, ver el comment de globals.css y de login/page.tsx).
@@ -72,6 +73,9 @@ export default function RegisterPage() {
       // que el mail de bienvenida se dispara acá. El servidor solo manda si la
       // cuenta tiene menos de 15 min y no lo recibió todavía, así que es
       // seguro llamarlo siempre que falte. Fire-and-forget.
+      // Migración 060: desde dónde se registró (país/ciudad por IP). Solo
+      // se guarda la primera vez; fire-and-forget.
+      authedFetch("/api/geo-stamp", { method: "POST", body: JSON.stringify({ kind: "signup" }) }).catch(() => {});
       if (m && !m.welcome_email_sent_at && session.user.email) {
         fetch("/api/send-welcome-email", {
           method: "POST",

@@ -2299,7 +2299,17 @@
     "adminDeleteHint": "Excluir definitivamente esta conta (primeiro desative-a).",
     "adminDeleteConfirm": "Excluir definitivamente a conta \"{user}\"? Não é possível desfazer. O histórico nos Logs de Auditoria é mantido.",
     "adminDeleted": "Conta excluída.",
-    "auditActionAdminUserDelete": "Admin excluído"
+    "auditActionAdminUserDelete": "Admin excluído",
+    "analyticsGeoTitle": "Onde o Maintly está crescendo",
+    "analyticsGeoNote": "País e cidade aproximados por IP (sem GPS). Maintlers: onde se cadastraram. Ativos: onde foram criados. Leituras: onde o QR foi lido, no período escolhido. Contas e ativos anteriores a 21/10/2026 não têm localização; Maintlers antigos ganham uma na próxima entrada.",
+    "analyticsGeoMechanics": "Maintlers",
+    "analyticsGeoAssets": "Ativos",
+    "analyticsGeoScans": "Leituras",
+    "analyticsGeoEmpty": "Ainda sem dados.",
+    "analyticsGeoUnknownCity": "cidade desconhecida",
+    "geoUnknown": "Localização: ainda sem dados (registrada na próxima entrada).",
+    "geoSignup": "Cadastrou-se de {place}",
+    "geoLastSeen": "última vez de {place} ({date})"
   },
   "ReportIssueModal": {
     "title": "Reportar um problema",

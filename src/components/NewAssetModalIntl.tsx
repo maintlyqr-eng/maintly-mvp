@@ -5,6 +5,7 @@ import { X, Camera, ScanLine, AlertTriangle } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { supabase } from "@/lib/supabase";
 import { authedFetch } from "@/lib/apiAuth";
+import { getGeo } from "@/lib/geoClient";
 import { validateImageFile } from "@/lib/imageValidation";
 import { uploadAssetPhoto, genAssetQrCode } from "@/lib/uploadAssetPhoto";
 import { assetTypeOptions, fuelTypeOptions } from "@/lib/assetTypes";
@@ -275,10 +276,13 @@ export default function NewAssetModalIntl({
 
     setSaving(true);
 
+    // Migración 060: desde dónde se creó (país/ciudad por IP, best-effort).
+    const geo = await getGeo();
     const { data: newAsset, error: assetError } = await supabase
       .from("assets")
       .insert({
         created_by: mechanicId,
+        created_country: geo.country, created_region: geo.region, created_city: geo.city,
         asset_type: assetType,
         brand: canonicalMake(assetType, brand.trim(), learned),
         model: model.trim(),

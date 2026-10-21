@@ -5,8 +5,7 @@
 // cual, estado y lógica se quedan en page.tsx).
 
 import {
-  Users, Box, QrCode, TrendingUp, MapPin, Calendar, ClipboardList, ScanLine, Wrench,
-} from "lucide-react";
+  Users, Box, QrCode, TrendingUp, MapPin, Calendar, ClipboardList, ScanLine, Wrench, Globe2 } from "lucide-react";
 import {
   StatCard, SectionTitle, ASSET_ICONS, PROFESSION_KEYS, INACTIVE_DAYS_THRESHOLD,
   type AnalyticsData,
@@ -25,6 +24,12 @@ type AnalyticsSectionProps = {
 
   assetLabel: (a: { nickname: string | null; brand: string | null; model: string | null }) => string;
 };
+
+// Código de país (2 letras) → bandera emoji.
+function countryFlag(code: string): string {
+  if (!/^[A-Z]{2}$/i.test(code)) return "";
+  return String.fromCodePoint(...code.toUpperCase().split("").map((c) => 0x1f1e6 + c.charCodeAt(0) - 65));
+}
 
 export default function AnalyticsSection({
   t, tProfessionTypes,
@@ -182,6 +187,46 @@ export default function AnalyticsSection({
               )}
             </div>
           </div>
+
+          {analyticsData.geo && (
+            <div className="bg-white rounded-2xl border border-zinc-200/80 p-6 shadow-sm">
+              <div className="flex items-center gap-2 mb-1">
+                <Globe2 size={14} className="text-zinc-400" />
+                <SectionTitle>{t("analyticsGeoTitle")}</SectionTitle>
+              </div>
+              <p className="text-[10.5px] text-zinc-300 mb-4">{t("analyticsGeoNote")}</p>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {([["mechanics", t("analyticsGeoMechanics")], ["assets", t("analyticsGeoAssets")], ["scans", t("analyticsGeoScans")]] as const).map(([key, label]) => {
+                  const tally = analyticsData.geo![key];
+                  const max = tally.byCountry[0]?.count ?? 0;
+                  return (
+                    <div key={key}>
+                      <p className="text-[11px] font-bold text-zinc-500 uppercase tracking-widest mb-2">{label}</p>
+                      {tally.byCountry.length === 0 ? <p className="text-[12px] text-zinc-300">{t("analyticsGeoEmpty")}</p> : (
+                        <div className="space-y-2">
+                          {tally.byCountry.slice(0, 8).map((c) => (
+                            <div key={c.country} className="flex items-center gap-2">
+                              <span className="text-[12px] font-semibold text-zinc-700 w-10 shrink-0">{countryFlag(c.country)} {c.country}</span>
+                              <div className="flex-1 h-1.5 bg-zinc-100 rounded-full overflow-hidden"><div className="h-full bg-red-500 rounded-full" style={{ width: `${Math.round((c.count / max) * 100)}%` }} /></div>
+                              <span className="text-[11px] font-black text-zinc-900 w-8 text-right shrink-0">{c.count}</span>
+                            </div>
+                          ))}
+                          <div className="pt-2 mt-2 border-t border-zinc-100 space-y-1">
+                            {tally.byCity.slice(0, 6).map((c) => (
+                              <div key={`${c.city}|${c.region}|${c.country}`} className="flex items-center justify-between gap-2 text-[11px]">
+                                <span className="text-zinc-600 truncate">{c.city === "?" ? t("analyticsGeoUnknownCity") : c.city}{c.region ? `, ${c.region}` : ""} <span className="text-zinc-300">({c.country})</span></span>
+                                <span className="font-bold text-zinc-800 shrink-0">{c.count}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           <div className="bg-white rounded-2xl border border-zinc-200/80 p-6 shadow-sm">
             <div className="flex items-center gap-2 mb-1">

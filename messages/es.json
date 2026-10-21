@@ -2299,7 +2299,17 @@
     "adminDeleteHint": "Eliminar definitivamente esta cuenta (primero hay que desactivarla).",
     "adminDeleteConfirm": "¿Eliminar definitivamente la cuenta \"{user}\"? No se puede deshacer. Su historial en Logs de Auditoría se conserva.",
     "adminDeleted": "Cuenta eliminada.",
-    "auditActionAdminUserDelete": "Admin eliminado"
+    "auditActionAdminUserDelete": "Admin eliminado",
+    "analyticsGeoTitle": "Dónde pesa Maintly",
+    "analyticsGeoNote": "País y ciudad aproximados por IP (sin GPS). Maintlers: dónde se registraron. Activos: dónde se crearon. Escaneos: dónde se leyó el QR, en el período elegido. Las cuentas y activos anteriores al 21/10/2026 no tienen ubicación; los Maintlers viejos la ganan la próxima vez que entran.",
+    "analyticsGeoMechanics": "Maintlers",
+    "analyticsGeoAssets": "Activos",
+    "analyticsGeoScans": "Escaneos",
+    "analyticsGeoEmpty": "Todavía sin datos.",
+    "analyticsGeoUnknownCity": "ciudad desconocida",
+    "geoUnknown": "Ubicación: sin datos todavía (se registra la próxima vez que entre).",
+    "geoSignup": "Se registró desde {place}",
+    "geoLastSeen": "última vez desde {place} ({date})"
   },
   "ReportIssueModal": {
     "title": "Reportar un problema",

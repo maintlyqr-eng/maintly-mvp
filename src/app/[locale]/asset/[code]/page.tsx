@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
+import { getGeo } from "@/lib/geoClient";
 // /login and /register are both migrated now (rollout page #5/#6), and
 // every router.push() call on this page targets one of those two — so
 // this can safely use next-intl's locale-aware router instead of
@@ -199,7 +200,7 @@ export default function AssetPublicPage() {
       if (!qrRow.asset_id) {
         // Valid code, part of the MaintlyQR World, just not assigned yet.
         setIsBlank(true);
-        supabase.from("qr_scans").insert({ code, asset_id: null }).then(({ error }) => {
+        getGeo().then((geo) => supabase.from("qr_scans").insert({ code, asset_id: null, country: geo.country, region: geo.region, city: geo.city })).then(({ error }) => {
           if (error) console.error("qr_scans insert failed", error);
         });
         setLoading(false);
@@ -215,7 +216,8 @@ export default function AssetPublicPage() {
       setAsset(assetData as AssetData);
 
       // Log the scan for the admin Dashboard (fire-and-forget, never blocks the page).
-      supabase.from("qr_scans").insert({ code, asset_id: qrRow.asset_id }).then(({ error }) => {
+      // Migración 060: país/ciudad del escaneo (por IP, best-effort).
+      getGeo().then((geo) => supabase.from("qr_scans").insert({ code, asset_id: qrRow.asset_id, country: geo.country, region: geo.region, city: geo.city })).then(({ error }) => {
         if (error) console.error("qr_scans insert failed", error);
       });
 

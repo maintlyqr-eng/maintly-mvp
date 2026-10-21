@@ -68,6 +68,13 @@ export type AccountRow = {
   last_active_at: string | null;
   terms_accepted_at?: string | null;
   terms_version?: string | null;
+  signup_country?: string | null;
+  signup_region?: string | null;
+  signup_city?: string | null;
+  last_seen_country?: string | null;
+  last_seen_region?: string | null;
+  last_seen_city?: string | null;
+  last_seen_at?: string | null;
   photo_url: string | null;
   profession: string | null;
   certificate_path: string | null;
@@ -543,6 +550,14 @@ export type AnalyticsData = {
   totalMaintlers: number;
   professionBreakdown: { profession: string; count: number }[];
   noProfessionCount: number;
+  // Migración 060: dónde pesa Maintly (por IP).
+  geo?: {
+    mechanics: GeoTally; assets: GeoTally; scans: GeoTally;
+  };
+};
+export type GeoTally = {
+  byCountry: { country: string; count: number }[];
+  byCity: { city: string; region: string; country: string; count: number }[];
 };
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -3513,6 +3528,17 @@ export default function AdminPage() {
                 {detailAccount.terms_accepted_at
                   ? <span className="text-zinc-400">{t("termsAcceptedOn", { date: formatDate(detailAccount.terms_accepted_at), version: detailAccount.terms_version ?? "—" })}</span>
                   : <span className="text-amber-600 font-semibold">{t("termsNotAccepted")}</span>}
+              </p>
+              {/* Migración 060: desde dónde se registró / entró por última vez (IP) */}
+              <p className="text-[11px] text-zinc-400 flex items-center gap-1.5">
+                <MapPin size={11} />
+                {(() => {
+                  const fmt = (c?: string | null, r?: string | null, co?: string | null) => [c, r, co].filter(Boolean).join(", ");
+                  const signup = fmt(detailAccount.signup_city, detailAccount.signup_region, detailAccount.signup_country);
+                  const seen = fmt(detailAccount.last_seen_city, detailAccount.last_seen_region, detailAccount.last_seen_country);
+                  if (!signup && !seen) return <span>{t("geoUnknown")}</span>;
+                  return <span>{signup ? t("geoSignup", { place: signup }) : ""}{signup && seen ? " · " : ""}{seen ? t("geoLastSeen", { place: seen, date: detailAccount.last_seen_at ? formatDate(detailAccount.last_seen_at) : "" }) : ""}</span>;
+                })()}
               </p>
 
               {/* Editable fields */}
