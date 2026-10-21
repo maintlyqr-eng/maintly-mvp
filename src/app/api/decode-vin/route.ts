@@ -81,8 +81,12 @@ export async function GET(req: NextRequest) {
   // tener cualquier cosa ahí, y tanto NHTSA como la tabla offline lo
   // interpretan igual como año y se equivocan. Para esos VIN no se
   // devuelve año: queda para que lo cargue la persona.
+  // Igual se devuelve como `yearHint` ("posible año") para mostrarlo
+  // como sugerencia con botón "Usar", nunca rellenado solo.
   const yearReliable = /^[1-5]/.test(vin);
-  const year = yearReliable ? (nhtsaYear || offlineYear) : null;
+  const yearFromVin = nhtsaYear || offlineYear;
+  const year = yearReliable ? yearFromVin : null;
+  const yearHint = yearReliable ? null : yearFromVin;
   const model = nhtsaModel; // sin fuente offline posible, ver comentario de arriba
 
   // Incremento 29c (Facu, 31 jul 2026): "sumar una IA como respaldo para
@@ -104,7 +108,7 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  if (!make && !model && !year && !aiSuggestedMake && !aiSuggestedModel) {
+  if (!make && !model && !year && !yearHint && !aiSuggestedMake && !aiSuggestedModel) {
     return NextResponse.json({ found: false });
   }
 
@@ -113,6 +117,7 @@ export async function GET(req: NextRequest) {
     make,
     model,
     year,
+    yearHint,
     fuelType: fuelTypePrimary,
     aiSuggestedMake,
     aiSuggestedModel,

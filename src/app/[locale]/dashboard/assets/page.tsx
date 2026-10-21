@@ -264,6 +264,7 @@ export default function AssetsPage() {
   const [showMergeModal, setShowMergeModal] = useState(false);
   const editVinTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [editYear, setEditYear] = useState("");
+  const [editYearHint, setEditYearHint] = useState<number | null>(null);
   const [editPlate, setEditPlate] = useState("");
   const [editFuelType, setEditFuelType] = useState("");
   const [editLocation, setEditLocation] = useState("");
@@ -505,6 +506,8 @@ export default function AssetsPage() {
           if (!editModel.trim() && dModel) { setEditModel(dModel); filled = true; }
           if (!editYear.trim() && dYear) { setEditYear(String(dYear)); filled = true; }
           if (filled) setEditVinAutoFilled(true);
+          // Año "posible" (VIN no norteamericano): sugerencia con "Usar", no relleno.
+          setEditYearHint(!dYear && json.yearHint && !editYear.trim() ? Number(json.yearHint) : null);
 
           // Campos cargados que NO coinciden con lo decodificado: sugerencia.
           const norm = (v: string | null | undefined) => (v ?? "").trim().toLowerCase();
@@ -1248,7 +1251,19 @@ export default function AssetsPage() {
                 </div>
                 <div>
                   <label className="text-[12px] font-bold text-zinc-700">{t("year")}</label>
-                  <input type="number" max={new Date().getFullYear()} value={editYear} onChange={(e) => setEditYear(e.target.value)} placeholder={t("yearPlaceholder")} className="w-full mt-1 rounded-xl border border-zinc-200 px-3 py-[10px] text-[13px] outline-none focus:border-red-500" />
+                  <input type="number" max={new Date().getFullYear()} value={editYear} onChange={(e) => { setEditYear(e.target.value); setEditYearHint(null); }} placeholder={t("yearPlaceholder")} className="w-full mt-1 rounded-xl border border-zinc-200 px-3 py-[10px] text-[13px] outline-none focus:border-red-500" />
+                  {editYearHint && !editYear.trim() && (
+                    <button
+                      type="button"
+                      onClick={() => { setEditYear(String(editYearHint)); setEditYearHint(null); }}
+                      className="mt-1.5 w-full text-left flex items-center justify-between gap-2 bg-violet-50 border border-violet-200 rounded-lg px-2.5 py-1.5 hover:bg-violet-100 transition-colors"
+                    >
+                      <span className="text-[11px] text-violet-700 leading-snug">
+                        {t("yearHintPrefix")}<span className="font-bold">{editYearHint}</span>
+                      </span>
+                      <span className="text-[11px] font-bold text-violet-700 shrink-0">{t("yearHintUse")}</span>
+                    </button>
+                  )}
                 </div>
               </div>
 

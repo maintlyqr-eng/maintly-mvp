@@ -135,6 +135,22 @@ export async function POST(req: NextRequest) {
     }
 
     const json = await res.json();
+
+    // 21/10/2026 (Facu: "está tardando demasiado el escaneo"): cuando
+    // Gemini contesta bien pero lento, no quedaba ningún rastro. Si el
+    // total pasa de 8 s se deja una advertencia con los tiempos, para
+    // poder ver en Admin → Errores si es Google el que tarda.
+    const totalMs = Date.now() - t0;
+    if (totalMs > 8000) {
+      await logServerError({
+        source: "server",
+        severity: "warning",
+        message: `[scan-vin-photo] Gemini respondió OK pero lento (${Math.round(totalMs / 1000)} s)`,
+        stack: `intentos: ${attempts.join(" / ")} | imagen ${Math.round(base64Data.length / 1024)} KB | modelo ${MODEL}`,
+        route: "/api/scan-vin-photo",
+      });
+    }
+
     const text: string = json?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
     const cleaned = text.trim().replace(/^```(?:json)?/i, "").replace(/```$/, "").trim();
     if (!cleaned) return NextResponse.json({ found: false });

@@ -1061,7 +1061,8 @@
     "vinDuplicateLinkText": "Ver equipo existente",
     "vinAutoDetectedHint": "Detectado automáticamente a partir del VIN — podés editarlo.",
     "aiModelSuggestionPrefix": "Sugerencia de IA (sin confirmar): ",
-    "aiModelUseButton": "Usar"
+    "aiModelUseButton": "Usar",
+    "yearHintPrefix": "Año según el VIN (no siempre confiable fuera de Norteamérica): "
   },
   "DashboardQrCodesPage": {
     "title": "Códigos QR",
@@ -1520,6 +1521,8 @@
     "assetStatusDueSoon": "Por vencer",
     "assetStatusOverdue": "Vencido",
     "editAssetTitle": "Editar Activo",
+    "yearHintPrefix": "Año según el VIN (no siempre confiable fuera de Norteamérica): ",
+    "yearHintUse": "Usar",
     "brand": "Marca",
     "brandPlaceholder": "ej. Ford",
     "model": "Modelo",

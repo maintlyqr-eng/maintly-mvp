@@ -1061,7 +1061,8 @@
     "vinDuplicateLinkText": "View existing equipment",
     "vinAutoDetectedHint": "Auto-detected from the VIN — you can edit it.",
     "aiModelSuggestionPrefix": "AI suggestion (unconfirmed): ",
-    "aiModelUseButton": "Use"
+    "aiModelUseButton": "Use",
+    "yearHintPrefix": "Year per VIN (not always reliable outside North America): "
   },
   "DashboardQrCodesPage": {
     "title": "QR Codes",
@@ -1520,6 +1521,8 @@
     "assetStatusDueSoon": "Due soon",
     "assetStatusOverdue": "Overdue",
     "editAssetTitle": "Edit Asset",
+    "yearHintPrefix": "Year per VIN (not always reliable outside North America): ",
+    "yearHintUse": "Use",
     "brand": "Brand",
     "brandPlaceholder": "e.g. Ford",
     "model": "Model",

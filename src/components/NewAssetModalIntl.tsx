@@ -96,6 +96,7 @@ export default function NewAssetModalIntl({
   // siquiera el fabricante (WMI no cubierto).
   const [aiSuggestedMake, setAiSuggestedMake] = useState<string | null>(null);
   const [aiSuggestedModel, setAiSuggestedModel] = useState<string | null>(null);
+  const [yearHint, setYearHint] = useState<number | null>(null);
   const vinCheckTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const vinCheckSeqRef = useRef(0);
 
@@ -126,6 +127,7 @@ export default function NewAssetModalIntl({
     setVinAutoFilled(false);
     setAiSuggestedMake(null);
     setAiSuggestedModel(null);
+    setYearHint(null);
     if (vinCheckTimerRef.current) {
       clearTimeout(vinCheckTimerRef.current);
       vinCheckTimerRef.current = null;
@@ -174,6 +176,7 @@ export default function NewAssetModalIntl({
     setVinChecking(false);
     setAiSuggestedMake(null);
     setAiSuggestedModel(null);
+    setYearHint(null);
 
     if (!VIN_ELIGIBLE_ASSET_TYPES.includes(assetType)) return;
     const cleaned = normalizeVin(vin);
@@ -212,6 +215,10 @@ export default function NewAssetModalIntl({
             }
             if (!json.model && json.aiSuggestedModel && !model.trim()) {
               setAiSuggestedModel(json.aiSuggestedModel);
+            }
+            // Año "posible" (VIN no norteamericano): sugerencia, no relleno.
+            if (!json.year && json.yearHint && !year.trim()) {
+              setYearHint(Number(json.yearHint));
             }
           }
         } catch {
@@ -450,7 +457,19 @@ export default function NewAssetModalIntl({
             </div>
             <div>
               <label className="text-[12px] font-bold text-zinc-700">{t("yearLabel")}</label>
-              <input type="number" max={new Date().getFullYear()} value={year} onChange={(e) => setYear(e.target.value)} placeholder={t("yearPlaceholder")} className="w-full mt-1 rounded-xl border border-zinc-200 px-3 py-[10px] text-[13px] outline-none focus:border-red-500" />
+              <input type="number" max={new Date().getFullYear()} value={year} onChange={(e) => { setYear(e.target.value); setYearHint(null); }} placeholder={t("yearPlaceholder")} className="w-full mt-1 rounded-xl border border-zinc-200 px-3 py-[10px] text-[13px] outline-none focus:border-red-500" />
+              {yearHint && !year.trim() && (
+                <button
+                  type="button"
+                  onClick={() => { setYear(String(yearHint)); setYearHint(null); }}
+                  className="mt-1.5 w-full text-left flex items-center justify-between gap-2 bg-violet-50 border border-violet-200 rounded-lg px-2.5 py-1.5 hover:bg-violet-100 transition-colors"
+                >
+                  <span className="text-[11px] text-violet-700 leading-snug">
+                    {t("yearHintPrefix")}<span className="font-bold">{yearHint}</span>
+                  </span>
+                  <span className="text-[11px] font-bold text-violet-700 shrink-0">{t("aiModelUseButton")}</span>
+                </button>
+              )}
             </div>
           </div>
 
