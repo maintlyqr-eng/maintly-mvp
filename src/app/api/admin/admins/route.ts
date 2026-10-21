@@ -4,6 +4,7 @@ import { hashPassword } from "@/lib/adminPassword";
 import { ADMIN_ROLES, isValidAdminRole } from "@/lib/adminRoles";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 import { logAdminAction, getRequestIp } from "@/lib/auditLog";
+import { ADMIN_INVITE_TTL_MS, buildInviteLink, generateInviteToken, hashInviteToken } from "@/lib/adminInvite";
 
 // Incremento 11 (14 jul 2026) — gestión de otros admins (crear, asignar
 // rol, activar/desactivar). Capacidad "admin_management": hoy solo la
@@ -32,14 +33,30 @@ export async function GET(req: NextRequest) {
   const admin = getSupabaseAdmin();
   const { data, error } = await admin
     .from("admin_users")
-    .select("id, username, role, active, created_at, created_by, last_login_at")
+    .select("id, username, role, active, created_at, created_by, last_login_at, password_hash, invite_expires_at")
     .order("created_at", { ascending: true });
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ admins: data ?? [] });
+  // Nunca se manda password_hash al navegador: se traduce a "invitación
+  // pendiente" (sin contraseña todavía) y nada más.
+  const admins = (data ?? []).map(({ password_hash, invite_expires_at, ...rest }) => ({
+    ...rest,
+    invite_pending: !password_hash,
+    invite_expires_at: password_hash ? null : invite_expires_at,
+  }));
+  return NextResponse.json({ admins });
 }
 
-// POST: crea un admin nuevo. Body: { username, password, role }
+function requestOrigin(req: NextRequest): string {
+  const proto = req.headers.get("x-forwarded-proto") ?? "https";
+  const host = req.headers.get("x-forwarded-host") ?? req.headers.get("host") ?? "www.maintlyqr.com";
+  return `${proto}://${host}`;
+}
+
+// POST: crea un admin nuevo. Body: { username, role, password? }
+// Sin password (Facu, 21/10/2026): se crea con una invitación por link —
+// la persona elige su propia contraseña al abrirlo. Respuesta: { admin,
+// inviteLink }. Con password: comportamiento original.
 export async function POST(req: NextRequest) {
   if (!adminHasCapability(req, "admin_management")) {
     return NextResponse.json({ error: "Not authorized." }, { status: 403 });
@@ -53,7 +70,7 @@ export async function POST(req: NextRequest) {
   if (!username || username.length < 3) {
     return NextResponse.json({ error: "Username must be at least 3 characters." }, { status: 400 });
   }
-  if (!password || password.length < 8) {
+  if (password && password.length < 8) {
     return NextResponse.json({ error: "Password must be at least 8 characters." }, { status: 400 });
   }
   if (!isValidAdminRole(role)) {
@@ -62,15 +79,18 @@ export async function POST(req: NextRequest) {
 
   const createdBy = getAdminUsername(req);
   const admin = getSupabaseAdmin();
+  const inviteToken = password ? null : generateInviteToken();
   const { data, error } = await admin
     .from("admin_users")
     .insert({
       username,
-      password_hash: hashPassword(password),
+      password_hash: password ? hashPassword(password) : null,
       role,
       created_by: createdBy,
+      invite_token_hash: inviteToken ? hashInviteToken(inviteToken) : null,
+      invite_expires_at: inviteToken ? new Date(Date.now() + ADMIN_INVITE_TTL_MS).toISOString() : null,
     })
-    .select("id, username, role, active, created_at, created_by, last_login_at")
+    .select("id, username, role, active, created_at, created_by, last_login_at, invite_expires_at")
     .single();
 
   if (error) {
@@ -86,12 +106,16 @@ export async function POST(req: NextRequest) {
       action: "admin_user.create",
       entityType: "admin_user",
       entityId: data.id,
-      newValue: { username, role },
+      newValue: { username, role, invited: !!inviteToken },
       ipAddress: getRequestIp(req),
     });
   }
 
-  return NextResponse.json({ ok: true, admin: data });
+  return NextResponse.json({
+    ok: true,
+    admin: { ...data, invite_pending: !!inviteToken, invite_expires_at: inviteToken ? data.invite_expires_at : null },
+    inviteLink: inviteToken ? buildInviteLink(requestOrigin(req), inviteToken) : null,
+  });
 }
 
 // PATCH: cambia el rol y/o activa/desactiva un admin existente.
@@ -102,10 +126,38 @@ export async function PATCH(req: NextRequest) {
   }
 
   const body = await req.json().catch(() => ({}));
-  const { id, role, active } = body ?? {};
+  const { id, role, active, reinvite } = body ?? {};
 
   if (!id || typeof id !== "string") {
     return NextResponse.json({ error: "Missing id." }, { status: 400 });
+  }
+
+  // { id, reinvite: true }: genera un link nuevo (el anterior deja de
+  // servir). Para invitaciones vencidas o perdidas, y también para
+  // resetear la contraseña de un admin existente: al aceptar el link, la
+  // persona elige una contraseña nueva.
+  if (reinvite === true) {
+    const admin = getSupabaseAdmin();
+    const { data: target, error: fetchErr } = await admin
+      .from("admin_users").select("id, username, active").eq("id", id).maybeSingle();
+    if (fetchErr) return NextResponse.json({ error: fetchErr.message }, { status: 500 });
+    if (!target) return NextResponse.json({ error: "Admin not found." }, { status: 404 });
+    if (!target.active) return NextResponse.json({ error: "Reactivate the admin first." }, { status: 400 });
+    const token = generateInviteToken();
+    const expires = new Date(Date.now() + ADMIN_INVITE_TTL_MS).toISOString();
+    const { error: updErr } = await admin
+      .from("admin_users")
+      .update({ invite_token_hash: hashInviteToken(token), invite_expires_at: expires, invite_accepted_at: null })
+      .eq("id", id);
+    if (updErr) return NextResponse.json({ error: updErr.message }, { status: 500 });
+    const me = getAdminUsername(req);
+    if (me) {
+      await logAdminAction({
+        adminUsername: me, action: "admin_user.reinvite", entityType: "admin_user", entityId: id,
+        newValue: { username: target.username, expires }, ipAddress: getRequestIp(req),
+      });
+    }
+    return NextResponse.json({ ok: true, inviteLink: buildInviteLink(requestOrigin(req), token), invite_expires_at: expires });
   }
   if (role !== undefined && !isValidAdminRole(role)) {
     return NextResponse.json({ error: `Invalid role. Must be one of: ${ADMIN_ROLES.join(", ")}` }, { status: 400 });

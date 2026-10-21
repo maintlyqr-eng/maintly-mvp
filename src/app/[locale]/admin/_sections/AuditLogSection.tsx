@@ -40,6 +40,8 @@ type AuditLogSectionProps = {
   setAuditLogEntityFilter: (v: string) => void;
   auditLogEntityIdFilter: string;
   setAuditLogEntityIdFilter: (v: string) => void;
+  auditLogAdminFilter: string;
+  setAuditLogAdminFilter: (v: string) => void;
   auditLogFrom: string;
   setAuditLogFrom: (v: string) => void;
   auditLogTo: string;
@@ -64,6 +66,7 @@ export default function AuditLogSection({
   auditLogActionFilter, setAuditLogActionFilter,
   auditLogEntityFilter, setAuditLogEntityFilter,
   auditLogEntityIdFilter, setAuditLogEntityIdFilter,
+  auditLogAdminFilter, setAuditLogAdminFilter,
   auditLogFrom, setAuditLogFrom,
   auditLogTo, setAuditLogTo,
   AUDIT_ACTION_LABEL, AUDIT_ENTITY_LABEL,
@@ -127,9 +130,18 @@ export default function AuditLogSection({
             className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-[12px] font-mono outline-none focus:border-red-400 w-[220px]"
           />
         </div>
-        {(auditLogActionFilter !== "all" || auditLogEntityFilter !== "all" || auditLogEntityIdFilter || auditLogFrom || auditLogTo) && (
+        <div>
+          <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1">{t("auditFilterAdmin")}</label>
+          <input
+            type="text" value={auditLogAdminFilter}
+            onChange={(e) => { setAuditLogAdminFilter(e.target.value); setAuditLogsPage(1); }}
+            placeholder={t("auditFilterAdminPlaceholder")}
+            className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-[12px] outline-none focus:border-red-400 w-[160px]"
+          />
+        </div>
+        {(auditLogActionFilter !== "all" || auditLogEntityFilter !== "all" || auditLogEntityIdFilter || auditLogAdminFilter || auditLogFrom || auditLogTo) && (
           <button
-            onClick={() => { setAuditLogActionFilter("all"); setAuditLogEntityFilter("all"); setAuditLogEntityIdFilter(""); setAuditLogFrom(""); setAuditLogTo(""); setAuditLogsPage(1); }}
+            onClick={() => { setAuditLogActionFilter("all"); setAuditLogEntityFilter("all"); setAuditLogEntityIdFilter(""); setAuditLogAdminFilter(""); setAuditLogFrom(""); setAuditLogTo(""); setAuditLogsPage(1); }}
             className="text-[11px] font-bold text-zinc-400 hover:text-red-600 transition-colors px-2 py-2"
           >
             {t("auditFilterClear")}

@@ -3,14 +3,24 @@
 // Facu (26 jul 2026): octava sección extraída del split del admin — mismo
 // criterio que las anteriores (JSX movido tal cual, estado y lógica se
 // quedan en page.tsx).
+//
+// 21/10/2026 (Facu: "pensalo como empresa en la que empiece a tener
+// empleados"): se sumó
+//   - invitación por link (sin contraseña: la persona elige la suya),
+//   - "Ver actividad" (log de auditoría filtrado por esa persona),
+//   - mensajes internos de admin a admin,
+//   - pestaña "Actividad del equipo": horas activas, sesiones y acciones
+//     por persona en un período, con export CSV para liquidar tiempo.
 
-import { UserCog } from "lucide-react";
-import PasswordInput from "@/components/PasswordInput";
+import { useState } from "react";
+import { UserCog, Copy, Check, MessageSquare, History, Link2, Download, Clock, X } from "lucide-react";
 import { formatDateDMY } from "@/lib/date";
-import { Pill, type AdminRole, type AdminUserRow } from "../page";
+import PasswordInput from "@/components/PasswordInput";
+import { Pill, type AdminRole, type AdminUserRow, type AdminNoteRow, type TeamActivityRow } from "../page";
 
 type AdminsSectionProps = {
   t: (key: string, values?: Record<string, string | number>) => string;
+  locale: string;
 
   newAdminUsername: string;
   setNewAdminUsername: (v: string) => void;
@@ -24,120 +34,353 @@ type AdminsSectionProps = {
   adminsLoading: boolean;
   adminsList: AdminUserRow[];
   updateAdmin: (id: string, patch: { role?: AdminRole; active?: boolean }) => void | Promise<void>;
+
+  lastInviteLink: { username: string; link: string } | null;
+  clearInviteLink: () => void;
+  reinviteAdmin: (a: AdminUserRow) => void | Promise<void>;
+  viewAdminActivity: (username: string) => void;
+
+  notesForAdmin: { admin: AdminUserRow; notes: AdminNoteRow[] } | null;
+  openNotesFor: (a: AdminUserRow) => void | Promise<void>;
+  closeNotes: () => void;
+  sendNote: (a: AdminUserRow, body: string) => Promise<boolean>;
+
+  teamActivity: TeamActivityRow[];
+  teamActivityLoading: boolean;
+  teamActivityRange: "week" | "month" | "custom";
+  setTeamActivityRange: (v: "week" | "month" | "custom") => void;
+  teamActivityFrom: string;
+  setTeamActivityFrom: (v: string) => void;
+  teamActivityTo: string;
+  setTeamActivityTo: (v: string) => void;
+  exportTeamActivity: () => void | Promise<void>;
+  AUDIT_ACTION_LABEL: Record<string, string>;
 };
 
+function minutesLabel(min: number): string {
+  const h = Math.floor(min / 60);
+  const m = min % 60;
+  return h > 0 ? `${h} h ${m.toString().padStart(2, "0")} min` : `${m} min`;
+}
+
 export default function AdminsSection({
-  t,
+  t, locale,
   newAdminUsername, setNewAdminUsername, newAdminPassword, setNewAdminPassword,
   newAdminRole, setNewAdminRole, creatingAdmin, createAdmin,
   adminsLoading, adminsList, updateAdmin,
+  lastInviteLink, clearInviteLink, reinviteAdmin, viewAdminActivity,
+  notesForAdmin, openNotesFor, closeNotes, sendNote,
+  teamActivity, teamActivityLoading, teamActivityRange, setTeamActivityRange,
+  teamActivityFrom, setTeamActivityFrom, teamActivityTo, setTeamActivityTo, exportTeamActivity,
+  AUDIT_ACTION_LABEL,
 }: AdminsSectionProps) {
+  const [tab, setTab] = useState<"people" | "activity">("people");
+  const [copied, setCopied] = useState(false);
+  const [noteDraft, setNoteDraft] = useState("");
+  const [sendingNote, setSendingNote] = useState(false);
+
+  const roleLabel: Record<string, string> = {
+    super_admin: t("roleSuperAdmin"),
+    support_admin: t("roleSupportAdmin"),
+    content_moderator: t("roleContentModerator"),
+    analytics_viewer: t("roleAnalyticsViewer"),
+  };
+
+  async function copyLink() {
+    if (!lastInviteLink) return;
+    try { await navigator.clipboard.writeText(lastInviteLink.link); setCopied(true); setTimeout(() => setCopied(false), 2000); } catch { /* sin clipboard */ }
+  }
+
+  function whatsappHref(): string {
+    if (!lastInviteLink) return "#";
+    return `https://wa.me/?text=${encodeURIComponent(t("inviteWhatsappText", { user: lastInviteLink.username, link: lastInviteLink.link }))}`;
+  }
+
+  const canCreate = !!newAdminUsername.trim() && (newAdminPassword.length === 0 || newAdminPassword.length >= 8);
+
   return (
     <div className="space-y-4">
       <p className="text-[12px] text-zinc-400">{t("adminsIntro")}</p>
 
-      <div className="bg-white rounded-2xl border border-zinc-200/80 shadow-sm p-5 space-y-3">
-        <p className="text-[11px] font-bold text-zinc-400 uppercase tracking-widest">{t("adminsCreateTitle")}</p>
-        <div className="flex flex-wrap items-end gap-3">
-          <div>
-            <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1">{t("adminsUsername")}</label>
-            <input
-              type="text" value={newAdminUsername}
-              onChange={(e) => setNewAdminUsername(e.target.value)}
-              className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-[12px] outline-none focus:border-red-400 w-40"
-            />
-          </div>
-          <div>
-            <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1">{t("adminsPassword")}</label>
-            <PasswordInput
-              value={newAdminPassword}
-              onChange={(e) => setNewAdminPassword(e.target.value)}
-              className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-[12px] outline-none focus:border-red-400 w-44"
-            />
-          </div>
-          <div>
-            <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1">{t("adminsRole")}</label>
-            <select
-              value={newAdminRole}
-              onChange={(e) => setNewAdminRole(e.target.value as AdminRole)}
-              className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-[12px] outline-none focus:border-red-400"
-            >
-              <option value="support_admin">{t("roleSupportAdmin")}</option>
-              <option value="content_moderator">{t("roleContentModerator")}</option>
-              <option value="analytics_viewer">{t("roleAnalyticsViewer")}</option>
-              <option value="super_admin">{t("roleSuperAdmin")}</option>
-            </select>
-          </div>
+      <div className="flex gap-2">
+        {([["people", t("adminsTabPeople")], ["activity", t("adminsTabActivity")]] as const).map(([key, label]) => (
           <button
-            onClick={createAdmin}
-            disabled={creatingAdmin || !newAdminUsername.trim() || newAdminPassword.length < 8}
-            className="text-[11px] font-bold px-4 py-2.5 rounded-xl bg-zinc-900 text-white hover:bg-zinc-800 transition-colors disabled:opacity-40"
+            key={key} onClick={() => setTab(key)}
+            className={`text-[12px] font-bold px-3.5 py-2 rounded-xl border transition-colors ${tab === key ? "bg-zinc-900 text-white border-zinc-900" : "bg-white text-zinc-500 border-zinc-200 hover:bg-zinc-50"}`}
           >
-            {creatingAdmin ? t("creating") : t("adminsCreateButton")}
+            {label}
           </button>
-        </div>
-        {newAdminPassword.length > 0 && newAdminPassword.length < 8 && (
-          <p className="text-[11px] text-amber-600">{t("adminsPasswordTooShort")}</p>
-        )}
+        ))}
       </div>
 
-      <div className="bg-white rounded-2xl border border-zinc-200/80 shadow-sm overflow-hidden">
-        {adminsLoading ? (
-          <p className="text-[13px] text-zinc-400 text-center py-16">{t("loading")}</p>
-        ) : adminsList.length === 0 ? (
-          <div className="text-center py-16">
-            <UserCog size={28} className="mx-auto text-zinc-200 mb-2" />
-            <p className="text-[13px] text-zinc-300 font-medium">{t("adminsEmpty")}</p>
+      {tab === "people" && (
+        <>
+          <div className="bg-white rounded-2xl border border-zinc-200/80 shadow-sm p-5 space-y-3">
+            <p className="text-[11px] font-bold text-zinc-400 uppercase tracking-widest">{t("adminsCreateTitle")}</p>
+            <div className="flex flex-wrap items-end gap-3">
+              <div>
+                <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1">{t("adminsUsername")}</label>
+                <input
+                  type="text" value={newAdminUsername}
+                  onChange={(e) => setNewAdminUsername(e.target.value)}
+                  className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-[12px] outline-none focus:border-red-400 w-40"
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1">{t("adminsRole")}</label>
+                <select
+                  value={newAdminRole}
+                  onChange={(e) => setNewAdminRole(e.target.value as AdminRole)}
+                  className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-[12px] outline-none focus:border-red-400"
+                >
+                  <option value="support_admin">{t("roleSupportAdmin")}</option>
+                  <option value="content_moderator">{t("roleContentModerator")}</option>
+                  <option value="analytics_viewer">{t("roleAnalyticsViewer")}</option>
+                  <option value="super_admin">{t("roleSuperAdmin")}</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1">{t("adminsPasswordOptional")}</label>
+                <PasswordInput
+                  value={newAdminPassword}
+                  onChange={(e) => setNewAdminPassword(e.target.value)}
+                  placeholder={t("adminsPasswordOptionalPlaceholder")}
+                  className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-[12px] outline-none focus:border-red-400 w-48"
+                />
+              </div>
+              <button
+                onClick={createAdmin}
+                disabled={creatingAdmin || !canCreate}
+                className="text-[11px] font-bold px-4 py-2.5 rounded-xl bg-zinc-900 text-white hover:bg-zinc-800 transition-colors disabled:opacity-40 flex items-center gap-1.5"
+              >
+                {newAdminPassword.length === 0 && <Link2 size={13} />}
+                {creatingAdmin ? t("creating") : newAdminPassword.length === 0 ? t("adminsInviteButton") : t("adminsCreateButton")}
+              </button>
+            </div>
+            <p className="text-[11px] text-zinc-400">{t("adminsInviteHint")}</p>
+            {newAdminPassword.length > 0 && newAdminPassword.length < 8 && (
+              <p className="text-[11px] text-amber-600">{t("adminsPasswordTooShort")}</p>
+            )}
           </div>
-        ) : (
-          <div className="overflow-x-auto overscroll-x-contain">
-            <table className="w-full min-w-[720px]">
-              <thead>
-                <tr className="bg-zinc-50 border-b border-zinc-100">
-                  {[t("adminsUsername"), t("adminsRole"), t("colStatus"), t("adminsLastLogin"), ""].map((h) => (
-                    <th key={h} className="px-7 py-3 text-left text-[9px] font-bold text-zinc-400 uppercase tracking-widest">{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-zinc-50">
-                {adminsList.map((a) => (
-                  <tr key={a.id} className="hover:bg-zinc-50/80 transition-colors">
-                    <td className="px-7 py-4 text-[13px] font-bold text-zinc-900">{a.username}</td>
-                    <td className="px-7 py-4">
-                      <select
-                        value={a.role}
-                        onChange={(e) => updateAdmin(a.id, { role: e.target.value as AdminRole })}
-                        className="rounded-lg border border-zinc-200 bg-white px-2 py-1 text-[12px] outline-none focus:border-red-400"
-                      >
-                        <option value="support_admin">{t("roleSupportAdmin")}</option>
-                        <option value="content_moderator">{t("roleContentModerator")}</option>
-                        <option value="analytics_viewer">{t("roleAnalyticsViewer")}</option>
-                        <option value="super_admin">{t("roleSuperAdmin")}</option>
-                      </select>
-                    </td>
-                    <td className="px-7 py-4">
-                      {a.active ? <Pill tone="emerald">{t("adminActive")}</Pill> : <Pill tone="zinc">{t("adminInactive")}</Pill>}
-                    </td>
-                    <td className="px-7 py-4 text-[12px] text-zinc-400">
-                      {a.last_login_at ? formatDateDMY(a.last_login_at) : <span className="text-zinc-300">{t("adminsNeverLoggedIn")}</span>}
-                    </td>
-                    <td className="px-7 py-4">
-                      <button
-                        onClick={() => updateAdmin(a.id, { active: !a.active })}
-                        className={`text-[11px] font-bold px-2.5 py-1.5 rounded-lg border transition-colors ${
-                          a.active ? "border-red-200 text-red-600 hover:bg-red-50" : "border-emerald-200 text-emerald-700 hover:bg-emerald-50"
-                        }`}
-                      >
-                        {a.active ? t("deactivate") : t("reactivate")}
-                      </button>
-                    </td>
-                  </tr>
+
+          {lastInviteLink && (
+            <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-5 space-y-3">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-[12px] font-bold text-emerald-800">{t("inviteReadyTitle", { user: lastInviteLink.username })}</p>
+                  <p className="text-[11px] text-emerald-700 mt-0.5">{t("inviteReadyHint")}</p>
+                </div>
+                <button onClick={clearInviteLink} className="text-emerald-600 hover:text-emerald-900"><X size={16} /></button>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <input readOnly value={lastInviteLink.link} onFocus={(e) => e.currentTarget.select()} className="flex-1 min-w-[260px] rounded-xl border border-emerald-200 bg-white px-3 py-2 text-[12px] font-mono text-zinc-700 outline-none" />
+                <button onClick={copyLink} className="text-[11px] font-bold px-3 py-2 rounded-xl bg-white border border-emerald-200 text-emerald-800 hover:bg-emerald-100 flex items-center gap-1.5">
+                  {copied ? <Check size={13} /> : <Copy size={13} />} {copied ? t("copied") : t("copyLink")}
+                </button>
+                <a href={whatsappHref()} target="_blank" rel="noopener noreferrer" className="text-[11px] font-bold px-3 py-2 rounded-xl bg-[#25D366] text-white hover:brightness-95 flex items-center gap-1.5">
+                  <MessageSquare size={13} /> {t("sendWhatsapp")}
+                </a>
+              </div>
+            </div>
+          )}
+
+          <div className="bg-white rounded-2xl border border-zinc-200/80 shadow-sm overflow-hidden">
+            {adminsLoading ? (
+              <p className="text-[13px] text-zinc-400 text-center py-16">{t("loading")}</p>
+            ) : adminsList.length === 0 ? (
+              <div className="text-center py-16">
+                <UserCog size={28} className="mx-auto text-zinc-200 mb-2" />
+                <p className="text-[13px] text-zinc-300 font-medium">{t("adminsEmpty")}</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto overscroll-x-contain">
+                <table className="w-full min-w-[920px]">
+                  <thead>
+                    <tr className="bg-zinc-50 border-b border-zinc-100">
+                      {[t("adminsUsername"), t("adminsRole"), t("colStatus"), t("adminsLastLogin"), ""].map((h, i) => (
+                        <th key={i} className="px-7 py-3 text-left text-[9px] font-bold text-zinc-400 uppercase tracking-widest">{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-zinc-50">
+                    {adminsList.map((a) => (
+                      <tr key={a.id} className="hover:bg-zinc-50/80 transition-colors">
+                        <td className="px-7 py-4 text-[13px] font-bold text-zinc-900">{a.username}</td>
+                        <td className="px-7 py-4">
+                          <select
+                            value={a.role}
+                            onChange={(e) => updateAdmin(a.id, { role: e.target.value as AdminRole })}
+                            className="rounded-lg border border-zinc-200 bg-white px-2 py-1 text-[12px] outline-none focus:border-red-400"
+                          >
+                            <option value="support_admin">{t("roleSupportAdmin")}</option>
+                            <option value="content_moderator">{t("roleContentModerator")}</option>
+                            <option value="analytics_viewer">{t("roleAnalyticsViewer")}</option>
+                            <option value="super_admin">{t("roleSuperAdmin")}</option>
+                          </select>
+                        </td>
+                        <td className="px-7 py-4">
+                          {!a.active ? <Pill tone="zinc">{t("adminInactive")}</Pill>
+                            : a.invite_pending ? <Pill tone="amber">{t("adminInvitePending")}</Pill>
+                            : <Pill tone="emerald">{t("adminActive")}</Pill>}
+                        </td>
+                        <td className="px-7 py-4 text-[12px] text-zinc-400">
+                          {a.last_login_at ? formatDateDMY(a.last_login_at) : <span className="text-zinc-300">{t("adminsNeverLoggedIn")}</span>}
+                        </td>
+                        <td className="px-7 py-4">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <button onClick={() => viewAdminActivity(a.username)} title={t("adminViewActivity")} className="text-[11px] font-bold px-2.5 py-1.5 rounded-lg border border-zinc-200 text-zinc-600 hover:bg-zinc-50 flex items-center gap-1">
+                              <History size={12} /> {t("adminViewActivity")}
+                            </button>
+                            <button onClick={() => openNotesFor(a)} title={t("adminNotes")} className="text-[11px] font-bold px-2.5 py-1.5 rounded-lg border border-zinc-200 text-zinc-600 hover:bg-zinc-50 flex items-center gap-1">
+                              <MessageSquare size={12} /> {t("adminNotes")}
+                            </button>
+                            {a.active && (
+                              <button onClick={() => reinviteAdmin(a)} title={t("adminReinviteHint")} className="text-[11px] font-bold px-2.5 py-1.5 rounded-lg border border-zinc-200 text-zinc-600 hover:bg-zinc-50 flex items-center gap-1">
+                                <Link2 size={12} /> {t("adminReinvite")}
+                              </button>
+                            )}
+                            <button
+                              onClick={() => updateAdmin(a.id, { active: !a.active })}
+                              className={`text-[11px] font-bold px-2.5 py-1.5 rounded-lg border transition-colors ${
+                                a.active ? "border-red-200 text-red-600 hover:bg-red-50" : "border-emerald-200 text-emerald-700 hover:bg-emerald-50"
+                              }`}
+                            >
+                              {a.active ? t("deactivate") : t("reactivate")}
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </>
+      )}
+
+      {tab === "activity" && (
+        <div className="space-y-4">
+          <div className="bg-white rounded-2xl border border-zinc-200/80 shadow-sm p-5">
+            <div className="flex flex-wrap items-end gap-3">
+              <div className="flex gap-1.5">
+                {([["week", t("activityRangeWeek")], ["month", t("activityRangeMonth")], ["custom", t("activityRangeCustom")]] as const).map(([key, label]) => (
+                  <button key={key} onClick={() => setTeamActivityRange(key)} className={`text-[11px] font-bold px-3 py-2 rounded-xl border ${teamActivityRange === key ? "bg-zinc-900 text-white border-zinc-900" : "bg-white text-zinc-500 border-zinc-200 hover:bg-zinc-50"}`}>{label}</button>
                 ))}
-              </tbody>
-            </table>
+              </div>
+              {teamActivityRange === "custom" && (
+                <>
+                  <div>
+                    <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1">{t("auditFilterFrom")}</label>
+                    <input type="date" value={teamActivityFrom} onChange={(e) => setTeamActivityFrom(e.target.value)} className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-[12px] outline-none focus:border-red-400" />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1">{t("auditFilterTo")}</label>
+                    <input type="date" value={teamActivityTo} onChange={(e) => setTeamActivityTo(e.target.value)} className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-[12px] outline-none focus:border-red-400" />
+                  </div>
+                </>
+              )}
+              <button onClick={exportTeamActivity} className="ml-auto flex items-center gap-2 bg-white border border-zinc-200 hover:bg-zinc-50 text-zinc-600 text-[12px] font-bold px-3.5 py-[9px] rounded-xl">
+                <Download size={13} /> {t("exportCsv")}
+              </button>
+            </div>
+            <p className="text-[11px] text-zinc-400 mt-3">{t("activityHint")}</p>
           </div>
-        )}
-      </div>
+
+          <div className="bg-white rounded-2xl border border-zinc-200/80 shadow-sm overflow-hidden">
+            {teamActivityLoading ? (
+              <p className="text-[13px] text-zinc-400 text-center py-16">{t("loading")}</p>
+            ) : teamActivity.length === 0 ? (
+              <div className="text-center py-16">
+                <Clock size={28} className="mx-auto text-zinc-200 mb-2" />
+                <p className="text-[13px] text-zinc-300 font-medium">{t("activityEmpty")}</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto overscroll-x-contain">
+                <table className="w-full min-w-[880px]">
+                  <thead>
+                    <tr className="bg-zinc-50 border-b border-zinc-100">
+                      {[t("adminsUsername"), t("adminsRole"), t("activityHours"), t("activitySessions"), t("activityActions"), t("activityLastSeen"), ""].map((h, i) => (
+                        <th key={i} className="px-6 py-3 text-left text-[9px] font-bold text-zinc-400 uppercase tracking-widest">{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-zinc-50">
+                    {teamActivity.map((r) => {
+                      const top = Object.entries(r.actionsByType).sort((a, b) => b[1] - a[1]).slice(0, 3);
+                      return (
+                        <tr key={r.username} className="hover:bg-zinc-50/80 transition-colors align-top">
+                          <td className="px-6 py-4 text-[13px] font-bold text-zinc-900">{r.username}{!r.active && <span className="ml-2 text-[10px] font-bold text-zinc-400">{t("adminInactive")}</span>}</td>
+                          <td className="px-6 py-4 text-[12px] text-zinc-500">{r.role ? roleLabel[r.role] ?? r.role : "—"}</td>
+                          <td className="px-6 py-4 text-[13px] font-bold text-zinc-900">{minutesLabel(r.activeMinutes)}</td>
+                          <td className="px-6 py-4 text-[12px] text-zinc-600">{r.sessions}</td>
+                          <td className="px-6 py-4 text-[12px] text-zinc-600">
+                            <span className="font-bold text-zinc-900">{r.actions}</span>
+                            {top.length > 0 && (
+                              <span className="block text-[11px] text-zinc-400 mt-0.5">{top.map(([k, n]) => `${AUDIT_ACTION_LABEL[k] ?? k} ×${n}`).join(" · ")}</span>
+                            )}
+                          </td>
+                          <td className="px-6 py-4 text-[12px] text-zinc-400">{r.lastSeen ? new Date(r.lastSeen).toLocaleString(locale, { dateStyle: "short", timeStyle: "short" }) : "—"}</td>
+                          <td className="px-6 py-4">
+                            <button onClick={() => viewAdminActivity(r.username)} className="text-[11px] font-bold px-2.5 py-1.5 rounded-lg border border-zinc-200 text-zinc-600 hover:bg-zinc-50 flex items-center gap-1 whitespace-nowrap">
+                              <History size={12} /> {t("adminViewActivity")}
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {notesForAdmin && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={closeNotes}>
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[85vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-200">
+              <div>
+                <h2 className="text-[15px] font-black text-zinc-900">{t("notesTitle", { user: notesForAdmin.admin.username })}</h2>
+                <p className="text-[11px] text-zinc-400 mt-0.5">{t("notesHint")}</p>
+              </div>
+              <button onClick={closeNotes} className="text-zinc-400 hover:text-zinc-700"><X size={18} /></button>
+            </div>
+            <div className="px-6 py-4 border-b border-zinc-100">
+              <textarea
+                value={noteDraft} onChange={(e) => setNoteDraft(e.target.value)} rows={3} maxLength={2000}
+                placeholder={t("notesPlaceholder")}
+                className="w-full rounded-xl border border-zinc-200 px-3 py-2 text-[13px] outline-none focus:border-red-500 resize-none"
+              />
+              <div className="flex justify-end mt-2">
+                <button
+                  disabled={sendingNote || !noteDraft.trim()}
+                  onClick={async () => { setSendingNote(true); const ok = await sendNote(notesForAdmin.admin, noteDraft.trim()); setSendingNote(false); if (ok) setNoteDraft(""); }}
+                  className="text-[12px] font-bold px-4 py-2 rounded-xl bg-zinc-900 text-white hover:bg-zinc-800 disabled:opacity-40"
+                >
+                  {sendingNote ? t("sending") : t("notesSend")}
+                </button>
+              </div>
+            </div>
+            <div className="flex-1 overflow-y-auto px-6 py-4 space-y-3">
+              {notesForAdmin.notes.length === 0 ? (
+                <p className="text-[12px] text-zinc-400 text-center py-6">{t("notesEmpty")}</p>
+              ) : notesForAdmin.notes.map((n) => (
+                <div key={n.id} className="rounded-xl border border-zinc-200 px-3.5 py-2.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-[11px] font-bold text-zinc-500">{n.from_username} · {formatDateDMY(n.created_at)}</span>
+                    {n.read_at
+                      ? <span className="text-[10px] font-bold text-emerald-600">{t("noteRead", { when: formatDateDMY(n.read_at) })}</span>
+                      : <span className="text-[10px] font-bold text-amber-600">{t("noteUnread")}</span>}
+                  </div>
+                  <p className="text-[13px] text-zinc-800 whitespace-pre-wrap mt-1">{n.body}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

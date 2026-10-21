@@ -51,7 +51,9 @@ export async function POST(req: NextRequest) {
     .ilike("username", username)
     .maybeSingle();
 
-  if (dbUser && verifyPassword(password, dbUser.password_hash)) {
+  // password_hash null = invitación pendiente (migración 052): esa cuenta
+  // todavía no puede entrar, tiene que aceptar el link primero.
+  if (dbUser && dbUser.password_hash && verifyPassword(password, dbUser.password_hash)) {
     authedUsername = dbUser.username;
     authedRole = dbUser.role as AdminRole;
     // Best-effort — un fallo acá nunca debe bloquear un login que ya es válido.

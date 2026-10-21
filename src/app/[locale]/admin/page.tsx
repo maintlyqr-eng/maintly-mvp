@@ -11,7 +11,7 @@ import {
   Ban, ShieldCheck, ShieldOff, Trash2, KeyRound, UserCog,
   UserPlus, UserMinus, Plus, Link2Off, ScanLine, ClipboardList,
   LifeBuoy, Send, MessageCircle, Flag, History, ChevronDown, ChevronRight,
-  Trash, RotateCcw, TrendingUp, MapPin, Calendar, Pencil, Download, Settings, AlertTriangle, Bug, Undo2, CheckCircle2, GitMerge,
+  Trash, RotateCcw, TrendingUp, MapPin, Calendar, Pencil, Download, Settings, AlertTriangle, Bug, Undo2, CheckCircle2, GitMerge, MessageSquare,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { formatDateDMY } from "@/lib/date";
@@ -228,6 +228,22 @@ export type AdminUserRow = {
   created_at: string;
   created_by: string | null;
   last_login_at: string | null;
+  invite_pending?: boolean;
+  invite_expires_at?: string | null;
+};
+
+export type AdminNoteRow = { id: string; created_at: string; from_username: string; body: string; read_at: string | null };
+
+export type TeamActivityRow = {
+  username: string;
+  role: string | null;
+  active: boolean;
+  sessions: number;
+  activeMinutes: number;
+  actions: number;
+  actionsByType: Record<string, number>;
+  lastSeen: string | null;
+  days: Record<string, number>;
 };
 
 // Incremento 17 (15 jul 2026, Fase 3 — "Configuraciones globales
@@ -813,6 +829,16 @@ export default function AdminPage() {
   const [newAdminPassword, setNewAdminPassword] = useState("");
   const [newAdminRole, setNewAdminRole] = useState<AdminRole>("support_admin");
   const [creatingAdmin, setCreatingAdmin] = useState(false);
+  // Invitación por link (migración 052), mensajes internos (053) y
+  // actividad del equipo (054) — Facu, 21/10/2026.
+  const [lastInviteLink, setLastInviteLink] = useState<{ username: string; link: string } | null>(null);
+  const [myNotes, setMyNotes] = useState<AdminNoteRow[]>([]);
+  const [notesForAdmin, setNotesForAdmin] = useState<{ admin: AdminUserRow; notes: AdminNoteRow[] } | null>(null);
+  const [teamActivity, setTeamActivity] = useState<TeamActivityRow[]>([]);
+  const [teamActivityLoading, setTeamActivityLoading] = useState(false);
+  const [teamActivityRange, setTeamActivityRange] = useState<"week" | "month" | "custom">("month");
+  const [teamActivityFrom, setTeamActivityFrom] = useState("");
+  const [teamActivityTo, setTeamActivityTo] = useState("");
 
   // ── Sistema (incremento 17): modo mantenimiento, banner global,
   // límites de archivo, changelog interno ──
@@ -917,6 +943,7 @@ export default function AdminPage() {
   // "Ver historial" de Cuentas/Assets (viewHistory()), pero también editable
   // a mano por si el admin ya tiene un ID copiado de otro lado.
   const [auditLogEntityIdFilter, setAuditLogEntityIdFilter] = useState("");
+  const [auditLogAdminFilter, setAuditLogAdminFilter] = useState("");
   const [auditLogFrom, setAuditLogFrom] = useState("");
   const [auditLogTo, setAuditLogTo] = useState("");
   const [expandedAuditLogId, setExpandedAuditLogId] = useState<string | null>(null);
@@ -1355,6 +1382,7 @@ export default function AdminPage() {
     if (auditLogActionFilter !== "all") params.set("action", auditLogActionFilter);
     if (auditLogEntityFilter !== "all") params.set("entityType", auditLogEntityFilter);
     if (auditLogEntityIdFilter.trim()) params.set("entityId", auditLogEntityIdFilter.trim());
+    if (auditLogAdminFilter.trim()) params.set("adminUsername", auditLogAdminFilter.trim());
     if (auditLogFrom) params.set("from", new Date(auditLogFrom).toISOString());
     if (auditLogTo) params.set("to", new Date(new Date(auditLogTo).getTime() + 86400000).toISOString());
     return params;
@@ -1854,12 +1882,31 @@ export default function AdminPage() {
   // (see the JSX below) rather than via a separate effect reacting to the
   // filter — that would cause two renders (one with the stale page, one
   // after the reset) and fetch twice per filter change.
+  // Presencia (migración 054): latido al entrar y cada 2 minutos mientras
+  // la pestaña está visible, para medir horas activas por admin. Y los
+  // mensajes internos dirigidos a este admin (053), al entrar y cada 5 min.
+  useEffect(() => {
+    if (!adminAuthed) return;
+    const beat = () => { if (document.visibilityState === "visible") fetch("/api/admin/presence", { method: "POST" }).catch(() => {}); };
+    const loadMyNotes = () => fetch("/api/admin/notes?mine=1").then((r) => r.json()).then((j) => setMyNotes((j.notes as AdminNoteRow[]) ?? [])).catch(() => {});
+    beat(); loadMyNotes();
+    const beatTimer = setInterval(beat, 2 * 60 * 1000);
+    const notesTimer = setInterval(loadMyNotes, 5 * 60 * 1000);
+    document.addEventListener("visibilitychange", beat);
+    return () => { clearInterval(beatTimer); clearInterval(notesTimer); document.removeEventListener("visibilitychange", beat); };
+  }, [adminAuthed]);
+
+  useEffect(() => {
+    if (section === "admins" && adminAuthed) loadTeamActivity();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [section, adminAuthed, teamActivityRange, teamActivityFrom, teamActivityTo]);
+
   useEffect(() => {
     if (section === "audit-log" && adminAuthed) {
       loadAuditLogs();
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [section, adminAuthed, auditLogsPage, auditLogActionFilter, auditLogEntityFilter, auditLogEntityIdFilter, auditLogFrom, auditLogTo]);
+  }, [section, adminAuthed, auditLogsPage, auditLogActionFilter, auditLogEntityFilter, auditLogEntityIdFilter, auditLogAdminFilter, auditLogFrom, auditLogTo]);
 
   // Incremento 19: mismo criterio que el log de auditoría — filtros/página
   // reales del lado del servidor, así que un cambio de filtro necesita un
@@ -2007,20 +2054,83 @@ export default function AdminPage() {
   }
 
   async function createAdmin() {
-    if (!newAdminUsername.trim() || newAdminPassword.length < 8) return;
+    if (!newAdminUsername.trim()) return;
+    if (newAdminPassword && newAdminPassword.length < 8) return;
     setCreatingAdmin(true);
     const res = await adminFetch("/api/admin/admins", "POST", {
       username: newAdminUsername.trim(),
-      password: newAdminPassword,
+      ...(newAdminPassword ? { password: newAdminPassword } : {}),
       role: newAdminRole,
     });
     setCreatingAdmin(false);
     if (!res.ok) { flash(res.error, "error"); return; }
-    setAdminsList((prev) => [...prev, res.data.admin as AdminUserRow]);
+    const created = res.data.admin as AdminUserRow;
+    setAdminsList((prev) => [...prev, created]);
+    if (res.data.inviteLink) setLastInviteLink({ username: created.username, link: res.data.inviteLink as string });
     setNewAdminUsername("");
     setNewAdminPassword("");
     setNewAdminRole("support_admin");
-    flash(t("adminCreated"));
+    flash(res.data.inviteLink ? t("adminInvited") : t("adminCreated"));
+  }
+
+  async function reinviteAdmin(a: AdminUserRow) {
+    const res = await adminFetch("/api/admin/admins", "PATCH", { id: a.id, reinvite: true });
+    if (!res.ok) { flash(res.error, "error"); return; }
+    setLastInviteLink({ username: a.username, link: res.data.inviteLink as string });
+    setAdminsList((prev) => prev.map((x) => (x.id === a.id ? { ...x, invite_pending: true, invite_expires_at: res.data.invite_expires_at as string } : x)));
+  }
+
+  async function openNotesFor(a: AdminUserRow) {
+    setNotesForAdmin({ admin: a, notes: [] });
+    try {
+      const r = await fetch(`/api/admin/notes?toAdminId=${encodeURIComponent(a.id)}`);
+      const j = await r.json().catch(() => ({}));
+      setNotesForAdmin({ admin: a, notes: (j.notes as AdminNoteRow[]) ?? [] });
+    } catch { /* se queda vacío */ }
+  }
+
+  async function sendNote(a: AdminUserRow, body: string): Promise<boolean> {
+    const res = await adminFetch("/api/admin/notes", "POST", { toAdminId: a.id, body });
+    if (!res.ok) { flash(res.error, "error"); return false; }
+    setNotesForAdmin((cur) => (cur && cur.admin.id === a.id ? { ...cur, notes: [res.data.note as AdminNoteRow, ...cur.notes] } : cur));
+    flash(t("noteSent"));
+    return true;
+  }
+
+  async function markNoteRead(id: string) {
+    setMyNotes((prev) => prev.map((n) => (n.id === id ? { ...n, read_at: new Date().toISOString() } : n)));
+    await adminFetch("/api/admin/notes", "PATCH", { id, read: true });
+  }
+
+  function teamActivityParams() {
+    const now = new Date();
+    let from: Date; let to: Date = now;
+    if (teamActivityRange === "week") { from = new Date(now); from.setDate(now.getDate() - 7); }
+    else if (teamActivityRange === "month") { from = new Date(now.getFullYear(), now.getMonth(), 1); }
+    else {
+      from = teamActivityFrom ? new Date(teamActivityFrom) : new Date(now.getFullYear(), now.getMonth(), 1);
+      to = teamActivityTo ? new Date(new Date(teamActivityTo).getTime() + 86400000 - 1) : now;
+    }
+    const p = new URLSearchParams();
+    p.set("from", from.toISOString()); p.set("to", to.toISOString());
+    return p;
+  }
+
+  async function loadTeamActivity() {
+    setTeamActivityLoading(true);
+    try {
+      const r = await fetch(`/api/admin/team-activity?${teamActivityParams().toString()}`);
+      const j = await r.json().catch(() => ({}));
+      setTeamActivity((j.rows as TeamActivityRow[]) ?? []);
+    } finally {
+      setTeamActivityLoading(false);
+    }
+  }
+
+  async function exportTeamActivity() {
+    const p = teamActivityParams(); p.set("export", "csv");
+    const ok = await downloadCsvFromApi(`/api/admin/team-activity?${p.toString()}`, "maintlyqr-actividad-equipo.csv");
+    if (!ok) flash(t("exportFailed"), "error");
   }
 
   async function updateAdmin(id: string, patch: { role?: AdminRole; active?: boolean }) {
@@ -2288,9 +2398,24 @@ export default function AdminPage() {
   // "Ver historial de acciones" (item 2/3 del pedido) — salta a Logs de
   // Auditoría filtrado por esta entidad exacta, en vez de tener que buscarla
   // a mano entre todas las acciones de todos los admins.
+  // Facu (21/10/2026): "como CEO tengo que poder ver todo lo que esa
+  // persona en su rol hace" — desde Administradores, un click abre el log
+  // de auditoría filtrado por ese usuario.
+  function viewAdminActivity(username: string) {
+    setAuditLogEntityFilter("all");
+    setAuditLogEntityIdFilter("");
+    setAuditLogAdminFilter(username);
+    setAuditLogActionFilter("all");
+    setAuditLogFrom("");
+    setAuditLogTo("");
+    setAuditLogsPage(1);
+    setSection("audit-log");
+  }
+
   function viewHistory(entityType: string, entityId: string) {
     setAuditLogEntityFilter(entityType);
     setAuditLogEntityIdFilter(entityId);
+    setAuditLogAdminFilter("");
     setAuditLogActionFilter("all");
     setAuditLogFrom("");
     setAuditLogTo("");
@@ -2524,6 +2649,11 @@ export default function AdminPage() {
     "support_thread.clear": t("auditActionSupportThreadClear"),
     "support_thread.update_state": t("auditActionSupportThreadUpdateState"),
     "report.update_status": t("auditActionReportUpdateStatus"),
+    "admin_user.create": t("auditActionAdminUserCreate"),
+    "admin_user.update": t("auditActionAdminUserUpdate"),
+    "admin_user.reinvite": t("auditActionAdminUserReinvite"),
+    "admin_user.accept_invite": t("auditActionAdminUserAcceptInvite"),
+    "admin_note.create": t("auditActionAdminNoteCreate"),
   };
 
   // "Actividad en tiempo real" (item 1 del pedido: "actividad reciente" del
@@ -2918,6 +3048,17 @@ export default function AdminPage() {
           </div>
         )}
 
+        {myNotes.filter((n) => !n.read_at).map((n) => (
+          <div key={n.id} className="mx-4 md:mx-8 mt-4 rounded-xl px-4 py-3 border bg-sky-50 border-sky-200 text-sky-900 flex items-start gap-3">
+            <MessageSquare size={15} className="shrink-0 mt-0.5 text-sky-600" />
+            <div className="flex-1 min-w-0">
+              <p className="text-[11px] font-bold text-sky-700">{t("noteFrom", { user: n.from_username, when: formatDateDMY(n.created_at) })}</p>
+              <p className="text-[13px] whitespace-pre-wrap mt-0.5">{n.body}</p>
+            </div>
+            <button onClick={() => markNoteRead(n.id)} className="text-[11px] font-bold text-sky-700 hover:text-sky-900 shrink-0 px-2 py-1 rounded-lg hover:bg-sky-100">{t("noteMarkRead")}</button>
+          </div>
+        ))}
+
         {dataTruncatedNotice && (
           <div className="mx-4 md:mx-8 mt-4 rounded-xl px-4 py-2.5 text-[12px] font-semibold border bg-amber-50 border-amber-200 text-amber-700">
             {dataTruncatedNotice}
@@ -3044,6 +3185,7 @@ export default function AdminPage() {
               auditLogActionFilter={auditLogActionFilter} setAuditLogActionFilter={setAuditLogActionFilter}
               auditLogEntityFilter={auditLogEntityFilter} setAuditLogEntityFilter={setAuditLogEntityFilter}
               auditLogEntityIdFilter={auditLogEntityIdFilter} setAuditLogEntityIdFilter={setAuditLogEntityIdFilter}
+              auditLogAdminFilter={auditLogAdminFilter} setAuditLogAdminFilter={setAuditLogAdminFilter}
               auditLogFrom={auditLogFrom} setAuditLogFrom={setAuditLogFrom}
               auditLogTo={auditLogTo} setAuditLogTo={setAuditLogTo}
               AUDIT_ACTION_LABEL={AUDIT_ACTION_LABEL} AUDIT_ENTITY_LABEL={AUDIT_ENTITY_LABEL}
@@ -3139,6 +3281,16 @@ export default function AdminPage() {
               newAdminRole={newAdminRole} setNewAdminRole={setNewAdminRole}
               creatingAdmin={creatingAdmin} createAdmin={createAdmin}
               adminsLoading={adminsLoading} adminsList={adminsList} updateAdmin={updateAdmin}
+              lastInviteLink={lastInviteLink} clearInviteLink={() => setLastInviteLink(null)}
+              reinviteAdmin={reinviteAdmin} viewAdminActivity={viewAdminActivity}
+              notesForAdmin={notesForAdmin} openNotesFor={openNotesFor} closeNotes={() => setNotesForAdmin(null)} sendNote={sendNote}
+              teamActivity={teamActivity} teamActivityLoading={teamActivityLoading}
+              teamActivityRange={teamActivityRange} setTeamActivityRange={setTeamActivityRange}
+              teamActivityFrom={teamActivityFrom} setTeamActivityFrom={setTeamActivityFrom}
+              teamActivityTo={teamActivityTo} setTeamActivityTo={setTeamActivityTo}
+              exportTeamActivity={exportTeamActivity}
+              AUDIT_ACTION_LABEL={AUDIT_ACTION_LABEL}
+              locale={locale}
             />
           )}
 

@@ -103,5 +103,7 @@ export const config = {
     "/(es|pt)/dashboard/team-chat",
     "/admin",
     "/(es|pt)/admin",
+    "/admin/invite",
+    "/(es|pt)/admin/invite",
   ],
 };
