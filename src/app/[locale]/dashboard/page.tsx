@@ -830,7 +830,7 @@ function DashboardPageInner() {
   // than the screen. h-dvh over h-screen for the same mobile-address-bar
   // reason documented there.
   return (
-    <div className="h-dvh bg-canvas flex relative overflow-hidden">
+    <div className="h-dvh bg-zinc-50 flex relative overflow-hidden">
 
       {/* Redesign (jul 2026): this page used to hide the sidebar's own
           "¿Necesitás ayuda?" support card (hideSupportWidget) and render an
@@ -883,7 +883,7 @@ function DashboardPageInner() {
             justo para que Chrome dibuje la barra de scroll aunque no haya
             nada que desplazar en la práctica. pb-3/md:pb-4 -> pb-2/md:pb-3
             recorta esos 4px sin tocar nada del layout en filas de siempre. */}
-        <div data-dashboard-scroll className="flex-1 overflow-y-auto px-3 md:px-4 pt-1.5 md:pt-2 pb-2 md:pb-3">
+        <div className="flex-1 overflow-y-auto px-3 md:px-4 pt-1.5 md:pt-2 pb-2 md:pb-3">
 
           {/* ── "Tus prioridades de hoy" ── the most urgent 3 reminders
               (overdue first, then soonest-due), same merged services+tasks

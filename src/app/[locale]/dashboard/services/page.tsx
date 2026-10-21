@@ -751,7 +751,7 @@ function ServicesPageInner() {
   const svcAssetType = assetOptions.find((a) => a.id === svcAssetId)?.asset_type;
 
   return (
-    <div className="h-dvh bg-canvas flex relative overflow-hidden">
+    <div className="h-dvh bg-zinc-50 flex relative overflow-hidden">
 
       <DashboardSidebarIntl
         activeHref="/dashboard/services"
@@ -794,7 +794,7 @@ function ServicesPageInner() {
             a la vez (este padding, los 2 "mb-5" de abajo, y el padding
             vertical de las filas de la tabla) en vez de un solo cambio
             grande, para no perder legibilidad en ningún punto puntual. */}
-        <div data-dashboard-scroll className="flex-1 overflow-y-auto px-3 md:px-4 pt-1.5 md:pt-2 pb-2 md:pb-3">
+        <div className="flex-1 overflow-y-auto px-3 md:px-4 pt-1.5 md:pt-2 pb-2 md:pb-3">
 
           {/* ── Summary tiles ── Facu (17 jul 2026): "quiero que se vea igual
               a esto" — matching his reference screenshot exactly this time:

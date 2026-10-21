@@ -885,7 +885,7 @@ function TeamChatPageInner() {
     // llegar a la barrita." h-dvh uses the *dynamic* viewport height
     // instead, which tracks the address bar's real state, so the compose
     // bar is fully visible immediately, no nudge needed.
-    <div className="h-dvh bg-canvas flex relative overflow-hidden">
+    <div className="h-dvh bg-zinc-50 flex relative overflow-hidden">
 
       {/* unreadMechanicMessages={totalUnread}, not the useUnreadMechanicMessages()
           hook every other dashboard page passes here — Facu's report: sitting
@@ -932,7 +932,7 @@ function TeamChatPageInner() {
           onLogout={handleLogout}
         />
 
-        <div className="flex-1 flex min-h-0 px-3 md:px-4 pt-1.5 md:pt-2 pb-[96px] md:pb-4 gap-4">
+        <div className="flex-1 flex min-h-0 px-3 md:px-4 pt-1.5 md:pt-2 pb-3 md:pb-4 gap-4">
 
           {/* ── Conversation list / Saved Maintlers ── */}
           <div className={`${selectedId ? "hidden md:flex" : "flex"} w-full md:w-[320px] shrink-0 flex-col bg-white rounded-2xl border border-zinc-200 shadow-sm overflow-hidden min-h-0`}>

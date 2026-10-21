@@ -261,7 +261,7 @@ export default function ScheduledServicesPage() {
   const okCount = withStatus.filter((r) => r.status === "ok").length;
 
   return (
-    <div className="h-dvh bg-canvas flex relative overflow-hidden">
+    <div className="h-dvh bg-zinc-50 flex relative overflow-hidden">
 
       <DashboardSidebarIntl
         activeHref="/dashboard/scheduled"
@@ -292,7 +292,7 @@ export default function ScheduledServicesPage() {
           onLogout={handleLogout}
         />
 
-        <div data-dashboard-scroll className="flex-1 overflow-y-auto px-3 md:px-4 pt-1.5 md:pt-2 pb-3 md:pb-4">
+        <div className="flex-1 overflow-y-auto px-3 md:px-4 pt-1.5 md:pt-2 pb-3 md:pb-4">
 
           {/* ── SUMMARY CARDS ── */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-5">

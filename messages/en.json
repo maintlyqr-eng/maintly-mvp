@@ -2317,9 +2317,5 @@
     "save": "Save changes",
     "saving": "Saving…",
     "errorSave": "Could not save changes."
-  },
-  "DashboardBottomNav": {
-    "ariaLabel": "Main navigation",
-    "more": "More"
   }
 }

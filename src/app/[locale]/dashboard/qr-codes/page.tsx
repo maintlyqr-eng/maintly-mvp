@@ -291,7 +291,7 @@ export default function QrCodesPage() {
   const printRows = printCodes ? codes.filter((c) => printCodes.includes(c.code)) : [];
 
   return (
-    <div className="h-dvh bg-canvas flex relative overflow-hidden">
+    <div className="h-dvh bg-zinc-50 flex relative overflow-hidden">
 
       <DashboardSidebarIntl
         activeHref="/dashboard/qr-codes"
@@ -323,7 +323,7 @@ export default function QrCodesPage() {
           className="no-print"
         />
 
-        <div data-dashboard-scroll className="no-print flex-1 overflow-y-auto px-3 md:px-4 pt-1.5 md:pt-2 pb-3 md:pb-4">
+        <div className="no-print flex-1 overflow-y-auto px-3 md:px-4 pt-1.5 md:pt-2 pb-3 md:pb-4">
 
           {/* Stats */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
