@@ -5,6 +5,7 @@
 // quedan en page.tsx).
 
 import { UserCog } from "lucide-react";
+import PasswordInput from "@/components/PasswordInput";
 import { formatDateDMY } from "@/lib/date";
 import { Pill, type AdminRole, type AdminUserRow } from "../page";
 
@@ -48,10 +49,10 @@ export default function AdminsSection({
           </div>
           <div>
             <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1">{t("adminsPassword")}</label>
-            <input
-              type="password" value={newAdminPassword}
+            <PasswordInput
+              value={newAdminPassword}
               onChange={(e) => setNewAdminPassword(e.target.value)}
-              className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-[12px] outline-none focus:border-red-400 w-40"
+              className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-[12px] outline-none focus:border-red-400 w-44"
             />
           </div>
           <div>

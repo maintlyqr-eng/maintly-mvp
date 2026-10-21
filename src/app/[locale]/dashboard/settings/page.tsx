@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import PasswordInput from "@/components/PasswordInput";
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
@@ -908,16 +909,18 @@ export default function SettingsPage() {
             <form onSubmit={handleChangePassword} className="space-y-4">
               <div>
                 <label className="text-[12px] font-bold text-zinc-700">{t("newPassword")}</label>
-                <input
-                  type="password" value={newPassword} onChange={(e) => { setNewPassword(e.target.value); if (passwordMsg) setPasswordMsg(null); }} placeholder={t("newPasswordPlaceholder")}
-                  className="w-full mt-1 rounded-xl border border-zinc-200 px-3 py-[10px] text-[13px] outline-none focus:border-red-500"
+                <PasswordInput
+                  value={newPassword} onChange={(e) => { setNewPassword(e.target.value); if (passwordMsg) setPasswordMsg(null); }} placeholder={t("newPasswordPlaceholder")}
+                  wrapperClassName="mt-1"
+                  className="w-full rounded-xl border border-zinc-200 px-3 py-[10px] text-[13px] outline-none focus:border-red-500"
                 />
               </div>
               <div>
                 <label className="text-[12px] font-bold text-zinc-700">{t("confirmNewPassword")}</label>
-                <input
-                  type="password" value={confirmPassword} onChange={(e) => { setConfirmPassword(e.target.value); if (passwordMsg) setPasswordMsg(null); }}
-                  className="w-full mt-1 rounded-xl border border-zinc-200 px-3 py-[10px] text-[13px] outline-none focus:border-red-500"
+                <PasswordInput
+                  value={confirmPassword} onChange={(e) => { setConfirmPassword(e.target.value); if (passwordMsg) setPasswordMsg(null); }}
+                  wrapperClassName="mt-1"
+                  className="w-full rounded-xl border border-zinc-200 px-3 py-[10px] text-[13px] outline-none focus:border-red-500"
                 />
               </div>
 
