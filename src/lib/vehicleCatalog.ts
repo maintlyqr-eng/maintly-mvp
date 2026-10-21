@@ -318,11 +318,29 @@ function norm(s: string): string {
   return s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim();
 }
 
+export type LearnedPair = { brand: string; model: string };
+
+/** Combina el catálogo fijo con los pares aprendidos (RPC learned_vehicle_catalog):
+ *  marcas nuevas se agregan al final; modelos nuevos de marcas conocidas se suman
+ *  a esa marca (sin duplicar, comparando sin acentos/mayúsculas). */
+function mergedMakes(assetType: string, learned?: LearnedPair[]): CatalogMake[] {
+  const base = VEHICLE_CATALOG[assetType] ?? [];
+  if (!learned || learned.length === 0) return base;
+  const out: CatalogMake[] = base.map((m) => ({ name: m.name, models: [...m.models] }));
+  for (const { brand, model } of learned) {
+    if (!brand.trim() || !model.trim()) continue;
+    let mk = out.find((m) => norm(m.name) === norm(brand));
+    if (!mk) { mk = { name: brand.trim(), models: [] }; out.push(mk); }
+    if (!mk.models.some((x) => norm(x) === norm(model))) mk.models.push(model.trim());
+  }
+  return out;
+}
+
 /** Marcas que empiezan con (o contienen) lo escrito, para un tipo de equipo. Vacío si no hay texto. */
-export function suggestMakes(assetType: string, query: string, limit = 8): string[] {
+export function suggestMakes(assetType: string, query: string, learned?: LearnedPair[], limit = 8): string[] {
   const q = norm(query);
   if (!q) return [];
-  const makes = VEHICLE_CATALOG[assetType] ?? [];
+  const makes = mergedMakes(assetType, learned);
   const starts: string[] = [];
   const contains: string[] = [];
   for (const m of makes) {
@@ -335,8 +353,8 @@ export function suggestMakes(assetType: string, query: string, limit = 8): strin
 }
 
 /** Modelos de una marca (match de nombre case/acento-insensible) que empiezan con lo escrito. Con query vacío, los primeros N. */
-export function suggestModels(assetType: string, make: string, query: string, limit = 10): string[] {
-  const makes = VEHICLE_CATALOG[assetType] ?? [];
+export function suggestModels(assetType: string, make: string, query: string, learned?: LearnedPair[], limit = 10): string[] {
+  const makes = mergedMakes(assetType, learned);
   const mk = makes.find((m) => norm(m.name) === norm(make));
   if (!mk) return [];
   const q = norm(query);
@@ -353,7 +371,7 @@ export function suggestModels(assetType: string, make: string, query: string, li
 }
 
 /** Nombre canónico de la marca si está en el catálogo (p. ej. "toyota" -> "Toyota"); si no, el texto tal cual. */
-export function canonicalMake(assetType: string, make: string): string {
-  const makes = VEHICLE_CATALOG[assetType] ?? [];
+export function canonicalMake(assetType: string, make: string, learned?: LearnedPair[]): string {
+  const makes = mergedMakes(assetType, learned);
   return makes.find((m) => norm(m.name) === norm(make))?.name ?? make;
 }

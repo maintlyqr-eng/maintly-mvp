@@ -10,6 +10,7 @@ import { uploadAssetPhoto, genAssetQrCode } from "@/lib/uploadAssetPhoto";
 import { assetTypeOptions, fuelTypeOptions } from "@/lib/assetTypes";
 import { suggestMakes, suggestModels, canonicalMake } from "@/lib/vehicleCatalog";
 import SuggestInput from "@/components/SuggestInput";
+import { useLearnedCatalog } from "@/lib/useLearnedCatalog";
 import CustomerPickerIntl, { CustomerOption } from "@/components/CustomerPickerIntl";
 import VinScannerModal from "@/components/VinScannerModal";
 import { VIN_ELIGIBLE_ASSET_TYPES, isVinFormatValid, normalizeVin } from "@/lib/vinValidation";
@@ -61,6 +62,7 @@ export default function NewAssetModalIntl({
   const [assetType, setAssetType] = useState("automotive");
   const [brand, setBrand] = useState("");
   const [model, setModel] = useState("");
+  const learned = useLearnedCatalog(assetType, true);
   const [nickname, setNickname] = useState("");
   const [vin, setVin] = useState("");
   const [year, setYear] = useState("");
@@ -271,7 +273,7 @@ export default function NewAssetModalIntl({
       .insert({
         created_by: mechanicId,
         asset_type: assetType,
-        brand: canonicalMake(assetType, brand.trim()),
+        brand: canonicalMake(assetType, brand.trim(), learned),
         model: model.trim(),
         nickname: nickname.trim() || null,
         // Para automotive/motorcycle se guarda normalizado (mayúsculas, sin
@@ -369,7 +371,7 @@ export default function NewAssetModalIntl({
                 required
                 value={brand}
                 onChange={(v) => { setBrand(v); setAiSuggestedMake(null); }}
-                suggestions={suggestMakes(assetType, brand)}
+                suggestions={suggestMakes(assetType, brand, learned)}
                 placeholder={t("brandPlaceholder")}
                 className="w-full mt-1 rounded-xl border border-zinc-200 px-3 py-[10px] text-[13px] outline-none focus:border-red-500"
               />
@@ -392,7 +394,7 @@ export default function NewAssetModalIntl({
                 required
                 value={model}
                 onChange={(v) => { setModel(v); setAiSuggestedModel(null); }}
-                suggestions={suggestModels(assetType, brand, model)}
+                suggestions={suggestModels(assetType, brand, model, learned)}
                 openOnFocus
                 placeholder={t("modelPlaceholder")}
                 className="w-full mt-1 rounded-xl border border-zinc-200 px-3 py-[10px] text-[13px] outline-none focus:border-red-500"
