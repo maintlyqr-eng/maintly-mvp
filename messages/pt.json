@@ -2145,7 +2145,7 @@
     "adminsInviteHint": "Deixe a senha vazia para gerar um link de convite (vale 7 dias) e a pessoa escolhe a própria senha. Se você definir uma, terá que passá-la separadamente.",
     "inviteReadyTitle": "Link de convite para {user}",
     "inviteReadyHint": "Vale 7 dias e só pode ser usado uma vez. Envie por WhatsApp ou e-mail; ao abrir, a pessoa escolhe a senha e entra direto no seu papel.",
-    "inviteWhatsappText": "🚀 {welcome} à equipe do MaintlyQR, {name}!\n\nEstamos muito felizes por você se juntar a esta aventura como {role}.\n\nEstamos construindo algo com uma visão muito clara: transformar a maneira como pessoas e empresas gerenciam a manutenção de seus equipamentos, em qualquer lugar do mundo. E agora você também faz parte desse caminho. ❤️\n\nPara começar, ative seu acesso ao painel do MaintlyQR pelo link a seguir:\n🔗 {link}\n\nEste link é pessoal e ficará disponível por 7 dias.\n\n{welcome} a bordo! O melhor ainda está por vir.\n\nFacundo Ledesma\nFounder & CEO | MaintlyQR",
+    "inviteWhatsappText": "{welcome} à equipe do MaintlyQR, {name}!\n\nEstamos muito felizes por você se juntar a esta aventura como {role}.\n\nEstamos construindo algo com uma visão muito clara: transformar a maneira como pessoas e empresas gerenciam a manutenção de seus equipamentos, em qualquer lugar do mundo. E agora você também faz parte desse caminho.\n\nPara começar, ative seu acesso ao painel do MaintlyQR pelo link a seguir:\n{link}\n\nEste link é pessoal e ficará disponível por 7 dias.\n\n{welcome} a bordo! O melhor ainda está por vir.\n\nFacundo Ledesma\nFounder & CEO | MaintlyQR",
     "copyLink": "Copiar link",
     "copied": "Copiado",
     "sendWhatsapp": "Enviar por WhatsApp",

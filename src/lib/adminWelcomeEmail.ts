@@ -128,7 +128,8 @@ ${strip(c.signoff.replace(/<br>/g, "\n"))}`;
 
           <!-- Cabecera grafito -->
           <tr><td style="background-color:#1c1f24;border-radius:20px 20px 0 0;padding:30px 36px 26px;text-align:center;">
-            <img src="${SITE}/images/maintly-wordmark-light.png" width="220" alt="MaintlyQR" style="display:inline-block;width:220px;max-width:70%;height:auto;border:0;" />
+            <div style="font-family:Arial Black,'Segoe UI Black',Impact,Helvetica,Arial,sans-serif;font-size:34px;line-height:1;font-weight:900;letter-spacing:0.04em;color:#ffffff;">MAINTLY<span style="color:#e0242b;">QR</span></div>
+            <div style="margin-top:8px;font-size:9px;line-height:1;font-weight:700;letter-spacing:0.38em;color:#9aa0a8;"><span style="color:#e0242b;">&#8212;</span>&nbsp; MAINTENANCE &nbsp;<span style="color:#e0242b;">&#8226;</span>&nbsp; TRACKED &nbsp;<span style="color:#e0242b;">&#8212;</span></div>
           </td></tr>
           <!-- Línea LED -->
           <tr><td style="height:4px;background-color:#e0242b;font-size:0;line-height:0;">&nbsp;</td></tr>
