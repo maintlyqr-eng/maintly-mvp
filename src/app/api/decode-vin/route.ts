@@ -73,7 +73,16 @@ export async function GET(req: NextRequest) {
   }
 
   const make = nhtsaMake || offlineMake;
-  const year = nhtsaYear || offlineYear;
+
+  // 21/10/2026 (Facu: "escaneé un auto 2007 y me sugiere 2013"): el año
+  // sale del carácter 10 del VIN, pero ese carácter SOLO está definido
+  // como año modelo en Norteamérica (primer carácter 1-5: EE.UU., Canadá,
+  // México). Un auto armado en Brasil, Argentina, Europa, etc. puede
+  // tener cualquier cosa ahí, y tanto NHTSA como la tabla offline lo
+  // interpretan igual como año y se equivocan. Para esos VIN no se
+  // devuelve año: queda para que lo cargue la persona.
+  const yearReliable = /^[1-5]/.test(vin);
+  const year = yearReliable ? (nhtsaYear || offlineYear) : null;
   const model = nhtsaModel; // sin fuente offline posible, ver comentario de arriba
 
   // Incremento 29c (Facu, 31 jul 2026): "sumar una IA como respaldo para
