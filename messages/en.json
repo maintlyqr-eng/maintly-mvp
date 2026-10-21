@@ -2219,7 +2219,12 @@
     "chatAttach": "Attach a photo or file (up to 25 MB)",
     "chatSeen": "Seen",
     "chatUploadFailed": "The file could not be uploaded.",
-    "chatSendFailed": "The message could not be sent."
+    "chatSendFailed": "The message could not be sent.",
+    "adminsFirstName": "First name",
+    "adminsLastName": "Last name",
+    "adminsNickname": "Nickname",
+    "adminsNicknamePlaceholder": "optional",
+    "adminsNicknameHint": "Messages (welcome, chat) use the nickname; otherwise the first name."
   },
   "ReportIssueModal": {
     "title": "Report an issue",

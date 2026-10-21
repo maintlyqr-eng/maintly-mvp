@@ -34,7 +34,7 @@ export async function GET(req: NextRequest) {
   const admin = getSupabaseAdmin();
   const { data, error } = await admin
     .from("admin_users")
-    .select("id, username, role, active, created_at, created_by, last_login_at, password_hash, invite_expires_at, email, display_name, salutation, phone, address, birth_date, notes")
+    .select("id, username, role, active, created_at, created_by, last_login_at, password_hash, invite_expires_at, email, display_name, first_name, last_name, nickname, salutation, phone, address, birth_date, notes")
     .order("created_at", { ascending: true });
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
@@ -69,7 +69,10 @@ export async function POST(req: NextRequest) {
   const role = body.role;
   const email = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
   const locale = typeof body.locale === "string" ? body.locale : "es";
-  const displayName = typeof body.displayName === "string" ? body.displayName.trim().slice(0, 80) : "";
+  const firstName = typeof body.firstName === "string" ? body.firstName.trim().slice(0, 80) : "";
+  const lastName = typeof body.lastName === "string" ? body.lastName.trim().slice(0, 80) : "";
+  const nickname = typeof body.nickname === "string" ? body.nickname.trim().slice(0, 80) : "";
+  const displayName = nickname || firstName;
   const salutation: Salutation = body.salutation === "f" || body.salutation === "m" ? body.salutation : "n";
   if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     return NextResponse.json({ error: "Invalid email." }, { status: 400 });
@@ -97,11 +100,14 @@ export async function POST(req: NextRequest) {
       created_by: createdBy,
       email: email || null,
       display_name: displayName || null,
+      first_name: firstName || null,
+      last_name: lastName || null,
+      nickname: nickname || null,
       salutation,
       invite_token_hash: inviteToken ? hashInviteToken(inviteToken) : null,
       invite_expires_at: inviteToken ? new Date(Date.now() + ADMIN_INVITE_TTL_MS).toISOString() : null,
     })
-    .select("id, username, role, active, created_at, created_by, last_login_at, invite_expires_at, email, display_name, salutation, phone, address, birth_date, notes")
+    .select("id, username, role, active, created_at, created_by, last_login_at, invite_expires_at, email, display_name, first_name, last_name, nickname, salutation, phone, address, birth_date, notes")
     .single();
 
   if (error) {
@@ -184,9 +190,9 @@ export async function PATCH(req: NextRequest) {
     const link = buildInviteLink(requestOrigin(req), token);
     let emailSent = false;
     if (body.sendEmail === true) {
-      const { data: full } = await admin.from("admin_users").select("email, role, display_name, salutation").eq("id", id).maybeSingle();
+      const { data: full } = await admin.from("admin_users").select("email, role, first_name, nickname, display_name, salutation").eq("id", id).maybeSingle();
       if (full?.email) {
-        const r = await sendAdminWelcomeEmail({ to: full.email, username: target.username, role: full.role, inviteLink: link, locale: typeof body.locale === "string" ? body.locale : "es", displayName: full.display_name, salutation: full.salutation as Salutation | null });
+        const r = await sendAdminWelcomeEmail({ to: full.email, username: target.username, role: full.role, inviteLink: link, locale: typeof body.locale === "string" ? body.locale : "es", displayName: full.nickname || full.first_name || full.display_name, salutation: full.salutation as Salutation | null });
         emailSent = r.ok && !r.skipped;
       }
     }
@@ -237,7 +243,10 @@ export async function PATCH(req: NextRequest) {
   const profile = body.profile;
   if (profile && typeof profile === "object") {
     const str = (v: unknown, max: number) => (typeof v === "string" ? v.trim().slice(0, max) || null : undefined);
-    const dn = str(profile.displayName, 80); if (dn !== undefined) updates.display_name = dn;
+    const fn = str(profile.firstName, 80); if (fn !== undefined) updates.first_name = fn;
+    const ln = str(profile.lastName, 80); if (ln !== undefined) updates.last_name = ln;
+    const nk = str(profile.nickname, 80); if (nk !== undefined) updates.nickname = nk;
+    if (fn !== undefined || nk !== undefined) updates.display_name = (nk ?? null) || (fn ?? null);
     const ph = str(profile.phone, 40); if (ph !== undefined) updates.phone = ph;
     const ad = str(profile.address, 300); if (ad !== undefined) updates.address = ad;
     const no = str(profile.notes, 2000); if (no !== undefined) updates.notes = no;
@@ -259,7 +268,7 @@ export async function PATCH(req: NextRequest) {
     .from("admin_users")
     .update(updates)
     .eq("id", id)
-    .select("id, username, role, active, created_at, created_by, last_login_at, email, display_name, salutation, phone, address, birth_date, notes")
+    .select("id, username, role, active, created_at, created_by, last_login_at, email, display_name, first_name, last_name, nickname, salutation, phone, address, birth_date, notes")
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });

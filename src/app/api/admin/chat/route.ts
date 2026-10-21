@@ -52,13 +52,13 @@ export async function GET(req: NextRequest) {
 
   // Lista de personas: admins activos + el Super Admin fundador (env).
   const [{ data: admins }, { data: unread }, { data: recent }] = await Promise.all([
-    admin.from("admin_users").select("username, display_name, role").eq("active", true),
+    admin.from("admin_users").select("username, display_name, first_name, nickname, role").eq("active", true),
     admin.from("admin_chat_messages").select("from_username").ilike("to_username", me).is("read_at", null).limit(5000),
     admin.from("admin_chat_messages").select("from_username, to_username, created_at")
       .or(`from_username.ilike.${me},to_username.ilike.${me}`).order("created_at", { ascending: false }).limit(500),
   ]);
   const people = new Map<string, { username: string; displayName: string | null; role: string | null; unread: number; lastAt: string | null }>();
-  for (const a of admins ?? []) people.set(a.username.toLowerCase(), { username: a.username, displayName: a.display_name, role: a.role, unread: 0, lastAt: null });
+  for (const a of admins ?? []) people.set(a.username.toLowerCase(), { username: a.username, displayName: a.nickname || a.first_name || a.display_name, role: a.role, unread: 0, lastAt: null });
   const founder = process.env.ADMIN_USERNAME;
   if (founder && !people.has(founder.toLowerCase())) people.set(founder.toLowerCase(), { username: founder, displayName: "Facundo (CEO)", role: "super_admin", unread: 0, lastAt: null });
   people.delete(me.toLowerCase());

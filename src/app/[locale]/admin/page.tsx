@@ -233,6 +233,9 @@ export type AdminUserRow = {
   invite_expires_at?: string | null;
   email?: string | null;
   display_name?: string | null;
+  first_name?: string | null;
+  last_name?: string | null;
+  nickname?: string | null;
   salutation?: "f" | "m" | "n" | null;
   phone?: string | null;
   address?: string | null;
@@ -240,7 +243,7 @@ export type AdminUserRow = {
   notes?: string | null;
 };
 
-export type AdminProfilePatch = { displayName?: string; salutation?: "f" | "m" | "n"; email?: string; phone?: string; address?: string; birthDate?: string; notes?: string };
+export type AdminProfilePatch = { firstName?: string; lastName?: string; nickname?: string; salutation?: "f" | "m" | "n"; email?: string; phone?: string; address?: string; birthDate?: string; notes?: string };
 
 export type AdminNoteRow = { id: string; created_at: string; from_username: string; body: string; read_at: string | null };
 
@@ -847,7 +850,9 @@ export default function AdminPage() {
   // actividad del equipo (054) — Facu, 21/10/2026.
   const [lastInviteLink, setLastInviteLink] = useState<{ username: string; link: string; emailSent?: string | null } | null>(null);
   const [newAdminEmail, setNewAdminEmail] = useState("");
-  const [newAdminDisplayName, setNewAdminDisplayName] = useState("");
+  const [newAdminFirstName, setNewAdminFirstName] = useState("");
+  const [newAdminLastName, setNewAdminLastName] = useState("");
+  const [newAdminNickname, setNewAdminNickname] = useState("");
   const [newAdminSalutation, setNewAdminSalutation] = useState<"f" | "m" | "n">("n");
   const [myNotes, setMyNotes] = useState<AdminNoteRow[]>([]);
   const [notesForAdmin, setNotesForAdmin] = useState<{ admin: AdminUserRow; notes: AdminNoteRow[] } | null>(null);
@@ -2095,7 +2100,9 @@ export default function AdminPage() {
       username: newAdminUsername.trim(),
       ...(newAdminPassword ? { password: newAdminPassword } : {}),
       ...(newAdminEmail.trim() ? { email: newAdminEmail.trim() } : {}),
-      displayName: newAdminDisplayName.trim(),
+      firstName: newAdminFirstName.trim(),
+      lastName: newAdminLastName.trim(),
+      nickname: newAdminNickname.trim(),
       salutation: newAdminSalutation,
       role: newAdminRole,
       locale,
@@ -2111,7 +2118,9 @@ export default function AdminPage() {
     setNewAdminUsername("");
     setNewAdminPassword("");
     setNewAdminEmail("");
-    setNewAdminDisplayName("");
+    setNewAdminFirstName("");
+    setNewAdminLastName("");
+    setNewAdminNickname("");
     setNewAdminSalutation("n");
     setNewAdminRole("support_admin");
     flash(res.data.inviteLink ? t("adminInvited") : t("adminCreated"));
@@ -3344,7 +3353,9 @@ export default function AdminPage() {
               newAdminUsername={newAdminUsername} setNewAdminUsername={setNewAdminUsername}
               newAdminPassword={newAdminPassword} setNewAdminPassword={setNewAdminPassword}
               newAdminEmail={newAdminEmail} setNewAdminEmail={setNewAdminEmail}
-              newAdminDisplayName={newAdminDisplayName} setNewAdminDisplayName={setNewAdminDisplayName}
+              newAdminFirstName={newAdminFirstName} setNewAdminFirstName={setNewAdminFirstName}
+              newAdminLastName={newAdminLastName} setNewAdminLastName={setNewAdminLastName}
+              newAdminNickname={newAdminNickname} setNewAdminNickname={setNewAdminNickname}
               newAdminSalutation={newAdminSalutation} setNewAdminSalutation={setNewAdminSalutation}
               newAdminRole={newAdminRole} setNewAdminRole={setNewAdminRole}
               creatingAdmin={creatingAdmin} createAdmin={createAdmin}

@@ -2219,7 +2219,12 @@
     "chatAttach": "Adjuntar foto o archivo (hasta 25 MB)",
     "chatSeen": "Visto",
     "chatUploadFailed": "No se pudo subir el archivo.",
-    "chatSendFailed": "No se pudo enviar el mensaje."
+    "chatSendFailed": "No se pudo enviar el mensaje.",
+    "adminsFirstName": "Nombre",
+    "adminsLastName": "Apellido",
+    "adminsNickname": "Apodo",
+    "adminsNicknamePlaceholder": "opcional",
+    "adminsNicknameHint": "Los mensajes (bienvenida, chat) usan el apodo; si no hay, el nombre."
   },
   "ReportIssueModal": {
     "title": "Reportar un problema",

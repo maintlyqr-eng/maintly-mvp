@@ -28,8 +28,12 @@ type AdminsSectionProps = {
   setNewAdminPassword: (v: string) => void;
   newAdminEmail: string;
   setNewAdminEmail: (v: string) => void;
-  newAdminDisplayName: string;
-  setNewAdminDisplayName: (v: string) => void;
+  newAdminFirstName: string;
+  setNewAdminFirstName: (v: string) => void;
+  newAdminLastName: string;
+  setNewAdminLastName: (v: string) => void;
+  newAdminNickname: string;
+  setNewAdminNickname: (v: string) => void;
   newAdminSalutation: "f" | "m" | "n";
   setNewAdminSalutation: (v: "f" | "m" | "n") => void;
   newAdminRole: AdminRole;
@@ -85,7 +89,8 @@ export default function AdminsSection({
   t, locale,
   newAdminUsername, setNewAdminUsername, newAdminPassword, setNewAdminPassword,
   newAdminEmail, setNewAdminEmail,
-  newAdminDisplayName, setNewAdminDisplayName, newAdminSalutation, setNewAdminSalutation,
+  newAdminFirstName, setNewAdminFirstName, newAdminLastName, setNewAdminLastName, newAdminNickname, setNewAdminNickname,
+  newAdminSalutation, setNewAdminSalutation,
   newAdminRole, setNewAdminRole, creatingAdmin, createAdmin,
   adminsLoading, adminsList, updateAdmin, saveAdminProfile,
   lastInviteLink, clearInviteLink, reinviteAdmin, viewAdminActivity,
@@ -105,7 +110,8 @@ export default function AdminsSection({
   function openProfile(a: AdminUserRow) {
     setProfileFor(a);
     setProfileDraft({
-      displayName: a.display_name ?? "", salutation: a.salutation ?? "n", email: a.email ?? "",
+      firstName: a.first_name ?? a.display_name ?? "", lastName: a.last_name ?? "", nickname: a.nickname ?? "",
+      salutation: a.salutation ?? "n", email: a.email ?? "",
       phone: a.phone ?? "", address: a.address ?? "", birthDate: a.birth_date ?? "", notes: a.notes ?? "",
     });
   }
@@ -129,7 +135,7 @@ export default function AdminsSection({
     const role = target ? roleLabel[target.role] ?? target.role : "";
     // Nombre: el cargado al invitar; si no, "katia.damas" -> "Katia".
     const first = lastInviteLink.username.split(/[._\-\s]/)[0];
-    const name = target?.display_name?.trim() || (first ? first.charAt(0).toUpperCase() + first.slice(1) : lastInviteLink.username);
+    const name = target?.nickname?.trim() || target?.first_name?.trim() || target?.display_name?.trim() || (first ? first.charAt(0).toUpperCase() + first.slice(1) : lastInviteLink.username);
     const welcome = t(target?.salutation === "f" ? "welcomeF" : target?.salutation === "m" ? "welcomeM" : "welcomeN");
     return `https://wa.me/?text=${encodeURIComponent(t("inviteWhatsappText", { name, role, link: lastInviteLink.link, welcome }))}`;
   }
@@ -179,13 +185,16 @@ export default function AdminsSection({
                 </select>
               </div>
               <div>
-                <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1">{t("adminsDisplayName")}</label>
-                <input
-                  type="text" value={newAdminDisplayName}
-                  onChange={(e) => setNewAdminDisplayName(e.target.value)}
-                  placeholder={t("adminsDisplayNamePlaceholder")}
-                  className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-[12px] outline-none focus:border-red-400 w-36"
-                />
+                <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1">{t("adminsFirstName")}</label>
+                <input type="text" value={newAdminFirstName} onChange={(e) => setNewAdminFirstName(e.target.value)} placeholder="Katia" className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-[12px] outline-none focus:border-red-400 w-32" />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1">{t("adminsLastName")}</label>
+                <input type="text" value={newAdminLastName} onChange={(e) => setNewAdminLastName(e.target.value)} className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-[12px] outline-none focus:border-red-400 w-32" />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1">{t("adminsNickname")}</label>
+                <input type="text" value={newAdminNickname} onChange={(e) => setNewAdminNickname(e.target.value)} placeholder={t("adminsNicknamePlaceholder")} className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-[12px] outline-none focus:border-red-400 w-28" />
               </div>
               <div>
                 <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1">{t("adminsSalutation")}</label>
@@ -286,7 +295,10 @@ export default function AdminsSection({
                     {adminsList.map((a) => (
                       <tr key={a.id} className="hover:bg-zinc-50/80 transition-colors">
                         <td className="px-7 py-4 text-[13px] font-bold text-zinc-900">
-                          {a.display_name ? <>{a.display_name} <span className="text-[11px] font-medium text-zinc-400">@{a.username}</span></> : a.username}
+                          {(() => {
+                            const full = [a.first_name ?? a.display_name, a.last_name].filter(Boolean).join(" ");
+                            return full ? <>{full}{a.nickname ? <span className="text-zinc-500 font-medium"> “{a.nickname}”</span> : null} <span className="text-[11px] font-medium text-zinc-400">@{a.username}</span></> : a.username;
+                          })()}
                           {a.email && <span className="block text-[11px] font-medium text-zinc-400">{a.email}</span>}
                           {(() => { const dd = daysToBirthday(a.birth_date); return dd !== null && dd <= 14 ? (
                             <span className="inline-flex items-center gap-1 mt-1 text-[10px] font-bold text-pink-700 bg-pink-50 border border-pink-200 rounded-full px-2 py-0.5">
@@ -445,8 +457,17 @@ export default function AdminsSection({
             >
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="text-[12px] font-bold text-zinc-700">{t("adminsDisplayName")}</label>
-                  <input type="text" value={profileDraft.displayName ?? ""} onChange={(e) => setProfileDraft({ ...profileDraft, displayName: e.target.value })} className="w-full mt-1 rounded-xl border border-zinc-200 px-3 py-[10px] text-[13px] outline-none focus:border-red-500" />
+                  <label className="text-[12px] font-bold text-zinc-700">{t("adminsFirstName")}</label>
+                  <input type="text" value={profileDraft.firstName ?? ""} onChange={(e) => setProfileDraft({ ...profileDraft, firstName: e.target.value })} className="w-full mt-1 rounded-xl border border-zinc-200 px-3 py-[10px] text-[13px] outline-none focus:border-red-500" />
+                </div>
+                <div>
+                  <label className="text-[12px] font-bold text-zinc-700">{t("adminsLastName")}</label>
+                  <input type="text" value={profileDraft.lastName ?? ""} onChange={(e) => setProfileDraft({ ...profileDraft, lastName: e.target.value })} className="w-full mt-1 rounded-xl border border-zinc-200 px-3 py-[10px] text-[13px] outline-none focus:border-red-500" />
+                </div>
+                <div>
+                  <label className="text-[12px] font-bold text-zinc-700">{t("adminsNickname")}</label>
+                  <input type="text" value={profileDraft.nickname ?? ""} onChange={(e) => setProfileDraft({ ...profileDraft, nickname: e.target.value })} placeholder={t("adminsNicknamePlaceholder")} className="w-full mt-1 rounded-xl border border-zinc-200 px-3 py-[10px] text-[13px] outline-none focus:border-red-500" />
+                  <p className="text-[11px] text-zinc-400 mt-1">{t("adminsNicknameHint")}</p>
                 </div>
                 <div>
                   <label className="text-[12px] font-bold text-zinc-700">{t("adminsSalutation")}</label>
