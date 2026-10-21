@@ -121,7 +121,8 @@
     "contactSendError": "Couldn't send your message. Please try again.",
     "sending": "Sending…",
     "sendMessageButton": "Send Message",
-    "reportIssueLink": "Report an issue"
+    "reportIssueLink": "Report an issue",
+    "contactRateLimited": "Too many messages in a short time. Please wait a few minutes and try again."
   },
   "ServiceTypes": {
     "oilChange": "Oil Change",

@@ -121,7 +121,8 @@
     "contactSendError": "Não foi possível enviar sua mensagem. Tente novamente.",
     "sending": "Enviando…",
     "sendMessageButton": "Enviar Mensagem",
-    "reportIssueLink": "Reportar um problema"
+    "reportIssueLink": "Reportar um problema",
+    "contactRateLimited": "Muitas mensagens em pouco tempo. Aguarde alguns minutos e tente novamente."
   },
   "ServiceTypes": {
     "oilChange": "Troca de Óleo",

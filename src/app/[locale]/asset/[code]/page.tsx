@@ -329,7 +329,11 @@ export default function AssetPublicPage() {
     });
     setContactSaving(false);
 
-    if (error) { setContactError(t("contactSendError")); return; }
+    if (error) {
+      // Migración 050: el trigger anti-spam rechaza con "rate_limited".
+      setContactError(error.message?.includes("rate_limited") ? t("contactRateLimited") : t("contactSendError"));
+      return;
+    }
     setContactSent(true);
   }
 

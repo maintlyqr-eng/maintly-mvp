@@ -29,7 +29,19 @@ export default function ErrorLogger() {
     let reportCount = 0;
     const seen = new Set<string>();
 
+    // 21/10/2026: errores que vienen de extensiones del navegador del
+    // usuario (traductores, gestores de contraseñas, etc.) no son de
+    // MaintlyQR -- el primer mail de alerta real fue uno de estos
+    // ("Cannot read properties of undefined (reading 'M_ID')" en
+    // chrome-extension://...). Se descartan antes de reportar.
+    const EXTENSION_MARKERS = ["chrome-extension://", "moz-extension://", "safari-extension://", "safari-web-extension://", "ms-browser-extension://"];
+    function isFromBrowserExtension(text: string | undefined): boolean {
+      if (!text) return false;
+      return EXTENSION_MARKERS.some((m) => text.includes(m));
+    }
+
     function report(payload: { message: string; stack?: string; severity?: "error" | "warning"; context?: unknown }) {
+      if (isFromBrowserExtension(payload.stack) || isFromBrowserExtension(payload.message)) return;
       // Dedup + tope por carga de página — evita que un error que se
       // repite en loop (ej. un render que falla una y otra vez) inunde la
       // tabla o mande cientos de pedidos de red.
@@ -55,6 +67,7 @@ export default function ErrorLogger() {
     }
 
     function handleError(event: ErrorEvent) {
+      if (isFromBrowserExtension(event.filename)) return;
       report({
         message: event.message || "Unknown error",
         stack: event.error?.stack,

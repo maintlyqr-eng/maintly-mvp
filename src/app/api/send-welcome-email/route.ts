@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 
 // Fires the welcome email for a brand-new mechanic account. Called
 // client-side from src/app/register/page.tsx right after supabase.auth
@@ -10,26 +11,56 @@ import { NextRequest, NextResponse } from "next/server";
 // route no-ops and logs a warning server-side instead of erroring, so
 // signup keeps working even before email is set up.
 //
-// RESEND_FROM_EMAIL is optional. Left unset, this sends from Resend's own
-// onboarding@resend.dev address, which works immediately with zero setup
-// and can send to any recipient (not just your own inbox) — good enough to
-// ship today. Once support@maintlyqr.com (or any @maintlyqr.com address) is
-// verified as a sending domain in the Resend dashboard, set
-// RESEND_FROM_EMAIL="MaintlyQR <support@maintlyqr.com>" for a more
-// professional from-address and better inbox deliverability.
+// RESEND_FROM_EMAIL: remitente de un dominio verificado en Resend, hoy
+// "MaintlyQR <support@maintlyqr.com>" (dominio verificado el 21/09/2026).
+// Si falta, cae a onboarding@resend.dev, que Resend SOLO acepta para
+// mandarle al dueño de la cuenta -- esa fue la causa del 403 silencioso con
+// el primer usuario externo. Dejar siempre configurada en Vercel.
+
 export async function POST(req: NextRequest) {
   const payload = await req.json().catch(() => ({}));
-  const { name, email } = payload ?? {};
+  const { email } = payload ?? {};
 
   if (!email || typeof email !== "string" || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     return NextResponse.json({ error: "Missing or invalid email." }, { status: 400 });
   }
 
+  // Migración 049 (21/10/2026): este endpoint era público sin ninguna
+  // protección. Ahora solo manda si el email corresponde a una cuenta de
+  // mechanics creada hace menos de 15 minutos que todavía no recibió el
+  // mail, y lo marca al mandarlo (una sola vez por cuenta). El nombre sale
+  // de la base, no del body. Se responde 200 genérico en los casos
+  // rechazados para no revelar qué emails tienen cuenta.
+  const admin = getSupabaseAdmin();
+  const { data: mech } = await admin
+    .from("mechanics")
+    .select("id, name, email, created_at, welcome_email_sent_at")
+    .ilike("email", email)
+    .is("deleted_at", null)
+    .maybeSingle();
+
+  if (!mech) return NextResponse.json({ ok: true, skipped: true });
+  if (mech.welcome_email_sent_at) return NextResponse.json({ ok: true, skipped: true });
+  const ageMs = Date.now() - new Date(mech.created_at as string).getTime();
+  if (!(ageMs >= 0 && ageMs < 15 * 60 * 1000)) return NextResponse.json({ ok: true, skipped: true });
+
+  // Marcar ANTES de mandar: si dos pedidos llegan a la vez (registro +
+  // listener de auth), solo uno pasa este update condicional.
+  const { data: claimed } = await admin
+    .from("mechanics")
+    .update({ welcome_email_sent_at: new Date().toISOString() })
+    .eq("id", mech.id)
+    .is("welcome_email_sent_at", null)
+    .select("id")
+    .maybeSingle();
+  if (!claimed) return NextResponse.json({ ok: true, skipped: true });
+
+  const name = mech.name as string | null;
+  const to = (mech.email as string) || email;
+
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) {
-    console.warn("[send-welcome-email] RESEND_API_KEY is not set — skipping welcome email for", email);
-    // Not an error from the caller's point of view: signup should never
-    // fail just because email sending isn't configured yet.
+    console.warn("[send-welcome-email] RESEND_API_KEY is not set — skipping welcome email for", to);
     return NextResponse.json({ ok: true, skipped: true });
   }
 
@@ -42,7 +73,7 @@ export async function POST(req: NextRequest) {
 
     const { error } = await resend.emails.send({
       from,
-      to: email,
+      to,
       subject: "Welcome to MaintlyQR",
       html: renderWelcomeEmailHtml(firstName),
       text: renderWelcomeEmailText(firstName),

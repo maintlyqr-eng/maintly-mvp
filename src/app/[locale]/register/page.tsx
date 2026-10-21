@@ -67,7 +67,18 @@ export default function RegisterPage() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       if (!session) return;
 
-      const { data: m } = await supabase.from("mechanics").select("suspended, deleted_at, profession, terms_accepted_at").eq("id", session.user.id).maybeSingle();
+      const { data: m } = await supabase.from("mechanics").select("suspended, deleted_at, profession, terms_accepted_at, welcome_email_sent_at, created_at").eq("id", session.user.id).maybeSingle();
+      // Migración 049: el alta con Google nunca pasa por handleRegister(), así
+      // que el mail de bienvenida se dispara acá. El servidor solo manda si la
+      // cuenta tiene menos de 15 min y no lo recibió todavía, así que es
+      // seguro llamarlo siempre que falte. Fire-and-forget.
+      if (m && !m.welcome_email_sent_at && session.user.email) {
+        fetch("/api/send-welcome-email", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email: session.user.email }),
+        }).catch(() => {});
+      }
       // Vuelta del alta con Google: el checkbox se tildó antes del redirect
       // y quedó en localStorage; recién ahora hay fila en mechanics para
       // grabarlo. Best-effort: si falla, no bloquea el ingreso.
@@ -166,7 +177,7 @@ export default function RegisterPage() {
     fetch("/api/send-welcome-email", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, email }),
+      body: JSON.stringify({ email }),
     }).catch(() => {});
 
     // If Supabase requires email confirmation, there is no session yet.
