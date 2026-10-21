@@ -2224,7 +2224,10 @@
     "adminsLastName": "Sobrenome",
     "adminsNickname": "Apelido",
     "adminsNicknamePlaceholder": "opcional",
-    "adminsNicknameHint": "As mensagens (boas-vindas, chat) usam o apelido; se não houver, o nome."
+    "adminsNicknameHint": "As mensagens (boas-vindas, chat) usam o apelido; se não houver, o nome.",
+    "viewAs": "Ver como",
+    "viewAsBanner": "Você está vendo o painel como {user}: este é o menu e as telas do papel dessa pessoa. Sua sessão continua sendo de Super Admin.",
+    "viewAsExit": "Sair"
   },
   "ReportIssueModal": {
     "title": "Reportar um problema",

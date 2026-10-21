@@ -2224,7 +2224,10 @@
     "adminsLastName": "Last name",
     "adminsNickname": "Nickname",
     "adminsNicknamePlaceholder": "optional",
-    "adminsNicknameHint": "Messages (welcome, chat) use the nickname; otherwise the first name."
+    "adminsNicknameHint": "Messages (welcome, chat) use the nickname; otherwise the first name.",
+    "viewAs": "View as",
+    "viewAsBanner": "You're viewing the panel as {user}: this is the menu and screens of their role. Your session is still Super Admin.",
+    "viewAsExit": "Exit"
   },
   "ReportIssueModal": {
     "title": "Report an issue",

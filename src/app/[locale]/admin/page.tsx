@@ -836,8 +836,24 @@ export default function AdminPage() {
   // Chat interno del equipo (migración 057): lista de personas + no leídos
   // para el badge del sidebar. Se refresca cada 30 s.
   const [chatPeople, setChatPeople] = useState<ChatPerson[]>([]);
-  const [adminCapabilities, setAdminCapabilities] = useState<string[]>([]);
-  const [adminReadOnly, setAdminReadOnly] = useState(false);
+  const [realAdminCapabilities, setAdminCapabilities] = useState<string[]>([]);
+  // "Ver como" (Facu, 21/10/2026: "¿cómo hago yo siendo el CEO para ver el
+  // dashboard que tiene Katia?"): el Super Admin elige a una persona y el
+  // panel se muestra con el menú y las pantallas de SU rol. Es solo una
+  // vista del lado del cliente — la sesión (y cada llamada a la API) sigue
+  // siendo la del Super Admin. Mapa rol → capacidades duplicado de
+  // src/lib/adminRoles.ts (mismo criterio que el tipo AdminRole de arriba).
+  const [viewAs, setViewAs] = useState<{ username: string; label: string; role: AdminRole } | null>(null);
+  const CLIENT_ROLE_CAPABILITIES: Record<AdminRole, string[]> = {
+    super_admin: ["accounts", "assets", "qr", "reports", "support", "analytics", "audit_logs", "admin_management", "critical_actions"],
+    support_admin: ["accounts", "reports", "support"],
+    content_moderator: ["assets", "qr", "reports"],
+    analytics_viewer: ["analytics", "reports"],
+    marketing: ["analytics"],
+  };
+  const adminCapabilities = viewAs ? CLIENT_ROLE_CAPABILITIES[viewAs.role] : realAdminCapabilities;
+  const [realAdminReadOnly, setAdminReadOnly] = useState(false);
+  const adminReadOnly = viewAs ? viewAs.role === "analytics_viewer" || viewAs.role === "marketing" : realAdminReadOnly;
 
   // ── Administradores (incremento 11) ──
   const [adminsList, setAdminsList] = useState<AdminUserRow[]>([]);
@@ -3122,6 +3138,14 @@ export default function AdminPage() {
           </div>
         )}
 
+        {viewAs && (
+          <div className="mx-4 md:mx-8 mt-4 rounded-xl px-4 py-2.5 text-[12px] font-semibold border bg-amber-50 border-amber-300 text-amber-900 flex items-center gap-3">
+            <Eye size={14} className="shrink-0" />
+            <span className="flex-1">{t("viewAsBanner", { user: viewAs.label })}</span>
+            <button onClick={() => { setViewAs(null); setSection("admins"); }} className="text-[11px] font-black px-2.5 py-1 rounded-lg bg-amber-900 text-white hover:bg-amber-800">{t("viewAsExit")}</button>
+          </div>
+        )}
+
         {myNotes.filter((n) => !n.read_at).map((n) => (
           <div key={n.id} className="mx-4 md:mx-8 mt-4 rounded-xl px-4 py-3 border bg-sky-50 border-sky-200 text-sky-900 flex items-start gap-3">
             <MessageSquare size={15} className="shrink-0 mt-0.5 text-sky-600" />
@@ -3361,6 +3385,7 @@ export default function AdminPage() {
               creatingAdmin={creatingAdmin} createAdmin={createAdmin}
               adminsLoading={adminsLoading} adminsList={adminsList} updateAdmin={updateAdmin}
               saveAdminProfile={saveAdminProfile}
+              viewPanelAs={(a) => { setViewAs({ username: a.username, label: a.nickname || a.first_name || a.display_name || a.username, role: a.role }); setSection(landingSection(CLIENT_ROLE_CAPABILITIES[a.role])); }}
               lastInviteLink={lastInviteLink} clearInviteLink={() => setLastInviteLink(null)}
               reinviteAdmin={reinviteAdmin} viewAdminActivity={viewAdminActivity}
               notesForAdmin={notesForAdmin} openNotesFor={openNotesFor} closeNotes={() => setNotesForAdmin(null)} sendNote={sendNote}

@@ -13,7 +13,7 @@
 //     por persona en un período, con export CSV para liquidar tiempo.
 
 import { useState } from "react";
-import { UserCog, Copy, Check, MessageSquare, History, Link2, Download, Clock, X, Mail, Cake, IdCard } from "lucide-react";
+import { UserCog, Copy, Check, MessageSquare, History, Link2, Download, Clock, X, Mail, Cake, IdCard, Eye } from "lucide-react";
 import { formatDateDMY } from "@/lib/date";
 import PasswordInput from "@/components/PasswordInput";
 import { Pill, type AdminRole, type AdminUserRow, type AdminNoteRow, type TeamActivityRow, type AdminProfilePatch } from "../page";
@@ -45,6 +45,7 @@ type AdminsSectionProps = {
   adminsList: AdminUserRow[];
   updateAdmin: (id: string, patch: { role?: AdminRole; active?: boolean }) => void | Promise<void>;
   saveAdminProfile: (id: string, profile: AdminProfilePatch) => Promise<boolean>;
+  viewPanelAs: (a: AdminUserRow) => void;
 
   lastInviteLink: { username: string; link: string; emailSent?: string | null } | null;
   clearInviteLink: () => void;
@@ -92,7 +93,7 @@ export default function AdminsSection({
   newAdminFirstName, setNewAdminFirstName, newAdminLastName, setNewAdminLastName, newAdminNickname, setNewAdminNickname,
   newAdminSalutation, setNewAdminSalutation,
   newAdminRole, setNewAdminRole, creatingAdmin, createAdmin,
-  adminsLoading, adminsList, updateAdmin, saveAdminProfile,
+  adminsLoading, adminsList, updateAdmin, saveAdminProfile, viewPanelAs,
   lastInviteLink, clearInviteLink, reinviteAdmin, viewAdminActivity,
   notesForAdmin, openNotesFor, closeNotes, sendNote,
   teamActivity, teamActivityLoading, teamActivityRange, setTeamActivityRange,
@@ -329,6 +330,9 @@ export default function AdminsSection({
                         </td>
                         <td className="px-7 py-4">
                           <div className="flex items-center gap-1.5 flex-wrap">
+                            <button onClick={() => viewPanelAs(a)} title={t("viewAs")} className="text-[11px] font-bold px-2.5 py-1.5 rounded-lg border border-amber-200 text-amber-700 hover:bg-amber-50 flex items-center gap-1">
+                              <Eye size={12} /> {t("viewAs")}
+                            </button>
                             <button onClick={() => openProfile(a)} title={t("adminProfile")} className="text-[11px] font-bold px-2.5 py-1.5 rounded-lg border border-zinc-200 text-zinc-600 hover:bg-zinc-50 flex items-center gap-1">
                               <IdCard size={12} /> {t("adminProfile")}
                             </button>
