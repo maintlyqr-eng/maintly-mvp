@@ -230,7 +230,7 @@ export default function RegisterPage() {
           imagen en particular queda arriba, al revés que en Login). ── */}
       <div className="md:hidden relative h-[140px] shrink-0 overflow-hidden bg-carbon">
         <Image
-          src="/images/register-hero-mobile-dark.png"
+          src="/images/register-hero-mobile-dark.webp"
           alt="MaintlyQR"
           fill
           priority
@@ -248,7 +248,7 @@ export default function RegisterPage() {
           form pegada al panel vacío. ── */}
       <div className="hidden md:block absolute inset-0 z-0 bg-carbon">
         <Image
-          src="/images/register-hero-desktop-dark.png"
+          src="/images/register-hero-desktop-dark.webp"
           alt="MaintlyQR"
           fill
           priority

@@ -122,7 +122,9 @@
     "sending": "Enviando…",
     "sendMessageButton": "Enviar Mensaje",
     "reportIssueLink": "Reportar un problema",
-    "contactRateLimited": "Demasiados mensajes en poco tiempo. Esperá unos minutos y volvé a intentar."
+    "contactRateLimited": "Demasiados mensajes en poco tiempo. Esperá unos minutos y volvé a intentar.",
+    "kmInconsistent": "revisar lectura",
+    "kmInconsistentHint": "Esta lectura es menor que la de un servicio anterior. Probablemente una de las dos se cargó mal; conviene revisarla."
   },
   "ServiceTypes": {
     "oilChange": "Cambio de Aceite",
@@ -1567,7 +1569,9 @@
     "vinMismatchWarning": "Este VIN corresponde a otro vehículo:",
     "vinMismatchApply": "Actualizar marca, modelo y año",
     "vinMismatchKeep": "Mantener lo cargado",
-    "vinMergeButton": "Fusionar historiales"
+    "vinMergeButton": "Fusionar historiales",
+    "kmInconsistent": "revisar lectura",
+    "kmInconsistentHint": "Esta lectura es menor que la de un servicio anterior. Probablemente una de las dos se cargó mal; conviene revisarla."
   },
   "DashboardTeamChatPage": {
     "loadingAuth": "Cargando...",

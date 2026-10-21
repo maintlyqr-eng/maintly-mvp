@@ -445,7 +445,7 @@ export default function HomePage() {
           así entra exactamente una pantalla, siempre, sin excepción. */}
       <section className="md:hidden relative shrink-0 overflow-hidden" style={{height:'calc(100dvh - 4rem)'}}>
         <div className="absolute inset-0 z-0">
-          <Image src="/images/login-hero-mobile-light.png" alt="MaintlyQR" fill priority sizes="100vw" className="object-cover object-top" />
+          <Image src="/images/login-hero-mobile-light.webp" alt="MaintlyQR" fill priority sizes="100vw" className="object-cover object-top" />
         </div>
 
         {/* La foto ya trae su propio ícono de engranaje+QR arriba, así que

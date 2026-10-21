@@ -42,3 +42,6 @@ next-env.d.ts
 
 .vercel
 supabase/.temp/
+
+# Imagenes generadas que no usa ninguna pantalla (21/10/2026). Quedan en disco, no se suben.
+/_imagenes_sin_uso/

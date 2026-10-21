@@ -122,7 +122,9 @@
     "sending": "Sending…",
     "sendMessageButton": "Send Message",
     "reportIssueLink": "Report an issue",
-    "contactRateLimited": "Too many messages in a short time. Please wait a few minutes and try again."
+    "contactRateLimited": "Too many messages in a short time. Please wait a few minutes and try again.",
+    "kmInconsistent": "check reading",
+    "kmInconsistentHint": "This reading is lower than an earlier service. One of the two was probably entered wrong — worth checking."
   },
   "ServiceTypes": {
     "oilChange": "Oil Change",
@@ -1567,7 +1569,9 @@
     "vinMismatchWarning": "This VIN decodes as a different vehicle:",
     "vinMismatchApply": "Update make, model & year",
     "vinMismatchKeep": "Keep what I entered",
-    "vinMergeButton": "Merge histories"
+    "vinMergeButton": "Merge histories",
+    "kmInconsistent": "check reading",
+    "kmInconsistentHint": "This reading is lower than an earlier service. One of the two was probably entered wrong — worth checking."
   },
   "DashboardTeamChatPage": {
     "loadingAuth": "Loading...",

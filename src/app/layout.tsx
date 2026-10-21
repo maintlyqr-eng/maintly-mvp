@@ -30,14 +30,14 @@ export const metadata: Metadata = {
   openGraph: {
     title: "MaintlyQR",
     description: "One QR. Lifetime maintenance history for any asset, anywhere in the world.",
-    images: [{ url: "/images/login-hero-desktop-light.png", width: 1672, height: 941 }],
+    images: [{ url: "/images/og-image.jpg", width: 1200, height: 675 }],
     siteName: "MaintlyQR",
   },
   twitter: {
     card: "summary_large_image",
     title: "MaintlyQR",
     description: "One QR. Lifetime maintenance history for any asset, anywhere in the world.",
-    images: ["/images/login-hero-desktop-light.png"],
+    images: ["/images/og-image.jpg"],
   },
   // Favicon: served automatically by Next.js from src/app/icon.png — no
   // need to declare it here. (The old reference pointed at a 1MB image in

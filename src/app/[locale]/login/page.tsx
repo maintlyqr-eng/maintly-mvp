@@ -464,7 +464,7 @@ function LoginForm() {
           (login-hero-mobile-dark.png). ── */}
       <div className="md:hidden relative z-10 h-[125px] shrink-0 overflow-hidden bg-carbon">
         <Image
-          src="/images/login-hero-mobile-dark.png"
+          src="/images/login-hero-mobile-dark.webp"
           alt="MaintlyQR"
           fill
           priority
@@ -495,7 +495,7 @@ function LoginForm() {
           práctica no se nota. ── */}
       <div className="hidden md:block absolute inset-0 z-0">
         <Image
-          src="/images/login-hero-desktop-worldmap.png"
+          src="/images/login-hero-desktop-worldmap.webp"
           alt="MaintlyQR"
           fill
           priority

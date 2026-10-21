@@ -17,6 +17,7 @@ import { useUnreadMechanicMessages } from "@/lib/useUnreadMechanicMessages";
 import CustomerPickerIntl, { CustomerOption } from "@/components/CustomerPickerIntl";
 import { formatDateDMY, daysAgoLabel, daysUntilLabel } from "@/lib/date";
 import { computeReminderStatus, ReminderStatus } from "@/lib/reminders";
+import { findKmRegressions } from "@/lib/kmConsistency";
 import { getUnitKind } from "@/lib/units";
 import { validateImageFile } from "@/lib/imageValidation";
 import NewAssetModalIntl from "@/components/NewAssetModalIntl";
@@ -1539,6 +1540,7 @@ export default function AssetsPage() {
               ) : (
                 <div className="space-y-3">
                   {historyRecords.map((svc, idx) => {
+                    const kmRegressions = findKmRegressions(historyRecords);
                     const tc = typeColors[svc.service_type] ?? { bg: "bg-zinc-100", text: "text-zinc-700" };
                     const isLatest = idx === 0;
                     const mech = Array.isArray(svc.mechanics) ? svc.mechanics[0] : svc.mechanics;
@@ -1565,6 +1567,14 @@ export default function AssetsPage() {
                             {svc.km_hours != null && (
                               <span className="flex items-center gap-1 text-[11px] text-zinc-500">
                                 <Gauge size={10} /> {svc.km_hours.toLocaleString()} {unitShort(historyAssetType)}
+                              </span>
+                            )}
+                            {svc.km_hours != null && kmRegressions.has(svc.id) && (
+                              <span
+                                title={t("kmInconsistentHint")}
+                                className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-[1px] rounded-full"
+                              >
+                                <AlertTriangle size={9} /> {t("kmInconsistent")}
                               </span>
                             )}
                           </div>

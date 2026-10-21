@@ -275,7 +275,7 @@ const MaintlerCardCanvas = forwardRef<MaintlerCardCanvasHandle, Props>(function 
     ctx.clearRect(0, 0, W, H);
 
     try {
-      const bgImg = await loadImageEl("/images/frontcard1.png");
+      const bgImg = await loadImageEl("/images/frontcard1.webp");
       if (isStale()) return;
       ctx.drawImage(bgImg, 0, 0, W, H);
     } catch {
@@ -515,7 +515,7 @@ const MaintlerCardCanvas = forwardRef<MaintlerCardCanvasHandle, Props>(function 
     const contentH = BACK_CONTENT_H;
 
     try {
-      const bgImg = await loadImageEl("/images/backcard.png");
+      const bgImg = await loadImageEl("/images/backcard.webp");
       if (isStale()) return;
       ctx.drawImage(bgImg, 0, 0, W, H);
     } catch {

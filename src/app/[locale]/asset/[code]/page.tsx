@@ -15,8 +15,9 @@ import {
   ShieldCheck, Calendar, Gauge, Wrench, CheckCircle2, MapPin,
   Hash, Fuel, AlertCircle, ChevronDown, ChevronUp, UserCircle2,
   Plus, BookMarked, LogIn, X, ChevronRight, MessageCircle, Send,
-  QrCode, UserPlus, Flag
+  QrCode, UserPlus, Flag, AlertTriangle
 } from "lucide-react";
+import { findKmRegressions } from "@/lib/kmConsistency";
 import { supabase } from "@/lib/supabase";
 import { formatDateDMY } from "@/lib/date";
 import { getUnitLabel, getUnitShort, formatUnitValue } from "@/lib/units";
@@ -175,6 +176,8 @@ export default function AssetPublicPage() {
   const minKmHours = services.length > 0
     ? services.reduce((max, s) => (s.km_hours != null && s.km_hours > max ? s.km_hours : max), 0)
     : null;
+  // Marca de "km hacia atrás" (ver src/lib/kmConsistency.ts).
+  const kmRegressions = findKmRegressions(services);
 
   // Load auth + asset
   useEffect(() => {
@@ -562,6 +565,11 @@ export default function AssetPublicPage() {
                           <div className="flex items-center gap-3 mt-1 flex-wrap">
                             <span className="flex items-center gap-1 text-[11px] text-zinc-500"><Calendar size={11} /> {formatDate(svc.service_date)}</span>
                             {svc.km_hours != null && <span className="flex items-center gap-1 text-[11px] text-zinc-500"><Gauge size={11} /> {svc.km_hours.toLocaleString()} {getUnitShort(asset.asset_type)}</span>}
+                            {svc.km_hours != null && kmRegressions.has(svc.id) && (
+                              <span title={t("kmInconsistentHint")} className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-[1px] rounded-full">
+                                <AlertTriangle size={9} /> {t("kmInconsistent")}
+                              </span>
+                            )}
                           </div>
                           {(() => {
                             const mech = Array.isArray(svc.mechanics) ? svc.mechanics[0] : svc.mechanics;

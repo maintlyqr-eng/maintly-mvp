@@ -33,7 +33,7 @@ type AssetMetaRow = {
   photo_url: string | null;
 };
 
-const FALLBACK_IMAGE = { url: "/images/login-hero-desktop-light.png", width: 1672, height: 941 };
+const FALLBACK_IMAGE = { url: "/images/og-image.jpg", width: 1200, height: 675 };
 
 export async function generateMetadata({
   params,
