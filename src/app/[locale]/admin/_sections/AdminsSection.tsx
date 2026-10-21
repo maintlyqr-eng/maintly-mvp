@@ -13,10 +13,10 @@
 //     por persona en un período, con export CSV para liquidar tiempo.
 
 import { useState } from "react";
-import { UserCog, Copy, Check, MessageSquare, History, Link2, Download, Clock, X, Mail } from "lucide-react";
+import { UserCog, Copy, Check, MessageSquare, History, Link2, Download, Clock, X, Mail, Cake, IdCard } from "lucide-react";
 import { formatDateDMY } from "@/lib/date";
 import PasswordInput from "@/components/PasswordInput";
-import { Pill, type AdminRole, type AdminUserRow, type AdminNoteRow, type TeamActivityRow } from "../page";
+import { Pill, type AdminRole, type AdminUserRow, type AdminNoteRow, type TeamActivityRow, type AdminProfilePatch } from "../page";
 
 type AdminsSectionProps = {
   t: (key: string, values?: Record<string, string | number>) => string;
@@ -28,6 +28,10 @@ type AdminsSectionProps = {
   setNewAdminPassword: (v: string) => void;
   newAdminEmail: string;
   setNewAdminEmail: (v: string) => void;
+  newAdminDisplayName: string;
+  setNewAdminDisplayName: (v: string) => void;
+  newAdminSalutation: "f" | "m" | "n";
+  setNewAdminSalutation: (v: "f" | "m" | "n") => void;
   newAdminRole: AdminRole;
   setNewAdminRole: (v: AdminRole) => void;
   creatingAdmin: boolean;
@@ -36,6 +40,7 @@ type AdminsSectionProps = {
   adminsLoading: boolean;
   adminsList: AdminUserRow[];
   updateAdmin: (id: string, patch: { role?: AdminRole; active?: boolean }) => void | Promise<void>;
+  saveAdminProfile: (id: string, profile: AdminProfilePatch) => Promise<boolean>;
 
   lastInviteLink: { username: string; link: string; emailSent?: string | null } | null;
   clearInviteLink: () => void;
@@ -59,6 +64,17 @@ type AdminsSectionProps = {
   AUDIT_ACTION_LABEL: Record<string, string>;
 };
 
+// Días hasta el próximo cumpleaños (0 = hoy). null si no hay fecha.
+function daysToBirthday(birthDate: string | null | undefined): number | null {
+  if (!birthDate) return null;
+  const [y, m, d] = birthDate.split("-").map(Number);
+  if (!y || !m || !d) return null;
+  const now = new Date(); now.setHours(0, 0, 0, 0);
+  let next = new Date(now.getFullYear(), m - 1, d);
+  if (next < now) next = new Date(now.getFullYear() + 1, m - 1, d);
+  return Math.round((next.getTime() - now.getTime()) / 86400000);
+}
+
 function minutesLabel(min: number): string {
   const h = Math.floor(min / 60);
   const m = min % 60;
@@ -69,8 +85,9 @@ export default function AdminsSection({
   t, locale,
   newAdminUsername, setNewAdminUsername, newAdminPassword, setNewAdminPassword,
   newAdminEmail, setNewAdminEmail,
+  newAdminDisplayName, setNewAdminDisplayName, newAdminSalutation, setNewAdminSalutation,
   newAdminRole, setNewAdminRole, creatingAdmin, createAdmin,
-  adminsLoading, adminsList, updateAdmin,
+  adminsLoading, adminsList, updateAdmin, saveAdminProfile,
   lastInviteLink, clearInviteLink, reinviteAdmin, viewAdminActivity,
   notesForAdmin, openNotesFor, closeNotes, sendNote,
   teamActivity, teamActivityLoading, teamActivityRange, setTeamActivityRange,
@@ -81,6 +98,17 @@ export default function AdminsSection({
   const [copied, setCopied] = useState(false);
   const [noteDraft, setNoteDraft] = useState("");
   const [sendingNote, setSendingNote] = useState(false);
+  const [profileFor, setProfileFor] = useState<AdminUserRow | null>(null);
+  const [profileDraft, setProfileDraft] = useState<AdminProfilePatch>({});
+  const [savingProfile, setSavingProfile] = useState(false);
+
+  function openProfile(a: AdminUserRow) {
+    setProfileFor(a);
+    setProfileDraft({
+      displayName: a.display_name ?? "", salutation: a.salutation ?? "n", email: a.email ?? "",
+      phone: a.phone ?? "", address: a.address ?? "", birthDate: a.birth_date ?? "", notes: a.notes ?? "",
+    });
+  }
 
   const roleLabel: Record<string, string> = {
     super_admin: t("roleSuperAdmin"),
@@ -98,10 +126,11 @@ export default function AdminsSection({
     if (!lastInviteLink) return "#";
     const target = adminsList.find((a) => a.username.toLowerCase() === lastInviteLink.username.toLowerCase());
     const role = target ? roleLabel[target.role] ?? target.role : "";
-    // Nombre "humano" a partir del usuario: "katia.damas" -> "Katia".
+    // Nombre: el cargado al invitar; si no, "katia.damas" -> "Katia".
     const first = lastInviteLink.username.split(/[._\-\s]/)[0];
-    const name = first ? first.charAt(0).toUpperCase() + first.slice(1) : lastInviteLink.username;
-    return `https://wa.me/?text=${encodeURIComponent(t("inviteWhatsappText", { name, role, link: lastInviteLink.link }))}`;
+    const name = target?.display_name?.trim() || (first ? first.charAt(0).toUpperCase() + first.slice(1) : lastInviteLink.username);
+    const welcome = t(target?.salutation === "f" ? "welcomeF" : target?.salutation === "m" ? "welcomeM" : "welcomeN");
+    return `https://wa.me/?text=${encodeURIComponent(t("inviteWhatsappText", { name, role, link: lastInviteLink.link, welcome }))}`;
   }
 
   const canCreate = !!newAdminUsername.trim() && (newAdminPassword.length === 0 || newAdminPassword.length >= 8);
@@ -145,6 +174,27 @@ export default function AdminsSection({
                   <option value="content_moderator">{t("roleContentModerator")}</option>
                   <option value="analytics_viewer">{t("roleAnalyticsViewer")}</option>
                   <option value="super_admin">{t("roleSuperAdmin")}</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1">{t("adminsDisplayName")}</label>
+                <input
+                  type="text" value={newAdminDisplayName}
+                  onChange={(e) => setNewAdminDisplayName(e.target.value)}
+                  placeholder={t("adminsDisplayNamePlaceholder")}
+                  className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-[12px] outline-none focus:border-red-400 w-36"
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1">{t("adminsSalutation")}</label>
+                <select
+                  value={newAdminSalutation}
+                  onChange={(e) => setNewAdminSalutation(e.target.value as "f" | "m" | "n")}
+                  className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-[12px] outline-none focus:border-red-400"
+                >
+                  <option value="f">{t("salutationF")}</option>
+                  <option value="m">{t("salutationM")}</option>
+                  <option value="n">{t("salutationN")}</option>
                 </select>
               </div>
               <div>
@@ -233,7 +283,15 @@ export default function AdminsSection({
                   <tbody className="divide-y divide-zinc-50">
                     {adminsList.map((a) => (
                       <tr key={a.id} className="hover:bg-zinc-50/80 transition-colors">
-                        <td className="px-7 py-4 text-[13px] font-bold text-zinc-900">{a.username}{a.email && <span className="block text-[11px] font-medium text-zinc-400">{a.email}</span>}</td>
+                        <td className="px-7 py-4 text-[13px] font-bold text-zinc-900">
+                          {a.display_name ? <>{a.display_name} <span className="text-[11px] font-medium text-zinc-400">@{a.username}</span></> : a.username}
+                          {a.email && <span className="block text-[11px] font-medium text-zinc-400">{a.email}</span>}
+                          {(() => { const dd = daysToBirthday(a.birth_date); return dd !== null && dd <= 14 ? (
+                            <span className="inline-flex items-center gap-1 mt-1 text-[10px] font-bold text-pink-700 bg-pink-50 border border-pink-200 rounded-full px-2 py-0.5">
+                              <Cake size={11} /> {dd === 0 ? t("birthdayToday") : dd === 1 ? t("birthdayTomorrow") : t("birthdayInDays", { days: dd })}
+                            </span>
+                          ) : null; })()}
+                        </td>
                         <td className="px-7 py-4">
                           <select
                             value={a.role}
@@ -256,6 +314,9 @@ export default function AdminsSection({
                         </td>
                         <td className="px-7 py-4">
                           <div className="flex items-center gap-1.5 flex-wrap">
+                            <button onClick={() => openProfile(a)} title={t("adminProfile")} className="text-[11px] font-bold px-2.5 py-1.5 rounded-lg border border-zinc-200 text-zinc-600 hover:bg-zinc-50 flex items-center gap-1">
+                              <IdCard size={12} /> {t("adminProfile")}
+                            </button>
                             <button onClick={() => viewAdminActivity(a.username)} title={t("adminViewActivity")} className="text-[11px] font-bold px-2.5 py-1.5 rounded-lg border border-zinc-200 text-zinc-600 hover:bg-zinc-50 flex items-center gap-1">
                               <History size={12} /> {t("adminViewActivity")}
                             </button>
@@ -361,6 +422,63 @@ export default function AdminsSection({
                 </table>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {profileFor && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setProfileFor(null)}>
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-200">
+              <div>
+                <h2 className="text-[15px] font-black text-zinc-900">{t("profileTitle", { user: profileFor.username })}</h2>
+                <p className="text-[11px] text-zinc-400 mt-0.5">{t("profileHint")}</p>
+              </div>
+              <button onClick={() => setProfileFor(null)} className="text-zinc-400 hover:text-zinc-700"><X size={18} /></button>
+            </div>
+            <form
+              className="px-6 py-5 space-y-4"
+              onSubmit={async (e) => { e.preventDefault(); if (!profileFor) return; setSavingProfile(true); const ok = await saveAdminProfile(profileFor.id, profileDraft); setSavingProfile(false); if (ok) setProfileFor(null); }}
+            >
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[12px] font-bold text-zinc-700">{t("adminsDisplayName")}</label>
+                  <input type="text" value={profileDraft.displayName ?? ""} onChange={(e) => setProfileDraft({ ...profileDraft, displayName: e.target.value })} className="w-full mt-1 rounded-xl border border-zinc-200 px-3 py-[10px] text-[13px] outline-none focus:border-red-500" />
+                </div>
+                <div>
+                  <label className="text-[12px] font-bold text-zinc-700">{t("adminsSalutation")}</label>
+                  <select value={profileDraft.salutation ?? "n"} onChange={(e) => setProfileDraft({ ...profileDraft, salutation: e.target.value as "f" | "m" | "n" })} className="w-full mt-1 rounded-xl border border-zinc-200 px-3 py-[10px] text-[13px] outline-none focus:border-red-500 bg-white">
+                    <option value="f">{t("salutationF")}</option>
+                    <option value="m">{t("salutationM")}</option>
+                    <option value="n">{t("salutationN")}</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-[12px] font-bold text-zinc-700">{t("profileBirthDate")}</label>
+                  <input type="date" value={profileDraft.birthDate ?? ""} onChange={(e) => setProfileDraft({ ...profileDraft, birthDate: e.target.value })} className="w-full mt-1 rounded-xl border border-zinc-200 px-3 py-[10px] text-[13px] outline-none focus:border-red-500" />
+                </div>
+                <div>
+                  <label className="text-[12px] font-bold text-zinc-700">{t("profilePhone")}</label>
+                  <input type="tel" value={profileDraft.phone ?? ""} onChange={(e) => setProfileDraft({ ...profileDraft, phone: e.target.value })} placeholder="+61 4…" className="w-full mt-1 rounded-xl border border-zinc-200 px-3 py-[10px] text-[13px] outline-none focus:border-red-500" />
+                </div>
+                <div className="sm:col-span-2">
+                  <label className="text-[12px] font-bold text-zinc-700">Email</label>
+                  <input type="email" value={profileDraft.email ?? ""} onChange={(e) => setProfileDraft({ ...profileDraft, email: e.target.value })} className="w-full mt-1 rounded-xl border border-zinc-200 px-3 py-[10px] text-[13px] outline-none focus:border-red-500" />
+                </div>
+                <div className="sm:col-span-2">
+                  <label className="text-[12px] font-bold text-zinc-700">{t("profileAddress")}</label>
+                  <input type="text" value={profileDraft.address ?? ""} onChange={(e) => setProfileDraft({ ...profileDraft, address: e.target.value })} className="w-full mt-1 rounded-xl border border-zinc-200 px-3 py-[10px] text-[13px] outline-none focus:border-red-500" />
+                </div>
+                <div className="sm:col-span-2">
+                  <label className="text-[12px] font-bold text-zinc-700">{t("profileNotes")}</label>
+                  <textarea rows={3} value={profileDraft.notes ?? ""} onChange={(e) => setProfileDraft({ ...profileDraft, notes: e.target.value })} placeholder={t("profileNotesPlaceholder")} className="w-full mt-1 rounded-xl border border-zinc-200 px-3 py-[10px] text-[13px] outline-none focus:border-red-500 resize-none" />
+                </div>
+              </div>
+              <div className="flex justify-end gap-2 pt-1">
+                <button type="button" onClick={() => setProfileFor(null)} className="text-[12px] font-bold px-4 py-2 rounded-xl border border-zinc-200 text-zinc-600 hover:bg-zinc-50">{t("cancel")}</button>
+                <button type="submit" disabled={savingProfile} className="text-[12px] font-bold px-4 py-2 rounded-xl bg-zinc-900 text-white hover:bg-zinc-800 disabled:opacity-40">{savingProfile ? t("saving") : t("save")}</button>
+              </div>
+            </form>
           </div>
         </div>
       )}

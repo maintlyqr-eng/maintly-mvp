@@ -231,7 +231,15 @@ export type AdminUserRow = {
   invite_pending?: boolean;
   invite_expires_at?: string | null;
   email?: string | null;
+  display_name?: string | null;
+  salutation?: "f" | "m" | "n" | null;
+  phone?: string | null;
+  address?: string | null;
+  birth_date?: string | null;
+  notes?: string | null;
 };
+
+export type AdminProfilePatch = { displayName?: string; salutation?: "f" | "m" | "n"; email?: string; phone?: string; address?: string; birthDate?: string; notes?: string };
 
 export type AdminNoteRow = { id: string; created_at: string; from_username: string; body: string; read_at: string | null };
 
@@ -834,6 +842,8 @@ export default function AdminPage() {
   // actividad del equipo (054) — Facu, 21/10/2026.
   const [lastInviteLink, setLastInviteLink] = useState<{ username: string; link: string; emailSent?: string | null } | null>(null);
   const [newAdminEmail, setNewAdminEmail] = useState("");
+  const [newAdminDisplayName, setNewAdminDisplayName] = useState("");
+  const [newAdminSalutation, setNewAdminSalutation] = useState<"f" | "m" | "n">("n");
   const [myNotes, setMyNotes] = useState<AdminNoteRow[]>([]);
   const [notesForAdmin, setNotesForAdmin] = useState<{ admin: AdminUserRow; notes: AdminNoteRow[] } | null>(null);
   const [teamActivity, setTeamActivity] = useState<TeamActivityRow[]>([]);
@@ -2063,6 +2073,8 @@ export default function AdminPage() {
       username: newAdminUsername.trim(),
       ...(newAdminPassword ? { password: newAdminPassword } : {}),
       ...(newAdminEmail.trim() ? { email: newAdminEmail.trim() } : {}),
+      displayName: newAdminDisplayName.trim(),
+      salutation: newAdminSalutation,
       role: newAdminRole,
       locale,
     });
@@ -2077,6 +2089,8 @@ export default function AdminPage() {
     setNewAdminUsername("");
     setNewAdminPassword("");
     setNewAdminEmail("");
+    setNewAdminDisplayName("");
+    setNewAdminSalutation("n");
     setNewAdminRole("support_admin");
     flash(res.data.inviteLink ? t("adminInvited") : t("adminCreated"));
   }
@@ -2147,6 +2161,17 @@ export default function AdminPage() {
     const res = await adminFetch("/api/admin/admins", "PATCH", { id, ...patch });
     if (!res.ok) { flash(res.error, "error"); return; }
     setAdminsList((prev) => prev.map((a) => (a.id === id ? { ...a, ...patch } : a)));
+  }
+
+  // Ficha del empleado (migración 056): nombre, tratamiento, contacto,
+  // cumpleaños, notas. Devuelve true si se guardó.
+  async function saveAdminProfile(id: string, profile: AdminProfilePatch): Promise<boolean> {
+    const res = await adminFetch("/api/admin/admins", "PATCH", { id, profile });
+    if (!res.ok) { flash(res.error, "error"); return false; }
+    const updated = res.data.admin as Partial<AdminUserRow> | undefined;
+    setAdminsList((prev) => prev.map((a) => (a.id === id ? { ...a, ...(updated ?? {}) } : a)));
+    flash(t("profileSaved"));
+    return true;
   }
 
   // ── Sistema (incremento 17) ──
@@ -3289,9 +3314,12 @@ export default function AdminPage() {
               newAdminUsername={newAdminUsername} setNewAdminUsername={setNewAdminUsername}
               newAdminPassword={newAdminPassword} setNewAdminPassword={setNewAdminPassword}
               newAdminEmail={newAdminEmail} setNewAdminEmail={setNewAdminEmail}
+              newAdminDisplayName={newAdminDisplayName} setNewAdminDisplayName={setNewAdminDisplayName}
+              newAdminSalutation={newAdminSalutation} setNewAdminSalutation={setNewAdminSalutation}
               newAdminRole={newAdminRole} setNewAdminRole={setNewAdminRole}
               creatingAdmin={creatingAdmin} createAdmin={createAdmin}
               adminsLoading={adminsLoading} adminsList={adminsList} updateAdmin={updateAdmin}
+              saveAdminProfile={saveAdminProfile}
               lastInviteLink={lastInviteLink} clearInviteLink={() => setLastInviteLink(null)}
               reinviteAdmin={reinviteAdmin} viewAdminActivity={viewAdminActivity}
               notesForAdmin={notesForAdmin} openNotesFor={openNotesFor} closeNotes={() => setNotesForAdmin(null)} sendNote={sendNote}
