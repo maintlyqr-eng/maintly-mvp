@@ -2208,7 +2208,18 @@
     "profileSaved": "Ficha guardada.",
     "birthdayToday": "¡Hoy es su cumpleaños!",
     "birthdayTomorrow": "Cumple mañana",
-    "birthdayInDays": "Cumple en {days} días"
+    "birthdayInDays": "Cumple en {days} días",
+    "roleMarketing": "Social Media & Marketing Manager",
+    "navTeam": "Equipo",
+    "chatPeople": "Personas",
+    "chatNoPeople": "Todavía no hay nadie más en el equipo.",
+    "chatPickPerson": "Elegí con quién hablar.",
+    "chatEmpty": "Todavía no hay mensajes. Escribí el primero.",
+    "chatPlaceholder": "Escribí un mensaje… (Enter para enviar, Shift+Enter para salto de línea)",
+    "chatAttach": "Adjuntar foto o archivo (hasta 25 MB)",
+    "chatSeen": "Visto",
+    "chatUploadFailed": "No se pudo subir el archivo.",
+    "chatSendFailed": "No se pudo enviar el mensaje."
   },
   "ReportIssueModal": {
     "title": "Reportar un problema",

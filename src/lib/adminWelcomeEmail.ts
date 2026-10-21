@@ -61,9 +61,9 @@ const COPY: Record<Locale, Copy> = {
 };
 
 const ROLE_LABEL: Record<Locale, Record<string, string>> = {
-  es: { super_admin: "Super Admin", support_admin: "Admin de Soporte", content_moderator: "Moderador de Contenido", analytics_viewer: "Visor de Analíticas" },
-  en: { super_admin: "Super Admin", support_admin: "Support Admin", content_moderator: "Content Moderator", analytics_viewer: "Analytics Viewer" },
-  pt: { super_admin: "Super Admin", support_admin: "Admin de Suporte", content_moderator: "Moderador de Conteúdo", analytics_viewer: "Visualizador de Análises" },
+  es: { super_admin: "Super Admin", support_admin: "Admin de Soporte", content_moderator: "Moderador de Contenido", analytics_viewer: "Visor de Analíticas", marketing: "Social Media & Marketing Manager" },
+  en: { super_admin: "Super Admin", support_admin: "Support Admin", content_moderator: "Content Moderator", analytics_viewer: "Analytics Viewer", marketing: "Social Media & Marketing Manager" },
+  pt: { super_admin: "Super Admin", support_admin: "Admin de Suporte", content_moderator: "Moderador de Conteúdo", analytics_viewer: "Visualizador de Análises", marketing: "Social Media & Marketing Manager" },
 };
 
 function escapeHtml(s: string): string {

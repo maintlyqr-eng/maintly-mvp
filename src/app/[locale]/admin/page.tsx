@@ -29,6 +29,7 @@ import TeamChatSection from "./_sections/TeamChatSection";
 import TrashSection from "./_sections/TrashSection";
 import DeleteRequestsSection from "./_sections/DeleteRequestsSection";
 import AdminsSection from "./_sections/AdminsSection";
+import TeamSection, { type ChatPerson } from "./_sections/TeamSection";
 import SystemSection from "./_sections/SystemSection";
 import DashboardSection from "./_sections/DashboardSection";
 import AssetsSection from "./_sections/AssetsSection";
@@ -211,7 +212,7 @@ export type ActivityEvent = {
 // verificación pendiente) — ahora es una sola sección "accounts" (label
 // "Maintlers" en el sidebar) con pestañas internas, ver `maintlersTab` más
 // abajo.
-type Section = "dashboard" | "accounts" | "assets" | "services" | "delete-requests" | "qr" | "support" | "team-chat" | "moderation" | "analytics" | "audit-log" | "trash" | "admins" | "system" | "errors" | "merges";
+type Section = "dashboard" | "accounts" | "assets" | "services" | "delete-requests" | "qr" | "support" | "team-chat" | "moderation" | "analytics" | "audit-log" | "trash" | "admins" | "system" | "errors" | "merges" | "team";
 
 // Incremento 11 (14 jul 2026, roles y permisos): rol de un admin del panel
 // y las capacidades que devuelve /api/admin/session — mismo tipo/nombres
@@ -219,7 +220,7 @@ type Section = "dashboard" | "accounts" | "assets" | "services" | "delete-reques
 // "use client" no debería importar nada del lado del servidor, aunque este
 // archivo en particular no toca crypto/env — es más simple mantener este
 // tipo como fuente de verdad del lado del cliente).
-export type AdminRole = "super_admin" | "support_admin" | "content_moderator" | "analytics_viewer";
+export type AdminRole = "super_admin" | "support_admin" | "content_moderator" | "analytics_viewer" | "marketing";
 export type AdminUserRow = {
   id: string;
   username: string;
@@ -341,7 +342,7 @@ function canSeeSection(id: Section, capabilities: string[]): boolean {
 // fallback defensivo, no debería activarse con los 4 roles actuales.
 const SECTION_LANDING_ORDER: Section[] = [
   "dashboard", "accounts", "assets", "services", "delete-requests",
-  "qr", "support", "team-chat", "moderation", "analytics", "audit-log", "trash", "admins", "system", "errors", "merges",
+  "qr", "support", "team-chat", "moderation", "analytics", "audit-log", "trash", "admins", "system", "errors", "merges", "team",
 ];
 
 function landingSection(capabilities: string[]): Section {
@@ -828,6 +829,10 @@ export default function AdminPage() {
   // adminReadOnly bloquea acciones de escritura para Analytics Viewer en
   // las secciones que sí puede ver (Reportes).
   const [adminRole, setAdminRole] = useState<AdminRole | null>(null);
+  const [adminUsername, setAdminUsername] = useState<string>("");
+  // Chat interno del equipo (migración 057): lista de personas + no leídos
+  // para el badge del sidebar. Se refresca cada 30 s.
+  const [chatPeople, setChatPeople] = useState<ChatPerson[]>([]);
   const [adminCapabilities, setAdminCapabilities] = useState<string[]>([]);
   const [adminReadOnly, setAdminReadOnly] = useState(false);
 
@@ -1803,6 +1808,7 @@ export default function AdminPage() {
     const ok = !!data.ok;
     setAdminAuthed(ok);
     setAdminRole(ok ? (data.role ?? null) : null);
+    setAdminUsername(ok && typeof data.username === "string" ? data.username : "");
     const capabilities = ok && Array.isArray(data.capabilities) ? data.capabilities : [];
     setAdminCapabilities(capabilities);
     setAdminReadOnly(ok ? !!data.readOnly : false);
@@ -1907,6 +1913,22 @@ export default function AdminPage() {
     document.addEventListener("visibilitychange", beat);
     return () => { clearInterval(beatTimer); clearInterval(notesTimer); document.removeEventListener("visibilitychange", beat); };
   }, [adminAuthed]);
+
+  async function loadChatPeople() {
+    try {
+      const r = await fetch("/api/admin/chat");
+      const j = await r.json().catch(() => ({}));
+      if (Array.isArray(j.people)) setChatPeople(j.people as ChatPerson[]);
+    } catch { /* se reintenta en el próximo ciclo */ }
+  }
+  useEffect(() => {
+    if (!adminAuthed) return;
+    loadChatPeople();
+    const timer = setInterval(loadChatPeople, 30 * 1000);
+    return () => clearInterval(timer);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [adminAuthed]);
+  const unreadChatCount = chatPeople.reduce((n, p) => n + p.unread, 0);
 
   useEffect(() => {
     if (section === "admins" && adminAuthed) loadTeamActivity();
@@ -2870,13 +2892,14 @@ export default function AdminPage() {
     { id: "system",    label: t("navSystem"),    icon: Settings },
     { id: "errors",    label: t("navErrors"),    icon: Bug      },
     { id: "merges",    label: t("navMerges"),    icon: GitMerge },
+    { id: "team",      label: t("navTeam"),      icon: MessageSquare },
   ];
   const navItems = ALL_NAV_ITEMS.filter(({ id }) => canSeeSection(id, adminCapabilities));
   const sectionLabels: Record<Section, string> = {
     dashboard: t("navDashboard"), accounts: t("navMaintlers"),
     assets: t("navAssets"), services: t("navServices"), "delete-requests": t("navDeleteRequests"), qr: t("navQr"), support: t("navSupport"), "team-chat": t("navTeamChat"),
     moderation: t("navModeration"), analytics: t("navAnalytics"), "audit-log": t("navAuditLog"), trash: t("navTrash"),
-    admins: t("navAdmins"), system: t("navSystem"), errors: t("navErrors"), merges: t("navMerges"),
+    admins: t("navAdmins"), system: t("navSystem"), errors: t("navErrors"), merges: t("navMerges"), team: t("navTeam"),
   };
   const REPORT_TYPE_LABEL: Record<string, string> = {
     incorrect_info: t("reportTypeIncorrectInfo"),
@@ -3008,6 +3031,13 @@ export default function AdminPage() {
               }`}>
               <Icon size={15} className={section === id ? "text-white" : ""} />
               {label}
+              {id === "team" && unreadChatCount > 0 && (
+                <span className={`ml-auto text-[10px] font-black px-1.5 py-0.5 rounded-full leading-none ${
+                  section === id ? "bg-white text-red-600" : "bg-red-600 text-white"
+                }`}>
+                  {unreadChatCount}
+                </span>
+              )}
               {id === "support" && unreadSupportCount > 0 && (
                 <span className={`ml-auto text-[10px] font-black px-1.5 py-0.5 rounded-full leading-none ${
                   section === id ? "bg-white text-red-600" : "bg-red-600 text-white"
@@ -3330,6 +3360,14 @@ export default function AdminPage() {
               exportTeamActivity={exportTeamActivity}
               AUDIT_ACTION_LABEL={AUDIT_ACTION_LABEL}
               locale={locale}
+            />
+          )}
+
+          {section === "team" && (
+            <TeamSection
+              t={t} locale={locale} me={adminUsername}
+              people={chatPeople} reloadPeople={loadChatPeople}
+              roleLabel={{ super_admin: t("roleSuperAdmin"), support_admin: t("roleSupportAdmin"), content_moderator: t("roleContentModerator"), analytics_viewer: t("roleAnalyticsViewer"), marketing: t("roleMarketing") }}
             />
           )}
 

@@ -10,9 +10,9 @@
 // los 4 nombres de rol hardcodeados en 20 archivos de ruta distintos. Si el
 // día de mañana se agrega un rol nuevo, alcanza con tocar este archivo.
 
-export type AdminRole = "super_admin" | "support_admin" | "content_moderator" | "analytics_viewer";
+export type AdminRole = "super_admin" | "support_admin" | "content_moderator" | "analytics_viewer" | "marketing";
 
-export const ADMIN_ROLES: AdminRole[] = ["super_admin", "support_admin", "content_moderator", "analytics_viewer"];
+export const ADMIN_ROLES: AdminRole[] = ["super_admin", "support_admin", "content_moderator", "analytics_viewer", "marketing"];
 
 export type AdminCapability =
   | "accounts" // Maintlers (mechanics): ver/editar/suspender/verificar/soft-delete/restore
@@ -38,12 +38,17 @@ const ROLE_CAPABILITIES: Record<AdminRole, AdminCapability[]> = {
   // cambio de una línea acá.
   content_moderator: ["assets", "qr", "reports"],
   analytics_viewer: ["analytics", "reports"],
+  // Marketing / Social Media (Facu, 21/10/2026): estadísticas agregadas
+  // para armar contenido (activos, escaneos, países) y el chat interno
+  // del equipo (que no requiere capacidad). Nada de datos personales de
+  // clientes ni acciones sobre la plataforma.
+  marketing: ["analytics"],
 };
 
 // Analytics Viewer es de solo lectura en todo lo que puede ver — a
 // diferencia de los otros 3 roles, donde tener la capacidad alcanza para
 // leer Y escribir. Si se agrega un rol de solo-lectura nuevo, se suma acá.
-const READ_ONLY_ROLES: AdminRole[] = ["analytics_viewer"];
+const READ_ONLY_ROLES: AdminRole[] = ["analytics_viewer", "marketing"];
 
 export function isValidAdminRole(value: unknown): value is AdminRole {
   return typeof value === "string" && (ADMIN_ROLES as string[]).includes(value);

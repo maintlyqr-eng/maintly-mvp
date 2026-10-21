@@ -43,6 +43,7 @@ function AdminInviteInner() {
     support_admin: tAdmin("roleSupportAdmin"),
     content_moderator: tAdmin("roleContentModerator"),
     analytics_viewer: tAdmin("roleAnalyticsViewer"),
+    marketing: tAdmin("roleMarketing"),
   };
 
   async function submit(e: React.FormEvent) {

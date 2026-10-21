@@ -115,6 +115,7 @@ export default function AdminsSection({
     support_admin: t("roleSupportAdmin"),
     content_moderator: t("roleContentModerator"),
     analytics_viewer: t("roleAnalyticsViewer"),
+    marketing: t("roleMarketing"),
   };
 
   async function copyLink() {
@@ -173,6 +174,7 @@ export default function AdminsSection({
                   <option value="support_admin">{t("roleSupportAdmin")}</option>
                   <option value="content_moderator">{t("roleContentModerator")}</option>
                   <option value="analytics_viewer">{t("roleAnalyticsViewer")}</option>
+                  <option value="marketing">{t("roleMarketing")}</option>
                   <option value="super_admin">{t("roleSuperAdmin")}</option>
                 </select>
               </div>
@@ -301,6 +303,7 @@ export default function AdminsSection({
                             <option value="support_admin">{t("roleSupportAdmin")}</option>
                             <option value="content_moderator">{t("roleContentModerator")}</option>
                             <option value="analytics_viewer">{t("roleAnalyticsViewer")}</option>
+                            <option value="marketing">{t("roleMarketing")}</option>
                             <option value="super_admin">{t("roleSuperAdmin")}</option>
                           </select>
                         </td>
