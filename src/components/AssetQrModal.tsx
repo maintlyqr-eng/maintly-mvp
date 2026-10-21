@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
-import { X, Copy, Check, Download, Printer, FileText, QrCode, Palette, ChevronDown, ChevronUp } from "lucide-react";
+import { X, Copy, Check, Download, Printer, FileText, QrCode, Palette, ChevronDown, ChevronUp, Share2 } from "lucide-react";
 import QrCodeCanvas, { type QrCodeCanvasHandle } from "@/components/QrCodeCanvas";
 import QrThemePicker from "@/components/QrThemePicker";
 import { authedFetch } from "@/lib/apiAuth";
@@ -45,6 +45,7 @@ export default function AssetQrModal({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [copied, setCopied] = useState(false);
+  const [sharing, setSharing] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -87,6 +88,39 @@ export default function AssetQrModal({
     window.print();
   }
 
+  // Facu (21/10/2026): "me gustaría poder mandar el QR a alguien por
+  // WhatsApp". En celular se usa la hoja nativa de compartir (Web Share API)
+  // con la IMAGEN del QR adjunta + el texto con el link: ahí el usuario
+  // elige WhatsApp, Telegram, mail, etc. En escritorio, o si el navegador no
+  // puede compartir archivos, se abre WhatsApp con el mensaje y el link ya
+  // escritos (wa.me no permite adjuntar imágenes; para eso está Descargar).
+  async function handleShare() {
+    if (!code) return;
+    const text = t("shareText", { asset: assetName, url: publicUrl });
+    setSharing(true);
+    try {
+      const blob = await canvasRef.current?.getBlob();
+      const nav = navigator as Navigator & { canShare?: (d: ShareData) => boolean };
+      if (blob && typeof nav.share === "function") {
+        const file = new File([blob], `maintlyqr-${draftLabel.trim() || code}.png`, { type: "image/png" });
+        const data: ShareData = { title: "MaintlyQR", text, files: [file] };
+        if (!nav.canShare || nav.canShare(data)) {
+          await nav.share(data);
+          return;
+        }
+        // Puede compartir, pero no archivos: va solo el texto con el link.
+        await nav.share({ title: "MaintlyQR", text });
+        return;
+      }
+      window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank", "noopener,noreferrer");
+    } catch {
+      // El usuario cerró la hoja de compartir, o el navegador la rechazó:
+      // no es un error que haya que mostrar.
+    } finally {
+      setSharing(false);
+    }
+  }
+
   return (
     <div className="fixed inset-0 z-50 bg-zinc-900/40 flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-md max-h-[92vh] flex flex-col">
@@ -109,7 +143,14 @@ export default function AssetQrModal({
           </div>
 
           {/* Acciones rápidas */}
-          <div className="grid grid-cols-3 gap-2 mt-4">
+          <button
+            onClick={handleShare}
+            disabled={sharing}
+            className="w-full mt-4 flex items-center justify-center gap-2 bg-[#25D366] hover:bg-[#1FBF5B] disabled:opacity-60 text-white font-bold py-[11px] rounded-xl text-[13px] transition-colors"
+          >
+            <Share2 size={15} /> {sharing ? t("sharing") : t("share")}
+          </button>
+          <div className="grid grid-cols-3 gap-2 mt-2">
             <button onClick={handleCopy} className="flex flex-col items-center gap-1 border border-zinc-200 hover:bg-zinc-50 rounded-xl py-2.5 text-[11px] font-bold text-zinc-700 transition-colors">
               {copied ? <Check size={16} className="text-green-600" /> : <Copy size={16} />}
               {copied ? t("copied") : t("copyLink")}

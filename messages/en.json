@@ -2316,6 +2316,9 @@
     "discard": "Discard",
     "save": "Save changes",
     "saving": "Saving…",
-    "errorSave": "Could not save changes."
+    "errorSave": "Could not save changes.",
+    "share": "Send via WhatsApp / share",
+    "sharing": "Opening…",
+    "shareText": "Service history of {asset} on MaintlyQR. Scan the QR or open: {url}"
   }
 }

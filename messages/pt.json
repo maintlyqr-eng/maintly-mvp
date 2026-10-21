@@ -2316,6 +2316,9 @@
     "discard": "Descartar",
     "save": "Salvar alterações",
     "saving": "Salvando…",
-    "errorSave": "Não foi possível salvar as alterações."
+    "errorSave": "Não foi possível salvar as alterações.",
+    "share": "Enviar por WhatsApp / compartilhar",
+    "sharing": "Abrindo…",
+    "shareText": "Histórico de manutenção de {asset} na MaintlyQR. Escaneie o QR ou acesse: {url}"
   }
 }
