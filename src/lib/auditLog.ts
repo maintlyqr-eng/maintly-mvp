@@ -35,13 +35,16 @@ export type AdminAuditAction =
   | "admin_user.reinvite"
   | "admin_user.accept_invite"
   | "admin_note.create"
+  | "marketing_account.reveal"
+  | "marketing_account.save"
+  | "marketing_account.delete"
   | "admin_user.update"
   | "system.update_settings"
   | "system.changelog_create"
   | "system.changelog_delete"
   | "error_log.resolve";
 
-export type AdminAuditEntityType = "mechanic" | "asset" | "service_record" | "qr_code" | "qr_batch" | "support_thread" | "content_report" | "admin_user" | "platform_settings" | "platform_changelog" | "platform_error_log";
+export type AdminAuditEntityType = "mechanic" | "asset" | "service_record" | "qr_code" | "qr_batch" | "support_thread" | "content_report" | "admin_user" | "platform_settings" | "platform_changelog" | "platform_error_log" | "marketing_account";
 
 export async function logAdminAction(params: {
   adminUsername: string;

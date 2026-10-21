@@ -11,7 +11,7 @@ import {
   Ban, ShieldCheck, ShieldOff, Trash2, KeyRound, UserCog,
   UserPlus, UserMinus, Plus, Link2Off, ScanLine, ClipboardList,
   LifeBuoy, Send, MessageCircle, Flag, History, ChevronDown, ChevronRight,
-  Trash, RotateCcw, TrendingUp, MapPin, Calendar, Pencil, Download, Settings, AlertTriangle, Bug, Undo2, CheckCircle2, GitMerge, MessageSquare,
+  Trash, RotateCcw, TrendingUp, MapPin, Calendar, Pencil, Download, Settings, AlertTriangle, Bug, Undo2, CheckCircle2, GitMerge, MessageSquare, Megaphone,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { formatDateDMY } from "@/lib/date";
@@ -30,6 +30,7 @@ import TrashSection from "./_sections/TrashSection";
 import DeleteRequestsSection from "./_sections/DeleteRequestsSection";
 import AdminsSection from "./_sections/AdminsSection";
 import TeamSection, { type ChatPerson } from "./_sections/TeamSection";
+import MarketingSection from "./_sections/MarketingSection";
 import SystemSection from "./_sections/SystemSection";
 import DashboardSection from "./_sections/DashboardSection";
 import AssetsSection from "./_sections/AssetsSection";
@@ -212,7 +213,7 @@ export type ActivityEvent = {
 // verificación pendiente) — ahora es una sola sección "accounts" (label
 // "Maintlers" en el sidebar) con pestañas internas, ver `maintlersTab` más
 // abajo.
-type Section = "dashboard" | "accounts" | "assets" | "services" | "delete-requests" | "qr" | "support" | "team-chat" | "moderation" | "analytics" | "audit-log" | "trash" | "admins" | "system" | "errors" | "merges" | "team";
+type Section = "dashboard" | "accounts" | "assets" | "services" | "delete-requests" | "qr" | "support" | "team-chat" | "moderation" | "analytics" | "audit-log" | "trash" | "admins" | "system" | "errors" | "merges" | "team" | "marketing";
 
 // Incremento 11 (14 jul 2026, roles y permisos): rol de un admin del panel
 // y las capacidades que devuelve /api/admin/session — mismo tipo/nombres
@@ -319,6 +320,8 @@ const SECTION_CAPABILITY: Partial<Record<Section, string>> = {
   // parte de la gestión de activos; deshacer una fusión está gateado
   // aparte con "critical_actions" dentro de la propia ruta.
   merges: "assets",
+  // Espacio de Marketing (migración 059): rol marketing + Super Admin.
+  marketing: "marketing",
 };
 
 function canSeeSection(id: Section, capabilities: string[]): boolean {
@@ -345,11 +348,12 @@ function canSeeSection(id: Section, capabilities: string[]): boolean {
 // fallback defensivo, no debería activarse con los 4 roles actuales.
 const SECTION_LANDING_ORDER: Section[] = [
   "dashboard", "accounts", "assets", "services", "delete-requests",
-  "qr", "support", "team-chat", "moderation", "analytics", "audit-log", "trash", "admins", "system", "errors", "merges", "team",
+  "qr", "support", "team-chat", "moderation", "analytics", "audit-log", "trash", "admins", "system", "errors", "merges", "team", "marketing",
 ];
 
 function landingSection(capabilities: string[]): Section {
   if (canSeeSection("dashboard", capabilities)) return "dashboard";
+  if (canSeeSection("marketing", capabilities)) return "marketing";
   if (canSeeSection("analytics", capabilities)) return "analytics";
   return SECTION_LANDING_ORDER.find((id) => canSeeSection(id, capabilities)) ?? "dashboard";
 }
@@ -845,15 +849,15 @@ export default function AdminPage() {
   // src/lib/adminRoles.ts (mismo criterio que el tipo AdminRole de arriba).
   const [viewAs, setViewAs] = useState<{ username: string; label: string; role: AdminRole } | null>(null);
   const CLIENT_ROLE_CAPABILITIES: Record<AdminRole, string[]> = {
-    super_admin: ["accounts", "assets", "qr", "reports", "support", "analytics", "audit_logs", "admin_management", "critical_actions"],
+    super_admin: ["accounts", "assets", "qr", "reports", "support", "analytics", "audit_logs", "admin_management", "critical_actions", "marketing"],
     support_admin: ["accounts", "reports", "support"],
     content_moderator: ["assets", "qr", "reports"],
     analytics_viewer: ["analytics", "reports"],
-    marketing: ["analytics"],
+    marketing: ["analytics", "marketing"],
   };
   const adminCapabilities = viewAs ? CLIENT_ROLE_CAPABILITIES[viewAs.role] : realAdminCapabilities;
   const [realAdminReadOnly, setAdminReadOnly] = useState(false);
-  const adminReadOnly = viewAs ? viewAs.role === "analytics_viewer" || viewAs.role === "marketing" : realAdminReadOnly;
+  const adminReadOnly = viewAs ? viewAs.role === "analytics_viewer" : realAdminReadOnly;
 
   // ── Administradores (incremento 11) ──
   const [adminsList, setAdminsList] = useState<AdminUserRow[]>([]);
@@ -2736,6 +2740,9 @@ export default function AdminPage() {
     "admin_user.reinvite": t("auditActionAdminUserReinvite"),
     "admin_user.accept_invite": t("auditActionAdminUserAcceptInvite"),
     "admin_note.create": t("auditActionAdminNoteCreate"),
+    "marketing_account.reveal": t("auditActionMkReveal"),
+    "marketing_account.save": t("auditActionMkSave"),
+    "marketing_account.delete": t("auditActionMkDelete"),
   };
 
   // "Actividad en tiempo real" (item 1 del pedido: "actividad reciente" del
@@ -2918,13 +2925,14 @@ export default function AdminPage() {
     { id: "errors",    label: t("navErrors"),    icon: Bug      },
     { id: "merges",    label: t("navMerges"),    icon: GitMerge },
     { id: "team",      label: t("navTeam"),      icon: MessageSquare },
+    { id: "marketing", label: t("navMarketing"), icon: Megaphone },
   ];
   const navItems = ALL_NAV_ITEMS.filter(({ id }) => canSeeSection(id, adminCapabilities));
   const sectionLabels: Record<Section, string> = {
     dashboard: t("navDashboard"), accounts: t("navMaintlers"),
     assets: t("navAssets"), services: t("navServices"), "delete-requests": t("navDeleteRequests"), qr: t("navQr"), support: t("navSupport"), "team-chat": t("navTeamChat"),
     moderation: t("navModeration"), analytics: t("navAnalytics"), "audit-log": t("navAuditLog"), trash: t("navTrash"),
-    admins: t("navAdmins"), system: t("navSystem"), errors: t("navErrors"), merges: t("navMerges"), team: t("navTeam"),
+    admins: t("navAdmins"), system: t("navSystem"), errors: t("navErrors"), merges: t("navMerges"), team: t("navTeam"), marketing: t("navMarketing"),
   };
   const REPORT_TYPE_LABEL: Record<string, string> = {
     incorrect_info: t("reportTypeIncorrectInfo"),
@@ -3397,6 +3405,10 @@ export default function AdminPage() {
               AUDIT_ACTION_LABEL={AUDIT_ACTION_LABEL}
               locale={locale}
             />
+          )}
+
+          {section === "marketing" && (
+            <MarketingSection t={t} locale={locale} flash={flash} />
           )}
 
           {section === "team" && (

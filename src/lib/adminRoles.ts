@@ -23,12 +23,13 @@ export type AdminCapability =
   | "analytics" // estadísticas del dashboard (analytics, bulk-data)
   | "audit_logs" // logs de auditoría — expone acciones de TODOS los admins, no solo las propias
   | "admin_management" // crear/desactivar otros admins y asignarles rol
-  | "critical_actions"; // eliminación permanente + configuración crítica del sistema
+  | "critical_actions" // eliminación permanente + configuración crítica del sistema
+  | "marketing"; // espacio de Marketing (migración 059): cuentas de redes, contactos, feedback
 
 const ROLE_CAPABILITIES: Record<AdminRole, AdminCapability[]> = {
   super_admin: [
     "accounts", "assets", "qr", "reports", "support", "analytics",
-    "audit_logs", "admin_management", "critical_actions",
+    "audit_logs", "admin_management", "critical_actions", "marketing",
   ],
   support_admin: ["accounts", "reports", "support"],
   // Nota de alcance: el pedido original no menciona QR explícitamente bajo
@@ -42,13 +43,13 @@ const ROLE_CAPABILITIES: Record<AdminRole, AdminCapability[]> = {
   // para armar contenido (activos, escaneos, países) y el chat interno
   // del equipo (que no requiere capacidad). Nada de datos personales de
   // clientes ni acciones sobre la plataforma.
-  marketing: ["analytics"],
+  marketing: ["analytics", "marketing"],
 };
 
 // Analytics Viewer es de solo lectura en todo lo que puede ver — a
 // diferencia de los otros 3 roles, donde tener la capacidad alcanza para
 // leer Y escribir. Si se agrega un rol de solo-lectura nuevo, se suma acá.
-const READ_ONLY_ROLES: AdminRole[] = ["analytics_viewer", "marketing"];
+const READ_ONLY_ROLES: AdminRole[] = ["analytics_viewer"];
 
 export function isValidAdminRole(value: unknown): value is AdminRole {
   return typeof value === "string" && (ADMIN_ROLES as string[]).includes(value);
