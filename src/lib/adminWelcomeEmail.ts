@@ -34,7 +34,7 @@ const COPY: Record<Locale, Copy> = {
   es: {
     subject: (w) => `🚀 ¡${w} al equipo de MaintlyQR!`,
     title: (n, w) => `🚀 ¡${w} al equipo de MaintlyQR, ${n}!`,
-    p1: (r) => `Nos alegra mucho que te sumes a esta aventura como <strong>${r}</strong>.`,
+    p1: (r) => `Nos alegra mucho que te sumes a esta aventura como <strong>${r}</strong>`,
     p2: "Estamos construyendo algo con una visión muy clara: transformar la manera en que las personas y las empresas gestionan el mantenimiento de sus equipos, en cualquier parte del mundo.",
     p3: "Y ahora vos también sos parte de ese camino. ❤️",
     p4: "Para comenzar, activá tu acceso al panel de MaintlyQR desde el siguiente enlace:",
@@ -46,7 +46,7 @@ const COPY: Record<Locale, Copy> = {
   en: {
     subject: () => "🚀 Welcome to the MaintlyQR team!",
     title: (n) => `🚀 Welcome to the MaintlyQR team, ${n}!`,
-    p1: (r) => `We're thrilled to have you join this adventure as <strong>${r}</strong>.`,
+    p1: (r) => `We're thrilled to have you join this adventure as <strong>${r}</strong>`,
     p2: "We're building something with a very clear vision: to transform the way people and companies manage the maintenance of their equipment, anywhere in the world.",
     p3: "And now you're part of that journey too. ❤️",
     p4: "To get started, activate your access to the MaintlyQR panel through this link:",
@@ -58,7 +58,7 @@ const COPY: Record<Locale, Copy> = {
   pt: {
     subject: (w) => `🚀 ${w} à equipe do MaintlyQR!`,
     title: (n, w) => `🚀 ${w} à equipe do MaintlyQR, ${n}!`,
-    p1: (r) => `Estamos muito felizes por você se juntar a esta aventura como <strong>${r}</strong>.`,
+    p1: (r) => `Estamos muito felizes por você se juntar a esta aventura como <strong>${r}</strong>`,
     p2: "Estamos construindo algo com uma visão muito clara: transformar a maneira como pessoas e empresas gerenciam a manutenção de seus equipamentos, em qualquer lugar do mundo.",
     p3: "E agora você também faz parte desse caminho. ❤️",
     p4: "Para começar, ative seu acesso ao painel do MaintlyQR pelo link a seguir:",
@@ -97,7 +97,7 @@ export async function sendAdminWelcomeEmail(params: { to: string; username: stri
   const strip = (x: string) => x.replace(/<[^>]+>/g, "").replace(/&amp;/g, "&");
   const text = `${strip(c.title(name, w))}
 
-${strip(c.p1(role))}
+${strip(c.p1(role))}.
 
 ${c.p2}
 ${c.p3}
@@ -111,25 +111,70 @@ ${c.p6(w)}
 
 ${strip(c.signoff.replace(/<br>/g, "\n"))}`;
 
-  const P = (inner: string, extra = "") => `<p style="margin:0 0 16px;font-size:14px;line-height:1.6;color:#3f3f46;${extra}">${inner}</p>`;
+  // Diseño (Facu: "dale estilo"): identidad Maintly — cabecera grafito con
+  // el wordmark, línea roja tipo LED, rol en etiqueta, visión en bloque
+  // destacado, botón rojo grande, firma con cargo. Todo inline (mail).
+  const SITE = "https://www.maintlyqr.com";
+  const roleBadge = (r: string) => `<span style="display:inline-block;background-color:#fef2f2;color:#b91c1c;border:1px solid #fecaca;border-radius:999px;padding:4px 12px;font-size:12px;font-weight:800;letter-spacing:0.02em;">${r}</span>`;
+  const p1Html = c.p1(roleBadge(escapeHtml(role)));
   const html = `<!DOCTYPE html>
-<html>
-  <body style="margin:0;padding:0;background-color:#f4f4f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
-    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f4f5;padding:32px 16px;">
+<html lang="${locale}">
+  <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeHtml(c.subject(w))}</title></head>
+  <body style="margin:0;padding:0;background-color:#eceef1;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+    <div style="display:none;max-height:0;overflow:hidden;opacity:0;">${escapeHtml(strip(c.p1(role)))}</div>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#eceef1;padding:32px 16px;">
       <tr><td align="center">
-        <table role="presentation" width="480" cellpadding="0" cellspacing="0" style="background-color:#ffffff;border-radius:16px;overflow:hidden;max-width:480px;width:100%;">
-          <tr><td style="background-color:#dc2626;padding:28px 32px;"><span style="color:#ffffff;font-size:20px;font-weight:900;letter-spacing:0.02em;">MaintlyQR</span></td></tr>
-          <tr><td style="padding:32px;">
-            <h1 style="margin:0 0 20px;font-size:22px;font-weight:900;color:#18181b;line-height:1.3;">${escapeHtml(c.title(name, w))}</h1>
-            ${P(c.p1(escapeHtml(role)))}
-            ${P(c.p2)}
-            ${P(c.p3, "font-weight:700;color:#18181b;")}
-            ${P(c.p4)}
-            <a href="${params.inviteLink}" style="display:inline-block;background-color:#dc2626;color:#ffffff;text-decoration:none;font-weight:700;font-size:13px;letter-spacing:0.03em;text-transform:uppercase;padding:12px 24px;border-radius:10px;">${c.button}</a>
-            <p style="margin:16px 0 0;font-size:12px;line-height:1.6;color:#71717a;word-break:break-all;">🔗 ${escapeHtml(params.inviteLink)}</p>
-            <p style="margin:16px 0 24px;font-size:13px;line-height:1.6;color:#71717a;">${c.p5}</p>
-            ${P(c.p6(w), "font-weight:700;color:#18181b;")}
-            <p style="margin:28px 0 0;font-size:13px;line-height:1.6;color:#18181b;font-weight:700;">${c.signoff}</p>
+        <table role="presentation" width="520" cellpadding="0" cellspacing="0" style="max-width:520px;width:100%;">
+
+          <!-- Cabecera grafito -->
+          <tr><td style="background-color:#1c1f24;border-radius:20px 20px 0 0;padding:30px 36px 26px;text-align:center;">
+            <img src="${SITE}/images/maintly-wordmark-light.png" width="220" alt="MaintlyQR" style="display:inline-block;width:220px;max-width:70%;height:auto;border:0;" />
+          </td></tr>
+          <!-- Línea LED -->
+          <tr><td style="height:4px;background-color:#e0242b;font-size:0;line-height:0;">&nbsp;</td></tr>
+
+          <!-- Cuerpo -->
+          <tr><td style="background-color:#ffffff;padding:36px 36px 8px;">
+            <p style="margin:0 0 10px;font-size:13px;font-weight:800;letter-spacing:0.12em;text-transform:uppercase;color:#e0242b;">${escapeHtml(locale === "es" ? "Equipo MaintlyQR" : locale === "pt" ? "Equipe MaintlyQR" : "MaintlyQR Team")}</p>
+            <h1 style="margin:0 0 22px;font-size:26px;line-height:1.25;font-weight:900;color:#18181b;letter-spacing:-0.01em;">${escapeHtml(c.title(name, w))}</h1>
+            <p style="margin:0 0 18px;font-size:15px;line-height:1.65;color:#3f3f46;">${p1Html}</p>
+          </td></tr>
+
+          <!-- Bloque visión -->
+          <tr><td style="background-color:#ffffff;padding:0 36px;">
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f6f7f9;border-left:4px solid #e0242b;border-radius:0 14px 14px 0;">
+              <tr><td style="padding:18px 20px;">
+                <p style="margin:0 0 10px;font-size:15px;line-height:1.65;color:#27272a;">${c.p2}</p>
+                <p style="margin:0;font-size:15px;line-height:1.65;color:#18181b;font-weight:800;">${c.p3}</p>
+              </td></tr>
+            </table>
+          </td></tr>
+
+          <!-- CTA -->
+          <tr><td style="background-color:#ffffff;padding:26px 36px 10px;">
+            <p style="margin:0 0 18px;font-size:15px;line-height:1.65;color:#3f3f46;">${c.p4}</p>
+            <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 auto;"><tr><td align="center" style="background-color:#e0242b;border-radius:12px;box-shadow:0 8px 24px rgba(224,36,43,0.35);">
+              <a href="${params.inviteLink}" style="display:inline-block;padding:15px 34px;color:#ffffff;text-decoration:none;font-weight:800;font-size:14px;letter-spacing:0.06em;text-transform:uppercase;">${c.button} &rarr;</a>
+            </td></tr></table>
+            <p style="margin:16px 0 0;font-size:11px;line-height:1.6;color:#a1a1aa;text-align:center;word-break:break-all;">${escapeHtml(params.inviteLink)}</p>
+            <p style="margin:14px 0 0;font-size:13px;line-height:1.6;color:#71717a;text-align:center;">${c.p5}</p>
+          </td></tr>
+
+          <!-- Cierre + firma -->
+          <tr><td style="background-color:#ffffff;padding:26px 36px 34px;border-radius:0 0 20px 20px;">
+            <p style="margin:0 0 26px;font-size:17px;line-height:1.5;font-weight:900;color:#18181b;">${c.p6(w)}</p>
+            <table role="presentation" cellpadding="0" cellspacing="0"><tr>
+              <td style="width:44px;height:44px;border-radius:22px;background-color:#1c1f24;color:#ffffff;text-align:center;vertical-align:middle;font-size:16px;font-weight:900;">FL</td>
+              <td style="padding-left:14px;">
+                <p style="margin:0;font-size:15px;font-weight:900;color:#18181b;">Facundo Ledesma</p>
+                <p style="margin:2px 0 0;font-size:12px;font-weight:700;letter-spacing:0.04em;color:#e0242b;">Founder &amp; CEO &nbsp;|&nbsp; MaintlyQR</p>
+              </td>
+            </tr></table>
+          </td></tr>
+
+          <!-- Pie -->
+          <tr><td style="padding:18px 12px 0;text-align:center;">
+            <p style="margin:0;font-size:11px;line-height:1.6;color:#a1a1aa;">MaintlyQR &middot; <a href="${SITE}" style="color:#a1a1aa;text-decoration:underline;">www.maintlyqr.com</a><br>${escapeHtml(locale === "es" ? "Historial de mantenimiento por QR, en cualquier parte del mundo." : locale === "pt" ? "Histórico de manutenção por QR, em qualquer lugar do mundo." : "QR-based maintenance history, anywhere in the world.")}</p>
           </td></tr>
         </table>
       </td></tr>
