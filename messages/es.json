@@ -2145,7 +2145,7 @@
     "adminsInviteHint": "Si dejás la contraseña vacía, se genera un link de invitación (vale 7 días) para que la persona elija su propia contraseña. Si la cargás vos, se la tenés que pasar aparte.",
     "inviteReadyTitle": "Link de invitación para {user}",
     "inviteReadyHint": "Vale 7 días y se usa una sola vez. Mandáselo por WhatsApp o mail; cuando lo abra elige su contraseña y entra directo a su rol.",
-    "inviteWhatsappText": "Hola {user}, te invito al panel de MaintlyQR. Abrí este link, elegí tu contraseña y ya entrás con tu rol: {link}",
+    "inviteWhatsappText": "Hola {name}, ¡bienvenido/a al equipo de MaintlyQR! Te sumás como {role}. En este link vas a poder crear tu contraseña y entrar a tu nuevo rol en el panel: {link}\n\nEl link es personal y vence en 7 días. Me alegra mucho que te sumes; espero que disfrutes trabajar con nuestro equipo.\n\nFacundo Ledesma\nCEO, MaintlyQR",
     "copyLink": "Copiar link",
     "copied": "Copiado",
     "sendWhatsapp": "Enviar por WhatsApp",
@@ -2181,7 +2181,13 @@
     "auditActionAdminUserUpdate": "Admin modificado",
     "auditActionAdminUserReinvite": "Link de invitación generado",
     "auditActionAdminUserAcceptInvite": "Invitación aceptada",
-    "auditActionAdminNoteCreate": "Mensaje interno enviado"
+    "auditActionAdminNoteCreate": "Mensaje interno enviado",
+    "adminsEmailOptional": "Email (opcional)",
+    "adminsEmailHint": "Con email, además del link le llega un mail de bienvenida al equipo firmado por el CEO, con su rol y el link.",
+    "inviteEmailSent": "Mail de bienvenida enviado a {email}.",
+    "inviteEmailFailed": "El mail no se pudo enviar ({error}). El link igual sirve.",
+    "resendEmail": "Reenviar mail",
+    "adminNoEmail": "Esta persona no tiene email cargado."
   },
   "ReportIssueModal": {
     "title": "Reportar un problema",

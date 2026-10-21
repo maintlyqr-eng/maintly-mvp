@@ -230,6 +230,7 @@ export type AdminUserRow = {
   last_login_at: string | null;
   invite_pending?: boolean;
   invite_expires_at?: string | null;
+  email?: string | null;
 };
 
 export type AdminNoteRow = { id: string; created_at: string; from_username: string; body: string; read_at: string | null };
@@ -831,7 +832,8 @@ export default function AdminPage() {
   const [creatingAdmin, setCreatingAdmin] = useState(false);
   // Invitación por link (migración 052), mensajes internos (053) y
   // actividad del equipo (054) — Facu, 21/10/2026.
-  const [lastInviteLink, setLastInviteLink] = useState<{ username: string; link: string } | null>(null);
+  const [lastInviteLink, setLastInviteLink] = useState<{ username: string; link: string; emailSent?: string | null } | null>(null);
+  const [newAdminEmail, setNewAdminEmail] = useState("");
   const [myNotes, setMyNotes] = useState<AdminNoteRow[]>([]);
   const [notesForAdmin, setNotesForAdmin] = useState<{ admin: AdminUserRow; notes: AdminNoteRow[] } | null>(null);
   const [teamActivity, setTeamActivity] = useState<TeamActivityRow[]>([]);
@@ -2060,23 +2062,31 @@ export default function AdminPage() {
     const res = await adminFetch("/api/admin/admins", "POST", {
       username: newAdminUsername.trim(),
       ...(newAdminPassword ? { password: newAdminPassword } : {}),
+      ...(newAdminEmail.trim() ? { email: newAdminEmail.trim() } : {}),
       role: newAdminRole,
+      locale,
     });
     setCreatingAdmin(false);
     if (!res.ok) { flash(res.error, "error"); return; }
     const created = res.data.admin as AdminUserRow;
     setAdminsList((prev) => [...prev, created]);
-    if (res.data.inviteLink) setLastInviteLink({ username: created.username, link: res.data.inviteLink as string });
+    if (res.data.inviteLink) {
+      setLastInviteLink({ username: created.username, link: res.data.inviteLink as string, emailSent: res.data.emailSent ? created.email ?? null : null });
+      if (res.data.emailError) flash(t("inviteEmailFailed", { error: String(res.data.emailError) }), "error");
+    }
     setNewAdminUsername("");
     setNewAdminPassword("");
+    setNewAdminEmail("");
     setNewAdminRole("support_admin");
     flash(res.data.inviteLink ? t("adminInvited") : t("adminCreated"));
   }
 
-  async function reinviteAdmin(a: AdminUserRow) {
-    const res = await adminFetch("/api/admin/admins", "PATCH", { id: a.id, reinvite: true });
+  async function reinviteAdmin(a: AdminUserRow, sendEmail = false) {
+    if (sendEmail && !a.email) { flash(t("adminNoEmail"), "error"); return; }
+    const res = await adminFetch("/api/admin/admins", "PATCH", { id: a.id, reinvite: true, sendEmail, locale });
     if (!res.ok) { flash(res.error, "error"); return; }
-    setLastInviteLink({ username: a.username, link: res.data.inviteLink as string });
+    setLastInviteLink({ username: a.username, link: res.data.inviteLink as string, emailSent: res.data.emailSent ? a.email ?? null : null });
+    if (sendEmail && res.data.emailSent) flash(t("inviteEmailSent", { email: a.email ?? "" }));
     setAdminsList((prev) => prev.map((x) => (x.id === a.id ? { ...x, invite_pending: true, invite_expires_at: res.data.invite_expires_at as string } : x)));
   }
 
@@ -3278,6 +3288,7 @@ export default function AdminPage() {
               t={t}
               newAdminUsername={newAdminUsername} setNewAdminUsername={setNewAdminUsername}
               newAdminPassword={newAdminPassword} setNewAdminPassword={setNewAdminPassword}
+              newAdminEmail={newAdminEmail} setNewAdminEmail={setNewAdminEmail}
               newAdminRole={newAdminRole} setNewAdminRole={setNewAdminRole}
               creatingAdmin={creatingAdmin} createAdmin={createAdmin}
               adminsLoading={adminsLoading} adminsList={adminsList} updateAdmin={updateAdmin}

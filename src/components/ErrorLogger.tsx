@@ -40,8 +40,28 @@ export default function ErrorLogger() {
       return EXTENSION_MARKERS.some((m) => text.includes(m));
     }
 
+    // 21/10/2026: "Failed to load chunk" / ChunkLoadError = la pestaña tenía
+    // una versión anterior del sitio abierta y, después de un deploy, pidió
+    // un archivo que ya no existe. No es un bug: se arregla recargando. En
+    // vez de reportarlo (y mandar un mail de alerta), se recarga la página
+    // una sola vez por sesión de pestaña para que la persona ni lo note.
+    function isStaleChunkError(text: string | undefined): boolean {
+      if (!text) return false;
+      return /ChunkLoadError|Failed to load chunk|Loading chunk \d+ failed|Failed to fetch dynamically imported module/i.test(text);
+    }
+    function handleStaleChunk(): boolean {
+      try {
+        const KEY = "mly_chunk_reload";
+        if (sessionStorage.getItem(KEY)) return true; // ya se recargó una vez: no entrar en loop
+        sessionStorage.setItem(KEY, String(Date.now()));
+        window.location.reload();
+      } catch { /* sin sessionStorage: se ignora el error igual */ }
+      return true;
+    }
+
     function report(payload: { message: string; stack?: string; severity?: "error" | "warning"; context?: unknown }) {
       if (isFromBrowserExtension(payload.stack) || isFromBrowserExtension(payload.message)) return;
+      if (isStaleChunkError(payload.message) || isStaleChunkError(payload.stack)) { handleStaleChunk(); return; }
       // Dedup + tope por carga de página — evita que un error que se
       // repite en loop (ej. un render que falla una y otra vez) inunde la
       // tabla o mande cientos de pedidos de red.

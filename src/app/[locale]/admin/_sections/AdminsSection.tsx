@@ -13,7 +13,7 @@
 //     por persona en un período, con export CSV para liquidar tiempo.
 
 import { useState } from "react";
-import { UserCog, Copy, Check, MessageSquare, History, Link2, Download, Clock, X } from "lucide-react";
+import { UserCog, Copy, Check, MessageSquare, History, Link2, Download, Clock, X, Mail } from "lucide-react";
 import { formatDateDMY } from "@/lib/date";
 import PasswordInput from "@/components/PasswordInput";
 import { Pill, type AdminRole, type AdminUserRow, type AdminNoteRow, type TeamActivityRow } from "../page";
@@ -26,6 +26,8 @@ type AdminsSectionProps = {
   setNewAdminUsername: (v: string) => void;
   newAdminPassword: string;
   setNewAdminPassword: (v: string) => void;
+  newAdminEmail: string;
+  setNewAdminEmail: (v: string) => void;
   newAdminRole: AdminRole;
   setNewAdminRole: (v: AdminRole) => void;
   creatingAdmin: boolean;
@@ -35,9 +37,9 @@ type AdminsSectionProps = {
   adminsList: AdminUserRow[];
   updateAdmin: (id: string, patch: { role?: AdminRole; active?: boolean }) => void | Promise<void>;
 
-  lastInviteLink: { username: string; link: string } | null;
+  lastInviteLink: { username: string; link: string; emailSent?: string | null } | null;
   clearInviteLink: () => void;
-  reinviteAdmin: (a: AdminUserRow) => void | Promise<void>;
+  reinviteAdmin: (a: AdminUserRow, sendEmail?: boolean) => void | Promise<void>;
   viewAdminActivity: (username: string) => void;
 
   notesForAdmin: { admin: AdminUserRow; notes: AdminNoteRow[] } | null;
@@ -66,6 +68,7 @@ function minutesLabel(min: number): string {
 export default function AdminsSection({
   t, locale,
   newAdminUsername, setNewAdminUsername, newAdminPassword, setNewAdminPassword,
+  newAdminEmail, setNewAdminEmail,
   newAdminRole, setNewAdminRole, creatingAdmin, createAdmin,
   adminsLoading, adminsList, updateAdmin,
   lastInviteLink, clearInviteLink, reinviteAdmin, viewAdminActivity,
@@ -93,7 +96,12 @@ export default function AdminsSection({
 
   function whatsappHref(): string {
     if (!lastInviteLink) return "#";
-    return `https://wa.me/?text=${encodeURIComponent(t("inviteWhatsappText", { user: lastInviteLink.username, link: lastInviteLink.link }))}`;
+    const target = adminsList.find((a) => a.username.toLowerCase() === lastInviteLink.username.toLowerCase());
+    const role = target ? roleLabel[target.role] ?? target.role : "";
+    // Nombre "humano" a partir del usuario: "katia.damas" -> "Katia".
+    const first = lastInviteLink.username.split(/[._\-\s]/)[0];
+    const name = first ? first.charAt(0).toUpperCase() + first.slice(1) : lastInviteLink.username;
+    return `https://wa.me/?text=${encodeURIComponent(t("inviteWhatsappText", { name, role, link: lastInviteLink.link }))}`;
   }
 
   const canCreate = !!newAdminUsername.trim() && (newAdminPassword.length === 0 || newAdminPassword.length >= 8);
@@ -140,6 +148,15 @@ export default function AdminsSection({
                 </select>
               </div>
               <div>
+                <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1">{t("adminsEmailOptional")}</label>
+                <input
+                  type="email" value={newAdminEmail}
+                  onChange={(e) => setNewAdminEmail(e.target.value)}
+                  placeholder="nombre@ejemplo.com"
+                  className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-[12px] outline-none focus:border-red-400 w-52"
+                />
+              </div>
+              <div>
                 <label className="block text-[10px] font-bold text-zinc-400 uppercase tracking-widest mb-1">{t("adminsPasswordOptional")}</label>
                 <PasswordInput
                   value={newAdminPassword}
@@ -157,7 +174,7 @@ export default function AdminsSection({
                 {creatingAdmin ? t("creating") : newAdminPassword.length === 0 ? t("adminsInviteButton") : t("adminsCreateButton")}
               </button>
             </div>
-            <p className="text-[11px] text-zinc-400">{t("adminsInviteHint")}</p>
+            <p className="text-[11px] text-zinc-400">{t("adminsInviteHint")} {t("adminsEmailHint")}</p>
             {newAdminPassword.length > 0 && newAdminPassword.length < 8 && (
               <p className="text-[11px] text-amber-600">{t("adminsPasswordTooShort")}</p>
             )}
@@ -180,7 +197,18 @@ export default function AdminsSection({
                 <a href={whatsappHref()} target="_blank" rel="noopener noreferrer" className="text-[11px] font-bold px-3 py-2 rounded-xl bg-[#25D366] text-white hover:brightness-95 flex items-center gap-1.5">
                   <MessageSquare size={13} /> {t("sendWhatsapp")}
                 </a>
+                {(() => {
+                  const target = adminsList.find((a) => a.username.toLowerCase() === lastInviteLink.username.toLowerCase());
+                  return target?.email ? (
+                    <button onClick={() => reinviteAdmin(target, true)} className="text-[11px] font-bold px-3 py-2 rounded-xl bg-white border border-emerald-200 text-emerald-800 hover:bg-emerald-100 flex items-center gap-1.5">
+                      <Mail size={13} /> {t("resendEmail")}
+                    </button>
+                  ) : null;
+                })()}
               </div>
+              {lastInviteLink.emailSent && (
+                <p className="text-[11px] font-bold text-emerald-700 flex items-center gap-1.5"><Check size={12} /> {t("inviteEmailSent", { email: lastInviteLink.emailSent })}</p>
+              )}
             </div>
           )}
 
@@ -205,7 +233,7 @@ export default function AdminsSection({
                   <tbody className="divide-y divide-zinc-50">
                     {adminsList.map((a) => (
                       <tr key={a.id} className="hover:bg-zinc-50/80 transition-colors">
-                        <td className="px-7 py-4 text-[13px] font-bold text-zinc-900">{a.username}</td>
+                        <td className="px-7 py-4 text-[13px] font-bold text-zinc-900">{a.username}{a.email && <span className="block text-[11px] font-medium text-zinc-400">{a.email}</span>}</td>
                         <td className="px-7 py-4">
                           <select
                             value={a.role}

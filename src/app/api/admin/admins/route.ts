@@ -5,6 +5,7 @@ import { ADMIN_ROLES, isValidAdminRole } from "@/lib/adminRoles";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
 import { logAdminAction, getRequestIp } from "@/lib/auditLog";
 import { ADMIN_INVITE_TTL_MS, buildInviteLink, generateInviteToken, hashInviteToken } from "@/lib/adminInvite";
+import { sendAdminWelcomeEmail } from "@/lib/adminWelcomeEmail";
 
 // Incremento 11 (14 jul 2026) — gestión de otros admins (crear, asignar
 // rol, activar/desactivar). Capacidad "admin_management": hoy solo la
@@ -33,7 +34,7 @@ export async function GET(req: NextRequest) {
   const admin = getSupabaseAdmin();
   const { data, error } = await admin
     .from("admin_users")
-    .select("id, username, role, active, created_at, created_by, last_login_at, password_hash, invite_expires_at")
+    .select("id, username, role, active, created_at, created_by, last_login_at, password_hash, invite_expires_at, email")
     .order("created_at", { ascending: true });
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
@@ -66,6 +67,11 @@ export async function POST(req: NextRequest) {
   const username = typeof body.username === "string" ? body.username.trim() : "";
   const password = typeof body.password === "string" ? body.password : "";
   const role = body.role;
+  const email = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
+  const locale = typeof body.locale === "string" ? body.locale : "es";
+  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return NextResponse.json({ error: "Invalid email." }, { status: 400 });
+  }
 
   if (!username || username.length < 3) {
     return NextResponse.json({ error: "Username must be at least 3 characters." }, { status: 400 });
@@ -87,10 +93,11 @@ export async function POST(req: NextRequest) {
       password_hash: password ? hashPassword(password) : null,
       role,
       created_by: createdBy,
+      email: email || null,
       invite_token_hash: inviteToken ? hashInviteToken(inviteToken) : null,
       invite_expires_at: inviteToken ? new Date(Date.now() + ADMIN_INVITE_TTL_MS).toISOString() : null,
     })
-    .select("id, username, role, active, created_at, created_by, last_login_at, invite_expires_at")
+    .select("id, username, role, active, created_at, created_by, last_login_at, invite_expires_at, email")
     .single();
 
   if (error) {
@@ -111,10 +118,23 @@ export async function POST(req: NextRequest) {
     });
   }
 
+  const inviteLink = inviteToken ? buildInviteLink(requestOrigin(req), inviteToken) : null;
+  // Mail de bienvenida al equipo si cargaron email (best-effort: si Resend
+  // falla, el admin ya quedó creado y el link igual se muestra en pantalla).
+  let emailSent = false;
+  let emailError: string | null = null;
+  if (inviteLink && email) {
+    const r = await sendAdminWelcomeEmail({ to: email, username, role, inviteLink, locale });
+    emailSent = r.ok && !r.skipped;
+    if (!r.ok) emailError = r.error ?? "send_failed";
+  }
+
   return NextResponse.json({
     ok: true,
     admin: { ...data, invite_pending: !!inviteToken, invite_expires_at: inviteToken ? data.invite_expires_at : null },
-    inviteLink: inviteToken ? buildInviteLink(requestOrigin(req), inviteToken) : null,
+    inviteLink,
+    emailSent,
+    emailError,
   });
 }
 
@@ -157,7 +177,16 @@ export async function PATCH(req: NextRequest) {
         newValue: { username: target.username, expires }, ipAddress: getRequestIp(req),
       });
     }
-    return NextResponse.json({ ok: true, inviteLink: buildInviteLink(requestOrigin(req), token), invite_expires_at: expires });
+    const link = buildInviteLink(requestOrigin(req), token);
+    let emailSent = false;
+    if (body.sendEmail === true) {
+      const { data: full } = await admin.from("admin_users").select("email, role").eq("id", id).maybeSingle();
+      if (full?.email) {
+        const r = await sendAdminWelcomeEmail({ to: full.email, username: target.username, role: full.role, inviteLink: link, locale: typeof body.locale === "string" ? body.locale : "es" });
+        emailSent = r.ok && !r.skipped;
+      }
+    }
+    return NextResponse.json({ ok: true, inviteLink: link, invite_expires_at: expires, emailSent });
   }
   if (role !== undefined && !isValidAdminRole(role)) {
     return NextResponse.json({ error: `Invalid role. Must be one of: ${ADMIN_ROLES.join(", ")}` }, { status: 400 });

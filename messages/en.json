@@ -2145,7 +2145,7 @@
     "adminsInviteHint": "Leave the password empty to generate an invite link (valid 7 days) so the person picks their own password. If you set one, you'll have to share it separately.",
     "inviteReadyTitle": "Invite link for {user}",
     "inviteReadyHint": "Valid for 7 days, single use. Send it by WhatsApp or email; they pick a password and land straight in their role.",
-    "inviteWhatsappText": "Hi {user}, you're invited to the MaintlyQR admin panel. Open this link, choose your password and you're in with your role: {link}",
+    "inviteWhatsappText": "Hi {name}, welcome to the MaintlyQR team! You're joining as {role}. Use this link to create your password and sign in to your new role in the panel: {link}\n\nThe link is personal and expires in 7 days. I'm really glad to have you on board; I hope you enjoy working with our team.\n\nFacundo Ledesma\nCEO, MaintlyQR",
     "copyLink": "Copy link",
     "copied": "Copied",
     "sendWhatsapp": "Send via WhatsApp",
@@ -2181,7 +2181,13 @@
     "auditActionAdminUserUpdate": "Admin updated",
     "auditActionAdminUserReinvite": "Invite link generated",
     "auditActionAdminUserAcceptInvite": "Invite accepted",
-    "auditActionAdminNoteCreate": "Internal message sent"
+    "auditActionAdminNoteCreate": "Internal message sent",
+    "adminsEmailOptional": "Email (optional)",
+    "adminsEmailHint": "With an email, besides the link they get a team welcome email signed by the CEO, with their role and the link.",
+    "inviteEmailSent": "Welcome email sent to {email}.",
+    "inviteEmailFailed": "The email could not be sent ({error}). The link still works.",
+    "resendEmail": "Resend email",
+    "adminNoEmail": "This person has no email on record."
   },
   "ReportIssueModal": {
     "title": "Report an issue",
