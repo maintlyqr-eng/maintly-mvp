@@ -1556,7 +1556,14 @@
     "removeConfirm": "Remover <b>{name}</b> da sua oficina? O histórico de serviços e o código QR permanecem intactos — você pode vinculá-lo novamente mais tarde escaneando o QR de novo.",
     "removing": "Removendo...",
     "remove": "Remover",
-    "vinScanTooltip": "Escanear VIN com a câmera"
+    "vinScanTooltip": "Escanear VIN com a câmera",
+    "vinChecking": "Verificando…",
+    "vinDuplicateWarning": "Já existe um equipamento cadastrado com este VIN:",
+    "vinDuplicateLinkText": "Ver equipamento existente",
+    "vinAutoDetectedHint": "Detectado automaticamente a partir do VIN — você pode editar.",
+    "vinMismatchWarning": "Este VIN corresponde a outro veículo:",
+    "vinMismatchApply": "Atualizar marca, modelo e ano",
+    "vinMismatchKeep": "Manter o que digitei"
   },
   "DashboardTeamChatPage": {
     "loadingAuth": "Carregando...",

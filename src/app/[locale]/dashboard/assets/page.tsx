@@ -21,7 +21,8 @@ import { getUnitKind } from "@/lib/units";
 import { validateImageFile } from "@/lib/imageValidation";
 import NewAssetModalIntl from "@/components/NewAssetModalIntl";
 import VinScannerModal from "@/components/VinScannerModal";
-import { VIN_ELIGIBLE_ASSET_TYPES } from "@/lib/vinValidation";
+import { VIN_ELIGIBLE_ASSET_TYPES, isVinFormatValid, normalizeVin } from "@/lib/vinValidation";
+import { findAssetByVin, VinMatch } from "@/lib/vinLookup";
 import LinkExistingAssetModalIntl from "@/components/LinkExistingAssetModalIntl";
 import ShareAssetModal from "@/components/ShareAssetModal";
 import AddAssetChooserIntl from "@/components/AddAssetChooserIntl";
@@ -232,6 +233,22 @@ export default function AssetsPage() {
   // Mismo VinScannerModal que usa NewAssetModalIntl, enchufado al form de
   // edición. Solo para automotive/motorcycle, igual que en el alta.
   const [showEditVinScanner, setShowEditVinScanner] = useState(false);
+  // Chequeo del VIN en edición (21/10/2026, Facu: "q pasa si el VIN q uno
+  // escanea me da q es otra marca y otro modelo al ya cargado?" y "si el
+  // Accord ya tiene otro QR cargado por VIN... el sistema deberia detectar
+  // q hay un auto q tiene dos qr"). Misma lógica que NewAssetModalIntl:
+  //   1. findAssetByVin -> si OTRO activo ya tiene este VIN, aviso rojo con
+  //      link y NO se deja guardar (evita generar el duplicado; la fusión
+  //      de historiales es el próximo incremento).
+  //   2. si no hay duplicado, /api/decode-vin: rellena marca/modelo/año
+  //      vacíos, y si difieren de lo cargado muestra una sugerencia
+  //      "Actualizar / Mantener" -- nunca pisa solo lo que cargó la persona.
+  const [editVinChecking, setEditVinChecking] = useState(false);
+  const [editVinDuplicate, setEditVinDuplicate] = useState<VinMatch | null>(null);
+  const [editVinAutoFilled, setEditVinAutoFilled] = useState(false);
+  const [editVinMismatch, setEditVinMismatch] = useState<{ make: string | null; model: string | null; year: number | null } | null>(null);
+  const editVinSeqRef = useRef(0);
+  const editVinTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [editYear, setEditYear] = useState("");
   const [editPlate, setEditPlate] = useState("");
   const [editFuelType, setEditFuelType] = useState("");
@@ -428,6 +445,79 @@ export default function AssetsPage() {
     setHistoryLoading(false);
   }
 
+  useEffect(() => {
+    if (editVinTimerRef.current) {
+      clearTimeout(editVinTimerRef.current);
+      editVinTimerRef.current = null;
+    }
+    setEditVinDuplicate(null);
+    setEditVinChecking(false);
+    setEditVinMismatch(null);
+    setEditVinAutoFilled(false);
+
+    if (!showEditForm || !editingAsset) return;
+    if (!VIN_ELIGIBLE_ASSET_TYPES.includes(editingAsset.asset_type)) return;
+    const cleaned = normalizeVin(editVin);
+    if (!isVinFormatValid(cleaned)) return;
+    // Si es el mismo VIN que ya tenía guardado, no hay nada que chequear.
+    if (cleaned === normalizeVin(editingAsset.vin_serial ?? "")) return;
+
+    const seq = ++editVinSeqRef.current;
+    const assetId = editingAsset.id;
+    setEditVinChecking(true);
+
+    editVinTimerRef.current = setTimeout(() => {
+      (async () => {
+        const match = await findAssetByVin(cleaned);
+        if (editVinSeqRef.current !== seq) return;
+        setEditVinChecking(false);
+        if (match && match.assetId !== assetId) {
+          setEditVinDuplicate(match);
+          return;
+        }
+
+        try {
+          const res = await fetch(`/api/decode-vin?vin=${encodeURIComponent(cleaned)}`);
+          if (editVinSeqRef.current !== seq) return;
+          const json = await res.json();
+          if (!json?.found) return;
+          const dMake: string | null = json.make || null;
+          const dModel: string | null = json.model || null;
+          const dYear: number | null = json.year ? Number(json.year) : null;
+
+          // Campos vacíos: se rellenan directo (igual que en el alta).
+          let filled = false;
+          if (!editBrand.trim() && dMake) { setEditBrand(dMake); filled = true; }
+          if (!editModel.trim() && dModel) { setEditModel(dModel); filled = true; }
+          if (!editYear.trim() && dYear) { setEditYear(String(dYear)); filled = true; }
+          if (filled) setEditVinAutoFilled(true);
+
+          // Campos cargados que NO coinciden con lo decodificado: sugerencia.
+          const norm = (v: string | null | undefined) => (v ?? "").trim().toLowerCase();
+          const makeDiffers = !!dMake && !!editBrand.trim() && norm(dMake) !== norm(editBrand);
+          const modelDiffers = !!dModel && !!editModel.trim() && norm(dModel) !== norm(editModel);
+          const yearDiffers = !!dYear && !!editYear.trim() && dYear !== parseInt(editYear, 10);
+          if (makeDiffers || modelDiffers || yearDiffers) {
+            setEditVinMismatch({ make: dMake, model: dModel, year: dYear });
+          }
+        } catch {
+          // Sin conexión o el decodificador no respondió -- la persona
+          // sigue editando a mano como siempre.
+        }
+      })();
+    }, 500);
+
+    return () => {
+      if (editVinTimerRef.current) {
+        clearTimeout(editVinTimerRef.current);
+        editVinTimerRef.current = null;
+      }
+    };
+    // editBrand/editModel/editYear fuera de las deps a propósito (mismo
+    // motivo que en NewAssetModalIntl): el propio autocompletado los cambia.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editVin, showEditForm, editingAsset?.id]);
+
   function openEdit(a: AssetRow) {
     setEditingAsset(a);
     setEditBrand(a.brand ?? "");
@@ -468,6 +558,10 @@ export default function AssetsPage() {
       setEditError(t("errorYearFuture", { year: currentYear }));
       return;
     }
+    if (editVinDuplicate) {
+      setEditError(`${t("vinDuplicateWarning")} ${editVinDuplicate.displayName}`);
+      return;
+    }
 
     setEditSaving(true);
 
@@ -496,7 +590,8 @@ export default function AssetsPage() {
         brand: editBrand.trim() || null,
         model: editModel.trim() || null,
         nickname: editNickname.trim() || null,
-        vin_serial: editVin.trim() || null,
+        // Mismo formato que graba el alta y que espera findAssetByVin.
+        vin_serial: (VIN_ELIGIBLE_ASSET_TYPES.includes(editingAsset.asset_type) ? normalizeVin(editVin) : editVin.trim()) || null,
         year: editYear ? parseInt(editYear, 10) : null,
         plate: editPlate.trim() || null,
         fuel_type: editFuelType || null,
@@ -1152,6 +1247,61 @@ export default function AssetsPage() {
                   <input type="number" max={new Date().getFullYear()} value={editYear} onChange={(e) => setEditYear(e.target.value)} placeholder={t("yearPlaceholder")} className="w-full mt-1 rounded-xl border border-zinc-200 px-3 py-[10px] text-[13px] outline-none focus:border-red-500" />
                 </div>
               </div>
+
+              {editVinChecking && (
+                <p className="text-[11px] text-zinc-400 -mt-2 mb-3">{t("vinChecking")}</p>
+              )}
+              {!editVinChecking && editVinDuplicate && (
+                <div className="flex items-start gap-1.5 -mt-2 mb-3 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+                  <AlertTriangle size={13} className="text-red-500 shrink-0 mt-0.5" />
+                  <p className="text-[11px] text-red-700 leading-snug">
+                    {t("vinDuplicateWarning")} <span className="font-bold">{editVinDuplicate.displayName}</span>
+                    {editVinDuplicate.qrCode && (
+                      <>
+                        {" — "}
+                        <Link href={`/asset/${editVinDuplicate.qrCode}`} target="_blank" className="underline font-bold hover:text-red-900">
+                          {t("vinDuplicateLinkText")}
+                        </Link>
+                      </>
+                    )}
+                  </p>
+                </div>
+              )}
+              {!editVinChecking && !editVinDuplicate && editVinMismatch && (
+                <div className="-mt-2 mb-3 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                  <div className="flex items-start gap-1.5">
+                    <AlertTriangle size={13} className="text-amber-500 shrink-0 mt-0.5" />
+                    <p className="text-[11px] text-amber-800 leading-snug">
+                      {t("vinMismatchWarning")}{" "}
+                      <span className="font-bold">{[editVinMismatch.make, editVinMismatch.model, editVinMismatch.year].filter(Boolean).join(" ")}</span>
+                    </p>
+                  </div>
+                  <div className="flex gap-2 mt-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (editVinMismatch.make) setEditBrand(editVinMismatch.make);
+                        if (editVinMismatch.model) setEditModel(editVinMismatch.model);
+                        if (editVinMismatch.year) setEditYear(String(editVinMismatch.year));
+                        setEditVinMismatch(null);
+                      }}
+                      className="text-[11px] font-bold bg-amber-500 hover:bg-amber-400 text-white px-3 py-1.5 rounded-lg transition-colors"
+                    >
+                      {t("vinMismatchApply")}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setEditVinMismatch(null)}
+                      className="text-[11px] font-bold border border-amber-300 text-amber-800 hover:bg-amber-100 px-3 py-1.5 rounded-lg transition-colors"
+                    >
+                      {t("vinMismatchKeep")}
+                    </button>
+                  </div>
+                </div>
+              )}
+              {!editVinChecking && !editVinDuplicate && !editVinMismatch && editVinAutoFilled && (
+                <p className="text-[11px] text-green-600 -mt-2 mb-3">{t("vinAutoDetectedHint")}</p>
+              )}
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
                 <div>

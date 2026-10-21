@@ -1556,7 +1556,14 @@
     "removeConfirm": "Remove <b>{name}</b> from your workshop? Its service history and QR code stay intact — you can re-link it later by scanning the QR again.",
     "removing": "Removing...",
     "remove": "Remove",
-    "vinScanTooltip": "Scan VIN with camera"
+    "vinScanTooltip": "Scan VIN with camera",
+    "vinChecking": "Checking…",
+    "vinDuplicateWarning": "There is already equipment registered with this VIN:",
+    "vinDuplicateLinkText": "View existing equipment",
+    "vinAutoDetectedHint": "Auto-detected from the VIN — you can edit it.",
+    "vinMismatchWarning": "This VIN decodes as a different vehicle:",
+    "vinMismatchApply": "Update make, model & year",
+    "vinMismatchKeep": "Keep what I entered"
   },
   "DashboardTeamChatPage": {
     "loadingAuth": "Loading...",

@@ -1556,7 +1556,14 @@
     "removeConfirm": "¿Quitar <b>{name}</b> de tu taller? Su historial de servicios y código QR se mantienen intactos — podés volver a vincularlo más tarde escaneando el QR de nuevo.",
     "removing": "Quitando...",
     "remove": "Quitar",
-    "vinScanTooltip": "Escanear VIN con la cámara"
+    "vinScanTooltip": "Escanear VIN con la cámara",
+    "vinChecking": "Verificando…",
+    "vinDuplicateWarning": "Ya hay un equipo cargado con este VIN:",
+    "vinDuplicateLinkText": "Ver equipo existente",
+    "vinAutoDetectedHint": "Detectado automáticamente a partir del VIN — podés editarlo.",
+    "vinMismatchWarning": "Este VIN corresponde a otro vehículo:",
+    "vinMismatchApply": "Actualizar marca, modelo y año",
+    "vinMismatchKeep": "Mantener lo cargado"
   },
   "DashboardTeamChatPage": {
     "loadingAuth": "Cargando...",
