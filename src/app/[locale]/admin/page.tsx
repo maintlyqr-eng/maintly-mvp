@@ -30,7 +30,7 @@ import TrashSection from "./_sections/TrashSection";
 import DeleteRequestsSection from "./_sections/DeleteRequestsSection";
 import AdminsSection from "./_sections/AdminsSection";
 import TeamSection, { type ChatPerson } from "./_sections/TeamSection";
-import MarketingSection from "./_sections/MarketingSection";
+import MarketingDept from "./_sections/marketing/MarketingDept";
 import SystemSection from "./_sections/SystemSection";
 import DashboardSection from "./_sections/DashboardSection";
 import AssetsSection from "./_sections/AssetsSection";
@@ -2767,6 +2767,20 @@ export default function AdminPage() {
     "marketing_account.reveal": t("auditActionMkReveal"),
     "marketing_account.save": t("auditActionMkSave"),
     "marketing_account.delete": t("auditActionMkDelete"),
+    "marketing_member.update": t("auditActionMkMemberUpdate"),
+    "marketing_member.revoke": t("auditActionMkMemberRevoke"),
+    "marketing_settings.update": t("auditActionMkSettings"),
+    "marketing_campaign.approve_budget": t("auditActionMkBudget"),
+    "marketing_post.submit": t("auditActionMkPostSubmit"),
+    "marketing_post.approve": t("auditActionMkPostApprove"),
+    "marketing_post.request_changes": t("auditActionMkPostChanges"),
+    "marketing_post.back_to_review": t("auditActionMkPostBack"),
+    "marketing_post.schedule": t("auditActionMkPostSchedule"),
+    "marketing_post.publish": t("auditActionMkPostPublish"),
+    "marketing_post.cancel": t("auditActionMkPostCancel"),
+    "marketing_library.update": t("auditActionMkLibrary"),
+    "marketing_handover.start": t("auditActionMkHandoverStart"),
+    "marketing_handover.complete": t("auditActionMkHandoverComplete"),
   };
 
   // "Actividad en tiempo real" (item 1 del pedido: "actividad reciente" del
@@ -3433,7 +3447,7 @@ export default function AdminPage() {
           )}
 
           {section === "marketing" && (
-            <MarketingSection t={t} locale={locale} flash={flash} />
+            <MarketingDept tAdmin={t} locale={locale} flash={flash} />
           )}
 
           {section === "team" && (

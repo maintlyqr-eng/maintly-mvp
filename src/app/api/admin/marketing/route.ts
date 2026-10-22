@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { adminHasCapability, getAdminUsername } from "@/lib/adminAuth";
+import { getAdminUsername } from "@/lib/adminAuth";
+import { getMarketingActor } from "@/lib/marketingPerms";
 import { getSupabaseAdmin } from "@/lib/supabaseAdmin";
-import { logAdminAction, getRequestIp } from "@/lib/auditLog";
-import { decryptSecret, encryptSecret, vaultConfigured } from "@/lib/vault";
 
 // Espacio de Marketing (migración 059). Capacidad "marketing" (rol
 // marketing + Super Admin). Un solo handler para los tres recursos:
@@ -26,8 +25,11 @@ const LIST_SELECT: Record<Resource, string> = {
   feedback: "id, created_at, updated_at, source, author, kind, body, status, answer, updated_by",
 };
 
+// 22/10/2026: "accounts" se movió a /api/admin/marketing/dept (migración
+// 061) con permisos por persona (connections / vault). Acá quedan solo
+// contactos y feedback, para miembros del departamento.
 function resourceOf(v: unknown): Resource | null {
-  return v === "accounts" || v === "contacts" || v === "feedback" ? v : null;
+  return v === "contacts" || v === "feedback" ? v : null;
 }
 
 function pick(resource: Resource, body: Record<string, unknown>): Record<string, unknown> {
@@ -42,108 +44,66 @@ function pick(resource: Resource, body: Record<string, unknown>): Record<string,
   return out;
 }
 
-function gate(req: NextRequest) {
-  if (!adminHasCapability(req, "marketing")) return NextResponse.json({ error: "Not authorized." }, { status: 403 });
+async function gate(req: NextRequest) {
+  const actor = await getMarketingActor(req);
+  if (!actor || !actor.isMember) return NextResponse.json({ error: "Not authorized." }, { status: 403 });
   return null;
 }
 
 export async function GET(req: NextRequest) {
-  const denied = gate(req); if (denied) return denied;
+  const denied = await gate(req); if (denied) return denied;
   const url = new URL(req.url);
   const resource = resourceOf(url.searchParams.get("resource"));
   if (!resource) return NextResponse.json({ error: "Bad resource." }, { status: 400 });
   const admin = getSupabaseAdmin();
-  const me = getAdminUsername(req) ?? "";
-
-  const reveal = url.searchParams.get("reveal");
-  if (resource === "accounts" && reveal) {
-    const { data } = await admin.from("marketing_accounts").select("id, label, password_enc").eq("id", reveal).maybeSingle();
-    if (!data) return NextResponse.json({ error: "Not found." }, { status: 404 });
-    if (!data.password_enc) return NextResponse.json({ password: "" });
-    try {
-      const password = decryptSecret(data.password_enc);
-      await logAdminAction({ adminUsername: me, action: "marketing_account.reveal", entityType: "marketing_account", entityId: data.id, newValue: { label: data.label }, ipAddress: getRequestIp(req) });
-      return NextResponse.json({ password });
-    } catch {
-      return NextResponse.json({ error: "Vault key missing or changed." }, { status: 500 });
-    }
-  }
 
   const order = resource === "contacts" ? "updated_at" : "created_at";
   const { data, error } = await admin.from(TABLE[resource]).select(LIST_SELECT[resource]).order(order, { ascending: false }).limit(1000);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  const rows = (data ?? []) as unknown as Record<string, unknown>[];
-  const items = resource === "accounts"
-    ? rows.map(({ password_enc, ...rest }) => ({ ...rest, has_password: !!password_enc }))
-    : rows;
-  return NextResponse.json({ items, vaultConfigured: vaultConfigured() });
+  return NextResponse.json({ items: data ?? [] });
 }
 
 export async function POST(req: NextRequest) {
-  const denied = gate(req); if (denied) return denied;
+  const denied = await gate(req); if (denied) return denied;
   const body = await req.json().catch(() => ({}));
   const resource = resourceOf(body.resource);
   if (!resource) return NextResponse.json({ error: "Bad resource." }, { status: 400 });
   const me = getAdminUsername(req) ?? "";
   const row = pick(resource, body);
-  if (resource === "accounts" && !row.label) return NextResponse.json({ error: "Label is required." }, { status: 400 });
   if (resource === "contacts" && !row.name) return NextResponse.json({ error: "Name is required." }, { status: 400 });
   if (resource === "feedback" && !row.body) return NextResponse.json({ error: "Text is required." }, { status: 400 });
-  if (resource === "accounts" && typeof body.password === "string" && body.password) {
-    if (!vaultConfigured()) return NextResponse.json({ error: "vault_not_configured" }, { status: 500 });
-    row.password_enc = encryptSecret(body.password);
-  }
   row.created_by = me; row.updated_by = me;
   const admin = getSupabaseAdmin();
   const { data: inserted, error } = await admin.from(TABLE[resource]).insert(row).select(LIST_SELECT[resource]).single();
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
   const data = inserted as unknown as Record<string, unknown>;
-  if (resource === "accounts") {
-    await logAdminAction({ adminUsername: me, action: "marketing_account.save", entityType: "marketing_account", entityId: String(data.id), newValue: { label: row.label }, ipAddress: getRequestIp(req) });
-  }
-  const { password_enc, ...rest } = data;
-  return NextResponse.json({ ok: true, item: resource === "accounts" ? { ...rest, has_password: !!password_enc } : rest });
+  return NextResponse.json({ ok: true, item: data });
 }
 
 export async function PATCH(req: NextRequest) {
-  const denied = gate(req); if (denied) return denied;
+  const denied = await gate(req); if (denied) return denied;
   const body = await req.json().catch(() => ({}));
   const resource = resourceOf(body.resource);
   const id = typeof body.id === "string" ? body.id : "";
   if (!resource || !id) return NextResponse.json({ error: "Bad request." }, { status: 400 });
   const me = getAdminUsername(req) ?? "";
   const row = pick(resource, body);
-  if (resource === "accounts" && typeof body.password === "string") {
-    if (body.password) {
-      if (!vaultConfigured()) return NextResponse.json({ error: "vault_not_configured" }, { status: 500 });
-      row.password_enc = encryptSecret(body.password);
-    }
-    // password "" = no tocar la guardada (el formulario no la reenvía).
-  }
   row.updated_by = me; row.updated_at = new Date().toISOString();
   const admin = getSupabaseAdmin();
   const { data: updated, error } = await admin.from(TABLE[resource]).update(row).eq("id", id).select(LIST_SELECT[resource]).single();
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
   const data = updated as unknown as Record<string, unknown>;
-  if (resource === "accounts") {
-    await logAdminAction({ adminUsername: me, action: "marketing_account.save", entityType: "marketing_account", entityId: id, newValue: { label: data.label, passwordChanged: !!row.password_enc }, ipAddress: getRequestIp(req) });
-  }
-  const { password_enc, ...rest } = data;
-  return NextResponse.json({ ok: true, item: resource === "accounts" ? { ...rest, has_password: !!password_enc } : rest });
+  return NextResponse.json({ ok: true, item: data });
 }
 
 export async function DELETE(req: NextRequest) {
-  const denied = gate(req); if (denied) return denied;
+  const denied = await gate(req); if (denied) return denied;
   const body = await req.json().catch(() => ({}));
   const resource = resourceOf(body.resource);
   const id = typeof body.id === "string" ? body.id : "";
   if (!resource || !id) return NextResponse.json({ error: "Bad request." }, { status: 400 });
-  const me = getAdminUsername(req) ?? "";
   const admin = getSupabaseAdmin();
   const { error } = await admin.from(TABLE[resource]).delete().eq("id", id);
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
-  if (resource === "accounts") {
-    await logAdminAction({ adminUsername: me, action: "marketing_account.delete", entityType: "marketing_account", entityId: id, ipAddress: getRequestIp(req) });
-  }
   return NextResponse.json({ ok: true });
 }

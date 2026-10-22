@@ -39,13 +39,27 @@ export type AdminAuditAction =
   | "marketing_account.reveal"
   | "marketing_account.save"
   | "marketing_account.delete"
+  | "marketing_member.update"
+  | "marketing_member.revoke"
+  | "marketing_settings.update"
+  | "marketing_campaign.approve_budget"
+  | "marketing_post.submit"
+  | "marketing_post.approve"
+  | "marketing_post.request_changes"
+  | "marketing_post.back_to_review"
+  | "marketing_post.schedule"
+  | "marketing_post.publish"
+  | "marketing_post.cancel"
+  | "marketing_library.update"
+  | "marketing_handover.start"
+  | "marketing_handover.complete"
   | "admin_user.update"
   | "system.update_settings"
   | "system.changelog_create"
   | "system.changelog_delete"
   | "error_log.resolve";
 
-export type AdminAuditEntityType = "mechanic" | "asset" | "service_record" | "qr_code" | "qr_batch" | "support_thread" | "content_report" | "admin_user" | "platform_settings" | "platform_changelog" | "platform_error_log" | "marketing_account";
+export type AdminAuditEntityType = "mechanic" | "asset" | "service_record" | "qr_code" | "qr_batch" | "support_thread" | "content_report" | "admin_user" | "platform_settings" | "platform_changelog" | "platform_error_log" | "marketing_account" | "marketing_member" | "marketing_settings" | "marketing_campaign" | "marketing_post" | "marketing_library" | "marketing_handover";
 
 export async function logAdminAction(params: {
   adminUsername: string;
