@@ -1,5 +1,6 @@
 "use client";
 
+import { cachedQuery, isOnline } from "@/lib/offline/cache";
 import DashboardSkeleton from "@/components/DashboardSkeleton";
 import Image from "next/image";
 // My Services isn't migrated yet — keep this one plain next/link.
@@ -148,7 +149,7 @@ export default function ScheduledServicesPage() {
 
     async function init() {
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) { router.replace("/login"); return; }
+      if (!session) { if (isOnline()) router.replace("/login"); return; }
       if (!active) return;
 
       setMechanicId(session.user.id);
@@ -158,8 +159,7 @@ export default function ScheduledServicesPage() {
       // carga principal en paralelo, no en fila.
       await Promise.all([
         (async () => {
-          const { data: mechanic } = await supabase
-            .from("mechanics").select("name, photo_url, maintler_code").eq("id", session.user.id).maybeSingle();
+          const { data: mechanic } = await cachedQuery("scheduled:1", () => supabase            .from("mechanics").select("name, photo_url, maintler_code").eq("id", session.user.id).maybeSingle());
           if (active && mechanic) { setMechanicName(mechanic.name); setMechanicPhoto(mechanic.photo_url ?? ""); setMaintlerCode(mechanic.maintler_code ?? ""); }
         })(),
         loadScheduled(session.user.id),

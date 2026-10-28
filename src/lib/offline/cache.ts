@@ -67,6 +67,35 @@ export type CachedResult<T> = { data: T | null; fromCache: boolean; cachedAt: st
 
 type Entry<T> = { data: T; at: string };
 
+/** id del usuario según la sesión que supabase-js guarda en localStorage (sin red). */
+export function cachedUid(): string {
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i) ?? "";
+      if (k.startsWith("sb-") && k.endsWith("-auth-token")) {
+        const v = JSON.parse(localStorage.getItem(k) ?? "null");
+        const id = v?.user?.id ?? v?.currentSession?.user?.id;
+        if (typeof id === "string") return id;
+      }
+    }
+  } catch { /* sin localStorage */ }
+  return "anon";
+}
+
+/** Atajo para una consulta de lectura: devuelve lo mismo que `await builder`
+ *  (data/error/count) pero, sin red, la última copia guardada. */
+export async function cachedQuery<T>(key: string, builder: () => PromiseLike<T>): Promise<T> {
+  const r = await cachedRead(cachedUid(), key, builder);
+  return (r.data ?? ({ data: null, error: r.offline ? { message: "offline" } : null, count: null } as unknown as T));
+}
+
+function withTimeout<T>(p: PromiseLike<T>, ms: number): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const t = setTimeout(() => reject(new Error("timeout")), ms);
+    p.then((v) => { clearTimeout(t); resolve(v); }, (e) => { clearTimeout(t); reject(e); });
+  });
+}
+
 export async function cachedRead<T>(
   uid: string,
   key: string,
@@ -95,7 +124,7 @@ export async function cachedRead<T>(
 
   if (isOnline()) {
     try {
-      const data = await fetcher();
+      const data = await withTimeout(fetcher(), 12000);
       if (!isFailure(data)) {
         await idbSet(k, { data, at: new Date().toISOString() } satisfies Entry<T>);
         return { data, fromCache: false, cachedAt: null, offline: false };

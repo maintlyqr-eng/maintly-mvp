@@ -1,5 +1,6 @@
 "use client";
 
+import { cachedQuery, isOnline } from "@/lib/offline/cache";
 import DashboardSkeleton from "@/components/DashboardSkeleton";
 import Link from "next/link";
 import Image from "next/image";
@@ -77,11 +78,10 @@ export default function MessagesPage() {
 
   async function loadMessages(uid: string) {
     setLoading(true);
-    const { data } = await supabase
-      .from("messages")
+    const { data } = await cachedQuery("messages:1", () => supabase      .from("messages")
       .select("id, asset_id, sender_name, sender_contact, body, read, created_at, assets(id, nickname, brand, model, asset_type)")
       .eq("mechanic_id", uid)
-      .order("created_at", { ascending: false });
+      .order("created_at", { ascending: false }));
     setMessages((data as unknown as MessageRow[]) ?? []);
     setLoading(false);
   }
@@ -91,7 +91,7 @@ export default function MessagesPage() {
 
     async function init() {
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) { router.replace("/login"); return; }
+      if (!session) { if (isOnline()) router.replace("/login"); return; }
       if (!active) return;
 
       setMechanicId(session.user.id);
@@ -101,8 +101,7 @@ export default function MessagesPage() {
       // carga principal en paralelo, no en fila.
       await Promise.all([
         (async () => {
-          const { data: mechanic } = await supabase
-            .from("mechanics").select("name, photo_url, maintler_code").eq("id", session.user.id).maybeSingle();
+          const { data: mechanic } = await cachedQuery("messages:2", () => supabase            .from("mechanics").select("name, photo_url, maintler_code").eq("id", session.user.id).maybeSingle());
           if (active && mechanic) { setMechanicName(mechanic.name); setMechanicPhoto(mechanic.photo_url ?? ""); setMaintlerCode(mechanic.maintler_code ?? ""); }
         })(),
         loadMessages(session.user.id),

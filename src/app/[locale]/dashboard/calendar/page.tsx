@@ -1,6 +1,7 @@
 "use client";
 
 // Scheduled and Services aren't migrated yet — keep this one plain next/link.
+import { cachedQuery, isOnline } from "@/lib/offline/cache";
 import DashboardSkeleton from "@/components/DashboardSkeleton";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
@@ -138,11 +139,10 @@ export default function CalendarPage() {
   const [taskError, setTaskError] = useState("");
 
   async function loadTasks(uid: string) {
-    const { data } = await supabase
-      .from("calendar_tasks")
+    const { data } = await cachedQuery("calendar:1", () => supabase      .from("calendar_tasks")
       .select("id, asset_id, title, notes, task_date, done, assets(id, nickname, brand, model, asset_type)")
       .eq("mechanic_id", uid)
-      .order("created_at", { ascending: true });
+      .order("created_at", { ascending: true }));
     setTaskRows((data as unknown as TaskRow[]) ?? []);
   }
 
@@ -157,20 +157,18 @@ export default function CalendarPage() {
   async function loadAll(uid: string) {
     await Promise.all([
       (async () => {
-        const { data: svc } = await supabase
-          .from("service_records")
+        const { data: svc } = await cachedQuery("calendar:2", () => supabase          .from("service_records")
           .select("id, asset_id, service_date, service_type, next_due_date, next_due_km_hours, assets(id, nickname, brand, model, asset_type)")
           .eq("mechanic_id", uid)
-          .is("deleted_at", null);
+          .is("deleted_at", null));
         setServiceRows((svc as unknown as ServiceRow[]) ?? []);
       })(),
       (async () => {
-        const { data: kmRows } = await supabase
-          .from("service_records")
+        const { data: kmRows } = await cachedQuery("calendar:3", () => supabase          .from("service_records")
           .select("asset_id, km_hours")
           .eq("mechanic_id", uid)
           .is("deleted_at", null)
-          .not("km_hours", "is", null);
+          .not("km_hours", "is", null));
         const maxKm: Record<string, number> = {};
         for (const r of (kmRows ?? []) as any[]) {
           if (r.km_hours != null && (maxKm[r.asset_id] == null || r.km_hours > maxKm[r.asset_id])) {
@@ -180,20 +178,18 @@ export default function CalendarPage() {
         setMaxKmByAsset(maxKm);
       })(),
       (async () => {
-        const { data: assets } = await supabase
-          .from("assets")
+        const { data: assets } = await cachedQuery("calendar:4", () => supabase          .from("assets")
           .select("id, nickname, brand, model")
           .eq("created_by", uid)
           .is("deleted_at", null)
-          .order("created_at", { ascending: false });
+          .order("created_at", { ascending: false }));
         setAssetOptions((assets as AssetOption[]) ?? []);
       })(),
       (async () => {
-        const { data: custRows } = await supabase
-          .from("customers")
+        const { data: custRows } = await cachedQuery("calendar:5", () => supabase          .from("customers")
           .select("id, name, phone, email")
           .eq("mechanic_id", uid)
-          .order("name", { ascending: true });
+          .order("name", { ascending: true }));
         setCustomers((custRows as CustomerOption[]) ?? []);
       })(),
       loadTasks(uid),
@@ -205,7 +201,7 @@ export default function CalendarPage() {
 
     async function init() {
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) { router.replace("/login"); return; }
+      if (!session) { if (isOnline()) router.replace("/login"); return; }
       if (!active) return;
 
       setMechanicId(session.user.id);
@@ -216,8 +212,7 @@ export default function CalendarPage() {
       // pide en paralelo, no antes.
       await Promise.all([
         (async () => {
-          const { data: mechanic } = await supabase
-            .from("mechanics").select("name, photo_url, maintler_code").eq("id", session.user.id).maybeSingle();
+          const { data: mechanic } = await cachedQuery("calendar:6", () => supabase            .from("mechanics").select("name, photo_url, maintler_code").eq("id", session.user.id).maybeSingle());
           if (active && mechanic) { setMechanicName(mechanic.name); setMechanicPhoto(mechanic.photo_url ?? ""); setMaintlerCode(mechanic.maintler_code ?? ""); }
         })(),
         loadAll(session.user.id),

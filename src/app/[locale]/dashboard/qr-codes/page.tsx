@@ -1,5 +1,6 @@
 "use client";
 
+import { cachedQuery, cachedRead, cachedUid, isOnline } from "@/lib/offline/cache";
 import DashboardSkeleton from "@/components/DashboardSkeleton";
 import { useEffect, useMemo, useRef, useState } from "react";
 // Login is migrated and every router.push()/replace() call on this page
@@ -112,14 +113,19 @@ export default function QrCodesPage() {
   async function loadCodes() {
     setLoading(true);
     setLoadError("");
-    const res = await authedFetch("/api/qr-codes");
-    const json = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      setLoadError(json.error || t("errorLoad"));
+    // Sin señal: última lista guardada (ver src/lib/offline/cache.ts).
+    const read = await cachedRead(cachedUid(), "qr-codes:list", async () => {
+      const res = await authedFetch("/api/qr-codes");
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json.error || "load");
+      return json as { codes?: unknown[] };
+    });
+    if (!read.data) {
+      setLoadError(t("errorLoad"));
       setLoading(false);
       return;
     }
-    setCodes(json.codes ?? []);
+    setCodes((read.data.codes as never[]) ?? []);
     setLoading(false);
   }
 
@@ -128,7 +134,7 @@ export default function QrCodesPage() {
 
     async function init() {
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) { router.replace("/login"); return; }
+      if (!session) { if (isOnline()) router.replace("/login"); return; }
       if (!active) return;
 
       setMechanicId(session.user.id);
@@ -139,8 +145,7 @@ export default function QrCodesPage() {
       // principal — van en paralelo, no en fila.
       await Promise.all([
         (async () => {
-          const { data: mechanic } = await supabase
-            .from("mechanics").select("name, photo_url, maintler_code").eq("id", session.user.id).maybeSingle();
+          const { data: mechanic } = await cachedQuery("qr-codes:1", () => supabase            .from("mechanics").select("name, photo_url, maintler_code").eq("id", session.user.id).maybeSingle());
           if (active && mechanic) { setMechanicName(mechanic.name); setMechanicPhoto(mechanic.photo_url ?? ""); setMaintlerCode(mechanic.maintler_code ?? ""); }
         })(),
         loadCodes(),

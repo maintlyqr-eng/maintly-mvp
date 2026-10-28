@@ -1,5 +1,6 @@
 "use client";
 
+import { cachedRead, isOnline, looksLikeNetworkError } from "@/lib/offline/cache";
 import DashboardSkeleton from "@/components/DashboardSkeleton";
 import Image from "next/image";
 // Assets isn't migrated yet — keep this one plain next/link.
@@ -65,7 +66,7 @@ export default function ReportsPage() {
 
     async function init() {
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) { router.replace("/login"); return; }
+      if (!session) { if (isOnline()) router.replace("/login"); return; }
       if (!active) return;
 
       setMechanicId(session.user.id);
@@ -76,7 +77,7 @@ export default function ReportsPage() {
       // Facu (26 jul 2026, revisión de rendimiento): el perfil propio se
       // pedía antes que assetRows/svcRows, en fila — ninguna de las 3
       // depende de otra, así que ahora las 3 van en la misma tanda.
-      const [{ data: mechanic }, { data: assetRows }, { data: svcRows }] = await Promise.all([
+      const [{ data: mechanic }, { data: assetRows }, { data: svcRows }] = (await cachedRead(session.user.id, "reports:all", () => Promise.all([
         supabase
           .from("mechanics").select("name, photo_url, maintler_code").eq("id", session.user.id).maybeSingle(),
         supabase
@@ -88,7 +89,7 @@ export default function ReportsPage() {
           .select("asset_id, service_date")
           .eq("mechanic_id", session.user.id)
           .is("deleted_at", null),
-      ]);
+      ]), { isFailure: (rs) => rs.some((r) => looksLikeNetworkError(r)) })).data ?? [{ data: null }, { data: null }, { data: null }];
       if (active && mechanic) { setMechanicName(mechanic.name); setMechanicPhoto(mechanic.photo_url ?? ""); setMaintlerCode(mechanic.maintler_code ?? ""); }
 
       const statsByAsset: Record<string, { count: number; lastDate: string | null }> = {};

@@ -1,5 +1,6 @@
 "use client";
 
+import { cachedQuery, isOnline } from "@/lib/offline/cache";
 import DashboardSkeleton from "@/components/DashboardSkeleton";
 import { useEffect, useMemo, useState } from "react";
 // Login is migrated and every router.push()/replace() call on this page
@@ -122,7 +123,7 @@ export default function DocumentsPage() {
 
     async function init() {
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) { router.replace("/login"); return; }
+      if (!session) { if (isOnline()) router.replace("/login"); return; }
       if (!active) return;
 
       setMechanicId(session.user.id);
@@ -134,8 +135,7 @@ export default function DocumentsPage() {
       // después arrancaba loadAll(); ahora van juntos.
       await Promise.all([
         (async () => {
-          const { data: mechanic } = await supabase
-            .from("mechanics").select("name, photo_url, maintler_code").eq("id", session.user.id).maybeSingle();
+          const { data: mechanic } = await cachedQuery("documents:1", () => supabase            .from("mechanics").select("name, photo_url, maintler_code").eq("id", session.user.id).maybeSingle());
           if (active && mechanic) { setMechanicName(mechanic.name); setMechanicPhoto(mechanic.photo_url ?? ""); setMaintlerCode(mechanic.maintler_code ?? ""); }
         })(),
         loadAll(session.user.id),

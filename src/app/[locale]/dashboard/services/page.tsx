@@ -1,5 +1,6 @@
 "use client";
 
+import { cachedQuery, isOnline } from "@/lib/offline/cache";
 import DashboardSkeleton from "@/components/DashboardSkeleton";
 import Image from "next/image";
 // Assets isn't migrated yet — keep this one plain next/link.
@@ -346,8 +347,7 @@ function ServicesPageInner() {
 
   async function loadServices(uid: string) {
     setLoading(true);
-    const { data } = await supabase
-      .from("service_records")
+    const { data } = await cachedQuery("services:1", () => supabase      .from("service_records")
       .select("id, service_date, service_type, km_hours, notes, created_at, mechanic_id, next_due_date, next_due_km_hours, hidden_from_panel_at, assets(id, nickname, brand, model, vin_serial, plate, asset_type, photo_url, qr_codes(code))")
       .eq("mechanic_id", uid)
       .is("deleted_at", null)
@@ -359,7 +359,7 @@ function ServicesPageInner() {
       // mechanic's own panel — filters on it; the public QR history and
       // any other mechanic's view of the same asset intentionally do not.
       .is("hidden_from_panel_at", null)
-      .order("service_date", { ascending: false });
+      .order("service_date", { ascending: false }));
     setServices((data as unknown as ServiceRow[]) ?? []);
 
     // Facu (21 jul 2026): which rows already have a pending "solicitar
@@ -367,11 +367,10 @@ function ServicesPageInner() {
     // service_delete_requests only lets a mechanic SELECT their own rows,
     // so this is already scoped without needing a .eq("requested_by", uid)
     // (kept anyway for clarity and as a second line of defense).
-    const { data: pendingRequests } = await supabase
-      .from("service_delete_requests")
+    const { data: pendingRequests } = await cachedQuery("services:2", () => supabase      .from("service_delete_requests")
       .select("service_record_id")
       .eq("requested_by", uid)
-      .eq("status", "pending");
+      .eq("status", "pending"));
     setPendingDeleteRequestIds(new Set((pendingRequests ?? []).map((r: { service_record_id: string }) => r.service_record_id)));
 
     setLoading(false);
@@ -385,11 +384,10 @@ function ServicesPageInner() {
     // misma fuente (mechanic_assets, todo el taller) y el mismo criterio de
     // soft-delete que la página Activos, para que "Activos" signifique lo
     // mismo en toda la app (ver auditoría de métricas cruzadas).
-    const { data } = await supabase
-      .from("mechanic_assets")
+    const { data } = await cachedQuery("services:3", () => supabase      .from("mechanic_assets")
       .select("assets(id, nickname, brand, model, asset_type, customer_id, deleted_at)")
       .eq("mechanic_id", uid)
-      .order("added_at", { ascending: false });
+      .order("added_at", { ascending: false }));
     const opts = ((data ?? []) as any[])
       .map((row) => {
         const a = Array.isArray(row.assets) ? row.assets[0] : row.assets;
@@ -402,11 +400,10 @@ function ServicesPageInner() {
   }
 
   async function loadCustomers(uid: string) {
-    const { data } = await supabase
-      .from("customers")
+    const { data } = await cachedQuery("services:4", () => supabase      .from("customers")
       .select("id, name, phone, email")
       .eq("mechanic_id", uid)
-      .order("name", { ascending: true });
+      .order("name", { ascending: true }));
     setCustomers((data as CustomerOption[]) ?? []);
   }
 
@@ -415,7 +412,7 @@ function ServicesPageInner() {
 
     async function init() {
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) { router.replace("/login"); return; }
+      if (!session) { if (isOnline()) router.replace("/login"); return; }
       if (!active) return;
 
       setMechanicId(session.user.id);
@@ -477,15 +474,14 @@ function ServicesPageInner() {
     if (!assetId) { setMinKmHours(null); return; }
     minKmHoursAssetIdRef.current = assetId;
     setMinKmHoursLoading(true);
-    const { data } = await supabase
-      .from("service_records")
+    const { data } = await cachedQuery("services:5", () => supabase      .from("service_records")
       .select("km_hours")
       .eq("asset_id", assetId)
       .is("deleted_at", null)
       .not("km_hours", "is", null)
       .order("km_hours", { ascending: false })
       .limit(1)
-      .maybeSingle();
+      .maybeSingle());
     if (minKmHoursAssetIdRef.current !== assetId) return;
     setMinKmHours(data?.km_hours ?? null);
     setMinKmHoursLoading(false);

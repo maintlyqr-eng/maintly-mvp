@@ -1,5 +1,6 @@
 "use client";
 
+import { cachedQuery, isOnline } from "@/lib/offline/cache";
 import DashboardSkeleton from "@/components/DashboardSkeleton";
 import Link from "next/link";
 import PasswordInput from "@/components/PasswordInput";
@@ -161,17 +162,16 @@ export default function SettingsPage() {
 
     async function init() {
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) { router.replace("/login"); return; }
+      if (!session) { if (isOnline()) router.replace("/login"); return; }
       if (!active) return;
 
       setMechanicId(session.user.id);
       setEmail(session.user.email ?? "");
 
-      const { data: mechanic } = await supabase
-        .from("mechanics")
+      const { data: mechanic } = await cachedQuery("settings:1", () => supabase        .from("mechanics")
         .select("name, workshop_name, location, created_at, is_mechanic, verified, photo_url, profession, verification_status, verification_note, maintler_code, phone, contact_email, instagram_url, facebook_url, website_url")
         .eq("id", session.user.id)
-        .single();
+        .single());
 
       if (active && mechanic) {
         setName(mechanic.name ?? "");
