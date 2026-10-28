@@ -1,6 +1,8 @@
 "use client";
 
-import { cachedQuery, isOnline } from "@/lib/offline/cache";
+import { isOnline } from "@/lib/offline/cache";
+import { localServices, localMe, updateServiceFields } from "@/lib/offline/local";
+import { getLocalSession, onSynced } from "@/lib/offline/session";
 import DashboardSkeleton from "@/components/DashboardSkeleton";
 import Image from "next/image";
 // My Services isn't migrated yet — keep this one plain next/link.
@@ -116,21 +118,12 @@ export default function ScheduledServicesPage() {
   async function loadScheduled(uid: string) {
     setLoading(true);
 
-    const [{ data: remRows }, { data: kmRows }] = await Promise.all([
-      supabase
-        .from("service_records")
-        .select("id, asset_id, service_type, service_date, next_due_date, next_due_km_hours, assets(id, nickname, brand, model, vin_serial, asset_type)")
-        .eq("mechanic_id", uid)
-        .is("deleted_at", null)
-        .or("next_due_date.not.is.null,next_due_km_hours.not.is.null")
-        .order("next_due_date", { ascending: true }),
-      supabase
-        .from("service_records")
-        .select("asset_id, km_hours")
-        .eq("mechanic_id", uid)
-        .is("deleted_at", null)
-        .not("km_hours", "is", null),
-    ]);
+    // Local-first: base local (src/lib/offline/local.ts).
+    const all = await localServices(uid, { includeHidden: true });
+    const remRows = all
+      .filter((r) => r.next_due_date != null || r.next_due_km_hours != null)
+      .sort((x, y) => String(x.next_due_date ?? "9999").localeCompare(String(y.next_due_date ?? "9999")));
+    const kmRows = all.filter((r) => r.km_hours != null);
 
     const maxKm: Record<string, number> = {};
     for (const r of (kmRows ?? []) as any[]) {
@@ -148,32 +141,30 @@ export default function ScheduledServicesPage() {
     let active = true;
 
     async function init() {
-      const { data: { session } } = await supabase.auth.getSession();
+      const session = await getLocalSession();
       if (!session) { if (isOnline()) router.replace("/login"); return; }
       if (!active) return;
 
-      setMechanicId(session.user.id);
-      setMechanicEmail(session.user.email ?? "");
+      setMechanicId(session.uid);
+      setMechanicEmail(session.email);
 
-      // Facu (26 jul 2026, revisión de rendimiento): perfil propio y
-      // carga principal en paralelo, no en fila.
-      await Promise.all([
-        (async () => {
-          const { data: mechanic } = await cachedQuery("scheduled:1", () => supabase            .from("mechanics").select("name, photo_url, maintler_code").eq("id", session.user.id).maybeSingle());
-          if (active && mechanic) { setMechanicName(mechanic.name); setMechanicPhoto(mechanic.photo_url ?? ""); setMaintlerCode(mechanic.maintler_code ?? ""); }
-        })(),
-        loadScheduled(session.user.id),
-      ]);
+      const loadAll = async () => {
+        const [mechanic] = await Promise.all([localMe(session.uid), loadScheduled(session.uid)]);
+        if (active && mechanic) { setMechanicName(mechanic.name); setMechanicPhoto(mechanic.photo_url ?? ""); setMaintlerCode(mechanic.maintler_code ?? ""); }
+      };
+      await loadAll();
       if (active) setCheckingAuth(false);
+      stopSync = onSynced(() => { if (active) void loadAll(); });
     }
 
+    let stopSync = () => {};
     init();
 
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
       if (!session) router.replace("/login");
     });
 
-    return () => { active = false; listener.subscription.unsubscribe(); };
+    return () => { active = false; stopSync(); listener.subscription.unsubscribe(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router]);
 
@@ -209,32 +200,19 @@ export default function ScheduledServicesPage() {
     }
 
     setEditSaving(true);
-    const { data, error } = await supabase
-      .from("service_records")
-      .update({
-        next_due_date: editDate || null,
-        next_due_km_hours: editKm ? parseFloat(editKm) : null,
-      })
-      .eq("id", editRow.id)
-      .select("id");
+    await updateServiceFields(mechanicId, editRow.id, {
+      next_due_date: editDate || null,
+      next_due_km_hours: editKm ? parseFloat(editKm) : null,
+    });
     setEditSaving(false);
-
-    if (error) { setEditError(error.message); return; }
-    if (!data || data.length === 0) {
-      setEditError(t("errorSaveFailed"));
-      return;
-    }
 
     setEditRow(null);
     await loadScheduled(mechanicId);
   }
 
   async function handleClearReminder(row: ScheduledRow) {
-    const { error } = await supabase
-      .from("service_records")
-      .update({ next_due_date: null, next_due_km_hours: null })
-      .eq("id", row.id);
-    if (!error) await loadScheduled(mechanicId);
+    await updateServiceFields(mechanicId, row.id, { next_due_date: null, next_due_km_hours: null });
+    await loadScheduled(mechanicId);
   }
 
   if (checkingAuth) {

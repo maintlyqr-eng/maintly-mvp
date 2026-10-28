@@ -1,7 +1,9 @@
 "use client";
 
 // Services isn't migrated yet — keep this one plain next/link.
-import { cachedQuery, isOnline } from "@/lib/offline/cache";
+import { isOnline } from "@/lib/offline/cache";
+import { localCustomers, localAssets, localServices, localMe, createCustomer, updateCustomer, deleteCustomer } from "@/lib/offline/local";
+import { getLocalSession, onSynced } from "@/lib/offline/session";
 import DashboardSkeleton from "@/components/DashboardSkeleton";
 import Link from "next/link";
 import { useEffect, useState } from "react";
@@ -124,11 +126,9 @@ export default function CustomersPage() {
 
   async function loadAll(uid: string) {
     setLoading(true);
-    const [{ data: customerRows }, { data: assetRows }, { data: serviceRows }] = await Promise.all([
-      supabase.from("customers").select("id, name, phone, email, notes, created_at").eq("mechanic_id", uid).order("name", { ascending: true }),
-      supabase.from("assets").select("id, nickname, brand, model, asset_type, customer_id").eq("created_by", uid).is("deleted_at", null),
-      supabase.from("service_records").select("id, service_type, service_date, customer_id, asset_id").eq("mechanic_id", uid).is("deleted_at", null).order("service_date", { ascending: false }),
-    ]);
+    // Local-first: base local (src/lib/offline/local.ts).
+    const [customerRows, assetsAll, serviceRows] = await Promise.all([localCustomers(uid), localAssets(uid), localServices(uid, { includeHidden: true })]);
+    const assetRows = assetsAll.map((a) => ({ id: a.id, nickname: a.nickname, brand: a.brand, model: a.model, asset_type: a.asset_type, customer_id: a.customer_id ?? null }));
     setCustomers((customerRows as CustomerRow[]) ?? []);
     setAssets((assetRows as AssetLite[]) ?? []);
     setServices((serviceRows as ServiceLite[]) ?? []);
@@ -139,32 +139,30 @@ export default function CustomersPage() {
     let active = true;
 
     async function init() {
-      const { data: { session } } = await supabase.auth.getSession();
+      const session = await getLocalSession();
       if (!session) { if (isOnline()) router.replace("/login"); return; }
       if (!active) return;
 
-      setMechanicId(session.user.id);
-      setMechanicEmail(session.user.email ?? "");
+      setMechanicId(session.uid);
+      setMechanicEmail(session.email);
 
-      // Facu (26 jul 2026, revisión de rendimiento): perfil propio y
-      // carga principal en paralelo, no en fila.
-      await Promise.all([
-        (async () => {
-          const { data: mechanic } = await cachedQuery("customers:1", () => supabase            .from("mechanics").select("name, photo_url, maintler_code").eq("id", session.user.id).maybeSingle());
-          if (active && mechanic) { setMechanicName(mechanic.name); setMechanicPhoto(mechanic.photo_url ?? ""); setMaintlerCode(mechanic.maintler_code ?? ""); }
-        })(),
-        loadAll(session.user.id),
-      ]);
+      const reload = async () => {
+        const [mechanic] = await Promise.all([localMe(session.uid), loadAll(session.uid)]);
+        if (active && mechanic) { setMechanicName(mechanic.name); setMechanicPhoto(mechanic.photo_url ?? ""); setMaintlerCode(mechanic.maintler_code ?? ""); }
+      };
+      await reload();
       if (active) setCheckingAuth(false);
+      stopSync = onSynced(() => { if (active) void reload(); });
     }
 
+    let stopSync = () => {};
     init();
 
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
       if (!session) router.replace("/login");
     });
 
-    return () => { active = false; listener.subscription.unsubscribe(); };
+    return () => { active = false; stopSync(); listener.subscription.unsubscribe(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router]);
 
@@ -194,14 +192,10 @@ export default function CustomersPage() {
     if (!newName.trim()) return;
     setAddSaving(true);
     setAddError("");
-    const { data, error } = await supabase
-      .from("customers")
-      .insert({ mechanic_id: mechanicId, name: newName.trim(), phone: newPhone.trim() || null, email: newEmail.trim() || null, notes: newNotes.trim() || null })
-      .select("id, name, phone, email, notes, created_at")
-      .single();
+    const row = { name: newName.trim(), phone: newPhone.trim() || null, email: newEmail.trim() || null, notes: newNotes.trim() || null };
+    const id = await createCustomer(mechanicId, row);
     setAddSaving(false);
-    if (error || !data) { setAddError(t("addCustomerFailed")); return; }
-    setCustomers((prev) => [...prev, data as CustomerRow].sort((a, b) => a.name.localeCompare(b.name)));
+    setCustomers((prev) => [...prev, { id, created_at: new Date().toISOString(), ...row } as CustomerRow].sort((a, b) => a.name.localeCompare(b.name)));
     setShowAddModal(false);
   }
 
@@ -220,9 +214,8 @@ export default function CustomersPage() {
     setDetailSaving(true);
     setDetailMsg(null);
     const patch = { name: detailName.trim(), phone: detailPhone.trim() || null, email: detailEmail.trim() || null, notes: detailNotes.trim() || null };
-    const { data, error } = await supabase.from("customers").update(patch).eq("id", detail.id).select("id");
+    await updateCustomer(mechanicId, detail.id, patch);
     setDetailSaving(false);
-    if (error || !data || data.length === 0) { setDetailMsg({ text: t("saveChangesFailed"), ok: false }); return; }
     setCustomers((prev) => prev.map((c) => (c.id === detail.id ? { ...c, ...patch } : c)).sort((a, b) => a.name.localeCompare(b.name)));
     setDetail((prev) => (prev ? { ...prev, ...patch } : prev));
     setDetailMsg({ text: t("saved"), ok: true });
@@ -231,11 +224,7 @@ export default function CustomersPage() {
   async function handleDeleteCustomer() {
     if (!detail) return;
     setDetailMsg(null);
-    const { error } = await supabase.from("customers").delete().eq("id", detail.id);
-    if (error) {
-      setDetailMsg({ text: t("deleteCustomerFailed"), ok: false });
-      return;
-    }
+    await deleteCustomer(mechanicId, detail.id);
     setCustomers((prev) => prev.filter((c) => c.id !== detail.id));
     setAssets((prev) => prev.map((a) => (a.customer_id === detail.id ? { ...a, customer_id: null } : a)));
     setServices((prev) => prev.map((s) => (s.customer_id === detail.id ? { ...s, customer_id: null } : s)));

@@ -1,6 +1,8 @@
 "use client";
 
-import { cachedRead, isOnline, looksLikeNetworkError } from "@/lib/offline/cache";
+import { isOnline } from "@/lib/offline/cache";
+import { localMe, localWorkshop, localServices } from "@/lib/offline/local";
+import { getLocalSession, onSynced } from "@/lib/offline/session";
 import DashboardSkeleton from "@/components/DashboardSkeleton";
 import Image from "next/image";
 // Assets isn't migrated yet — keep this one plain next/link.
@@ -65,31 +67,22 @@ export default function ReportsPage() {
     let active = true;
 
     async function init() {
-      const { data: { session } } = await supabase.auth.getSession();
+      const session = await getLocalSession();
       if (!session) { if (isOnline()) router.replace("/login"); return; }
       if (!active) return;
 
-      setMechanicId(session.user.id);
-      setMechanicEmail(session.user.email ?? "");
+      setMechanicId(session.uid);
+      setMechanicEmail(session.email);
 
       setLoading(true);
 
       // Facu (26 jul 2026, revisión de rendimiento): el perfil propio se
       // pedía antes que assetRows/svcRows, en fila — ninguna de las 3
       // depende de otra, así que ahora las 3 van en la misma tanda.
-      const [{ data: mechanic }, { data: assetRows }, { data: svcRows }] = (await cachedRead(session.user.id, "reports:all", () => Promise.all([
-        supabase
-          .from("mechanics").select("name, photo_url, maintler_code").eq("id", session.user.id).maybeSingle(),
-        supabase
-          .from("mechanic_assets")
-          .select("assets(id, nickname, brand, model, asset_type, deleted_at, qr_codes(code))")
-          .eq("mechanic_id", session.user.id),
-        supabase
-          .from("service_records")
-          .select("asset_id, service_date")
-          .eq("mechanic_id", session.user.id)
-          .is("deleted_at", null),
-      ]), { isFailure: (rs) => rs.some((r) => looksLikeNetworkError(r)) })).data ?? [{ data: null }, { data: null }, { data: null }];
+      // Local-first: base local (src/lib/offline/local.ts).
+      const [mechanic, workshop, svcAll] = await Promise.all([localMe(session.uid), localWorkshop(session.uid), localServices(session.uid, { includeHidden: true })]);
+      const assetRows = workshop.map((w) => ({ assets: w.assets ? { id: w.assets.id, nickname: w.assets.nickname, brand: w.assets.brand, model: w.assets.model, asset_type: w.assets.asset_type, deleted_at: w.assets.deleted_at ?? null, qr_codes: w.assets.qr_codes } : null }));
+      const svcRows = svcAll.map((r) => ({ asset_id: r.asset_id, service_date: r.service_date }));
       if (active && mechanic) { setMechanicName(mechanic.name); setMechanicPhoto(mechanic.photo_url ?? ""); setMaintlerCode(mechanic.maintler_code ?? ""); }
 
       const statsByAsset: Record<string, { count: number; lastDate: string | null }> = {};

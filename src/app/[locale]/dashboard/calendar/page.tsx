@@ -1,7 +1,9 @@
 "use client";
 
 // Scheduled and Services aren't migrated yet — keep this one plain next/link.
-import { cachedQuery, isOnline } from "@/lib/offline/cache";
+import { isOnline } from "@/lib/offline/cache";
+import { localServices, localAssets, localCustomers, localMe, localTasksWithAssets, createTask, updateTask, deleteTask } from "@/lib/offline/local";
+import { getLocalSession, onSynced } from "@/lib/offline/session";
 import DashboardSkeleton from "@/components/DashboardSkeleton";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
@@ -139,11 +141,7 @@ export default function CalendarPage() {
   const [taskError, setTaskError] = useState("");
 
   async function loadTasks(uid: string) {
-    const { data } = await cachedQuery("calendar:1", () => supabase      .from("calendar_tasks")
-      .select("id, asset_id, title, notes, task_date, done, assets(id, nickname, brand, model, asset_type)")
-      .eq("mechanic_id", uid)
-      .order("created_at", { ascending: true }));
-    setTaskRows((data as unknown as TaskRow[]) ?? []);
+    setTaskRows((await localTasksWithAssets(uid)) as unknown as TaskRow[]);
   }
 
   // Facu (26 jul 2026, revisión de rendimiento): esto pedía 5 cosas
@@ -155,78 +153,46 @@ export default function CalendarPage() {
   // esperarlas en fila — Promise.all las dispara todas juntas y el tiempo
   // total pasa a ser el de la más lenta de las 5, no la suma de las 5.
   async function loadAll(uid: string) {
-    await Promise.all([
-      (async () => {
-        const { data: svc } = await cachedQuery("calendar:2", () => supabase          .from("service_records")
-          .select("id, asset_id, service_date, service_type, next_due_date, next_due_km_hours, assets(id, nickname, brand, model, asset_type)")
-          .eq("mechanic_id", uid)
-          .is("deleted_at", null));
-        setServiceRows((svc as unknown as ServiceRow[]) ?? []);
-      })(),
-      (async () => {
-        const { data: kmRows } = await cachedQuery("calendar:3", () => supabase          .from("service_records")
-          .select("asset_id, km_hours")
-          .eq("mechanic_id", uid)
-          .is("deleted_at", null)
-          .not("km_hours", "is", null));
-        const maxKm: Record<string, number> = {};
-        for (const r of (kmRows ?? []) as any[]) {
-          if (r.km_hours != null && (maxKm[r.asset_id] == null || r.km_hours > maxKm[r.asset_id])) {
-            maxKm[r.asset_id] = r.km_hours;
-          }
-        }
-        setMaxKmByAsset(maxKm);
-      })(),
-      (async () => {
-        const { data: assets } = await cachedQuery("calendar:4", () => supabase          .from("assets")
-          .select("id, nickname, brand, model")
-          .eq("created_by", uid)
-          .is("deleted_at", null)
-          .order("created_at", { ascending: false }));
-        setAssetOptions((assets as AssetOption[]) ?? []);
-      })(),
-      (async () => {
-        const { data: custRows } = await cachedQuery("calendar:5", () => supabase          .from("customers")
-          .select("id, name, phone, email")
-          .eq("mechanic_id", uid)
-          .order("name", { ascending: true }));
-        setCustomers((custRows as CustomerOption[]) ?? []);
-      })(),
-      loadTasks(uid),
-    ]);
+    // Local-first: todo sale de la base local (src/lib/offline/local.ts).
+    const [svcAll, assets, custRows] = await Promise.all([localServices(uid, { includeHidden: true }), localAssets(uid), localCustomers(uid), loadTasks(uid)]);
+    setServiceRows(svcAll.map((r) => ({ id: r.id, asset_id: r.asset_id, service_date: r.service_date, service_type: r.service_type, next_due_date: r.next_due_date ?? null, next_due_km_hours: r.next_due_km_hours ?? null, assets: r.assets ? { id: r.assets.id, nickname: r.assets.nickname, brand: r.assets.brand, model: r.assets.model, asset_type: r.assets.asset_type } : null })) as unknown as ServiceRow[]);
+    const maxKm: Record<string, number> = {};
+    for (const r of svcAll) {
+      if (r.km_hours != null && (maxKm[r.asset_id] == null || r.km_hours > maxKm[r.asset_id])) maxKm[r.asset_id] = r.km_hours;
+    }
+    setMaxKmByAsset(maxKm);
+    setAssetOptions(assets.map((a) => ({ id: a.id, nickname: a.nickname, brand: a.brand, model: a.model })) as AssetOption[]);
+    setCustomers(custRows as CustomerOption[]);
   }
 
   useEffect(() => {
     let active = true;
 
     async function init() {
-      const { data: { session } } = await supabase.auth.getSession();
+      const session = await getLocalSession();
       if (!session) { if (isOnline()) router.replace("/login"); return; }
       if (!active) return;
 
-      setMechanicId(session.user.id);
-      setMechanicEmail(session.user.email ?? "");
+      setMechanicId(session.uid);
+      setMechanicEmail(session.email);
 
-      // El perfil del mecánico (nombre/foto para el sidebar) tampoco
-      // depende de ni bloquea la carga principal del calendario — se
-      // pide en paralelo, no antes.
-      await Promise.all([
-        (async () => {
-          const { data: mechanic } = await cachedQuery("calendar:6", () => supabase            .from("mechanics").select("name, photo_url, maintler_code").eq("id", session.user.id).maybeSingle());
-          if (active && mechanic) { setMechanicName(mechanic.name); setMechanicPhoto(mechanic.photo_url ?? ""); setMaintlerCode(mechanic.maintler_code ?? ""); }
-        })(),
-        loadAll(session.user.id),
-      ]);
+      const reload = async () => {
+        const [mechanic] = await Promise.all([localMe(session.uid), loadAll(session.uid)]);
+        if (active && mechanic) { setMechanicName(mechanic.name); setMechanicPhoto(mechanic.photo_url ?? ""); setMaintlerCode(mechanic.maintler_code ?? ""); }
+      };
+      await reload();
       if (active) setCheckingAuth(false);
+      stopSync = onSynced(() => { if (active) void reload(); });
     }
 
+    let stopSync = () => {};
     init();
 
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
       if (!session) router.replace("/login");
     });
 
-    return () => { active = false; listener.subscription.unsubscribe(); };
+    return () => { active = false; stopSync(); listener.subscription.unsubscribe(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router]);
 
@@ -280,23 +246,14 @@ export default function CalendarPage() {
 
     setTaskSaving(true);
     setTaskError("");
-    const { data, error } = await supabase
-      .from("calendar_tasks")
-      .insert({
-        mechanic_id: mechanicId,
-        asset_id: taskAssetId || null,
-        title: taskTitle.trim(),
-        notes: taskNotes.trim() || null,
-        task_date: selectedKey,
-        customer_id: taskCustomerId || null,
-      })
-      .select("id");
+    await createTask(mechanicId, {
+      asset_id: taskAssetId || null,
+      title: taskTitle.trim(),
+      notes: taskNotes.trim() || null,
+      task_date: selectedKey,
+      customer_id: taskCustomerId || null,
+    });
     setTaskSaving(false);
-
-    if (error || !data || data.length === 0) {
-      setTaskError(error?.message || t("saveTaskFailed"));
-      return;
-    }
 
     resetTaskForm();
     setShowAddTask(false);
@@ -305,14 +262,12 @@ export default function CalendarPage() {
 
   async function handleToggleTask(task: TaskRow) {
     setTaskRows((prev) => prev.map((tk) => (tk.id === task.id ? { ...tk, done: !tk.done } : tk)));
-    const { error } = await supabase.from("calendar_tasks").update({ done: !task.done }).eq("id", task.id);
-    if (error) await loadTasks(mechanicId);
+    await updateTask(mechanicId, task.id, { done: !task.done });
   }
 
   async function handleDeleteTask(task: TaskRow) {
     setTaskRows((prev) => prev.filter((tk) => tk.id !== task.id));
-    const { error } = await supabase.from("calendar_tasks").delete().eq("id", task.id);
-    if (error) await loadTasks(mechanicId);
+    await deleteTask(mechanicId, task.id);
   }
 
   if (checkingAuth) {

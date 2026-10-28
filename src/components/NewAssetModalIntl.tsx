@@ -1,5 +1,6 @@
 "use client";
 
+import { createAssetLocal } from "@/lib/offline/local";
 import { useEffect, useRef, useState } from "react";
 import { X, Camera, ScanLine, AlertTriangle } from "lucide-react";
 import { useTranslations } from "next-intl";
@@ -278,10 +279,7 @@ export default function NewAssetModalIntl({
 
     // Migración 060: desde dónde se creó (país/ciudad por IP, best-effort).
     const geo = await getGeo();
-    const { data: newAsset, error: assetError } = await supabase
-      .from("assets")
-      .insert({
-        created_by: mechanicId,
+    const assetFields = {
         created_country: geo.country, created_region: geo.region, created_city: geo.city,
         asset_type: assetType,
         brand: canonicalMake(assetType, brand.trim(), learned),
@@ -298,7 +296,27 @@ export default function NewAssetModalIntl({
         fuel_type: fuelType || null,
         location: location.trim() || null,
         customer_id: customerId || null,
-      })
+    };
+
+    // Local-first (28/10/2026): un activo nuevo con código propio se crea
+    // en la base local al instante (activo + QR + vínculo + foto en cola) y
+    // se sube solo. Asignar un sticker ya impreso (existingCode) necesita
+    // al servidor, así que sigue por el camino de siempre.
+    if (!existingCode) {
+      if (photoFile) {
+        const v = validateImageFile(photoFile);
+        if (v) { setFormError(v); setSaving(false); return; }
+      }
+      const newId = await createAssetLocal(mechanicId, assetFields, genAssetQrCode(), photoFile);
+      setSaving(false);
+      onCreated(newId);
+      onClose();
+      return;
+    }
+
+    const { data: newAsset, error: assetError } = await supabase
+      .from("assets")
+      .insert({ created_by: mechanicId, ...assetFields })
       .select()
       .single();
 

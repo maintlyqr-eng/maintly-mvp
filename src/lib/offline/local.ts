@@ -97,3 +97,72 @@ export async function createCustomer(uid: string, row: { name: string; phone?: s
   await enqueue({ uid, table: "customers", op: "insert", row: full });
   return id;
 }
+
+/** Tareas del calendario con `assets(...)` anidado, por orden de creación. */
+export async function localTasksWithAssets(uid: string): Promise<Any[]> {
+  const [tasks, assets] = await Promise.all([getAll<Any>("calendar_tasks"), getAll<Any>("assets")]);
+  const assetById = new Map(assets.map((a) => [a.id, a]));
+  return tasks
+    .filter((t) => t.mechanic_id === uid)
+    .sort((a, b) => String(a.created_at ?? "").localeCompare(String(b.created_at ?? "")))
+    .map((t) => { const a = t.asset_id ? assetById.get(t.asset_id) : null; return { ...t, assets: a ? { id: a.id, nickname: a.nickname, brand: a.brand, model: a.model, asset_type: a.asset_type } : null }; });
+}
+
+export async function createTask(uid: string, row: { asset_id: string | null; title: string; notes: string | null; task_date: string; customer_id: string | null }): Promise<string> {
+  const id = newId();
+  const full = { id, mechanic_id: uid, done: false, created_at: new Date().toISOString(), ...row };
+  const { putOne } = await import("./db");
+  await putOne("calendar_tasks", full);
+  await enqueue({ uid, table: "calendar_tasks", op: "insert", row: full });
+  return id;
+}
+export async function updateTask(uid: string, id: string, fields: Record<string, unknown>): Promise<void> {
+  const { getOne, putOne } = await import("./db");
+  const cur = await getOne<Row>("calendar_tasks", id);
+  if (cur) await putOne("calendar_tasks", { ...cur, ...fields });
+  await enqueue({ uid, table: "calendar_tasks", op: "update", row: fields, match: { id } });
+}
+export async function deleteTask(uid: string, id: string): Promise<void> {
+  const { deleteOne } = await import("./db");
+  await deleteOne("calendar_tasks", id);
+  await enqueue({ uid, table: "calendar_tasks", op: "delete", row: {}, match: { id } });
+}
+
+export async function updateCustomer(uid: string, id: string, fields: Record<string, unknown>): Promise<void> {
+  const { getOne, putOne } = await import("./db");
+  const cur = await getOne<Row>("customers", id);
+  if (cur) await putOne("customers", { ...cur, ...fields });
+  await enqueue({ uid, table: "customers", op: "update", row: fields, match: { id } });
+}
+export async function deleteCustomer(uid: string, id: string): Promise<void> {
+  const { deleteOne } = await import("./db");
+  await deleteOne("customers", id);
+  await enqueue({ uid, table: "customers", op: "delete", row: {}, match: { id } });
+}
+
+/** Activo nuevo creado desde el dispositivo (con o sin señal): activo + su
+ *  código QR + vínculo con el taller, y la foto en cola si la hay. */
+export async function createAssetLocal(uid: string, asset: Record<string, unknown>, code: string, photo?: File | null): Promise<string> {
+  const { putOne } = await import("./db");
+  const id = newId();
+  const now = new Date().toISOString();
+  const assetRow = { id, created_by: uid, created_at: now, photo_url: null, ...asset };
+  const qrRow = { id: newId(), code, asset_id: id, created_by: uid, created_at: now };
+  const linkRow = { id: newId(), mechanic_id: uid, asset_id: id, qr_code: code, added_at: now };
+  await putOne("assets", assetRow);
+  await putOne("qr_codes", qrRow);
+  await putOne("mechanic_assets", linkRow);
+  await enqueue({ uid, table: "assets", op: "insert", row: assetRow });
+  await enqueue({ uid, table: "qr_codes", op: "insert", row: qrRow });
+  // insert (no upsert): si ya existía, el "duplicate" se toma como subido.
+  await enqueue({ uid, table: "mechanic_assets", op: "insert", row: linkRow });
+  if (photo) {
+    // Vista previa local mientras se sube: data URL en la fila local.
+    try {
+      const dataUrl = await new Promise<string>((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result)); r.onerror = () => rej(r.error); r.readAsDataURL(photo); });
+      await putOne("assets", { ...assetRow, photo_url: dataUrl });
+    } catch { /* sin vista previa */ }
+    await enqueue({ uid, table: "asset_photo", op: "upload", row: { asset_id: id, name: photo.name }, blob: photo });
+  }
+  return id;
+}

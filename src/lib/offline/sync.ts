@@ -12,14 +12,16 @@
 // - La app escucha "mly:sync" para volver a leer la base local.
 
 import { supabase } from "@/lib/supabase";
+import { uploadAssetPhoto } from "@/lib/uploadAssetPhoto";
 import { TABLES, type Row, replaceAll, getAll, putOne, deleteOne, metaGet, metaSet, clearStores } from "./db";
 import { isOnline, looksLikeNetworkError } from "./cache";
 
 export type QueueOp = {
   id: string;            // uuid del cambio
   uid: string;
-  table: "service_records" | "assets" | "customers" | "calendar_tasks" | "mechanic_assets" | "qr_codes";
-  op: "insert" | "update" | "upsert" | "delete";
+  table: "service_records" | "assets" | "customers" | "calendar_tasks" | "mechanic_assets" | "qr_codes" | "asset_photo";
+  op: "insert" | "update" | "upsert" | "delete" | "upload";
+  blob?: Blob;           // foto a subir (op "upload"); IndexedDB guarda Blobs tal cual
   row: Record<string, unknown>;   // fila completa (insert/upsert) o campos (update)
   match?: Record<string, unknown>; // filtro para update/delete (normalmente { id })
   createdAt: string;
@@ -161,6 +163,18 @@ async function doPush() {
     uid = op.uid;
     let error: { message: string } | null = null;
     try {
+      if (op.table === "asset_photo") {
+        // Foto de un activo creado sin señal: subir y guardar la URL.
+        const assetId = String(op.row.asset_id);
+        const file = op.blob instanceof File ? op.blob : new File([op.blob as Blob], String(op.row.name ?? "photo.jpg"), { type: (op.blob as Blob)?.type || "image/jpeg" });
+        const up = await uploadAssetPhoto(supabase, file, assetId);
+        if (up.url) { const r2 = await supabase.from("assets").update({ photo_url: up.url }).eq("id", assetId); error = r2.error; }
+        else error = { message: up.error ?? "upload" };
+        if (!error) { await deleteOne("queue", op.id); continue; }
+        if (looksLikeNetworkError({ error })) break;
+        await putOne("queue", { ...op, status: "failed", error: error.message, attempts: op.attempts + 1 } as unknown as Row);
+        continue;
+      }
       const t = supabase.from(op.table);
       let r: { error: { message: string } | null };
       if (op.op === "insert") r = await t.insert(op.row);
