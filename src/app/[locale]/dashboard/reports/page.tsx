@@ -1,5 +1,6 @@
 "use client";
 
+import DashboardSkeleton from "@/components/DashboardSkeleton";
 import Image from "next/image";
 // Assets isn't migrated yet — keep this one plain next/link.
 import Link from "next/link";
@@ -145,9 +146,7 @@ export default function ReportsPage() {
 
   if (checkingAuth) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-zinc-50">
-        <p className="text-zinc-400 text-[13px]">{t("loadingAuth")}</p>
-      </div>
+      <DashboardSkeleton />
     );
   }
 

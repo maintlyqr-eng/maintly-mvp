@@ -1,5 +1,6 @@
 "use client";
 
+import DashboardSkeleton from "@/components/DashboardSkeleton";
 import Link from "next/link";
 import Image from "next/image";
 import { useEffect, useState } from "react";
@@ -148,9 +149,7 @@ export default function MessagesPage() {
 
   if (checkingAuth) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-zinc-50">
-        <p className="text-zinc-400 text-[13px]">{t("loadingAuth")}</p>
-      </div>
+      <DashboardSkeleton />
     );
   }
 

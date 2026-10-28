@@ -92,3 +92,6 @@ html.mly-wco .fixed.inset-y-0,
 html.mly-wco .sticky.top-0 {
   top: env(titlebar-area-height, 32px);
 }
+
+/* Barrita de progreso fina mientras una pantalla del panel arranca. */
+@keyframes mlyBar { 0% { transform: translateX(-100%); } 100% { transform: translateX(300%); } }

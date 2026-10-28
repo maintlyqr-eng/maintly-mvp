@@ -1,6 +1,7 @@
 "use client";
 
 // Services isn't migrated yet — keep this one plain next/link.
+import DashboardSkeleton from "@/components/DashboardSkeleton";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 // Login is migrated and every router.push()/replace() call on this page
@@ -243,9 +244,7 @@ export default function CustomersPage() {
 
   if (checkingAuth) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-zinc-50">
-        <p className="text-zinc-400 text-[13px]">{t("loadingAuth")}</p>
-      </div>
+      <DashboardSkeleton />
     );
   }
 

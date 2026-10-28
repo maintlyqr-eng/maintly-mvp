@@ -1,5 +1,6 @@
 "use client";
 
+import DashboardSkeleton from "@/components/DashboardSkeleton";
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useRef, useState, Suspense } from "react";
@@ -538,13 +539,12 @@ function DashboardPageInner() {
     router.replace("/login");
   }
 
-  if (!authChecked) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-zinc-50">
-        <p className="text-zinc-400 text-[13px]">{t("loadingAuth")}</p>
-      </div>
-    );
-  }
+  // Facu (28/10/2026): "ese cargando queda feo" — mientras se verifica la
+  // sesión y llegan los datos, se dibuja igual la pantalla completa (menú,
+  // cabecera) con el contenido en esqueleto gris, en vez de una pantalla
+  // vacía con "Cargando…". Así pasar de una sección a otra se siente como
+  // navegar, no como recargar.
+  const booting = !authChecked;
 
   const displayName = mechanicName || mechanicEmail;
 
@@ -909,7 +909,15 @@ function DashboardPageInner() {
             justo para que Chrome dibuje la barra de scroll aunque no haya
             nada que desplazar en la práctica. pb-3/md:pb-4 -> pb-2/md:pb-3
             recorta esos 4px sin tocar nada del layout en filas de siempre. */}
-        <div className="flex-1 overflow-y-auto px-3 md:px-4 pt-1.5 md:pt-2 pb-2 md:pb-3">
+        {booting && <div className="h-0.5 w-full bg-zinc-100 overflow-hidden"><div className="h-full w-1/3 bg-red-600 animate-[mlyBar_1s_ease-in-out_infinite]" /></div>}
+        <div className={`flex-1 overflow-y-auto px-3 md:px-4 pt-1.5 md:pt-2 pb-2 md:pb-3 ${booting ? "animate-pulse" : ""}`} aria-busy={booting}>
+          {booting ? (
+            <div className="space-y-3 pt-1">
+              <div className="h-[150px] rounded-2xl bg-zinc-200/60" />
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3"><div className="h-[230px] rounded-2xl bg-zinc-200/60" /><div className="h-[230px] rounded-2xl bg-zinc-200/60" /><div className="h-[230px] rounded-2xl bg-zinc-200/60" /></div>
+              <div className="h-[260px] rounded-2xl bg-zinc-200/60" />
+            </div>
+          ) : (<>
           <OfflineBanner cachedAt={cachedAt} />
 
           {/* ── "Tus prioridades de hoy" ── the most urgent 3 reminders
@@ -1366,6 +1374,7 @@ function DashboardPageInner() {
           </div>
 
           <p className="text-center text-[10px] text-zinc-400 mt-1.5">{t("copyright")}</p>
+          </>)}
         </div>
       </div>
 
@@ -1409,9 +1418,7 @@ function DashboardPageInner() {
 export default function DashboardPage() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen flex items-center justify-center bg-zinc-50">
-        <div className="w-8 h-8 border-4 border-red-600 border-t-transparent rounded-full animate-spin" />
-      </div>
+      <DashboardSkeleton />
     }>
       <DashboardPageInner />
     </Suspense>

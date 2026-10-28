@@ -1,5 +1,6 @@
 "use client";
 
+import DashboardSkeleton from "@/components/DashboardSkeleton";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -792,9 +793,7 @@ export default function AssetsPage() {
 
   if (checkingAuth) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-zinc-50">
-        <p className="text-zinc-400 text-[13px]">{t("loadingAuth")}</p>
-      </div>
+      <DashboardSkeleton />
     );
   }
 

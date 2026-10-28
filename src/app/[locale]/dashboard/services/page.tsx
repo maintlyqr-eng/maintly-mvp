@@ -1,5 +1,6 @@
 "use client";
 
+import DashboardSkeleton from "@/components/DashboardSkeleton";
 import Image from "next/image";
 // Assets isn't migrated yet — keep this one plain next/link.
 import Link from "next/link";
@@ -742,9 +743,7 @@ function ServicesPageInner() {
 
   if (checkingAuth) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-zinc-50">
-        <p className="text-zinc-400 text-[13px]">{t("loadingAuth")}</p>
-      </div>
+      <DashboardSkeleton />
     );
   }
 
@@ -1482,9 +1481,7 @@ function ServicesPageInner() {
 export default function ServicesPage() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen flex items-center justify-center bg-zinc-50">
-        <div className="w-8 h-8 border-4 border-red-600 border-t-transparent rounded-full animate-spin" />
-      </div>
+      <DashboardSkeleton />
     }>
       <ServicesPageInner />
     </Suspense>

@@ -1,5 +1,6 @@
 "use client";
 
+import DashboardSkeleton from "@/components/DashboardSkeleton";
 import { useEffect, useMemo, useState } from "react";
 // Login is migrated and every router.push()/replace() call on this page
 // targets it — safe to use next-intl's locale-aware router.
@@ -265,9 +266,7 @@ export default function DocumentsPage() {
 
   if (checkingAuth) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-zinc-50">
-        <p className="text-zinc-400 text-[13px]">{t("loadingAuth")}</p>
-      </div>
+      <DashboardSkeleton />
     );
   }
 
