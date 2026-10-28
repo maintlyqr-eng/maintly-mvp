@@ -1,6 +1,8 @@
 "use client";
 
 import { cachedQuery, isOnline } from "@/lib/offline/cache";
+import { localServices, localAssets, localCustomers, localAssetHistory, localMe, createServiceRecord, updateAssetFields } from "@/lib/offline/local";
+import { getLocalSession, onSynced } from "@/lib/offline/session";
 import DashboardSkeleton from "@/components/DashboardSkeleton";
 import Image from "next/image";
 // Assets isn't migrated yet — keep this one plain next/link.
@@ -347,19 +349,8 @@ function ServicesPageInner() {
 
   async function loadServices(uid: string) {
     setLoading(true);
-    const { data } = await cachedQuery("services:1", () => supabase      .from("service_records")
-      .select("id, service_date, service_type, km_hours, notes, created_at, mechanic_id, next_due_date, next_due_km_hours, hidden_from_panel_at, assets(id, nickname, brand, model, vin_serial, plate, asset_type, photo_url, qr_codes(code))")
-      .eq("mechanic_id", uid)
-      .is("deleted_at", null)
-      // Facu (19 jul 2026): "eso sí debería poder hacer, borrar lo que él
-      // quiera porque es su panel, pero nunca se borra de la máquina" —
-      // hidden_from_panel_at (migration 041) is the per-mechanic "remove
-      // from my Mis Servicios list" flag, separate from deleted_at (which
-      // migration 040 locked to Super Admin only). Only THIS query — the
-      // mechanic's own panel — filters on it; the public QR history and
-      // any other mechanic's view of the same asset intentionally do not.
-      .is("hidden_from_panel_at", null)
-      .order("service_date", { ascending: false }));
+    // Local-first: base local, instantánea con o sin señal.
+    const data = await localServices(uid);
     setServices((data as unknown as ServiceRow[]) ?? []);
 
     // Facu (21 jul 2026): which rows already have a pending "solicitar
@@ -384,26 +375,13 @@ function ServicesPageInner() {
     // misma fuente (mechanic_assets, todo el taller) y el mismo criterio de
     // soft-delete que la página Activos, para que "Activos" signifique lo
     // mismo en toda la app (ver auditoría de métricas cruzadas).
-    const { data } = await cachedQuery("services:3", () => supabase      .from("mechanic_assets")
-      .select("assets(id, nickname, brand, model, asset_type, customer_id, deleted_at)")
-      .eq("mechanic_id", uid)
-      .order("added_at", { ascending: false }));
-    const opts = ((data ?? []) as any[])
-      .map((row) => {
-        const a = Array.isArray(row.assets) ? row.assets[0] : row.assets;
-        if (!a || a.deleted_at) return null;
-        return a as AssetOption;
-      })
-      .filter(Boolean) as AssetOption[];
+    const opts = (await localAssets(uid)).map((a) => ({ id: a.id, nickname: a.nickname, brand: a.brand, model: a.model, asset_type: a.asset_type, customer_id: a.customer_id ?? null }) as AssetOption);
     setAssetOptions(opts);
     if (opts.length > 0) setSvcAssetId(opts[0].id);
   }
 
   async function loadCustomers(uid: string) {
-    const { data } = await cachedQuery("services:4", () => supabase      .from("customers")
-      .select("id, name, phone, email")
-      .eq("mechanic_id", uid)
-      .order("name", { ascending: true }));
+    const data = await localCustomers(uid);
     setCustomers((data as CustomerOption[]) ?? []);
   }
 
@@ -411,34 +389,35 @@ function ServicesPageInner() {
     let active = true;
 
     async function init() {
-      const { data: { session } } = await supabase.auth.getSession();
+      const session = await getLocalSession();
       if (!session) { if (isOnline()) router.replace("/login"); return; }
       if (!active) return;
 
-      setMechanicId(session.user.id);
-      setMechanicEmail(session.user.email ?? "");
+      setMechanicId(session.uid);
+      setMechanicEmail(session.email);
 
-      // Facu (26 jul 2026, revisión de rendimiento): el perfil propio se
-      // pedía antes que las otras 3 cargas, en fila — ahora las 4 van
-      // juntas, ninguna depende de otra.
-      const [{ data: mechanic }] = await Promise.all([
-        supabase
-          .from("mechanics").select("name, photo_url, maintler_code").eq("id", session.user.id).maybeSingle(),
-        loadServices(session.user.id),
-        loadAssets(session.user.id),
-        loadCustomers(session.user.id),
-      ]);
-      if (active && mechanic) { setMechanicName(mechanic.name); setMechanicPhoto(mechanic.photo_url ?? ""); setMaintlerCode(mechanic.maintler_code ?? ""); }
+      const loadAll = async () => {
+        const [mechanic] = await Promise.all([
+          localMe(session.uid),
+          loadServices(session.uid),
+          loadAssets(session.uid),
+          loadCustomers(session.uid),
+        ]);
+        if (active && mechanic) { setMechanicName(mechanic.name); setMechanicPhoto(mechanic.photo_url ?? ""); setMaintlerCode(mechanic.maintler_code ?? ""); }
+      };
+      await loadAll();
       if (active) setCheckingAuth(false);
+      stopSync = onSynced(() => { if (active) void loadAll(); });
     }
 
+    let stopSync = () => {};
     init();
 
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
       if (!session) router.replace("/login");
     });
 
-    return () => { active = false; listener.subscription.unsubscribe(); };
+    return () => { active = false; stopSync(); listener.subscription.unsubscribe(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router]);
 
@@ -474,14 +453,8 @@ function ServicesPageInner() {
     if (!assetId) { setMinKmHours(null); return; }
     minKmHoursAssetIdRef.current = assetId;
     setMinKmHoursLoading(true);
-    const { data } = await cachedQuery("services:5", () => supabase      .from("service_records")
-      .select("km_hours")
-      .eq("asset_id", assetId)
-      .is("deleted_at", null)
-      .not("km_hours", "is", null)
-      .order("km_hours", { ascending: false })
-      .limit(1)
-      .maybeSingle());
+    const hist = await localAssetHistory(assetId);
+    const data = { km_hours: hist.reduce<number | null>((m, r) => (r.km_hours != null && (m == null || r.km_hours > m) ? r.km_hours : m), null) };
     if (minKmHoursAssetIdRef.current !== assetId) return;
     setMinKmHours(data?.km_hours ?? null);
     setMinKmHoursLoading(false);
@@ -523,8 +496,8 @@ function ServicesPageInner() {
 
     setSvcSaving(true);
 
-    const { error } = await supabase.from("service_records").insert({
-      mechanic_id: mechanicId,
+    // Local-first: queda guardado al instante y se sube solo.
+    await createServiceRecord(mechanicId, {
       asset_id: svcAssetId,
       service_type: svcType,
       service_date: new Date().toISOString().slice(0, 10),
@@ -533,12 +506,10 @@ function ServicesPageInner() {
       customer_id: svcCustomerId || null,
     });
 
-    if (error) { setSvcSaving(false); setSvcError(error.message); return; }
-
     const asset = assetOptions.find((a) => a.id === svcAssetId);
     const newCustomerId = svcCustomerId || null;
     if (asset && asset.customer_id !== newCustomerId) {
-      await supabase.from("assets").update({ customer_id: newCustomerId }).eq("id", svcAssetId);
+      await updateAssetFields(mechanicId, svcAssetId, { customer_id: newCustomerId });
       setAssetOptions((prev) => prev.map((a) => (a.id === svcAssetId ? { ...a, customer_id: newCustomerId } : a)));
     }
 

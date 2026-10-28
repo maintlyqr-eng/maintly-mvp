@@ -2780,6 +2780,12 @@
     "iosStep1": "Tap Safari's Share button",
     "iosStep2": "Choose \"Add to Home Screen\"",
     "iosStep3": "Tap \"Add\". Done: MaintlyQR is now an app.",
-    "close": "Close"
+    "close": "Close",
+    "offlineHint": "No signal: keep working, it uploads by itself when it's back.",
+    "pendingN": "{n} to upload",
+    "failedN": "{n} failed to upload",
+    "retry": "Retry",
+    "uploadingN": "Uploading {n}…",
+    "syncing": "Syncing…"
   }
 }

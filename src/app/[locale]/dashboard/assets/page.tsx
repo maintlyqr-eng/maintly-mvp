@@ -16,7 +16,9 @@ import { supabase } from "@/lib/supabase";
 import { suggestMakes, suggestModels, canonicalMake } from "@/lib/vehicleCatalog";
 import SuggestInput from "@/components/SuggestInput";
 import { useLearnedCatalog } from "@/lib/useLearnedCatalog";
-import { cachedRead, isOnline } from "@/lib/offline/cache";
+import { isOnline } from "@/lib/offline/cache";
+import { localWorkshop, localCustomers, localServices, localAssetHistory, localMe, createServiceRecord, updateAssetFields } from "@/lib/offline/local";
+import { getLocalSession, onSynced } from "@/lib/offline/session";
 import OfflineBanner from "@/components/OfflineBanner";
 import { useUnreadMessagesCount } from "@/lib/useUnreadMessages";
 import { useUnreadMechanicMessages } from "@/lib/useUnreadMechanicMessages";
@@ -299,33 +301,19 @@ export default function AssetsPage() {
         .filter(Boolean);
       setAssets(assetList as unknown as AssetRow[]);
     };
-    // Copia guardada al instante; la lectura fresca la reemplaza al llegar.
-    const read = await cachedRead(uid, "assets", () => supabase
-      .from("mechanic_assets")
-      .select("asset_id, shared_by, sharer:mechanics!mechanic_assets_shared_by_fkey(name), assets(id, asset_type, brand, model, nickname, vin_serial, year, plate, fuel_type, location, photo_url, created_at, customer_id, deleted_at, qr_codes(code, theme, label))")
-      .eq("mechanic_id", uid)
-      .order("added_at", { ascending: false }), { onUpdate: (fresh) => applyAssets((fresh.data as any[] | null) ?? null) });
-    setCachedAt(read.fromCache ? read.cachedAt : null);
-    applyAssets((read.data?.data as any[] | null) ?? null);
+    // Local-first: la base local responde al instante; el sincronizador la
+    // mantiene al día y esta función se vuelve a llamar al terminar (onSynced).
+    setCachedAt(null);
+    applyAssets(await localWorkshop(uid));
     setLoadingAssets(false);
   }
 
   async function loadCustomers(uid: string) {
-    const read = await cachedRead(uid, "customers", () => supabase
-      .from("customers")
-      .select("id, name, phone, email")
-      .eq("mechanic_id", uid)
-      .order("name", { ascending: true }));
-    setCustomers((read.data?.data as CustomerOption[]) ?? []);
+    setCustomers((await localCustomers(uid)) as CustomerOption[]);
   }
 
   async function loadServiceAggregates(uid: string) {
-    const read = await cachedRead(uid, "svc-agg", () => supabase
-      .from("service_records")
-      .select("asset_id, service_date, km_hours, next_due_date, next_due_km_hours")
-      .eq("mechanic_id", uid)
-      .is("deleted_at", null));
-    const data = read.data?.data ?? null;
+    const data = await localServices(uid, { includeHidden: true });
 
     type Bucket = {
       dates: string[];
@@ -380,33 +368,31 @@ export default function AssetsPage() {
     let active = true;
 
     async function init() {
-      const { data: { session } } = await supabase.auth.getSession();
+      const session = await getLocalSession();
       if (!session) {
         if (isOnline()) router.replace("/login");
         return;
       }
       if (!active) return;
 
-      setMechanicId(session.user.id);
-      setMechanicEmail(session.user.email ?? "");
+      setMechanicId(session.uid);
+      setMechanicEmail(session.email);
 
-      // Facu (26 jul 2026, revisión de rendimiento): el perfil propio se
-      // pedía antes que las otras 3 cargas, en fila — ahora las 4 van
-      // juntas, ninguna depende de otra.
-      const [{ data: mechanic }] = await Promise.all([
-        supabase
-          .from("mechanics")
-          .select("name, photo_url, maintler_code")
-          .eq("id", session.user.id)
-          .maybeSingle(),
-        loadAssets(session.user.id),
-        loadServiceAggregates(session.user.id),
-        loadCustomers(session.user.id),
-      ]);
-      if (active && mechanic) { setMechanicName(mechanic.name); setMechanicPhoto(mechanic.photo_url ?? ""); setMaintlerCode(mechanic.maintler_code ?? ""); }
+      const loadAll = async () => {
+        const [mechanic] = await Promise.all([
+          localMe(session.uid),
+          loadAssets(session.uid),
+          loadServiceAggregates(session.uid),
+          loadCustomers(session.uid),
+        ]);
+        if (active && mechanic) { setMechanicName(mechanic.name); setMechanicPhoto(mechanic.photo_url ?? ""); setMaintlerCode(mechanic.maintler_code ?? ""); }
+      };
+      await loadAll();
       if (active) setCheckingAuth(false);
+      stopSync = onSynced(() => { if (active) void loadAll(); });
     }
 
+    let stopSync = () => {};
     init();
 
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
@@ -415,6 +401,7 @@ export default function AssetsPage() {
 
     return () => {
       active = false;
+      stopSync();
       listener.subscription.unsubscribe();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -454,14 +441,7 @@ export default function AssetsPage() {
     setHistoryRecords([]);
     setHistoryLoading(true);
     setShowHistoryModal(true);
-    // Sin señal: historial guardado la última vez que se abrió este equipo.
-    const read = await cachedRead(mechanicId || "anon", `history:${a.id}`, () => supabase
-      .from("service_records")
-      .select("id, service_date, service_type, km_hours, notes, mechanic_id")
-      .eq("asset_id", a.id)
-      .is("deleted_at", null)
-      .order("service_date", { ascending: false }));
-    const data = read.data?.data ?? null;
+    const data = await localAssetHistory(a.id);
     if (currentHistoryAssetIdRef.current !== a.id) return;
     const rows = (data as unknown as (ServiceRecord & { mechanic_id: string | null })[]) ?? [];
     // An asset can have services logged by OTHER mechanics too (shared/multi-shop
@@ -665,8 +645,9 @@ export default function AssetsPage() {
 
     setSvcSaving(true);
 
-    const { error } = await supabase.from("service_records").insert({
-      mechanic_id: mechanicId,
+    // Local-first: se guarda al instante en el dispositivo y se sube solo
+    // (con señal ahora, o cuando vuelva).
+    await createServiceRecord(mechanicId, {
       asset_id: svcAssetId,
       service_type: svcType,
       service_date: new Date().toISOString().slice(0, 10),
@@ -675,17 +656,11 @@ export default function AssetsPage() {
       customer_id: svcCustomerId || null,
     });
 
-    if (error) {
-      setSvcSaving(false);
-      setSvcError(error.message);
-      return;
-    }
-
     // Keep the asset's "last known customer" cache in sync.
     const asset = assets.find((a) => a.id === svcAssetId);
     const newCustomerId = svcCustomerId || null;
     if (asset && asset.customer_id !== newCustomerId) {
-      await supabase.from("assets").update({ customer_id: newCustomerId }).eq("id", svcAssetId);
+      await updateAssetFields(mechanicId, svcAssetId, { customer_id: newCustomerId });
       setAssets((prev) => prev.map((a) => (a.id === svcAssetId ? { ...a, customer_id: newCustomerId } : a)));
     }
 

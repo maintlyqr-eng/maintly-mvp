@@ -2780,6 +2780,12 @@
     "iosStep1": "Toque no botão Compartilhar do Safari",
     "iosStep2": "Escolha \"Adicionar à Tela de Início\"",
     "iosStep3": "Toque em \"Adicionar\". Pronto: o MaintlyQR vira um app.",
-    "close": "Fechar"
+    "close": "Fechar",
+    "offlineHint": "Sem sinal: continue trabalhando, sobe sozinho quando voltar.",
+    "pendingN": "{n} para enviar",
+    "failedN": "{n} não puderam ser enviados",
+    "retry": "Tentar de novo",
+    "uploadingN": "Enviando {n}…",
+    "syncing": "Sincronizando…"
   }
 }

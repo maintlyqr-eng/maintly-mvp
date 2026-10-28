@@ -9,22 +9,9 @@
 //       r.data (el mismo tipo que devuelve el fetcher), r.fromCache,
 //       r.cachedAt, r.offline (true si no había red ni copia guardada).
 
-const DB_NAME = "maintlyqr";
-const STORE = "reads";
+import { openDb } from "./db";
 
-function openDb(): Promise<IDBDatabase> {
-  return new Promise((resolve, reject) => {
-    if (typeof indexedDB === "undefined") { reject(new Error("no indexedDB")); return; }
-    const req = indexedDB.open(DB_NAME, 1);
-    req.onupgradeneeded = () => {
-      const db = req.result;
-      if (!db.objectStoreNames.contains(STORE)) db.createObjectStore(STORE);
-      if (!db.objectStoreNames.contains("queue")) db.createObjectStore("queue", { keyPath: "id" }); // etapa B
-    };
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error);
-  });
-}
+const STORE = "reads";
 
 export async function idbGet<T>(key: string): Promise<T | undefined> {
   try {

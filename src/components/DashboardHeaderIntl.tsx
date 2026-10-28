@@ -1,5 +1,6 @@
 "use client";
 
+import SyncIndicator from "@/components/SyncIndicator";
 import Link from "next/link";
 import { Fragment, type ReactNode } from "react";
 import { Menu, LogOut } from "lucide-react";
@@ -80,6 +81,7 @@ export default function DashboardHeaderIntl({
         </div>
         <div className="flex items-center gap-2 md:gap-4 shrink-0">
           {extraHeaderContent}
+          <SyncIndicator />
           <NotificationBellIntl mechanicId={mechanicId} unreadMessagesCount={unreadMessages} unreadMechanicCount={unreadMechanicMessages} />
           <div className="flex items-center gap-3 md:pl-3 md:border-l border-zinc-200">
             <Link href={maintlerCode ? `/maintler/${maintlerCode}` : "/dashboard/settings"} className="flex items-center gap-2.5 group">

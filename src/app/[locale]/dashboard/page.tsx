@@ -14,7 +14,10 @@ import {
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { authedFetch } from "@/lib/apiAuth";
-import { cachedRead, isOnline, looksLikeNetworkError } from "@/lib/offline/cache";
+import { isOnline } from "@/lib/offline/cache";
+import { localMe, localServices, localTasks, localWorkshop } from "@/lib/offline/local";
+import { getLocalSession, onSynced } from "@/lib/offline/session";
+type Any = Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
 import OfflineBanner from "@/components/OfflineBanner";
 import { useUnreadMessagesCount } from "@/lib/useUnreadMessages";
 import { useUnreadMechanicMessages } from "@/lib/useUnreadMechanicMessages";
@@ -203,37 +206,22 @@ function DashboardPageInner() {
   useEffect(() => {
     let active = true;
 
-    const readHome = (uid: string) => Promise.all([
-        supabase.from("mechanics").select("name, photo_url, maintler_code").eq("id", uid).maybeSingle(),
-        supabase.from("service_records").select("*", { count: "exact", head: true }).eq("mechanic_id", uid).is("deleted_at", null),
-        supabase
-          .from("service_records")
-          .select("id, asset_id, service_type, next_due_date, next_due_km_hours, assets(nickname, brand, model, asset_type)")
-          .eq("mechanic_id", uid)
-          .is("deleted_at", null)
-          .or("next_due_date.not.is.null,next_due_km_hours.not.is.null"),
-        supabase
-          .from("service_records")
-          .select("asset_id, km_hours")
-          .eq("mechanic_id", uid)
-          .is("deleted_at", null)
-          .not("km_hours", "is", null),
-        supabase
-          .from("service_records")
-          .select("asset_id, service_date, service_type, assets(nickname, brand, model)")
-          .eq("mechanic_id", uid)
-          .is("deleted_at", null)
-          .order("service_date", { ascending: false })
-          .limit(3000), // feeds "last service per asset" + the activity feed — bounds payload for very long-tenured accounts
-        supabase
-          .from("calendar_tasks")
-          .select("id, task_date, done, title")
-          .eq("mechanic_id", uid),
-        supabase
-          .from("mechanic_assets")
-          .select("assets(id, nickname, brand, model, vin_serial, asset_type, photo_url, deleted_at, qr_codes(code))")
-          .eq("mechanic_id", uid),
-      ]);
+    // Local-first (28/10/2026): las 7 lecturas salen de la base local
+    // (src/lib/offline/local.ts), instantáneas con o sin señal. Mismas
+    // formas que las consultas a Supabase que había antes.
+    const readHome = async (uid: string) => {
+      const [me, svcs, tasks, workshop] = await Promise.all([localMe(uid), localServices(uid, { includeHidden: true }), localTasks(uid), localWorkshop(uid)]);
+      const pick = (a: Any | null, keys: string[]) => (a ? Object.fromEntries(keys.map((k) => [k, a[k] ?? null])) : null);
+      return [
+        { data: me ? { name: me.name, photo_url: me.photo_url ?? null, maintler_code: me.maintler_code ?? null } : null },
+        { count: svcs.length },
+        { data: svcs.filter((r) => r.next_due_date != null || r.next_due_km_hours != null).map((r) => ({ id: r.id, asset_id: r.asset_id, service_type: r.service_type, next_due_date: r.next_due_date ?? null, next_due_km_hours: r.next_due_km_hours ?? null, assets: pick(r.assets, ["nickname", "brand", "model", "asset_type"]) })) },
+        { data: svcs.filter((r) => r.km_hours != null).map((r) => ({ asset_id: r.asset_id, km_hours: r.km_hours })) },
+        { data: svcs.slice(0, 3000).map((r) => ({ asset_id: r.asset_id, service_date: r.service_date, service_type: r.service_type, assets: pick(r.assets, ["nickname", "brand", "model"]) })) },
+        { data: tasks.map((t) => ({ id: t.id, task_date: t.task_date, done: t.done, title: t.title })) },
+        { data: workshop.map((w) => ({ assets: w.assets ? { ...pick(w.assets, ["id", "nickname", "brand", "model", "vin_serial", "asset_type", "photo_url", "deleted_at"]), qr_codes: w.assets.qr_codes.map((q: Any) => ({ code: q.code })) } : null })) },
+      ] as const;
+    };
     type HomeRows = Awaited<ReturnType<typeof readHome>>;
     async function applyHome(rows: NonNullable<HomeRows>) {
       if (!active) return;
@@ -429,12 +417,13 @@ function DashboardPageInner() {
     }
 
     async function init() {
-      const { data: { session } } = await supabase.auth.getSession();
+      const session = await getLocalSession();
       if (!session) { if (isOnline()) router.replace("/login"); return; }
       if (!active) return;
+      const uid = session.uid;
 
-      setMechanicId(session.user.id);
-      setMechanicEmail(session.user.email ?? "");
+      setMechanicId(uid);
+      setMechanicEmail(session.email);
       // Migración 060: última ubicación desde la que entró (por IP). Si es
       // una cuenta vieja sin ubicación de registro, también la fija.
       authedFetch("/api/geo-stamp", { method: "POST", body: JSON.stringify({ kind: "signup" }) }).catch(() => {});
@@ -449,27 +438,21 @@ function DashboardPageInner() {
       // page instead of an unfiltered raw count.)
       // Etapa A sin señal: las 7 lecturas van juntas a la caché local como
       // un solo bloque "home"; si no hay red, vuelve la última copia.
-      const homeRead = await cachedRead(session.user.id, "home", () => readHome(session.user.id), {
-        isFailure: (rs) => rs.some((r) => looksLikeNetworkError(r)),
-        onUpdate: applyHome,
-      });
-
+      await applyHome(await readHome(uid));
       if (!active) return;
-      setCachedAt(homeRead.fromCache ? homeRead.cachedAt : null);
-      if (!homeRead.data) { if (active) setAuthChecked(true); return; }
-      // Aplica las 7 lecturas al estado. Se llama con la copia guardada
-      // (instantáneo) y de nuevo cuando llega la lectura fresca.
-      await applyHome(homeRead.data);
+      setCachedAt(null);
+      stopSync = onSynced(() => { if (active) readHome(uid).then((rows) => applyHome(rows)); });
       if (active) setAuthChecked(true);
     }
 
+    let stopSync = () => {};
     init();
 
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
       if (!session) router.replace("/login");
     });
 
-    return () => { active = false; listener.subscription.unsubscribe(); };
+    return () => { active = false; stopSync(); listener.subscription.unsubscribe(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router]);
 
