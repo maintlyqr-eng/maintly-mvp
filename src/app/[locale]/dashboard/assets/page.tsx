@@ -282,27 +282,30 @@ export default function AssetsPage() {
     // vinculó + los que otro Maintler le compartió — ver migration 029).
     // "sharer" resuelve el nombre de quien compartió vía shared_by; viene null
     // para cualquier fila que el mecánico agregó por su cuenta (escaneo propio).
+    const applyAssets = (data: any[] | null) => {
+      const assetList = (data ?? [])
+        .map((row: any) => {
+          const a = Array.isArray(row.assets) ? row.assets[0] : row.assets;
+          if (!a) return null;
+          // Filtered here (not in the query) because `assets` is an embedded
+          // relation through mechanic_assets — see admin's soft-delete
+          // migration 031. An asset the admin soft-deleted disappears from
+          // the owner's own workshop too, same as it does from public view.
+          if (a.deleted_at) return null;
+          const sharer = Array.isArray(row.sharer) ? row.sharer[0] : row.sharer;
+          return { ...a, sharedByName: row.shared_by ? (sharer?.name ?? t("anotherMaintler")) : null };
+        })
+        .filter(Boolean);
+      setAssets(assetList as unknown as AssetRow[]);
+    };
+    // Copia guardada al instante; la lectura fresca la reemplaza al llegar.
     const read = await cachedRead(uid, "assets", () => supabase
       .from("mechanic_assets")
       .select("asset_id, shared_by, sharer:mechanics!mechanic_assets_shared_by_fkey(name), assets(id, asset_type, brand, model, nickname, vin_serial, year, plate, fuel_type, location, photo_url, created_at, customer_id, deleted_at, qr_codes(code, theme, label))")
       .eq("mechanic_id", uid)
-      .order("added_at", { ascending: false }));
+      .order("added_at", { ascending: false }), { onUpdate: (fresh) => applyAssets((fresh.data as any[] | null) ?? null) });
     setCachedAt(read.fromCache ? read.cachedAt : null);
-    const data = read.data?.data ?? null;
-    const assetList = (data ?? [])
-      .map((row: any) => {
-        const a = Array.isArray(row.assets) ? row.assets[0] : row.assets;
-        if (!a) return null;
-        // Filtered here (not in the query) because `assets` is an embedded
-        // relation through mechanic_assets — see admin's soft-delete
-        // migration 031. An asset the admin soft-deleted disappears from
-        // the owner's own workshop too, same as it does from public view.
-        if (a.deleted_at) return null;
-        const sharer = Array.isArray(row.sharer) ? row.sharer[0] : row.sharer;
-        return { ...a, sharedByName: row.shared_by ? (sharer?.name ?? t("anotherMaintler")) : null };
-      })
-      .filter(Boolean);
-    setAssets(assetList as unknown as AssetRow[]);
+    applyAssets((read.data?.data as any[] | null) ?? null);
     setLoadingAssets(false);
   }
 

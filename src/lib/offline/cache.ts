@@ -67,9 +67,32 @@ export type CachedResult<T> = { data: T | null; fromCache: boolean; cachedAt: st
 
 type Entry<T> = { data: T; at: string };
 
-export async function cachedRead<T>(uid: string, key: string, fetcher: () => PromiseLike<T>, opts?: { isFailure?: (r: T) => boolean }): Promise<CachedResult<T>> {
+export async function cachedRead<T>(
+  uid: string,
+  key: string,
+  fetcher: () => PromiseLike<T>,
+  opts?: { isFailure?: (r: T) => boolean; onUpdate?: (fresh: T) => void },
+): Promise<CachedResult<T>> {
   const k = `${uid}:${key}`;
   const isFailure = opts?.isFailure ?? ((r: T) => looksLikeNetworkError(r));
+  const cached = await idbGet<Entry<T>>(k);
+
+  // Con señal y copia guardada + onUpdate: se devuelve la copia al instante
+  // (la pantalla aparece ya) y la lectura real sigue por detrás; cuando
+  // llega, onUpdate la aplica. Así la app se siente rápida con y sin señal.
+  if (isOnline() && cached && opts?.onUpdate) {
+    const onUpdate = opts.onUpdate;
+    Promise.resolve()
+      .then(() => fetcher())
+      .then(async (data) => {
+        if (isFailure(data)) return;
+        await idbSet(k, { data, at: new Date().toISOString() } satisfies Entry<T>);
+        onUpdate(data);
+      })
+      .catch(() => { /* se queda con la copia */ });
+    return { data: cached.data, fromCache: true, cachedAt: null, offline: false };
+  }
+
   if (isOnline()) {
     try {
       const data = await fetcher();
@@ -79,7 +102,6 @@ export async function cachedRead<T>(uid: string, key: string, fetcher: () => Pro
       }
     } catch { /* cae a la caché */ }
   }
-  const cached = await idbGet<Entry<T>>(k);
   if (cached) return { data: cached.data, fromCache: true, cachedAt: cached.at, offline: true };
   return { data: null, fromCache: false, cachedAt: null, offline: true };
 }

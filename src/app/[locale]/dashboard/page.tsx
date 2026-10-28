@@ -202,62 +202,40 @@ function DashboardPageInner() {
   useEffect(() => {
     let active = true;
 
-    async function init() {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) { if (isOnline()) router.replace("/login"); return; }
-      if (!active) return;
-
-      setMechanicId(session.user.id);
-      setMechanicEmail(session.user.email ?? "");
-      // Migración 060: última ubicación desde la que entró (por IP). Si es
-      // una cuenta vieja sin ubicación de registro, también la fija.
-      authedFetch("/api/geo-stamp", { method: "POST", body: JSON.stringify({ kind: "signup" }) }).catch(() => {});
-
-      // These 7 queries are all independent (none depends on another's
-      // result), so they're fired concurrently instead of one after another
-      // — page load time is now bounded by the slowest single query instead
-      // of the sum of all of them. (26 jul 2026: was 8 — the separate
-      // mechanic_assets head-count query was dropped; totalAssets is now
-      // derived from the assets(...) rows fetched below, post soft-delete
-      // filtering, so "Activos" means the same thing here as on the Activos
-      // page instead of an unfiltered raw count.)
-      // Etapa A sin señal: las 7 lecturas van juntas a la caché local como
-      // un solo bloque "home"; si no hay red, vuelve la última copia.
-      const homeRead = await cachedRead(session.user.id, "home", () => Promise.all([
-        supabase.from("mechanics").select("name, photo_url, maintler_code").eq("id", session.user.id).maybeSingle(),
-        supabase.from("service_records").select("*", { count: "exact", head: true }).eq("mechanic_id", session.user.id).is("deleted_at", null),
+    const readHome = (uid: string) => Promise.all([
+        supabase.from("mechanics").select("name, photo_url, maintler_code").eq("id", uid).maybeSingle(),
+        supabase.from("service_records").select("*", { count: "exact", head: true }).eq("mechanic_id", uid).is("deleted_at", null),
         supabase
           .from("service_records")
           .select("id, asset_id, service_type, next_due_date, next_due_km_hours, assets(nickname, brand, model, asset_type)")
-          .eq("mechanic_id", session.user.id)
+          .eq("mechanic_id", uid)
           .is("deleted_at", null)
           .or("next_due_date.not.is.null,next_due_km_hours.not.is.null"),
         supabase
           .from("service_records")
           .select("asset_id, km_hours")
-          .eq("mechanic_id", session.user.id)
+          .eq("mechanic_id", uid)
           .is("deleted_at", null)
           .not("km_hours", "is", null),
         supabase
           .from("service_records")
           .select("asset_id, service_date, service_type, assets(nickname, brand, model)")
-          .eq("mechanic_id", session.user.id)
+          .eq("mechanic_id", uid)
           .is("deleted_at", null)
           .order("service_date", { ascending: false })
           .limit(3000), // feeds "last service per asset" + the activity feed — bounds payload for very long-tenured accounts
         supabase
           .from("calendar_tasks")
           .select("id, task_date, done, title")
-          .eq("mechanic_id", session.user.id),
+          .eq("mechanic_id", uid),
         supabase
           .from("mechanic_assets")
           .select("assets(id, nickname, brand, model, vin_serial, asset_type, photo_url, deleted_at, qr_codes(code))")
-          .eq("mechanic_id", session.user.id),
-      ]), { isFailure: (rs) => rs.some((r) => looksLikeNetworkError(r)) });
-
+          .eq("mechanic_id", uid),
+      ]);
+    type HomeRows = Awaited<ReturnType<typeof readHome>>;
+    async function applyHome(rows: NonNullable<HomeRows>) {
       if (!active) return;
-      setCachedAt(homeRead.fromCache ? homeRead.cachedAt : null);
-      if (!homeRead.data) return; // sin red y sin copia guardada: queda el panel vacío con el aviso
       const [
         { data: mechanic },
         { count: svcCount },
@@ -266,7 +244,7 @@ function DashboardPageInner() {
         { data: allSvcRows },
         { data: taskRowsForCal },
         { data: assetRows },
-      ] = homeRead.data;
+      ] = rows;
 
       if (mechanic) { setMechanicName(mechanic.name); setMechanicPhoto(mechanic.photo_url ?? ""); setMaintlerCode(mechanic.maintler_code ?? ""); }
       setTotalServices(svcCount ?? 0);
@@ -447,6 +425,40 @@ function DashboardPageInner() {
         );
       }
 
+    }
+
+    async function init() {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) { if (isOnline()) router.replace("/login"); return; }
+      if (!active) return;
+
+      setMechanicId(session.user.id);
+      setMechanicEmail(session.user.email ?? "");
+      // Migración 060: última ubicación desde la que entró (por IP). Si es
+      // una cuenta vieja sin ubicación de registro, también la fija.
+      authedFetch("/api/geo-stamp", { method: "POST", body: JSON.stringify({ kind: "signup" }) }).catch(() => {});
+
+      // These 7 queries are all independent (none depends on another's
+      // result), so they're fired concurrently instead of one after another
+      // — page load time is now bounded by the slowest single query instead
+      // of the sum of all of them. (26 jul 2026: was 8 — the separate
+      // mechanic_assets head-count query was dropped; totalAssets is now
+      // derived from the assets(...) rows fetched below, post soft-delete
+      // filtering, so "Activos" means the same thing here as on the Activos
+      // page instead of an unfiltered raw count.)
+      // Etapa A sin señal: las 7 lecturas van juntas a la caché local como
+      // un solo bloque "home"; si no hay red, vuelve la última copia.
+      const homeRead = await cachedRead(session.user.id, "home", () => readHome(session.user.id), {
+        isFailure: (rs) => rs.some((r) => looksLikeNetworkError(r)),
+        onUpdate: applyHome,
+      });
+
+      if (!active) return;
+      setCachedAt(homeRead.fromCache ? homeRead.cachedAt : null);
+      if (!homeRead.data) { if (active) setAuthChecked(true); return; }
+      // Aplica las 7 lecturas al estado. Se llama con la copia guardada
+      // (instantáneo) y de nuevo cuando llega la lectura fresca.
+      await applyHome(homeRead.data);
       if (active) setAuthChecked(true);
     }
 
