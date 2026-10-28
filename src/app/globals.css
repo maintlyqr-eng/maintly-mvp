@@ -82,3 +82,13 @@ body {
     cursor: pointer;
   }
 }
+
+/* App instalada (compu) con barra de título propia: ver AppTitleBar.tsx.
+   Corre todo el contenido hacia abajo el alto de la barra. */
+html.mly-wco body {
+  padding-top: env(titlebar-area-height, 32px);
+}
+html.mly-wco .fixed.inset-y-0,
+html.mly-wco .sticky.top-0 {
+  top: env(titlebar-area-height, 32px);
+}

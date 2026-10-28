@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import PwaSetup from "@/components/PwaSetup";
+import AppTitleBar from "@/components/AppTitleBar";
 import { Geist, Geist_Mono } from "next/font/google";
 import { getLocale } from "next-intl/server";
 import "./globals.css";
@@ -77,7 +78,7 @@ export default async function RootLayout({
       lang={locale}
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">{children}<PwaSetup /></body>
+      <body className="min-h-full flex flex-col"><AppTitleBar />{children}<PwaSetup /></body>
     </html>
   );
 }
