@@ -32,7 +32,9 @@ export default function PwaSetup() {
       if (!navigator.onLine) return;
       const loc = window.location.pathname.match(/^\/(es|pt)(\/|$)/)?.[1];
       const pre = loc ? `/${loc}` : "";
-      const pages = ["/dashboard", "/dashboard/assets", "/dashboard/services", "/dashboard/scheduled", "/dashboard/qr-codes", "/dashboard/calendar", "/dashboard/settings", "/login"].map((p) => pre + p);
+      const base = ["/dashboard", "/dashboard/assets", "/dashboard/services", "/dashboard/scheduled", "/dashboard/qr-codes", "/dashboard/calendar", "/dashboard/settings", "/login"];
+      // Sin prefijo (la dirección de arranque de la app) y con el idioma actual.
+      const pages = pre ? [...base.map((p) => pre + p), "/dashboard", "/dashboard?source=pwa"] : [...base, "/dashboard?source=pwa"];
       navigator.serviceWorker.ready.then((reg) => reg.active?.postMessage({ type: "WARM", urls: [...pages, "/offline"] }));
     };
     const timer = window.setTimeout(warm, 8000);

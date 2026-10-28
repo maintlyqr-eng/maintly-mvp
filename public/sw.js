@@ -6,7 +6,7 @@
  * - API propia (/api/) y Supabase: nunca se cachean acá (los datos sin
  *   señal los maneja la app en IndexedDB, ver src/lib/offline/).
  * Versión en CACHE: subirla invalida todo lo guardado. */
-const CACHE = "mly-v2";
+const CACHE = "mly-v3";
 const OFFLINE_URL = "/offline";
 const PRECACHE = [OFFLINE_URL, "/icons/icon-192.png", "/icons/icon-512.png", "/manifest.webmanifest"];
 
@@ -19,6 +19,15 @@ self.addEventListener("activate", (event) => {
     caches.keys().then((keys) => Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k)))).then(() => self.clients.claim())
   );
 });
+
+// Chrome no deja servirle a una navegación una respuesta que vino de una
+// redirección (p. ej. /dashboard -> /es/dashboard). Se guarda una copia
+// "limpia" sin la marca de redirigida.
+async function cleanCopy(res) {
+  if (!res.redirected) return res.clone();
+  const body = await res.clone().arrayBuffer();
+  return new Response(body, { status: 200, statusText: "OK", headers: res.headers });
+}
 
 function isStatic(url) {
   return url.pathname.startsWith("/_next/static/") || url.pathname.startsWith("/icons/") || url.pathname.startsWith("/images/") || /\.(png|jpg|jpeg|webp|svg|ico|woff2?)$/i.test(url.pathname);
@@ -35,7 +44,12 @@ self.addEventListener("fetch", (event) => {
     event.respondWith(
       fetch(req)
         .then((res) => {
-          if (res.ok) { const copy = res.clone(); caches.open(CACHE).then((c) => c.put(req, copy)); }
+          if (res.ok) {
+            cleanCopy(res).then((copy) => caches.open(CACHE).then((c) => {
+              c.put(req, copy.clone());
+              if (res.redirected) c.put(new URL(res.url).pathname, copy); // también bajo la URL final
+            }));
+          }
           return res;
         })
         .catch(async () => (await caches.match(req)) || (await caches.match(req, { ignoreSearch: true })) || (await caches.match(OFFLINE_URL)))
@@ -64,7 +78,9 @@ async function warm(urls) {
       const res = await fetch(u, { credentials: "same-origin" });
       if (!res.ok) continue;
       const html = await res.clone().text();
-      await cache.put(u, res);
+      const copy = await cleanCopy(res);
+      await cache.put(u, copy.clone());
+      if (res.redirected) await cache.put(new URL(res.url).pathname, copy);
       const assets = new Set();
       const re = /(?:src|href)="(\/_next\/static\/[^"]+)"/g;
       let m; while ((m = re.exec(html))) assets.add(m[1]);
