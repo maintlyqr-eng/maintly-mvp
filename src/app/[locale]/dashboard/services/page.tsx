@@ -932,7 +932,8 @@ function ServicesPageInner() {
                                 // eslint-disable-next-line @next/next/no-img-element
                                 <img src={photo} alt={label} className="w-full h-full object-cover" />
                               ) : (
-                                <Image src={img} alt={label} width={28} height={28} className="object-contain" />
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img src={img} alt="" width={28} height={28} className="object-contain" />
                               )}
                             </div>
                             <div className="min-w-0">

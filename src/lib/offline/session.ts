@@ -12,7 +12,13 @@ export type LocalSession = { uid: string; email: string; online: boolean };
 
 export async function getLocalSession(): Promise<LocalSession | null> {
   try {
-    const { data: { session } } = await supabase.auth.getSession();
+    // Tope de 1,5 s: si el token venció y Supabase se queda intentando
+    // renovarlo con mala señal, se sigue con la sesión guardada.
+    const got = await Promise.race([
+      supabase.auth.getSession().then((r) => r.data.session),
+      new Promise<null>((r) => setTimeout(() => r(null), 1500)),
+    ]);
+    const session = got;
     if (session) {
       startSync(session.user.id);
       // Primera vez en este dispositivo: esperar la bajada inicial (máx. 15 s)

@@ -5,7 +5,7 @@
 // (anidados `assets(...)`, `qr_codes(...)`, `sharer`), así las pantallas
 // cambian una línea y no su lógica. Siempre instantáneas, con o sin señal.
 
-import { getAll, type Row } from "./db";
+import { getAll, getOne, putOne, deleteOne, type Row } from "./db";
 import { enqueue, newId } from "./sync";
 
 type Any = Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
@@ -69,21 +69,18 @@ export async function localTasks(uid: string): Promise<Any[]> {
 export async function createServiceRecord(uid: string, row: { asset_id: string; service_type: string; service_date: string; km_hours: number | null; notes: string | null; customer_id: string | null; next_due_date?: string | null; next_due_km_hours?: number | null }): Promise<string> {
   const id = newId();
   const full = { id, mechanic_id: uid, created_at: new Date().toISOString(), ...row };
-  const { putOne } = await import("./db");
   await putOne("service_records", full);
   await enqueue({ uid, table: "service_records", op: "insert", row: full });
   return id;
 }
 
 export async function updateAssetFields(uid: string, assetId: string, fields: Record<string, unknown>): Promise<void> {
-  const { getOne, putOne } = await import("./db");
   const cur = await getOne<Row>("assets", assetId);
   if (cur) await putOne("assets", { ...cur, ...fields });
   await enqueue({ uid, table: "assets", op: "update", row: fields, match: { id: assetId } });
 }
 
 export async function updateServiceFields(uid: string, serviceId: string, fields: Record<string, unknown>): Promise<void> {
-  const { getOne, putOne } = await import("./db");
   const cur = await getOne<Row>("service_records", serviceId);
   if (cur) await putOne("service_records", { ...cur, ...fields });
   await enqueue({ uid, table: "service_records", op: "update", row: fields, match: { id: serviceId } });
@@ -92,7 +89,6 @@ export async function updateServiceFields(uid: string, serviceId: string, fields
 export async function createCustomer(uid: string, row: { name: string; phone?: string | null; email?: string | null; notes?: string | null }): Promise<string> {
   const id = newId();
   const full = { id, mechanic_id: uid, created_at: new Date().toISOString(), ...row };
-  const { putOne } = await import("./db");
   await putOne("customers", full);
   await enqueue({ uid, table: "customers", op: "insert", row: full });
   return id;
@@ -111,31 +107,26 @@ export async function localTasksWithAssets(uid: string): Promise<Any[]> {
 export async function createTask(uid: string, row: { asset_id: string | null; title: string; notes: string | null; task_date: string; customer_id: string | null }): Promise<string> {
   const id = newId();
   const full = { id, mechanic_id: uid, done: false, created_at: new Date().toISOString(), ...row };
-  const { putOne } = await import("./db");
   await putOne("calendar_tasks", full);
   await enqueue({ uid, table: "calendar_tasks", op: "insert", row: full });
   return id;
 }
 export async function updateTask(uid: string, id: string, fields: Record<string, unknown>): Promise<void> {
-  const { getOne, putOne } = await import("./db");
   const cur = await getOne<Row>("calendar_tasks", id);
   if (cur) await putOne("calendar_tasks", { ...cur, ...fields });
   await enqueue({ uid, table: "calendar_tasks", op: "update", row: fields, match: { id } });
 }
 export async function deleteTask(uid: string, id: string): Promise<void> {
-  const { deleteOne } = await import("./db");
   await deleteOne("calendar_tasks", id);
   await enqueue({ uid, table: "calendar_tasks", op: "delete", row: {}, match: { id } });
 }
 
 export async function updateCustomer(uid: string, id: string, fields: Record<string, unknown>): Promise<void> {
-  const { getOne, putOne } = await import("./db");
   const cur = await getOne<Row>("customers", id);
   if (cur) await putOne("customers", { ...cur, ...fields });
   await enqueue({ uid, table: "customers", op: "update", row: fields, match: { id } });
 }
 export async function deleteCustomer(uid: string, id: string): Promise<void> {
-  const { deleteOne } = await import("./db");
   await deleteOne("customers", id);
   await enqueue({ uid, table: "customers", op: "delete", row: {}, match: { id } });
 }
@@ -143,7 +134,6 @@ export async function deleteCustomer(uid: string, id: string): Promise<void> {
 /** Activo nuevo creado desde el dispositivo (con o sin señal): activo + su
  *  código QR + vínculo con el taller, y la foto en cola si la hay. */
 export async function createAssetLocal(uid: string, asset: Record<string, unknown>, code: string, photo?: File | null): Promise<string> {
-  const { putOne } = await import("./db");
   const id = newId();
   const now = new Date().toISOString();
   const assetRow = { id, created_by: uid, created_at: now, photo_url: null, ...asset };

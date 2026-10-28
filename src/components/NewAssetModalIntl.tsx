@@ -1,6 +1,7 @@
 "use client";
 
 import { createAssetLocal } from "@/lib/offline/local";
+import { pull } from "@/lib/offline/sync";
 import { useEffect, useRef, useState } from "react";
 import { X, Camera, ScanLine, AlertTriangle } from "lucide-react";
 import { useTranslations } from "next-intl";
@@ -364,6 +365,8 @@ export default function NewAssetModalIntl({
       { mechanic_id: mechanicId, asset_id: newAsset.id, qr_code: code },
       { onConflict: "mechanic_id,asset_id", ignoreDuplicates: true }
     );
+    // Creado en el servidor: bajar a la base local para que aparezca ya.
+    await pull(mechanicId);
 
     setSaving(false);
 

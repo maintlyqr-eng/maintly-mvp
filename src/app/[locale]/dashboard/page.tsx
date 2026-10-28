@@ -128,6 +128,7 @@ function DashboardPageInner() {
   const tCal = useTranslations("DashboardCalendarPage");
   const tServiceTypes = useTranslations("ServiceTypes");
   const [authChecked, setAuthChecked] = useState(false);
+  const readHomeRef = useRef<(() => void) | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   // Etapa A sin señal (28/10/2026): si no hay red, el panel muestra la
   // última copia guardada en el dispositivo y avisa de cuándo es.
@@ -441,7 +442,9 @@ function DashboardPageInner() {
       await applyHome(await readHome(uid));
       if (!active) return;
       setCachedAt(null);
-      stopSync = onSynced(() => { if (active) readHome(uid).then((rows) => applyHome(rows)); });
+      const reread = () => { if (active) readHome(uid).then((rows) => applyHome(rows)); };
+      readHomeRef.current = reread;
+      stopSync = onSynced(reread);
       if (active) setAuthChecked(true);
     }
 
@@ -1282,7 +1285,10 @@ function DashboardPageInner() {
                               // eslint-disable-next-line @next/next/no-img-element
                               <img src={img} alt={a.label} className="w-full h-full object-contain" />
                             ) : (
-                              <Image src={img} alt={a.label} width={36} height={36} className="object-contain" />
+                              // Ícono fijo de /images/: <img> directo (no next/image) para que
+                              // el service worker lo tenga guardado y se vea sin señal.
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img src={img} alt="" width={36} height={36} className="object-contain" />
                             )}
                           </div>
                           <p className="text-[11px] font-bold text-zinc-800 truncate">{a.label}</p>
@@ -1380,7 +1386,7 @@ function DashboardPageInner() {
         open={addStep === "new"}
         onClose={() => setAddStep("closed")}
         mechanicId={mechanicId}
-        onCreated={() => refreshTotalAssets(mechanicId)}
+        onCreated={() => { refreshTotalAssets(mechanicId); readHomeRef.current?.(); }}
         initialVin={pendingVin || undefined}
       />
       <LinkExistingAssetModalIntl

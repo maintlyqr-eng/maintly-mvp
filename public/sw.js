@@ -6,7 +6,7 @@
  * - API propia (/api/) y Supabase: nunca se cachean acá (los datos sin
  *   señal los maneja la app en IndexedDB, ver src/lib/offline/).
  * Versión en CACHE: subirla invalida todo lo guardado. */
-const CACHE = "mly-v3";
+const CACHE = "mly-v4";
 const OFFLINE_URL = "/offline";
 const PRECACHE = [OFFLINE_URL, "/icons/icon-192.png", "/icons/icon-512.png", "/manifest.webmanifest"];
 
@@ -37,7 +37,16 @@ self.addEventListener("fetch", (event) => {
   const req = event.request;
   if (req.method !== "GET") return;
   const url = new URL(req.url);
-  if (url.origin !== self.location.origin) return;            // Supabase, Google, etc.: directo
+  // Fotos de equipos y de perfil en el storage público de Supabase: caché
+  // primero (se guardan la primera vez que se ven) para verlas sin señal.
+  if (url.origin !== self.location.origin) {
+    if (/\.supabase\.co$/.test(url.hostname) && url.pathname.includes("/storage/v1/object/public/")) {
+      event.respondWith(
+        caches.match(req).then((cached) => cached || fetch(req).then((res) => { if (res.ok || res.type === "opaque") caches.open(CACHE).then((c) => c.put(req, res.clone())); return res; }))
+      );
+    }
+    return;                                                     // resto (Supabase API, Google): directo
+  }
   if (url.pathname.startsWith("/api/")) return;                // API propia: directo
 
   if (req.mode === "navigate") {
