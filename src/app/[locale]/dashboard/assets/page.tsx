@@ -15,6 +15,8 @@ import { supabase } from "@/lib/supabase";
 import { suggestMakes, suggestModels, canonicalMake } from "@/lib/vehicleCatalog";
 import SuggestInput from "@/components/SuggestInput";
 import { useLearnedCatalog } from "@/lib/useLearnedCatalog";
+import { cachedRead, isOnline } from "@/lib/offline/cache";
+import OfflineBanner from "@/components/OfflineBanner";
 import { useUnreadMessagesCount } from "@/lib/useUnreadMessages";
 import { useUnreadMechanicMessages } from "@/lib/useUnreadMechanicMessages";
 import CustomerPickerIntl, { CustomerOption } from "@/components/CustomerPickerIntl";
@@ -157,6 +159,8 @@ export default function AssetsPage() {
 
   // ── Service aggregates (last service, total count, max km/hours, worst reminder) per asset ──
   const [assetAgg, setAssetAgg] = useState<Record<string, AssetAgg>>({});
+  // Etapa A sin señal (28/10/2026): última copia guardada de la lista.
+  const [cachedAt, setCachedAt] = useState<string | null>(null);
 
   // ── Search / filter / sort ──
   const [searchQuery, setSearchQuery] = useState("");
@@ -278,11 +282,13 @@ export default function AssetsPage() {
     // vinculó + los que otro Maintler le compartió — ver migration 029).
     // "sharer" resuelve el nombre de quien compartió vía shared_by; viene null
     // para cualquier fila que el mecánico agregó por su cuenta (escaneo propio).
-    const { data } = await supabase
+    const read = await cachedRead(uid, "assets", () => supabase
       .from("mechanic_assets")
       .select("asset_id, shared_by, sharer:mechanics!mechanic_assets_shared_by_fkey(name), assets(id, asset_type, brand, model, nickname, vin_serial, year, plate, fuel_type, location, photo_url, created_at, customer_id, deleted_at, qr_codes(code, theme, label))")
       .eq("mechanic_id", uid)
-      .order("added_at", { ascending: false });
+      .order("added_at", { ascending: false }));
+    setCachedAt(read.fromCache ? read.cachedAt : null);
+    const data = read.data?.data ?? null;
     const assetList = (data ?? [])
       .map((row: any) => {
         const a = Array.isArray(row.assets) ? row.assets[0] : row.assets;
@@ -301,20 +307,21 @@ export default function AssetsPage() {
   }
 
   async function loadCustomers(uid: string) {
-    const { data } = await supabase
+    const read = await cachedRead(uid, "customers", () => supabase
       .from("customers")
       .select("id, name, phone, email")
       .eq("mechanic_id", uid)
-      .order("name", { ascending: true });
-    setCustomers((data as CustomerOption[]) ?? []);
+      .order("name", { ascending: true }));
+    setCustomers((read.data?.data as CustomerOption[]) ?? []);
   }
 
   async function loadServiceAggregates(uid: string) {
-    const { data } = await supabase
+    const read = await cachedRead(uid, "svc-agg", () => supabase
       .from("service_records")
       .select("asset_id, service_date, km_hours, next_due_date, next_due_km_hours")
       .eq("mechanic_id", uid)
-      .is("deleted_at", null);
+      .is("deleted_at", null));
+    const data = read.data?.data ?? null;
 
     type Bucket = {
       dates: string[];
@@ -371,7 +378,7 @@ export default function AssetsPage() {
     async function init() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
-        router.replace("/login");
+        if (isOnline()) router.replace("/login");
         return;
       }
       if (!active) return;
@@ -443,18 +450,20 @@ export default function AssetsPage() {
     setHistoryRecords([]);
     setHistoryLoading(true);
     setShowHistoryModal(true);
-    const { data } = await supabase
+    // Sin señal: historial guardado la última vez que se abrió este equipo.
+    const read = await cachedRead(mechanicId || "anon", `history:${a.id}`, () => supabase
       .from("service_records")
       .select("id, service_date, service_type, km_hours, notes, mechanic_id")
       .eq("asset_id", a.id)
       .is("deleted_at", null)
-      .order("service_date", { ascending: false });
+      .order("service_date", { ascending: false }));
+    const data = read.data?.data ?? null;
     if (currentHistoryAssetIdRef.current !== a.id) return;
     const rows = (data as unknown as (ServiceRecord & { mechanic_id: string | null })[]) ?? [];
     // An asset can have services logged by OTHER mechanics too (shared/multi-shop
     // assets) — `mechanics` is owner-only now, so their name comes from the
     // public-safe view instead. See lib/mechanicPublicProfile.ts.
-    const profiles = await fetchMechanicPublicProfiles(supabase, rows.map((r) => r.mechanic_id));
+    const profiles = isOnline() ? await fetchMechanicPublicProfiles(supabase, rows.map((r) => r.mechanic_id)) : new Map();
     if (currentHistoryAssetIdRef.current !== a.id) return;
     setHistoryRecords(rows.map((r) => ({ ...r, mechanics: r.mechanic_id ? profiles.get(r.mechanic_id) ?? null : null })));
     setHistoryLoading(false);
@@ -833,6 +842,7 @@ export default function AssetsPage() {
         />
 
         <div className="flex-1 overflow-y-auto px-3 md:px-4 pt-1.5 md:pt-2 pb-1.5 md:pb-2">
+          <OfflineBanner cachedAt={cachedAt} />
 
           {/* KPI summary bar */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-2">

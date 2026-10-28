@@ -13,6 +13,8 @@ import {
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { authedFetch } from "@/lib/apiAuth";
+import { cachedRead, isOnline, looksLikeNetworkError } from "@/lib/offline/cache";
+import OfflineBanner from "@/components/OfflineBanner";
 import { useUnreadMessagesCount } from "@/lib/useUnreadMessages";
 import { useUnreadMechanicMessages } from "@/lib/useUnreadMechanicMessages";
 import { formatDateDMY } from "@/lib/date";
@@ -123,6 +125,9 @@ function DashboardPageInner() {
   const tServiceTypes = useTranslations("ServiceTypes");
   const [authChecked, setAuthChecked] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  // Etapa A sin señal (28/10/2026): si no hay red, el panel muestra la
+  // última copia guardada en el dispositivo y avisa de cuándo es.
+  const [cachedAt, setCachedAt] = useState<string | null>(null);
   const [mechanicId, setMechanicId] = useState("");
   const unreadMessages = useUnreadMessagesCount(mechanicId);
   const unreadMechanicMessages = useUnreadMechanicMessages(mechanicId);
@@ -199,7 +204,7 @@ function DashboardPageInner() {
 
     async function init() {
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) { router.replace("/login"); return; }
+      if (!session) { if (isOnline()) router.replace("/login"); return; }
       if (!active) return;
 
       setMechanicId(session.user.id);
@@ -216,15 +221,9 @@ function DashboardPageInner() {
       // derived from the assets(...) rows fetched below, post soft-delete
       // filtering, so "Activos" means the same thing here as on the Activos
       // page instead of an unfiltered raw count.)
-      const [
-        { data: mechanic },
-        { count: svcCount },
-        { data: remRows },
-        { data: kmRows },
-        { data: allSvcRows },
-        { data: taskRowsForCal },
-        { data: assetRows },
-      ] = await Promise.all([
+      // Etapa A sin señal: las 7 lecturas van juntas a la caché local como
+      // un solo bloque "home"; si no hay red, vuelve la última copia.
+      const homeRead = await cachedRead(session.user.id, "home", () => Promise.all([
         supabase.from("mechanics").select("name, photo_url, maintler_code").eq("id", session.user.id).maybeSingle(),
         supabase.from("service_records").select("*", { count: "exact", head: true }).eq("mechanic_id", session.user.id).is("deleted_at", null),
         supabase
@@ -254,9 +253,20 @@ function DashboardPageInner() {
           .from("mechanic_assets")
           .select("assets(id, nickname, brand, model, vin_serial, asset_type, photo_url, deleted_at, qr_codes(code))")
           .eq("mechanic_id", session.user.id),
-      ]);
+      ]), { isFailure: (rs) => rs.some((r) => looksLikeNetworkError(r)) });
 
       if (!active) return;
+      setCachedAt(homeRead.fromCache ? homeRead.cachedAt : null);
+      if (!homeRead.data) return; // sin red y sin copia guardada: queda el panel vacío con el aviso
+      const [
+        { data: mechanic },
+        { count: svcCount },
+        { data: remRows },
+        { data: kmRows },
+        { data: allSvcRows },
+        { data: taskRowsForCal },
+        { data: assetRows },
+      ] = homeRead.data;
 
       if (mechanic) { setMechanicName(mechanic.name); setMechanicPhoto(mechanic.photo_url ?? ""); setMaintlerCode(mechanic.maintler_code ?? ""); }
       setTotalServices(svcCount ?? 0);
@@ -888,6 +898,7 @@ function DashboardPageInner() {
             nada que desplazar en la práctica. pb-3/md:pb-4 -> pb-2/md:pb-3
             recorta esos 4px sin tocar nada del layout en filas de siempre. */}
         <div className="flex-1 overflow-y-auto px-3 md:px-4 pt-1.5 md:pt-2 pb-2 md:pb-3">
+          <OfflineBanner cachedAt={cachedAt} />
 
           {/* ── "Tus prioridades de hoy" ── the most urgent 3 reminders
               (overdue first, then soonest-due), same merged services+tasks

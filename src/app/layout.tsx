@@ -1,4 +1,5 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
+import PwaSetup from "@/components/PwaSetup";
 import { Geist, Geist_Mono } from "next/font/google";
 import { getLocale } from "next-intl/server";
 import "./globals.css";
@@ -42,6 +43,21 @@ export const metadata: Metadata = {
   // Favicon: served automatically by Next.js from src/app/icon.png — no
   // need to declare it here. (The old reference pointed at a 1MB image in
   // /public, which is likely why the tab icon was slow/inconsistent.)
+  //
+  // App instalable (PWA, etapa A, 28/10/2026): manifiesto + ícono de iPhone
+  // + modo pantalla completa en iOS. El service worker se registra desde
+  // <PwaSetup /> (public/sw.js). Íconos en public/icons/.
+  manifest: "/manifest.webmanifest",
+  applicationName: "MaintlyQR",
+  appleWebApp: { capable: true, statusBarStyle: "black-translucent", title: "MaintlyQR" },
+  icons: { apple: "/icons/apple-touch-icon.png" },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#1c1f24",
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
 };
 
 export default async function RootLayout({
@@ -61,7 +77,7 @@ export default async function RootLayout({
       lang={locale}
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col">{children}<PwaSetup /></body>
     </html>
   );
 }

@@ -2767,5 +2767,17 @@
     "completed": "completed",
     "completeHandover": "Mark handover completed",
     "handoverCompleted": "Handover completed."
+  },
+  "Offline": {
+    "offline": "Offline",
+    "showingSaved": "showing data saved on {when}",
+    "install": "Install MaintlyQR",
+    "installTitle": "MaintlyQR as an app",
+    "installHint": "Install it on your phone or computer: it opens full screen with its own icon, and your assets and histories stay available even without signal.",
+    "iosTitle": "Install on iPhone",
+    "iosStep1": "Tap Safari's Share button",
+    "iosStep2": "Choose \"Add to Home Screen\"",
+    "iosStep3": "Tap \"Add\". Done: MaintlyQR is now an app.",
+    "close": "Close"
   }
 }

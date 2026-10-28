@@ -2767,5 +2767,17 @@
     "completed": "concluída",
     "completeHandover": "Marcar transferência concluída",
     "handoverCompleted": "Transferência concluída."
+  },
+  "Offline": {
+    "offline": "Sem conexão",
+    "showingSaved": "mostrando dados salvos em {when}",
+    "install": "Instalar MaintlyQR",
+    "installTitle": "MaintlyQR como app",
+    "installHint": "Instale no celular ou no computador: abre em tela cheia, com ícone próprio, e seus ativos e históricos ficam disponíveis mesmo sem sinal.",
+    "iosTitle": "Instalar no iPhone",
+    "iosStep1": "Toque no botão Compartilhar do Safari",
+    "iosStep2": "Escolha \"Adicionar à Tela de Início\"",
+    "iosStep3": "Toque em \"Adicionar\". Pronto: o MaintlyQR vira um app.",
+    "close": "Fechar"
   }
 }

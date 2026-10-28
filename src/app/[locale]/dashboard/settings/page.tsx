@@ -24,6 +24,8 @@ import { normalizeContactUrl, isValidPhone, isValidEmail, isSafeHref, type Conta
 import DashboardSidebarIntl from "@/components/DashboardSidebarIntl";
 import DashboardHeaderIntl from "@/components/DashboardHeaderIntl";
 import { getInitials } from "@/lib/initials";
+import InstallAppButton from "@/components/InstallAppButton";
+import { useTranslations as useT2 } from "next-intl";
 
 // NOTE (updated 26 jul 2026): MaintlerCardCanvas used to draw hardcoded
 // English text straight onto its canvas (badge/stat/section labels, "Member
@@ -901,6 +903,9 @@ export default function SettingsPage() {
             </form>
           </div>
 
+          {/* ── APP INSTALABLE (etapa A, 28/10/2026) ── */}
+          <AppInstallCard />
+
           {/* ── PASSWORD ── */}
           <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm p-6 mb-6">
             <h2 className="text-[14px] font-black text-zinc-900 mb-1 flex items-center gap-2"><KeyRound size={15} className="text-zinc-400" /> {t("password")}</h2>
@@ -941,6 +946,21 @@ export default function SettingsPage() {
           <p className="text-center text-[11px] text-zinc-400 mt-8">{t("copyright")}</p>
         </div>
       </div>
+    </div>
+  );
+}
+
+
+// Tarjeta "Instalar MaintlyQR como app": aparece solo cuando el navegador
+// permite instalar (Android/Chrome/Edge) o en iPhone (con instructivo). Si
+// ya está instalada, no se muestra nada.
+function AppInstallCard() {
+  const t = useT2("Offline");
+  return (
+    <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm p-6 mb-6 hidden has-[button]:block">
+      <h2 className="text-[14px] font-black text-zinc-900 mb-1">{t("installTitle")}</h2>
+      <p className="text-[12px] text-zinc-400 mb-4">{t("installHint")}</p>
+      <InstallAppButton />
     </div>
   );
 }
