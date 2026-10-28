@@ -23,6 +23,21 @@ export default function PwaSetup() {
         });
       });
     }).catch(() => { /* sin SW: la app sigue andando como web normal */ });
+
+    // Precarga de pantallas para sin señal (ver warm() en sw.js). Unos
+    // segundos después de abrir, para no competir con la carga de la
+    // página. Se repite en cada apertura con señal: así siempre está el
+    // código de la versión actual.
+    const warm = () => {
+      if (!navigator.onLine) return;
+      const loc = window.location.pathname.match(/^\/(es|pt)(\/|$)/)?.[1];
+      const pre = loc ? `/${loc}` : "";
+      const pages = ["/dashboard", "/dashboard/assets", "/dashboard/services", "/dashboard/scheduled", "/dashboard/qr-codes", "/dashboard/calendar", "/dashboard/settings", "/login"].map((p) => pre + p);
+      navigator.serviceWorker.ready.then((reg) => reg.active?.postMessage({ type: "WARM", urls: [...pages, "/offline"] }));
+    };
+    const timer = window.setTimeout(warm, 8000);
+    window.addEventListener("online", warm);
+    return () => { window.clearTimeout(timer); window.removeEventListener("online", warm); };
   }, []);
   return null;
 }

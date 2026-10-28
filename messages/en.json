@@ -2419,7 +2419,9 @@
     "title": "We're working on it",
     "subtitle": "Something went wrong on our end — we've already been notified and we're on it. Try again in a moment.",
     "retry": "Try again",
-    "goHome": "Go to homepage"
+    "goHome": "Go to homepage",
+    "offlineTitle": "No connection",
+    "offlineSubtitle": "This screen hasn't been saved on your device yet. Open it once while online and it will work offline afterwards."
   },
   "MaintlerCard": {
     "verifiedBadge": "✓ VERIFIED MAINTLER",

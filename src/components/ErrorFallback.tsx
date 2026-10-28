@@ -4,7 +4,7 @@ import { useEffect, useRef } from "react";
 import Image from "next/image";
 import { useTranslations } from "next-intl";
 import { Link } from "@/i18n/navigation";
-import { AlertTriangle, RotateCcw, Home } from "lucide-react";
+import { AlertTriangle, RotateCcw, Home, WifiOff } from "lucide-react";
 
 // Facu (26 jul 2026): after the React error #310 crash, he asked "en caso
 // de q falle no quiero q se vea como q no existe" — up until now, any
@@ -30,6 +30,10 @@ export default function ErrorFallback({
 }) {
   const t = useTranslations("ErrorFallback");
   const reportedRef = useRef(false);
+  // Sin señal, un error acá casi siempre es un archivo de código que no
+  // llegó a guardarse en el dispositivo (ChunkLoadError). Decirlo claro
+  // en vez de "estamos trabajando en esto".
+  const offline = typeof navigator !== "undefined" && !navigator.onLine;
 
   useEffect(() => {
     if (reportedRef.current) return;
@@ -57,10 +61,10 @@ export default function ErrorFallback({
           <Image src="/images/Maintly_crop.png" alt="MaintlyQR" width={136} height={26} style={{ objectFit: "contain" }} />
         </div>
         <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-red-50 border border-red-100 mb-5">
-          <AlertTriangle size={26} className="text-red-500" />
+          {offline ? <WifiOff size={26} className="text-amber-500" /> : <AlertTriangle size={26} className="text-red-500" />}
         </div>
-        <h1 className="text-[18px] font-black text-zinc-900 mb-2">{t("title")}</h1>
-        <p className="text-[13px] text-zinc-500 mb-7 leading-relaxed">{t("subtitle")}</p>
+        <h1 className="text-[18px] font-black text-zinc-900 mb-2">{t(offline ? "offlineTitle" : "title")}</h1>
+        <p className="text-[13px] text-zinc-500 mb-7 leading-relaxed">{t(offline ? "offlineSubtitle" : "subtitle")}</p>
         <div className="flex items-center justify-center gap-2.5">
           <button
             onClick={() => reset()}

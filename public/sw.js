@@ -6,7 +6,7 @@
  * - API propia (/api/) y Supabase: nunca se cachean acá (los datos sin
  *   señal los maneja la app en IndexedDB, ver src/lib/offline/).
  * Versión en CACHE: subirla invalida todo lo guardado. */
-const CACHE = "mly-v1";
+const CACHE = "mly-v2";
 const OFFLINE_URL = "/offline";
 const PRECACHE = [OFFLINE_URL, "/icons/icon-192.png", "/icons/icon-512.png", "/manifest.webmanifest"];
 
@@ -38,7 +38,7 @@ self.addEventListener("fetch", (event) => {
           if (res.ok) { const copy = res.clone(); caches.open(CACHE).then((c) => c.put(req, copy)); }
           return res;
         })
-        .catch(async () => (await caches.match(req)) || (await caches.match(OFFLINE_URL)))
+        .catch(async () => (await caches.match(req)) || (await caches.match(req, { ignoreSearch: true })) || (await caches.match(OFFLINE_URL)))
     );
     return;
   }
@@ -53,5 +53,30 @@ self.addEventListener("fetch", (event) => {
   }
 });
 
-// Mensaje desde la app para activar una versión nueva sin esperar.
-self.addEventListener("message", (event) => { if (event.data === "SKIP_WAITING") self.skipWaiting(); });
+// Precarga ("WARM"): la app, cuando tiene señal, manda la lista de
+// pantallas principales. Se baja el HTML de cada una y todos los archivos
+// de código (/_next/static/...) que esa pantalla necesita, así sin señal
+// no falta nada aunque el usuario nunca haya entrado ahí.
+async function warm(urls) {
+  const cache = await caches.open(CACHE);
+  for (const u of urls) {
+    try {
+      const res = await fetch(u, { credentials: "same-origin" });
+      if (!res.ok) continue;
+      const html = await res.clone().text();
+      await cache.put(u, res);
+      const assets = new Set();
+      const re = /(?:src|href)="(\/_next\/static\/[^"]+)"/g;
+      let m; while ((m = re.exec(html))) assets.add(m[1]);
+      for (const a of assets) {
+        if (await cache.match(a)) continue;
+        try { const r = await fetch(a); if (r.ok) await cache.put(a, r); } catch { /* sigue con el resto */ }
+      }
+    } catch { /* sin red: se reintenta en la próxima apertura */ }
+  }
+}
+
+self.addEventListener("message", (event) => {
+  if (event.data === "SKIP_WAITING") self.skipWaiting();
+  if (event.data && event.data.type === "WARM" && Array.isArray(event.data.urls)) event.waitUntil(warm(event.data.urls));
+});

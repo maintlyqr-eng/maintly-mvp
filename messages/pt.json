@@ -2419,7 +2419,9 @@
     "title": "Estamos trabalhando nisso",
     "subtitle": "Algo deu errado do nosso lado — já fomos notificados e estamos resolvendo. Tente novamente em instantes.",
     "retry": "Tentar novamente",
-    "goHome": "Ir para o início"
+    "goHome": "Ir para o início",
+    "offlineTitle": "Sem conexão",
+    "offlineSubtitle": "Esta tela ainda não ficou salva no seu dispositivo. Abra-a uma vez com sinal e depois ela vai funcionar sem conexão."
   },
   "MaintlerCard": {
     "verifiedBadge": "✓ MAINTLER VERIFICADO",

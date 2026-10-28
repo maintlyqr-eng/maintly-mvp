@@ -22,6 +22,7 @@ export default function GlobalError({
   reset: () => void;
 }) {
   const reportedRef = useRef(false);
+  const offline = typeof navigator !== "undefined" && !navigator.onLine;
 
   useEffect(() => {
     if (reportedRef.current) return;
@@ -50,9 +51,11 @@ export default function GlobalError({
               <path d="M12 17h.01" />
             </svg>
           </div>
-          <h1 className="text-[18px] font-black text-zinc-900 mb-2">We&apos;re working on it</h1>
+          <h1 className="text-[18px] font-black text-zinc-900 mb-2">{offline ? "Sin conexión · No connection" : "We\u2019re working on it"}</h1>
           <p className="text-[13px] text-zinc-500 mb-7 leading-relaxed">
-            Something went wrong on our end — we&apos;ve already been notified and we&apos;re on it. Try again in a moment.
+            {offline
+              ? "Esta pantalla todavía no quedó guardada en tu dispositivo. Abrila una vez con señal y después va a funcionar sin conexión. / Open this screen once while online and it will work offline afterwards."
+              : "Something went wrong on our end — we\u2019ve already been notified and we\u2019re on it. Try again in a moment."}
           </p>
           <div className="flex items-center justify-center gap-2.5">
             <button
