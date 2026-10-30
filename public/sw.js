@@ -6,7 +6,7 @@
  * - API propia (/api/) y Supabase: nunca se cachean acá (los datos sin
  *   señal los maneja la app en IndexedDB, ver src/lib/offline/).
  * Versión en CACHE: subirla invalida todo lo guardado. */
-const CACHE = "mly-v5";
+const CACHE = "mly-v6";
 const OFFLINE_URL = "/offline";
 const PRECACHE = [OFFLINE_URL, "/icons/icon-192.png", "/icons/icon-512.png", "/manifest.webmanifest"];
 // Páginas de arranque de la app instalada: se guardan ya al instalar el SW.
@@ -47,6 +47,11 @@ async function dashboardFallback(url) {
   return null;
 }
 
+function rscKey(url) {
+  const path = url.pathname.replace(/\/$/, "") || "/";
+  return path + "?__rsc";
+}
+
 function isStatic(url) {
   return url.pathname.startsWith("/_next/static/") || url.pathname.startsWith("/_next/image") || url.pathname.startsWith("/icons/") || url.pathname.startsWith("/images/") || /\.(png|jpg|jpeg|webp|svg|ico|woff2?)$/i.test(url.pathname);
 }
@@ -66,6 +71,20 @@ self.addEventListener("fetch", (event) => {
     return;                                                     // resto (Supabase API, Google): directo
   }
   if (url.pathname.startsWith("/api/")) return;                // API propia: directo
+
+  // Navegación interna de Next (pedidos RSC): red primero; sin señal, el
+  // último paquete guardado para esa ruta, así cambiar de sección es
+  // instantáneo y no hace falta recargar la página entera.
+  if (req.headers.get("RSC") === "1" || url.searchParams.has("_rsc")) {
+    if (req.headers.get("Next-Router-Prefetch") === "1" || req.headers.get("Next-Router-Segment-Prefetch")) return; // prefetch parcial: no sirve de respaldo
+    const key = rscKey(url);
+    event.respondWith(
+      fetch(req)
+        .then((res) => { if (res.ok) caches.open(CACHE).then((c) => c.put(key, res.clone())); return res; })
+        .catch(async () => (await caches.match(key)) || Response.error())
+    );
+    return;
+  }
 
   if (req.mode === "navigate") {
     event.respondWith(
@@ -111,6 +130,13 @@ async function warm(urls) {
       if (res.redirected) await cache.put(new URL(res.url).pathname, copy);
       const re = /(?:src|href)="(\/_next\/static\/[^"]+)"/g;
       let m; while ((m = re.exec(html))) assets.add(m[1]);
+      // Paquete de navegación (RSC) de la misma ruta, para cambiar de
+      // sección sin recargar cuando no hay señal.
+      try {
+        const final = new URL(res.url);
+        const r2 = await fetch(final.pathname, { credentials: "same-origin", headers: { RSC: "1" } });
+        if (r2.ok) await cache.put(rscKey(final), r2);
+      } catch { /* sin paquete: la navegación recarga la página, como antes */ }
     } catch { /* sin red: se reintenta en la próxima apertura */ }
   }));
   const missing = [];

@@ -32,7 +32,8 @@ export default function PwaSetup() {
       if (!navigator.onLine) return;
       const loc = window.location.pathname.match(/^\/(es|pt)(\/|$)/)?.[1];
       const pre = loc ? `/${loc}` : "";
-      const base = ["/dashboard", "/dashboard/assets", "/dashboard/services", "/dashboard/scheduled", "/dashboard/qr-codes", "/dashboard/calendar", "/dashboard/settings", "/dashboard/sync", "/login"];
+      // Todas las secciones del panel (src/lib/dashboardNav.ts) + sync + login.
+      const base = ["/dashboard", "/dashboard/assets", "/dashboard/services", "/dashboard/scheduled", "/dashboard/customers", "/dashboard/qr-codes", "/dashboard/calendar", "/dashboard/reports", "/dashboard/settings", "/dashboard/sync", "/dashboard/messages", "/dashboard/team-chat", "/dashboard/documents", "/login"];
       // Sin prefijo (la dirección de arranque de la app) y con el idioma actual.
       // Las de arranque primero: son las que se necesitan sí o sí sin señal.
       const pages = pre ? ["/dashboard?source=pwa", "/dashboard", ...base.map((p) => pre + p)] : ["/dashboard?source=pwa", ...base];
