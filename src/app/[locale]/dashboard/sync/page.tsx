@@ -25,7 +25,7 @@ export default function SyncPage() {
   const [counts, setCounts] = useState<Record<string, number>>({});
   const [queue, setQueue] = useState<QueueOp[]>([]);
   const [owner, setOwner] = useState<string>("");
-  const [sw, setSw] = useState<{ controlled: boolean; caches: string[]; cached: number } | null>(null);
+  const [sw, setSw] = useState<{ controlled: boolean; caches: string[]; cached: number; pages: string[] } | null>(null);
   const [busy, setBusy] = useState(false);
 
   async function refresh() {
@@ -36,9 +36,10 @@ export default function SyncPage() {
     setOwner((await metaGet<string>("owner")) ?? "");
     try {
       const keys = await caches.keys();
-      let n = 0; for (const k of keys) n += (await (await caches.open(k)).keys()).length;
-      setSw({ controlled: !!navigator.serviceWorker?.controller, caches: keys, cached: n });
-    } catch { setSw({ controlled: false, caches: [], cached: 0 }); }
+      let n = 0; const pages: string[] = [];
+      for (const k of keys) { const rs = await (await caches.open(k)).keys(); n += rs.length; for (const r of rs) { const u = r.url.replace(location.origin, ""); if (!u.startsWith("/_next") && !u.includes("supabase")) pages.push(u); } }
+      setSw({ controlled: !!navigator.serviceWorker?.controller, caches: keys, cached: n, pages: pages.sort() });
+    } catch { setSw({ controlled: false, caches: [], cached: 0, pages: [] }); }
   }
 
   useEffect(() => {
@@ -65,6 +66,7 @@ export default function SyncPage() {
         <Row k={t("lastPull")} v={fmt(state?.lastPullAt)} />
         <Row k={t("syncError")} v={state?.error ?? "—"} />
         <Row k="Service worker" v={sw ? `${sw.controlled ? "activo" : "NO activo"} · ${sw.caches.join(", ") || "sin caché"} · ${sw.cached} archivos` : "…"} />
+        {sw && <p className="text-[11px] text-zinc-400 font-mono break-all pt-1">{sw.pages.join("  ")}</p>}
       </div>
 
       <div className="rounded-2xl bg-white border border-zinc-200 p-4 mb-3">
