@@ -19,6 +19,8 @@ type DashboardSectionProps = {
   t: (key: string, values?: Record<string, string | number>) => string;
   locale: string;
   tAssetTypes: (key: string) => string;
+  /** Ir a una sección del admin (atajos desde las tarjetas). */
+  onGo: (section: "accounts" | "assets" | "services" | "qr" | "analytics") => void;
 
   totalUsers: number;
   totalMechanicAccounts: number;
@@ -53,19 +55,19 @@ export default function DashboardSection({
   usageMetrics,
   newUserDays, newMechanicDays, newAssetDays, newQrDays, newServiceDays,
   qrPct, assetTypes, maxAssetCount,
-  activityRefreshedAt, recentActivityFeed,
+  activityRefreshedAt, recentActivityFeed, onGo,
 }: DashboardSectionProps) {
   return (
     <div className="space-y-7">
       <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
-        <StatCard label={t("usersRegistered")}   value={totalUsers}             icon={Users}     accent="bg-blue-500" />
-        <StatCard label={t("mechanicAccounts")}   value={totalMechanicAccounts}  icon={Wrench}    accent="bg-orange-500" />
-        <StatCard label={t("verifiedMechanics")}  value={totalVerifiedMechanics} icon={ShieldCheck} accent="bg-emerald-500" />
-        <StatCard label={t("assetsRegistered")}   value={totalAssets}            icon={Box}       accent="bg-purple-500" />
-        <StatCard label={t("qrAssigned")}         value={assignedQR}             icon={QrCode}    accent="bg-red-500" sub={t("qrAssignedSub", { total: totalQR })} />
-        <StatCard label={t("servicesCreated")}    value={totalServices}          icon={ClipboardList} accent="bg-cyan-500" />
-        <StatCard label={t("scansToday")}         value={scansToday}             icon={ScanLine}  accent="bg-pink-500" />
-        <StatCard label={t("scansThisWeek")}     value={scansWeek}              icon={ScanLine}  accent="bg-indigo-500" />
+        <StatCard label={t("usersRegistered")}   value={totalUsers}             icon={Users}     accent="bg-blue-500" onClick={() => onGo("accounts")} />
+        <StatCard label={t("mechanicAccounts")}   value={totalMechanicAccounts}  icon={Wrench}    accent="bg-orange-500" onClick={() => onGo("accounts")} />
+        <StatCard label={t("verifiedMechanics")}  value={totalVerifiedMechanics} icon={ShieldCheck} accent="bg-emerald-500" onClick={() => onGo("accounts")} />
+        <StatCard label={t("assetsRegistered")}   value={totalAssets}            icon={Box}       accent="bg-purple-500" onClick={() => onGo("assets")} />
+        <StatCard label={t("qrAssigned")}         value={assignedQR}             icon={QrCode}    accent="bg-red-500" sub={t("qrAssignedSub", { total: totalQR })} onClick={() => onGo("qr")} />
+        <StatCard label={t("servicesCreated")}    value={totalServices}          icon={ClipboardList} accent="bg-cyan-500" onClick={() => onGo("services")} />
+        <StatCard label={t("scansToday")}         value={scansToday}             icon={ScanLine}  accent="bg-pink-500" onClick={() => onGo("analytics")} />
+        <StatCard label={t("scansThisWeek")}     value={scansWeek}              icon={ScanLine}  accent="bg-indigo-500" onClick={() => onGo("analytics")} />
       </div>
 
       {usageMetrics && (
@@ -105,20 +107,20 @@ export default function DashboardSection({
               <div className="h-full bg-gradient-to-r from-red-600 to-red-400 rounded-full transition-all duration-700" style={{ width: `${qrPct}%` }} />
             </div>
             <div className="flex gap-5">
-              <div className="flex items-center gap-2.5 bg-emerald-50 border border-emerald-100 rounded-xl px-4 py-3 flex-1">
+              <button type="button" onClick={() => onGo("qr")} className="flex items-center gap-2.5 bg-emerald-50 border border-emerald-100 hover:border-emerald-300 rounded-xl px-4 py-3 flex-1 text-left transition-colors">
                 <div className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
                 <div>
                   <p className="text-[9px] font-bold text-emerald-600 uppercase tracking-widest">{t("linked")}</p>
                   <p className="text-[22px] font-black text-emerald-700 leading-none">{assignedQR}</p>
                 </div>
-              </div>
-              <div className="flex items-center gap-2.5 bg-zinc-50 border border-zinc-100 rounded-xl px-4 py-3 flex-1">
+              </button>
+              <button type="button" onClick={() => onGo("qr")} className="flex items-center gap-2.5 bg-zinc-50 border border-zinc-100 hover:border-zinc-300 rounded-xl px-4 py-3 flex-1 text-left transition-colors">
                 <div className="w-2 h-2 rounded-full bg-zinc-300 shrink-0" />
                 <div>
                   <p className="text-[9px] font-bold text-zinc-400 uppercase tracking-widest">{t("free")}</p>
                   <p className="text-[22px] font-black text-zinc-500 leading-none">{totalQR - assignedQR}</p>
                 </div>
-              </div>
+              </button>
             </div>
           </div>
 

@@ -731,12 +731,15 @@ async function adminFetch(url: string, method: "PATCH" | "DELETE" | "POST", body
 // Presentational pieces
 // ────────────────────────────────────────────────────────────────────────────
 
-export function StatCard({ label, value, icon: Icon, accent, sub }: {
+// Facu (30/10/2026): "donde sientas que puede haber atajos... simple y
+// práctico". Con `onClick`, la tarjeta es un botón que lleva a su sección
+// (flecha al pasar el mouse); sin él, sigue siendo solo informativa.
+export function StatCard({ label, value, icon: Icon, accent, sub, onClick }: {
   label: string; value: string | number; icon: React.ElementType;
-  accent: string; sub?: string;
+  accent: string; sub?: string; onClick?: () => void;
 }) {
-  return (
-    <div className="bg-white rounded-2xl border border-zinc-200/80 p-5 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden">
+  const inner = (
+    <>
       <div className={`absolute inset-x-0 top-0 h-0.5 ${accent} opacity-60`} />
       <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${accent} bg-opacity-10 mb-3`}>
         <Icon size={16} className="opacity-80" />
@@ -744,8 +747,12 @@ export function StatCard({ label, value, icon: Icon, accent, sub }: {
       <p className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider mb-1">{label}</p>
       <p className="text-[26px] font-black text-zinc-900 leading-none">{value}</p>
       {sub && <p className="text-[11px] text-zinc-400 mt-1.5 font-medium">{sub}</p>}
-    </div>
+      {onClick && <ChevronRight size={16} className="absolute right-4 top-1/2 -translate-y-1/2 text-zinc-300 group-hover:text-red-500 group-hover:translate-x-0.5 transition-all" />}
+    </>
   );
+  const cls = "bg-white rounded-2xl border border-zinc-200/80 p-5 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden text-left";
+  if (onClick) return <button type="button" onClick={onClick} className={`${cls} w-full group hover:border-red-200 active:scale-[0.99] cursor-pointer`}>{inner}</button>;
+  return <div className={cls}>{inner}</div>;
 }
 
 export function UsageBar({ label, usedMB, limitMB, percent }: {
@@ -3215,6 +3222,7 @@ export default function AdminPage() {
           {section === "dashboard" && (
             <DashboardSection
               t={t} locale={locale} tAssetTypes={tAssetTypes}
+              onGo={(id) => { setSection(id); setSidebarOpen(false); }}
               totalUsers={totalUsers} totalMechanicAccounts={totalMechanicAccounts}
               totalVerifiedMechanics={totalVerifiedMechanics} totalAssets={totalAssets}
               assignedQR={assignedQR} totalQR={totalQR} totalServices={totalServices}
