@@ -77,6 +77,8 @@ export const config = {
     // every route above. See DashboardSidebarIntl.tsx for why the shared
     // sidebar/header/etc. exist as separate "*Intl" components during this
     // transition instead of being edited in place.
+    "/dashboard/sync",
+    "/(es|pt)/dashboard/sync",
     "/dashboard/messages",
     "/(es|pt)/dashboard/messages",
     "/dashboard/reports",
