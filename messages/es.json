@@ -2325,7 +2325,11 @@
     "auditActionMkPostCancel": "Publicación cancelada",
     "auditActionMkLibrary": "Biblioteca de marca modificada",
     "auditActionMkHandoverStart": "Transferencia de Marketing iniciada",
-    "auditActionMkHandoverComplete": "Transferencia de Marketing completada"
+    "auditActionMkHandoverComplete": "Transferencia de Marketing completada",
+    "viewAssetTitle": "Ver el equipo (historial completo)",
+    "viewServicesTitle": "Ver los servicios de este equipo",
+    "filteringByAsset": "Equipo: {asset}",
+    "clearFilter": "Quitar filtro"
   },
   "ReportIssueModal": {
     "title": "Reportar un problema",

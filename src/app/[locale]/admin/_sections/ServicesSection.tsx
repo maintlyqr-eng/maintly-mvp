@@ -21,6 +21,9 @@ type ServicesSectionProps = {
   svcMechanicFilter: string;
   setSvcMechanicFilter: (v: string) => void;
   svcTypeFilter: string;
+  svcAssetFilter: { id: string; label: string } | null;
+  clearSvcAssetFilter: () => void;
+  onOpenMechanic: (id: string) => void;
   setSvcTypeFilter: (v: string) => void;
 
   accounts: AccountRow[];
@@ -33,7 +36,7 @@ type ServicesSectionProps = {
 export default function ServicesSection({
   t,
   totalServices, totalMechanicAccounts, visibleServices,
-  svcMechanicFilter, setSvcMechanicFilter, svcTypeFilter, setSvcTypeFilter,
+  svcMechanicFilter, setSvcMechanicFilter, svcTypeFilter, setSvcTypeFilter, svcAssetFilter, clearSvcAssetFilter, onOpenMechanic,
   accounts, serviceTypeOptions,
   viewHistory, confirmDeleteService,
 }: ServicesSectionProps) {
@@ -53,6 +56,12 @@ export default function ServicesSection({
       </div>
 
       <div className="flex flex-wrap items-center gap-3">
+        {svcAssetFilter && (
+          <span className="inline-flex items-center gap-2 rounded-xl bg-red-50 border border-red-200 text-red-700 px-3 py-2 text-[12px] font-bold">
+            {t("filteringByAsset", { asset: svcAssetFilter.label })}
+            <button type="button" onClick={clearSvcAssetFilter} className="text-red-400 hover:text-red-700" aria-label={t("clearFilter")}>×</button>
+          </span>
+        )}
         <select value={svcMechanicFilter} onChange={(e) => setSvcMechanicFilter(e.target.value)}
           className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-[12px] outline-none focus:border-red-400">
           <option value="all">{t("allMechanics")}</option>
@@ -97,7 +106,9 @@ export default function ServicesSection({
                       {s.service_type}
                     </span>
                   </td>
-                  <td className="px-7 py-4 text-[12px] text-zinc-500">{s.mechanic_name}</td>
+                  <td className="px-7 py-4 text-[12px] text-zinc-500">
+                    {s.mechanic_id ? <button type="button" onClick={() => onOpenMechanic(s.mechanic_id as string)} className="hover:text-red-600 hover:underline underline-offset-2 transition-colors">{s.mechanic_name}</button> : s.mechanic_name}
+                  </td>
                   <td className="px-7 py-4 text-[12px] text-zinc-500">{s.customer_name}</td>
                   <td className="px-7 py-4 text-[12px] text-zinc-400">{formatDate(s.service_date)}</td>
                   <td className="px-7 py-4 text-right">

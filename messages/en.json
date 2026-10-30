@@ -2325,7 +2325,11 @@
     "auditActionMkPostCancel": "Post cancelled",
     "auditActionMkLibrary": "Brand library updated",
     "auditActionMkHandoverStart": "Marketing handover started",
-    "auditActionMkHandoverComplete": "Marketing handover completed"
+    "auditActionMkHandoverComplete": "Marketing handover completed",
+    "viewAssetTitle": "View asset (full history)",
+    "viewServicesTitle": "View this asset's services",
+    "filteringByAsset": "Asset: {asset}",
+    "clearFilter": "Clear filter"
   },
   "ReportIssueModal": {
     "title": "Report an issue",

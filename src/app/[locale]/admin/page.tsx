@@ -1108,6 +1108,8 @@ export default function AdminPage() {
 
   // ── Services UI state ──
   const [svcMechanicFilter, setSvcMechanicFilter] = useState("all");
+  // Atajo desde Activos: ver los servicios de un equipo (id, etiqueta).
+  const [svcAssetFilter, setSvcAssetFilter] = useState<{ id: string; label: string } | null>(null);
   const [svcTypeFilter, setSvcTypeFilter] = useState("all");
 
   // ── QR Manager UI state ──
@@ -2723,11 +2725,12 @@ export default function AdminPage() {
 
   const visibleServices = useMemo(() => {
     return services.filter((s) => {
+      if (svcAssetFilter && s.asset_id !== svcAssetFilter.id) return false;
       if (svcMechanicFilter !== "all" && s.mechanic_id !== svcMechanicFilter) return false;
       if (svcTypeFilter !== "all" && s.service_type !== svcTypeFilter) return false;
       return true;
     });
-  }, [services, svcMechanicFilter, svcTypeFilter]);
+  }, [services, svcAssetFilter, svcMechanicFilter, svcTypeFilter]);
 
   const visibleQr = useMemo(() => {
     const q = qrSearch.trim().toLowerCase();
@@ -3264,6 +3267,8 @@ export default function AdminPage() {
               servicesByAsset={servicesByAsset} qrCodesByAssetId={qrCodesByAssetId}
               assetLabel={assetLabel}
               openEditAsset={openEditAsset} viewHistory={viewHistory} confirmDeleteAsset={confirmDeleteAsset}
+              onOpenOwner={(ownerId) => { const acc = accounts.find((x) => x.id === ownerId); if (acc) { setSection("accounts"); openDetail(acc); } }}
+              onOpenServices={(a) => { setSvcAssetFilter({ id: a.id, label: assetLabel(a) }); setSvcMechanicFilter("all"); setSvcTypeFilter("all"); setSection("services"); }}
             />
           )}
 
@@ -3275,6 +3280,8 @@ export default function AdminPage() {
               visibleServices={visibleServices}
               svcMechanicFilter={svcMechanicFilter} setSvcMechanicFilter={setSvcMechanicFilter}
               svcTypeFilter={svcTypeFilter} setSvcTypeFilter={setSvcTypeFilter}
+              svcAssetFilter={svcAssetFilter} clearSvcAssetFilter={() => setSvcAssetFilter(null)}
+              onOpenMechanic={(id) => { const acc = accounts.find((x) => x.id === id); if (acc) { setSection("accounts"); openDetail(acc); } }}
               accounts={accounts} serviceTypeOptions={serviceTypeOptions}
               viewHistory={viewHistory} confirmDeleteService={confirmDeleteService}
             />
@@ -3527,14 +3534,15 @@ export default function AdminPage() {
             <div className="px-6 py-5 space-y-5">
               {/* Stats */}
               <div className="grid grid-cols-3 gap-3">
-                <div className="bg-zinc-50 rounded-xl p-3 text-center">
+                {/* Atajos (Facu, 30/10/2026): activos → Activos buscando por este dueño; servicios → Servicios filtrado por este mecánico. */}
+                <button type="button" onClick={() => { setAssetSearch(detailAccount.name); setSection("assets"); setDetailAccount(null); }} className="bg-zinc-50 hover:bg-red-50 hover:border-red-200 border border-transparent rounded-xl p-3 text-center transition-colors">
                   <p className="text-[18px] font-black text-zinc-900">{assetsByMechanic[detailAccount.id] ?? 0}</p>
                   <p className="text-[9px] font-bold text-zinc-400 uppercase tracking-wide mt-0.5">{t("assetsStat")}</p>
-                </div>
-                <div className="bg-zinc-50 rounded-xl p-3 text-center">
+                </button>
+                <button type="button" onClick={() => { setSvcAssetFilter(null); setSvcTypeFilter("all"); setSvcMechanicFilter(detailAccount.id); setSection("services"); setDetailAccount(null); }} className="bg-zinc-50 hover:bg-red-50 hover:border-red-200 border border-transparent rounded-xl p-3 text-center transition-colors">
                   <p className="text-[18px] font-black text-zinc-900">{servicesByMechanic[detailAccount.id] ?? 0}</p>
                   <p className="text-[9px] font-bold text-zinc-400 uppercase tracking-wide mt-0.5">{t("servicesStat")}</p>
-                </div>
+                </button>
                 <div className="bg-zinc-50 rounded-xl p-3 text-center">
                   <p className="text-[18px] font-black text-zinc-900">{qrByMechanic[detailAccount.id] ?? 0}</p>
                   <p className="text-[9px] font-bold text-zinc-400 uppercase tracking-wide mt-0.5">{t("qrRegisteredStat")}</p>

@@ -7,7 +7,7 @@
 // diálogo de confirmación que abren se quedan renderizados en page.tsx,
 // esta sección no los toca.
 
-import { Search, Download, Pencil, History, Trash2 } from "lucide-react";
+import { Search, Download, Pencil, History, Trash2, ExternalLink } from "lucide-react";
 import {
   formatDate, downloadCsv, ASSET_ICONS,
   SectionTitle,
@@ -31,6 +31,9 @@ type AssetsSectionProps = {
   openEditAsset: (a: AssetRow) => void;
   viewHistory: (entityType: string, entityId: string) => void;
   confirmDeleteAsset: (a: AssetRow) => void;
+  // Atajos (Facu, 30/10/2026): dueño → ficha del Maintler; servicios → Servicios filtrado por el equipo.
+  onOpenOwner: (ownerId: string) => void;
+  onOpenServices: (a: AssetRow) => void;
 };
 
 export default function AssetsSection({
@@ -38,7 +41,7 @@ export default function AssetsSection({
   assetSearch, setAssetSearch,
   visibleAssets, mechanicsById, servicesByAsset, qrCodesByAssetId,
   assetLabel,
-  openEditAsset, viewHistory, confirmDeleteAsset,
+  openEditAsset, viewHistory, confirmDeleteAsset, onOpenOwner, onOpenServices,
 }: AssetsSectionProps) {
   return (
     <div className="space-y-4">
@@ -88,15 +91,28 @@ export default function AssetsSection({
                 return (
                   <tr key={a.id} className="hover:bg-zinc-50/80 transition-colors">
                     <td className="px-7 py-4">
-                      <div className="flex items-center gap-2.5">
-                        <span className="text-[16px]">{ASSET_ICONS[a.asset_type] ?? "🔧"}</span>
-                        <span className="text-[13px] font-bold text-zinc-900">{label}</span>
-                      </div>
+                      {/* Nombre → página pública del equipo (historial completo) en otra pestaña; sin QR, abre la edición. */}
+                      {(qrCodesByAssetId[a.id] ?? [])[0] ? (
+                        <a href={`/asset/${qrCodesByAssetId[a.id][0]}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2.5 group" title={t("viewAssetTitle")}>
+                          <span className="text-[16px]">{ASSET_ICONS[a.asset_type] ?? "🔧"}</span>
+                          <span className="text-[13px] font-bold text-zinc-900 group-hover:text-red-600 transition-colors">{label}</span>
+                          <ExternalLink size={11} className="text-zinc-300 group-hover:text-red-400" />
+                        </a>
+                      ) : (
+                        <button type="button" onClick={() => openEditAsset(a)} className="flex items-center gap-2.5 group text-left">
+                          <span className="text-[16px]">{ASSET_ICONS[a.asset_type] ?? "🔧"}</span>
+                          <span className="text-[13px] font-bold text-zinc-900 group-hover:text-red-600 transition-colors">{label}</span>
+                        </button>
+                      )}
                     </td>
                     <td className="px-7 py-4 text-[12px] text-zinc-500">{tAssetTypes(a.asset_type)}</td>
                     <td className="px-7 py-4 text-[12px] text-zinc-500 font-mono">{a.vin_serial || a.plate || "—"}</td>
-                    <td className="px-7 py-4 text-[12px] text-zinc-500">{owner?.name ?? "—"}</td>
-                    <td className="px-7 py-4 text-[12px] text-zinc-500">{servicesByAsset[a.id] ?? 0}</td>
+                    <td className="px-7 py-4 text-[12px] text-zinc-500">
+                      {owner ? <button type="button" onClick={() => onOpenOwner(owner.id)} className="hover:text-red-600 hover:underline underline-offset-2 transition-colors">{owner.name}</button> : "—"}
+                    </td>
+                    <td className="px-7 py-4 text-[12px] text-zinc-500">
+                      <button type="button" onClick={() => onOpenServices(a)} className="font-bold text-zinc-700 hover:text-red-600 hover:underline underline-offset-2 transition-colors" title={t("viewServicesTitle")}>{servicesByAsset[a.id] ?? 0}</button>
+                    </td>
                     <td className="px-7 py-4 text-[12px] text-zinc-400">{formatDate(a.created_at)}</td>
                     <td className="px-7 py-4 text-right">
                       <div className="flex items-center justify-end gap-3">
