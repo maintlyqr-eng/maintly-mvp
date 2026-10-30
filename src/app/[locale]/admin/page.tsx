@@ -780,7 +780,8 @@ export function UsageBar({ label, usedMB, limitMB, percent }: {
 }
 
 export function SectionTitle({ children }: { children: React.ReactNode }) {
-  return <h2 className="text-[13px] font-bold text-zinc-900 tracking-tight">{children}</h2>;
+  // Título de bloque estilo placa de taller: mayúsculas espaciadas con marca roja a la izquierda.
+  return <h2 className="text-[11px] font-black text-zinc-800 uppercase tracking-[0.16em] flex items-center gap-2"><span className="inline-block w-1.5 h-3.5 rounded-sm bg-red-600 shadow-[0_0_6px_rgba(220,38,38,0.6)]" />{children}</h2>;
 }
 
 export function TrendRow({ label, data, color }: { label: string; data: DayBucket[]; color: string }) {
@@ -816,8 +817,10 @@ export function Pill({ children, tone }: { children: React.ReactNode; tone: "zin
     amber: "bg-amber-50 text-amber-700 border-amber-200",
     red: "bg-red-50 text-red-700 border-red-200",
   };
+  const dots: Record<string, string> = { zinc: "bg-zinc-300", blue: "bg-sky-500", emerald: "bg-emerald-500 shadow-[0_0_5px_rgba(16,185,129,0.8)]", amber: "bg-amber-500", red: "bg-red-500 shadow-[0_0_5px_rgba(239,68,68,0.8)]" };
   return (
-    <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full border ${tones[tone]}`}>
+    <span className={`inline-flex items-center gap-1.5 text-[10px] font-bold px-2 py-0.5 rounded-full border ${tones[tone]}`}>
+      <span className={`w-1.5 h-1.5 rounded-full ${dots[tone]}`} />
       {children}
     </span>
   );
@@ -3080,7 +3083,7 @@ export default function AdminPage() {
   // sección, cerrando sobre esas mismas cosas pero recibidas como props.
 
   return (
-    <div className="min-h-screen bg-[#F3F4F6] flex text-zinc-900 relative">
+    <div className="mly-admin min-h-screen bg-[#F3F4F6] flex text-zinc-900 relative">
       <ErrorLogger />
 
       {sidebarOpen && (
