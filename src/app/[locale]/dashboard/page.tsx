@@ -1162,17 +1162,24 @@ function DashboardPageInner() {
                   horizontally (icon beside the number) instead — same 4
                   numbers, roughly half the height. */}
               <div className="grid grid-cols-2 gap-2">
-                {resumenTiles.map(({ id, value, caption, icon: Icon, color }) => (
-                  <div key={id} className="flex items-center gap-2 rounded-xl border border-zinc-100 bg-zinc-50/60 p-2">
-                    <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${color}`}>
-                      <Icon size={13} />
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-[15px] font-black text-zinc-900 leading-tight">{value}</p>
-                      <p className="text-[9px] font-semibold text-zinc-500 leading-snug truncate">{caption}</p>
-                    </div>
-                  </div>
-                ))}
+                {/* Facu (30/10/2026): "que esos 4 cuadrados sean botones":
+                    activos → Activos, servicios → Mis Servicios, tareas →
+                    Calendario, mantenimiento al día → Programados. */}
+                {resumenTiles.map(({ id, value, caption, icon: Icon, color }) => {
+                  const href = id === "assets" ? "/dashboard/assets" : id === "services" ? "/dashboard/services" : id === "pending" ? "/dashboard/calendar" : "/dashboard/scheduled";
+                  return (
+                    <Link key={id} href={href} className="flex items-center gap-2 rounded-xl border border-zinc-100 bg-zinc-50/60 p-2 hover:border-red-200 hover:bg-red-50/40 active:scale-[0.98] transition-all group">
+                      <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${color}`}>
+                        <Icon size={13} />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[15px] font-black text-zinc-900 leading-tight">{value}</p>
+                        <p className="text-[9px] font-semibold text-zinc-500 leading-snug truncate group-hover:text-red-600">{caption}</p>
+                      </div>
+                      <ChevronRight size={12} className="text-zinc-300 group-hover:text-red-400 shrink-0" />
+                    </Link>
+                  );
+                })}
               </div>
             </div>
 
