@@ -6,21 +6,28 @@
  * - API propia (/api/) y Supabase: nunca se cachean acá (los datos sin
  *   señal los maneja la app en IndexedDB, ver src/lib/offline/).
  * Versión en CACHE: subirla invalida todo lo guardado. */
-const CACHE = "mly-v6";
+const CACHE = "mly-v7";
+// Imágenes, íconos y fotos: caché aparte que NO se borra al cambiar de
+// versión (si no, cada deploy dejaba la app sin imágenes hasta volver a verlas).
+const STATIC_CACHE = "mly-static";
 const OFFLINE_URL = "/offline";
-const PRECACHE = [OFFLINE_URL, "/icons/icon-192.png", "/icons/icon-512.png", "/manifest.webmanifest"];
+const PRECACHE = [OFFLINE_URL, "/manifest.webmanifest"];
+const PRECACHE_STATIC = ["/icons/icon-192.png", "/icons/icon-512.png", "/images/car.png", "/images/moto.png", "/images/generador.png", "/images/excavator.png", "/images/barco.png", "/images/avion.png", "/images/Maintly_crop.png", "/images/maintly-logo-full.png"];
 // Páginas de arranque de la app instalada: se guardan ya al instalar el SW.
 const START_PAGES = ["/dashboard?source=pwa", "/dashboard"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
-    caches.open(CACHE).then((c) => c.addAll(PRECACHE)).then(() => warm(START_PAGES)).catch(() => {}).then(() => self.skipWaiting())
+    Promise.all([
+      caches.open(CACHE).then((c) => c.addAll(PRECACHE)),
+      caches.open(STATIC_CACHE).then((c) => Promise.all(PRECACHE_STATIC.map((u) => c.add(u).catch(() => {})))),
+    ]).then(() => warm(START_PAGES)).catch(() => {}).then(() => self.skipWaiting())
   );
 });
 
 self.addEventListener("activate", (event) => {
   event.waitUntil(
-    caches.keys().then((keys) => Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k)))).then(() => self.clients.claim())
+    caches.keys().then((keys) => Promise.all(keys.filter((k) => k !== CACHE && k !== STATIC_CACHE).map((k) => caches.delete(k)))).then(() => self.clients.claim())
   );
 });
 
@@ -65,7 +72,7 @@ self.addEventListener("fetch", (event) => {
   if (url.origin !== self.location.origin) {
     if (/\.supabase\.co$/.test(url.hostname) && url.pathname.includes("/storage/v1/object/public/")) {
       event.respondWith(
-        caches.match(req).then((cached) => cached || fetch(req).then((res) => { if (res.ok || res.type === "opaque") caches.open(CACHE).then((c) => c.put(req, res.clone())); return res; }))
+        caches.match(req).then((cached) => cached || fetch(req).then((res) => { if (res.ok || res.type === "opaque") caches.open(STATIC_CACHE).then((c) => c.put(req, res.clone())); return res; }))
       );
     }
     return;                                                     // resto (Supabase API, Google): directo
@@ -104,9 +111,10 @@ self.addEventListener("fetch", (event) => {
   }
 
   if (isStatic(url)) {
+    const bucket = url.pathname.startsWith("/_next/static/") ? CACHE : STATIC_CACHE;
     event.respondWith(
       caches.match(req).then((cached) => {
-        const fresh = fetch(req).then((res) => { if (res.ok) caches.open(CACHE).then((c) => c.put(req, res.clone())); return res; }).catch(() => cached);
+        const fresh = fetch(req).then((res) => { if (res.ok) caches.open(bucket).then((c) => c.put(req, res.clone())); return res; }).catch(() => cached);
         return cached || fresh;
       })
     );
