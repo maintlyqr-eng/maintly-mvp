@@ -109,9 +109,9 @@ html.mly-wco .sticky.top-0 {
 /* Demo de escaneo de la portada (ScanDemo.tsx): ciclo de 7 s. */
 @keyframes mlyDemoLine { 0% { top: 0; opacity: 0; } 5% { opacity: 1; } 30% { top: calc(100% - 2px); opacity: 1; } 34% { opacity: 0; } 100% { top: 0; opacity: 0; } }
 .mly-demo-line { animation: mlyDemoLine 7s ease-in-out infinite; top: 0; }
-@keyframes mlyDemoStep { 0% { opacity: 0; transform: translateX(6px); } 6% { opacity: 1; transform: translateX(0); } 88% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes mlyDemoStep { 0% { opacity: 0; transform: translateX(6px); } 4% { opacity: 1; transform: translateX(0); } 19% { opacity: 1; } 22% { opacity: 0; transform: translateX(-4px); } 100% { opacity: 0; } }
 .mly-demo-step { opacity: 0; animation: mlyDemoStep 7s ease-out infinite; }
-.mly-demo-step-1 { animation-delay: 2.4s; }
-.mly-demo-step-2 { animation-delay: 3.4s; }
-.mly-demo-step-3 { animation-delay: 4.4s; }
-@media (prefers-reduced-motion: reduce) { .mly-demo-line { display: none; } .mly-demo-step { animation: none; opacity: 1; } }
+.mly-demo-step-1 { animation-delay: 2.3s; }
+.mly-demo-step-2 { animation-delay: 3.8s; }
+.mly-demo-step-3 { animation-delay: 5.3s; }
+@media (prefers-reduced-motion: reduce) { .mly-demo-line { display: none; } .mly-demo-step { animation: none; } .mly-demo-step-3 { opacity: 1; } }

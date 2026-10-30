@@ -235,9 +235,9 @@ export default function HomePage() {
   // como variables para no duplicar el JSX/las traducciones en los dos
   // lugares (mismo patrón que "const card" en Login/Register).
   const trustBar = (
-    <div className="flex flex-wrap items-center justify-center gap-3 text-zinc-500" style={{marginTop:'0.4vh'}}>
+    <div className="w-full max-w-[680px] flex flex-wrap items-center justify-between gap-x-4 gap-y-1 text-zinc-700 rounded-xl bg-white/80 backdrop-blur-sm border border-zinc-200/80 shadow-sm px-4" style={{marginTop:'0.8vh', paddingTop:'clamp(4px,0.6vh,8px)', paddingBottom:'clamp(4px,0.6vh,8px)'}}>
       <ShieldCheck className="text-red-500 shrink-0" style={{width:'clamp(11px,0.9vw,14px)', height:'clamp(11px,0.9vw,14px)'}} />
-      <span style={{fontSize:'clamp(10px,0.8vw,12px)'}}>{t("trustBarText")}</span>
+      <span className="font-semibold" style={{fontSize:'clamp(10px,0.85vw,13px)'}}>{t("trustBarText")}</span>
       {/* Facu (30/10/2026): antes había 5 avatares con iniciales inventadas;
           ahora va actividad real de la plataforma (sin datos privados). */}
       <HeroActivity className="ml-1" />
@@ -257,20 +257,20 @@ export default function HomePage() {
   // secundaria; el protagonista debería ser lo que resolvés". Barra clara y
   // discreta en vez del bloque negro; los números se actualizan solos.
   const statsGrid = (
-    <div className="w-full max-w-[680px] grid grid-cols-2 md:grid-cols-4 rounded-xl overflow-hidden bg-white/70 backdrop-blur border border-zinc-200/80 shadow-sm" style={{marginTop:'0.5vh'}}>
+    <div className="w-full max-w-[680px] grid grid-cols-2 md:grid-cols-4 rounded-xl overflow-hidden bg-white/80 backdrop-blur border border-zinc-200/80 shadow-sm" style={{marginTop:'0.9vh'}}>
       {[
         { icon: Globe, value: stats?.machines ?? null, label: t("statMachines") },
         { icon: FileText, value: stats?.services ?? null, label: t("statServices") },
         { icon: Wrench, value: stats?.mechanics ?? null, label: t("statMechanics") },
         { icon: TrendingUp, value: undefined, label: t("statGrowing") },
       ].map(({ icon: Icon, value, label }, i) => (
-        <div key={label} className={["flex flex-row items-center justify-center gap-1.5 px-2 border-zinc-200/70", i % 2 === 0 ? "border-r" : "", i < 2 ? "border-b" : "", "md:border-b-0", i < 3 ? "md:border-r" : "md:border-r-0"].filter(Boolean).join(" ")} style={{paddingTop:'clamp(4px,0.6vh,8px)', paddingBottom:'clamp(4px,0.6vh,8px)'}}>
-          <Icon className="text-red-500 shrink-0" style={{width:'clamp(11px,0.9vw,14px)', height:'clamp(11px,0.9vw,14px)'}} />
+        <div key={label} className={["flex flex-row items-center justify-center gap-1.5 px-2 border-zinc-200/70", i % 2 === 0 ? "border-r" : "", i < 2 ? "border-b" : "", "md:border-b-0", i < 3 ? "md:border-r" : "md:border-r-0"].filter(Boolean).join(" ")} style={{paddingTop:'clamp(5px,0.8vh,10px)', paddingBottom:'clamp(5px,0.8vh,10px)'}}>
+          <Icon className="text-red-500 shrink-0" style={{width:'clamp(12px,1vw,15px)', height:'clamp(12px,1vw,15px)'}} />
           <div className="flex flex-row items-baseline gap-1.5 leading-none">
             {value !== undefined && (
-              <CountUp value={value} className="font-black text-zinc-900 leading-none" style={{fontSize:'clamp(11px,1vw,14px)'}} />
+              <CountUp value={value} className="font-black text-zinc-900 leading-none" style={{fontSize:'clamp(12px,1.15vw,16px)'}} />
             )}
-            <p className="text-zinc-500 font-semibold uppercase tracking-wide leading-tight" style={{fontSize:'clamp(7.5px,0.5vw,8.5px)'}}>{label}</p>
+            <p className="text-zinc-500 font-semibold uppercase tracking-wide leading-tight" style={{fontSize:'clamp(8.5px,0.6vw,10px)'}}>{label}</p>
           </div>
         </div>
       ))}
@@ -284,7 +284,7 @@ export default function HomePage() {
   // de abajo queda como red de contención para cualquier idioma futuro con
   // texto aún más largo.
   const pillarsGrid = (
-    <div className="w-full max-w-[680px] grid grid-cols-2 md:grid-cols-4 rounded-2xl overflow-hidden border border-zinc-200 bg-white/92 backdrop-blur-sm shadow-sm" style={{marginTop:'0.4vh'}}>
+    <div className="w-full max-w-[680px] grid grid-cols-2 md:grid-cols-4 rounded-2xl overflow-hidden border border-zinc-200 bg-white/92 backdrop-blur-sm shadow-sm" style={{marginTop:'0.9vh'}}>
       {[
         { icon: ShieldCheck, title: t("pillarSecure") },
         { icon: Globe, title: t("pillarAccess") },
@@ -295,25 +295,25 @@ export default function HomePage() {
           <div className="rounded-full border border-red-200 bg-red-50 flex items-center justify-center text-red-500 shrink-0" style={{width:'clamp(16px,1.4vw,20px)', height:'clamp(16px,1.4vw,20px)'}}>
             <Icon style={{width:'clamp(8px,0.75vw,11px)', height:'clamp(8px,0.75vw,11px)'}} />
           </div>
-          <p className="font-black tracking-normal text-zinc-800 leading-tight uppercase text-center" style={{fontSize:'clamp(8px,0.56vw,8.5px)'}}>{title}</p>
+          <p className="font-black tracking-normal text-zinc-800 leading-tight uppercase text-center" style={{fontSize:'clamp(8.5px,0.62vw,10px)'}}>{title}</p>
         </div>
       ))}
     </div>
   );
 
   const footerLinks = (
-    <div className="flex justify-center items-center gap-3 flex-wrap" style={{marginTop:'0.15vh', marginBottom:'0.15vh'}}>
-      <span className="tracking-[0.2em] text-zinc-400 font-semibold uppercase" style={{fontSize:'clamp(8px,0.55vw,8px)'}}>{t("footerBrand")}</span>
+    <div className="flex justify-center items-center gap-3 flex-wrap rounded-full bg-white/60 px-4" style={{marginTop:'0.9vh', marginBottom:'0.4vh', paddingTop:'2px', paddingBottom:'2px'}}>
+      <span className="tracking-[0.2em] text-zinc-400 font-semibold uppercase" style={{fontSize:'clamp(8px,0.6vw,9px)'}}>{t("footerBrand")}</span>
       <span className="text-red-400" style={{fontSize:'clamp(6px,0.5vw,7px)'}}>•</span>
-      <span className="tracking-[0.2em] text-zinc-400 font-semibold uppercase" style={{fontSize:'clamp(8px,0.55vw,8px)'}}>{t("footerTagline")}</span>
+      <span className="tracking-[0.2em] text-zinc-400 font-semibold uppercase" style={{fontSize:'clamp(8px,0.6vw,9px)'}}>{t("footerTagline")}</span>
       <span className="text-red-400" style={{fontSize:'clamp(6px,0.5vw,7px)'}}>•</span>
-      <Link href="/terms" className="tracking-[0.2em] text-zinc-400 hover:text-red-500 font-semibold uppercase transition-colors" style={{fontSize:'clamp(8px,0.55vw,8px)'}}>{t("footerTerms")}</Link>
+      <Link href="/terms" className="tracking-[0.2em] text-zinc-400 hover:text-red-500 font-semibold uppercase transition-colors" style={{fontSize:'clamp(8px,0.6vw,9px)'}}>{t("footerTerms")}</Link>
       <span className="text-red-400" style={{fontSize:'clamp(6px,0.5vw,7px)'}}>•</span>
-      <Link href="/privacy" className="tracking-[0.2em] text-zinc-400 hover:text-red-500 font-semibold uppercase transition-colors" style={{fontSize:'clamp(8px,0.55vw,8px)'}}>{t("footerPrivacy")}</Link>
+      <Link href="/privacy" className="tracking-[0.2em] text-zinc-400 hover:text-red-500 font-semibold uppercase transition-colors" style={{fontSize:'clamp(8px,0.6vw,9px)'}}>{t("footerPrivacy")}</Link>
       <span className="text-red-400" style={{fontSize:'clamp(6px,0.5vw,7px)'}}>•</span>
-      <Link href="/cookies" className="tracking-[0.2em] text-zinc-400 hover:text-red-500 font-semibold uppercase transition-colors" style={{fontSize:'clamp(8px,0.55vw,8px)'}}>{t("footerCookies")}</Link>
+      <Link href="/cookies" className="tracking-[0.2em] text-zinc-400 hover:text-red-500 font-semibold uppercase transition-colors" style={{fontSize:'clamp(8px,0.6vw,9px)'}}>{t("footerCookies")}</Link>
       <span className="text-red-400" style={{fontSize:'clamp(6px,0.5vw,7px)'}}>•</span>
-      <span className="tracking-[0.2em] text-zinc-400 font-semibold uppercase" style={{fontSize:'clamp(8px,0.55vw,8px)'}}>{t("footerRights")}</span>
+      <span className="tracking-[0.2em] text-zinc-400 font-semibold uppercase" style={{fontSize:'clamp(8px,0.6vw,9px)'}}>{t("footerRights")}</span>
     </div>
   );
 
