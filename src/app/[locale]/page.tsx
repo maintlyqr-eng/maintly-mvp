@@ -273,11 +273,13 @@ export default function HomePage() {
       ].map(({ icon: Icon, value, label }, i) => (
         <div key={label} className={["flex flex-row items-center justify-center gap-1.5 px-2 border-zinc-200/70", i % 2 === 0 ? "border-r" : "", i < 2 ? "border-b" : "", "md:border-b-0", i < 3 ? "md:border-r" : "md:border-r-0"].filter(Boolean).join(" ")} style={{paddingTop:'clamp(5px,0.8vh,10px)', paddingBottom:'clamp(5px,0.8vh,10px)'}}>
           <Icon className="text-red-500 shrink-0" style={{width:'clamp(12px,1vw,15px)', height:'clamp(12px,1vw,15px)'}} />
-          <div className="flex flex-row items-baseline gap-1.5 leading-none">
+          {/* Número y etiqueta centrados verticalmente (antes iban por línea
+              base y, con etiquetas de dos renglones, quedaban desparejos). */}
+          <div className="flex flex-row items-center gap-1.5">
             {value !== undefined && (
-              <CountUp value={value} className="font-black text-zinc-900 leading-none" style={{fontSize:'clamp(12px,1.15vw,16px)'}} />
+              <CountUp value={value} className="font-black text-zinc-900 leading-none shrink-0" style={{fontSize:'clamp(12px,1.15vw,16px)'}} />
             )}
-            <p className="text-zinc-500 font-semibold uppercase tracking-wide leading-tight" style={{fontSize:'clamp(8.5px,0.6vw,10px)'}}>{label}</p>
+            <p className="text-zinc-500 font-semibold uppercase tracking-wide leading-[1.1] text-left" style={{fontSize:'clamp(8px,0.58vw,9.5px)'}}>{label}</p>
           </div>
         </div>
       ))}

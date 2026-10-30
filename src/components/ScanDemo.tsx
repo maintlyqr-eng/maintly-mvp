@@ -9,10 +9,10 @@ import { CheckCircle2, Wrench } from "lucide-react";
 export default function ScanDemo() {
   const t = useTranslations("ScanDemo");
   return (
-    <div className="mly-demo relative w-full rounded-xl bg-zinc-800/80 border border-white/10 overflow-hidden text-left" style={{ height: "clamp(80px,11vh,124px)" }} aria-hidden="true">
-      <span className="absolute bottom-1 left-2 text-[7px] font-black tracking-[0.2em] text-zinc-500 uppercase">{t("label")}</span>
-      {/* Equipo con su QR */}
-      <div className="absolute left-2 top-1/2 -translate-y-1/2 flex items-center gap-1.5">
+    <div className="mly-demo relative w-full rounded-xl bg-zinc-800/80 border border-white/10 overflow-hidden text-left flex items-center gap-2 px-2.5" style={{ height: "clamp(80px,11vh,124px)" }} aria-hidden="true">
+      <span className="absolute bottom-1 left-2.5 text-[7px] font-black tracking-[0.2em] text-zinc-500 uppercase">{t("label")}</span>
+      {/* Equipo con su QR (ancho fijo) */}
+      <div className="flex items-center gap-1.5 shrink-0">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src="/images/generador.png" alt="" className="object-contain opacity-90" style={{ width: "clamp(34px,4.6vh,56px)", height: "clamp(34px,4.6vh,56px)" }} />
         <div className="relative rounded-sm bg-white p-[2px]" style={{ width: "clamp(22px,3.2vh,38px)", height: "clamp(22px,3.2vh,38px)" }}>
@@ -24,10 +24,10 @@ export default function ScanDemo() {
       </div>
       {/* Estados */}
       {/* Un paso por vez (Facu: "cuesta leer sus tres mensajes"), más grande. */}
-      <div className="absolute right-2 top-1/2 -translate-y-1/2 grid" style={{ fontSize: "clamp(10px,1.4vh,14px)" }}>
-        <div className="mly-demo-step mly-demo-step-1 col-start-1 row-start-1 flex items-center gap-1 rounded-md bg-emerald-500/15 border border-emerald-400/30 text-emerald-300 px-2 py-1 font-bold whitespace-nowrap"><CheckCircle2 style={{ width: "1em", height: "1em" }} /> {t("step1")}</div>
-        <div className="mly-demo-step mly-demo-step-2 col-start-1 row-start-1 flex items-center gap-1 rounded-md bg-sky-500/15 border border-sky-400/30 text-sky-300 px-2 py-1 font-bold whitespace-nowrap"><CheckCircle2 style={{ width: "1em", height: "1em" }} /> {t("step2")}</div>
-        <div className="mly-demo-step mly-demo-step-3 col-start-1 row-start-1 flex items-center gap-1 rounded-md bg-white/10 border border-white/15 text-zinc-200 px-2 py-1 font-bold whitespace-nowrap"><Wrench style={{ width: "1em", height: "1em" }} className="text-red-400" /> {t("step3")}</div>
+      <div className="grid flex-1 min-w-0" style={{ fontSize: "clamp(9px,1.25vh,12px)" }}>
+        <div className="mly-demo-step mly-demo-step-1 col-start-1 row-start-1 flex items-center gap-1 rounded-md bg-emerald-500/15 border border-emerald-400/30 text-emerald-300 px-2 py-1 font-bold leading-tight min-w-0"><CheckCircle2 style={{ width: "1em", height: "1em" }} /> {t("step1")}</div>
+        <div className="mly-demo-step mly-demo-step-2 col-start-1 row-start-1 flex items-center gap-1 rounded-md bg-sky-500/15 border border-sky-400/30 text-sky-300 px-2 py-1 font-bold leading-tight min-w-0"><CheckCircle2 style={{ width: "1em", height: "1em" }} /> {t("step2")}</div>
+        <div className="mly-demo-step mly-demo-step-3 col-start-1 row-start-1 flex items-center gap-1 rounded-md bg-white/10 border border-white/15 text-zinc-200 px-2 py-1 font-bold leading-tight min-w-0"><Wrench style={{ width: "1em", height: "1em" }} className="text-red-400" /> {t("step3")}</div>
       </div>
     </div>
   );
