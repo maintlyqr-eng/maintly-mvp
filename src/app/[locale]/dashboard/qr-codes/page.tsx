@@ -1,5 +1,6 @@
 "use client";
 
+import OfflineBanner from "@/components/OfflineBanner";
 import { cachedQuery, cachedRead, cachedUid, isOnline } from "@/lib/offline/cache";
 import DashboardSkeleton from "@/components/DashboardSkeleton";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -328,6 +329,7 @@ export default function QrCodesPage() {
         />
 
         <div className="no-print flex-1 overflow-y-auto px-3 md:px-4 pt-1.5 md:pt-2 pb-3 md:pb-4">
+          <OfflineBanner needsSignal />
 
           {/* Stats */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">

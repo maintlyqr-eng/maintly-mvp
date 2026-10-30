@@ -1,5 +1,6 @@
 "use client";
 
+import OfflineBanner from "@/components/OfflineBanner";
 import { cachedQuery, isOnline } from "@/lib/offline/cache";
 import DashboardSkeleton from "@/components/DashboardSkeleton";
 import { useEffect, useMemo, useState } from "react";
@@ -303,6 +304,7 @@ export default function DocumentsPage() {
         />
 
         <div className="flex-1 overflow-y-auto px-3 md:px-4 pt-1.5 md:pt-2 pb-3 md:pb-4">
+          <OfflineBanner needsSignal />
 
           {/* Toolbar */}
           <div className="flex items-center justify-between mb-5 -mt-2 gap-3 flex-wrap">

@@ -156,3 +156,23 @@ export async function createAssetLocal(uid: string, asset: Record<string, unknow
   }
   return id;
 }
+
+/** Foto nueva para un activo existente: vista previa local (data URL) y
+ *  subida en cola. Devuelve la data URL para mostrar mientras tanto. */
+export async function queueAssetPhoto(uid: string, assetId: string, photo: File): Promise<string | null> {
+  let dataUrl: string | null = null;
+  try {
+    dataUrl = await new Promise<string>((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result)); r.onerror = () => rej(r.error); r.readAsDataURL(photo); });
+    const cur = await getOne<Row>("assets", assetId);
+    if (cur) await putOne("assets", { ...cur, photo_url: dataUrl });
+  } catch { /* sin vista previa */ }
+  await enqueue({ uid, table: "asset_photo", op: "upload", row: { asset_id: assetId, name: photo.name }, blob: photo });
+  return dataUrl;
+}
+
+/** Quitar un activo del taller propio (el activo y su historial siguen existiendo). */
+export async function removeFromWorkshop(uid: string, assetId: string): Promise<void> {
+  const links = (await getAll<Row>("mechanic_assets")).filter((l) => l.mechanic_id === uid && l.asset_id === assetId);
+  for (const l of links) await deleteOne("mechanic_assets", l.id);
+  await enqueue({ uid, table: "mechanic_assets", op: "delete", row: {}, match: { mechanic_id: uid, asset_id: assetId } });
+}

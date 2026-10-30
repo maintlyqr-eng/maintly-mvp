@@ -2786,6 +2786,7 @@
     "failedN": "{n} não puderam ser enviados",
     "retry": "Tentar de novo",
     "uploadingN": "Enviando {n}…",
-    "syncing": "Sincronizando…"
+    "syncing": "Sincronizando…",
+    "needsSignal": "esta seção precisa de sinal para carregar e salvar alterações"
   }
 }

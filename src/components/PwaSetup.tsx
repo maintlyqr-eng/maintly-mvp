@@ -36,6 +36,10 @@ export default function PwaSetup() {
       // Sin prefijo (la dirección de arranque de la app) y con el idioma actual.
       const pages = pre ? [...base.map((p) => pre + p), "/dashboard", "/dashboard?source=pwa"] : [...base, "/dashboard?source=pwa"];
       navigator.serviceWorker.ready.then((reg) => reg.active?.postMessage({ type: "WARM", urls: [...pages, "/offline"] }));
+      // Módulos que se cargan bajo demanda (QR del activo, lector de QR):
+      // pedirlos ahora para que el service worker los deje guardados.
+      void import("qr-code-styling").catch(() => {});
+      void import("jsqr").catch(() => {});
     };
     const timer = window.setTimeout(warm, 8000);
     window.addEventListener("online", warm);

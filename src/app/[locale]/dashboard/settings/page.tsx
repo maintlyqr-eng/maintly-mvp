@@ -1,5 +1,6 @@
 "use client";
 
+import OfflineBanner from "@/components/OfflineBanner";
 import { cachedQuery, isOnline } from "@/lib/offline/cache";
 import DashboardSkeleton from "@/components/DashboardSkeleton";
 import Link from "next/link";
@@ -462,6 +463,7 @@ export default function SettingsPage() {
         />
 
         <div className="flex-1 overflow-y-auto px-3 md:px-4 pt-1.5 md:pt-2 pb-3 md:pb-4 max-w-2xl lg:max-w-5xl">
+          <OfflineBanner needsSignal />
 
           {/* ── ACCOUNT STATUS ── */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">

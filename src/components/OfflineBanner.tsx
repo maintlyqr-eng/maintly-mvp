@@ -9,7 +9,7 @@ import { subscribeSync } from "@/lib/offline/sync";
 // Franja discreta arriba del contenido cuando no hay señal. Muestra de
 // cuándo es la última sincronización y cuántos cambios esperan subir.
 // `cachedAt` (etapa A) se mantiene por compatibilidad.
-export default function OfflineBanner({ cachedAt }: { cachedAt?: string | null }) {
+export default function OfflineBanner({ cachedAt, needsSignal }: { cachedAt?: string | null; needsSignal?: boolean }) {
   const online = useOnline();
   const t = useTranslations("Offline");
   const [lastPullAt, setLastPullAt] = useState<string | null>(null);
@@ -22,7 +22,8 @@ export default function OfflineBanner({ cachedAt }: { cachedAt?: string | null }
       <WifiOff size={14} className="shrink-0" />
       <span>
         {t("offline")}
-        {when ? ` · ${t("showingSaved", { when: new Date(when).toLocaleString() })}` : ""}
+        {needsSignal ? ` · ${t("needsSignal")}` : ""}
+        {when && !needsSignal ? ` · ${t("showingSaved", { when: new Date(when).toLocaleString() })}` : ""}
         {pending > 0 ? ` · ${t("pendingN", { n: pending })}` : ""}
       </span>
     </div>

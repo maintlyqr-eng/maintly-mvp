@@ -17,7 +17,7 @@ import { suggestMakes, suggestModels, canonicalMake } from "@/lib/vehicleCatalog
 import SuggestInput from "@/components/SuggestInput";
 import { useLearnedCatalog } from "@/lib/useLearnedCatalog";
 import { isOnline } from "@/lib/offline/cache";
-import { localWorkshop, localCustomers, localServices, localAssetHistory, localMe, createServiceRecord, updateAssetFields } from "@/lib/offline/local";
+import { localWorkshop, localCustomers, localServices, localAssetHistory, localMe, createServiceRecord, updateAssetFields, queueAssetPhoto, removeFromWorkshop } from "@/lib/offline/local";
 import { getLocalSession, onSynced } from "@/lib/offline/session";
 import OfflineBanner from "@/components/OfflineBanner";
 import { useUnreadMessagesCount } from "@/lib/useUnreadMessages";
@@ -419,17 +419,10 @@ export default function AssetsPage() {
     setMinKmHours(null);
     setShowServiceForm(true);
     setMinKmHoursLoading(true);
-    const { data } = await supabase
-      .from("service_records")
-      .select("km_hours")
-      .eq("asset_id", assetId)
-      .is("deleted_at", null)
-      .not("km_hours", "is", null)
-      .order("km_hours", { ascending: false })
-      .limit(1)
-      .maybeSingle();
+    const hist = await localAssetHistory(assetId);
+    const maxKm = hist.reduce<number | null>((m, r) => (r.km_hours != null && (m == null || r.km_hours > m) ? r.km_hours : m), null);
     if (currentServiceAssetIdRef.current !== assetId) return;
-    setMinKmHours(data?.km_hours ?? null);
+    setMinKmHours(maxKm);
     setMinKmHoursLoading(false);
   }
 
@@ -545,19 +538,6 @@ export default function AssetsPage() {
     setShowEditForm(true);
   }
 
-  async function uploadPhoto(file: File, assetId: string): Promise<{ url: string | null; error: string | null }> {
-    const validationError = validateImageFile(file);
-    if (validationError) return { url: null, error: validationError };
-    const ext = file.name.split(".").pop() ?? "jpg";
-    const path = `${assetId}.${ext}`;
-    const { error: uploadError } = await supabase.storage
-      .from("asset-photos")
-      .upload(path, file, { upsert: true });
-    if (uploadError) return { url: null, error: uploadError.message };
-    const { data } = supabase.storage.from("asset-photos").getPublicUrl(path);
-    return { url: data.publicUrl, error: null };
-  }
-
   async function handleEditAsset(e: React.FormEvent) {
     e.preventDefault();
     if (!editingAsset) return;
@@ -585,18 +565,17 @@ export default function AssetsPage() {
     // missing case: no new file AND the preview is empty means the photo
     // was explicitly removed, so persist null.
     let photoUrl: string | null = editingAsset.photo_url;
-    let photoUploadError: string | null = null;
     if (editPhotoFile) {
-      const { url, error } = await uploadPhoto(editPhotoFile, editingAsset.id);
-      if (url) photoUrl = url;
-      else photoUploadError = error ?? t("errorPhotoUploadFailed");
+      const v = validateImageFile(editPhotoFile);
+      if (v) { setEditError(v); setEditSaving(false); return; }
+      // Foto nueva: vista previa local al instante y subida en cola (con
+      // señal ahora, o cuando vuelva). Ver queueAssetPhoto.
+      photoUrl = await queueAssetPhoto(mechanicId, editingAsset.id, editPhotoFile);
     } else if (!editPhotoPreview) {
       photoUrl = null;
     }
 
-    const { error } = await supabase
-      .from("assets")
-      .update({
+    await updateAssetFields(mechanicId, editingAsset.id, {
         brand: canonicalMake(editingAsset.asset_type, editBrand.trim(), learnedEdit) || null,
         model: editModel.trim() || null,
         nickname: editNickname.trim() || null,
@@ -606,24 +585,11 @@ export default function AssetsPage() {
         plate: editPlate.trim() || null,
         fuel_type: editFuelType || null,
         location: editLocation.trim() || null,
-        photo_url: photoUrl,
+        ...(editPhotoFile ? {} : { photo_url: photoUrl }),
         customer_id: editCustomerId || null,
-      })
-      .eq("id", editingAsset.id);
+    });
 
     setEditSaving(false);
-
-    if (error) {
-      setEditError(error.message);
-      return;
-    }
-
-    if (photoUploadError) {
-      setEditError(t("errorSavedButPhotoFailed", { error: photoUploadError }));
-      await loadAssets(mechanicId);
-      return;
-    }
-
     setShowEditForm(false);
     await loadAssets(mechanicId);
   }
@@ -672,11 +638,7 @@ export default function AssetsPage() {
   async function handleRemoveFromWorkshop() {
     if (!removeTarget) return;
     setRemoving(true);
-    await supabase
-      .from("mechanic_assets")
-      .delete()
-      .eq("mechanic_id", mechanicId)
-      .eq("asset_id", removeTarget.id);
+    await removeFromWorkshop(mechanicId, removeTarget.id);
     setRemoving(false);
     setRemoveTarget(null);
     await loadAssets(mechanicId);
