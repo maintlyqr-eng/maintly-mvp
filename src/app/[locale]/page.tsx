@@ -9,7 +9,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Link } from "@/i18n/navigation";
 import { useTranslations } from "next-intl";
-import { ArrowRight, ShieldCheck, Camera, Keyboard, User, Globe, Clock, TrendingUp, LogOut, LayoutGrid, X, Menu, Wrench, FileText, ExternalLink, MessageCircle } from "lucide-react";
+import { ArrowRight, ShieldCheck, Camera, Keyboard, User, Globe, Clock, TrendingUp, LogOut, LayoutGrid, X, Menu, Wrench, FileText, ExternalLink, MessageCircle, QrCode } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import QRScannerModal from "@/components/QRScannerModal";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
@@ -36,6 +36,7 @@ export default function HomePage() {
   const [qrCode, setQrCode] = useState("");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [stats, setStats] = useState<PublicStats | null>(null);
+  const [reach, setReach] = useState<{ countries: number; scans: number } | null>(null);
 
   // Camera scanner — the actual camera/jsQR logic lives in QRScannerModal,
   // shared with the "link existing asset" flows in the dashboard.
@@ -148,10 +149,12 @@ export default function HomePage() {
         });
       }
     });
-    load();
+    // Cuarta celda real: países alcanzados (o escaneos si todavía es 1 país).
+    const loadReach = () => fetch("/api/public-activity").then((r) => r.json()).then((j) => setReach({ countries: j.countries ?? 0, scans: j.scans ?? 0 })).catch(() => {});
+    load(); loadReach();
     // Facu (30/10/2026): que se actualicen solas, con transición discreta
     // cuando cambia un número (ver CountUp).
-    const id = setInterval(load, 60_000);
+    const id = setInterval(() => { load(); loadReach(); }, 60_000);
     return () => clearInterval(id);
   }, []);
 
@@ -262,7 +265,11 @@ export default function HomePage() {
         { icon: Globe, value: stats?.machines ?? null, label: t("statMachines") },
         { icon: FileText, value: stats?.services ?? null, label: t("statServices") },
         { icon: Wrench, value: stats?.mechanics ?? null, label: t("statMechanics") },
-        { icon: TrendingUp, value: undefined, label: t("statGrowing") },
+        reach && reach.countries >= 2
+          ? { icon: Globe, value: reach.countries, label: t("statCountries") }
+          : reach && reach.scans > 0
+            ? { icon: QrCode, value: reach.scans, label: t("statScans") }
+            : { icon: TrendingUp, value: undefined, label: t("statGrowing") },
       ].map(({ icon: Icon, value, label }, i) => (
         <div key={label} className={["flex flex-row items-center justify-center gap-1.5 px-2 border-zinc-200/70", i % 2 === 0 ? "border-r" : "", i < 2 ? "border-b" : "", "md:border-b-0", i < 3 ? "md:border-r" : "md:border-r-0"].filter(Boolean).join(" ")} style={{paddingTop:'clamp(5px,0.8vh,10px)', paddingBottom:'clamp(5px,0.8vh,10px)'}}>
           <Icon className="text-red-500 shrink-0" style={{width:'clamp(12px,1vw,15px)', height:'clamp(12px,1vw,15px)'}} />

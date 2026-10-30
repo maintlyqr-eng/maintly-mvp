@@ -46,7 +46,9 @@
     "footerTerms": "Termos",
     "footerPrivacy": "Privacidade",
     "footerCookies": "Cookies",
-    "footerRights": "Todos os Direitos Reservados"
+    "footerRights": "Todos os Direitos Reservados",
+    "statCountries": "Países alcançados",
+    "statScans": "QR escaneados"
   },
   "AssetPage": {
     "loading": "Carregando histórico de manutenção...",
