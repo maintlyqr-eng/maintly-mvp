@@ -6,12 +6,16 @@
  * - API propia (/api/) y Supabase: nunca se cachean acá (los datos sin
  *   señal los maneja la app en IndexedDB, ver src/lib/offline/).
  * Versión en CACHE: subirla invalida todo lo guardado. */
-const CACHE = "mly-v4";
+const CACHE = "mly-v5";
 const OFFLINE_URL = "/offline";
 const PRECACHE = [OFFLINE_URL, "/icons/icon-192.png", "/icons/icon-512.png", "/manifest.webmanifest"];
+// Páginas de arranque de la app instalada: se guardan ya al instalar el SW.
+const START_PAGES = ["/dashboard?source=pwa", "/dashboard"];
 
 self.addEventListener("install", (event) => {
-  event.waitUntil(caches.open(CACHE).then((c) => c.addAll(PRECACHE)).then(() => self.skipWaiting()));
+  event.waitUntil(
+    caches.open(CACHE).then((c) => c.addAll(PRECACHE)).then(() => warm(START_PAGES)).catch(() => {}).then(() => self.skipWaiting())
+  );
 });
 
 self.addEventListener("activate", (event) => {
@@ -27,6 +31,20 @@ async function cleanCopy(res) {
   if (!res.redirected) return res.clone();
   const body = await res.clone().arrayBuffer();
   return new Response(body, { status: 200, statusText: "OK", headers: res.headers });
+}
+
+// Sin señal y sin esa página exacta guardada: cualquier página del panel ya
+// guardada sirve (son pantallas de cliente que leen la base local).
+async function dashboardFallback(url) {
+  const m = url.pathname.match(/^(?:\/(es|pt))?\/dashboard(?:\/.*)?$/);
+  if (!m) return null;
+  const cache = await caches.open(CACHE);
+  const bare = url.pathname.replace(/^\/(es|pt)(?=\/)/, "");
+  const candidates = [];
+  for (const pre of ["", "/es", "/pt"]) candidates.push(pre + bare);
+  for (const pre of ["", "/es", "/pt"]) candidates.push(pre + "/dashboard");
+  for (const c of candidates) { const r = await cache.match(c, { ignoreSearch: true }); if (r) return r; }
+  return null;
 }
 
 function isStatic(url) {
@@ -61,7 +79,7 @@ self.addEventListener("fetch", (event) => {
           }
           return res;
         })
-        .catch(async () => (await caches.match(req)) || (await caches.match(req, { ignoreSearch: true })) || (await caches.match(OFFLINE_URL)))
+        .catch(async () => (await caches.match(req)) || (await caches.match(req, { ignoreSearch: true })) || (await dashboardFallback(url)) || (await caches.match(OFFLINE_URL)))
     );
     return;
   }
@@ -82,22 +100,24 @@ self.addEventListener("fetch", (event) => {
 // no falta nada aunque el usuario nunca haya entrado ahí.
 async function warm(urls) {
   const cache = await caches.open(CACHE);
-  for (const u of urls) {
+  const assets = new Set();
+  await Promise.all(urls.map(async (u) => {
     try {
       const res = await fetch(u, { credentials: "same-origin" });
-      if (!res.ok) continue;
+      if (!res.ok) return;
       const html = await res.clone().text();
       const copy = await cleanCopy(res);
       await cache.put(u, copy.clone());
       if (res.redirected) await cache.put(new URL(res.url).pathname, copy);
-      const assets = new Set();
       const re = /(?:src|href)="(\/_next\/static\/[^"]+)"/g;
       let m; while ((m = re.exec(html))) assets.add(m[1]);
-      for (const a of assets) {
-        if (await cache.match(a)) continue;
-        try { const r = await fetch(a); if (r.ok) await cache.put(a, r); } catch { /* sigue con el resto */ }
-      }
     } catch { /* sin red: se reintenta en la próxima apertura */ }
+  }));
+  const missing = [];
+  for (const a of assets) if (!(await cache.match(a))) missing.push(a);
+  // De a 6 a la vez: rápido sin ahogar la conexión del celular.
+  for (let i = 0; i < missing.length; i += 6) {
+    await Promise.all(missing.slice(i, i + 6).map(async (a) => { try { const r = await fetch(a); if (r.ok) await cache.put(a, r); } catch { /* sigue */ } }));
   }
 }
 
