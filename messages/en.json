@@ -2331,7 +2331,9 @@
     "filteringByAsset": "Asset: {asset}",
     "clearFilter": "Clear filter",
     "openMechanicCard": "Open the Maintler's card",
-    "analyticsGeoOpenCountry": "See Maintlers from this country"
+    "analyticsGeoOpenCountry": "See Maintlers from this country",
+    "quickErrors": "{n} unresolved errors",
+    "quickSupport": "{n} unread support messages"
   },
   "ReportIssueModal": {
     "title": "Report an issue",

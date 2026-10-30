@@ -736,16 +736,18 @@ async function adminFetch(url: string, method: "PATCH" | "DELETE" | "POST", body
 // (flecha al pasar el mouse); sin él, sigue siendo solo informativa.
 export function StatCard({ label, value, icon: Icon, accent, sub, onClick }: {
   label: string; value: string | number; icon: React.ElementType;
-  accent: string; sub?: string; onClick?: () => void;
+  accent?: string; sub?: string; onClick?: () => void; // accent: se conserva por compatibilidad, ya no colorea
 }) {
   const inner = (
     <>
-      <div className={`absolute inset-x-0 top-0 h-0.5 ${accent} opacity-60`} />
-      <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${accent} bg-opacity-10 mb-3`}>
-        <Icon size={16} className="opacity-80" />
+      {/* Una sola paleta: línea LED roja arriba, ícono rojo sobre grafito
+          (antes cada tarjeta tenía su color: azul, naranja, violeta…). */}
+      <div className="absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-red-600 to-red-500/30" />
+      <div className="w-9 h-9 rounded-xl flex items-center justify-center bg-[#1C1F24] text-red-500 mb-3 shadow-sm">
+        <Icon size={16} />
       </div>
-      <p className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider mb-1">{label}</p>
-      <p className="text-[26px] font-black text-zinc-900 leading-none">{value}</p>
+      <p className="text-[10px] font-bold text-zinc-400 uppercase tracking-[0.14em] mb-1">{label}</p>
+      <p className="text-[26px] font-black text-zinc-900 leading-none tabular-nums">{value}</p>
       {sub && <p className="text-[11px] text-zinc-400 mt-1.5 font-medium">{sub}</p>}
       {onClick && <ChevronRight size={16} className="absolute right-4 top-1/2 -translate-y-1/2 text-zinc-300 group-hover:text-red-500 group-hover:translate-x-0.5 transition-all" />}
     </>
@@ -3078,7 +3080,7 @@ export default function AdminPage() {
   // sección, cerrando sobre esas mismas cosas pero recibidas como props.
 
   return (
-    <div className="min-h-screen bg-zinc-50/60 flex text-zinc-900 relative">
+    <div className="min-h-screen bg-[#F3F4F6] flex text-zinc-900 relative">
       <ErrorLogger />
 
       {sidebarOpen && (
@@ -3086,67 +3088,60 @@ export default function AdminPage() {
       )}
 
       {/* ══ SIDEBAR ══ */}
-      <aside className={`fixed md:static inset-y-0 left-0 z-40 w-[240px] bg-white border-r border-zinc-200/80 flex flex-col shrink-0 transform transition-transform duration-200 md:translate-x-0 ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}`}>
-        <div className="px-5 pt-5 pb-4 border-b border-zinc-100 flex items-center justify-between">
+      {/* Facu (30/10/2026): "la veo muy seca, poca onda" — sala de control
+          con la identidad de la portada: barra grafito (#1C1F24), wordmark
+          en blanco + rojo, sección activa con línea roja LED, una sola
+          paleta (grafito, acero, rojo). Cambio de piel, no de planos. */}
+      <aside className={`fixed md:static inset-y-0 left-0 z-40 w-[240px] bg-[#1C1F24] text-zinc-300 flex flex-col shrink-0 transform transition-transform duration-200 md:translate-x-0 ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}`}>
+        <div className="px-5 pt-5 pb-4 border-b border-white/10 flex items-center justify-between relative">
+          <div className="absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-transparent via-red-600 to-transparent opacity-80" />
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-red-600 flex items-center justify-center shadow-sm shrink-0">
-              <Shield size={15} className="text-white" />
-            </div>
-            <div>
-              {/* Incremento 14: mismo cambio que el logo del login — usar
-                  el recorte nítido en vez de Maintly.png a tamaño chico. */}
-              <Image src="/images/Maintly_crop.png" alt="MaintlyQR" width={84} height={16} priority style={{ objectFit: "contain" }} />
-              <p className="text-[9px] font-bold text-red-500 tracking-[0.12em] uppercase leading-none mt-0.5">{t("controlCenterLabel")}</p>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/icons/icon-192.png" alt="" width={34} height={34} className="rounded-lg shrink-0" />
+            <div className="leading-none">
+              <p className="text-[15px] font-black tracking-wide text-white">MAINTLY<span className="text-red-500">QR</span></p>
+              <p className="text-[8.5px] font-bold text-zinc-400 tracking-[0.18em] uppercase mt-1">{t("controlCenterLabel")}</p>
             </div>
           </div>
-          <button onClick={() => setSidebarOpen(false)} className="md:hidden text-zinc-400 hover:text-zinc-700">
+          <button onClick={() => setSidebarOpen(false)} className="md:hidden text-zinc-400 hover:text-white">
             <X size={18} />
           </button>
         </div>
 
         <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto">
-          <p className="text-[9px] font-bold text-zinc-300 uppercase tracking-widest px-3 pt-2 pb-1.5">{t("navigationLabel")}</p>
+          <p className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest px-3 pt-2 pb-1.5">{t("navigationLabel")}</p>
           {navItems.map(({ id, label, icon: Icon }) => (
             <button key={id} onClick={() => { setSection(id); setSidebarOpen(false); }}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13px] font-semibold transition-all text-left ${
+              className={`relative w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-[13px] font-semibold transition-all text-left ${
                 section === id
-                  ? "bg-red-600 text-white shadow-sm shadow-red-200"
-                  : "text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900"
+                  ? "bg-white/[0.07] text-white"
+                  : "text-zinc-400 hover:bg-white/[0.05] hover:text-white"
               }`}>
-              <Icon size={15} className={section === id ? "text-white" : ""} />
+              {section === id && <span className="absolute left-0 top-2 bottom-2 w-[3px] rounded-r bg-red-500 shadow-[0_0_8px_1px_rgba(239,68,68,0.7)]" />}
+              <Icon size={15} className={section === id ? "text-red-500" : ""} />
               {label}
               {id === "team" && unreadChatCount > 0 && (
-                <span className={`ml-auto text-[10px] font-black px-1.5 py-0.5 rounded-full leading-none ${
-                  section === id ? "bg-white text-red-600" : "bg-red-600 text-white"
-                }`}>
+                <span className="ml-auto text-[10px] font-black px-1.5 py-0.5 rounded-full leading-none bg-red-600 text-white">
                   {unreadChatCount}
                 </span>
               )}
               {id === "support" && unreadSupportCount > 0 && (
-                <span className={`ml-auto text-[10px] font-black px-1.5 py-0.5 rounded-full leading-none ${
-                  section === id ? "bg-white text-red-600" : "bg-red-600 text-white"
-                }`}>
+                <span className="ml-auto text-[10px] font-black px-1.5 py-0.5 rounded-full leading-none bg-red-600 text-white">
                   {unreadSupportCount}
                 </span>
               )}
               {id === "accounts" && pendingVerifications.length > 0 && (
-                <span className={`ml-auto text-[10px] font-black px-1.5 py-0.5 rounded-full leading-none ${
-                  section === id ? "bg-white text-red-600" : "bg-amber-500 text-white"
-                }`}>
+                <span className="ml-auto text-[10px] font-black px-1.5 py-0.5 rounded-full leading-none bg-amber-500 text-white">
                   {pendingVerifications.length}
                 </span>
               )}
               {id === "team-chat" && mechanicReports.length > 0 && (
-                <span className={`ml-auto text-[10px] font-black px-1.5 py-0.5 rounded-full leading-none ${
-                  section === id ? "bg-white text-red-600" : "bg-amber-500 text-white"
-                }`}>
+                <span className="ml-auto text-[10px] font-black px-1.5 py-0.5 rounded-full leading-none bg-amber-500 text-white">
                   {mechanicReports.length}
                 </span>
               )}
               {id === "moderation" && reportsNewCount > 0 && (
-                <span className={`ml-auto text-[10px] font-black px-1.5 py-0.5 rounded-full leading-none ${
-                  section === id ? "bg-white text-red-600" : "bg-amber-500 text-white"
-                }`}>
+                <span className="ml-auto text-[10px] font-black px-1.5 py-0.5 rounded-full leading-none bg-amber-500 text-white">
                   {reportsNewCount}
                 </span>
               )}
@@ -3154,14 +3149,14 @@ export default function AdminPage() {
           ))}
         </nav>
 
-        <div className="p-3 border-t border-zinc-100 space-y-0.5">
+        <div className="p-3 border-t border-white/10 space-y-0.5">
           <Link href="/dashboard"
-            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13px] font-semibold text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900 transition-all">
+            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-[13px] font-semibold text-zinc-400 hover:bg-white/[0.05] hover:text-white transition-all">
             <Layers size={15} />
             {t("mechanicView")}
           </Link>
           <button onClick={handleAdminLogout}
-            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13px] font-semibold text-zinc-400 hover:bg-red-50 hover:text-red-600 transition-all">
+            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-[13px] font-semibold text-zinc-500 hover:bg-red-500/10 hover:text-red-400 transition-all">
             <LogOut size={15} />
             {t("logOut")}
           </button>
@@ -3171,21 +3166,40 @@ export default function AdminPage() {
       {/* ══ MAIN ══ */}
       <div className="flex-1 flex flex-col min-w-0">
 
-        <header className="bg-white border-b border-zinc-200/80 px-4 md:px-8 py-4 flex items-center justify-between gap-3">
-          <div className="flex items-center gap-3 min-w-0">
+        <header className="relative bg-white border-b border-zinc-200/80 px-4 md:px-8 py-4 flex items-center justify-between gap-3 overflow-hidden">
+          {/* Textura sutil de rejilla metálica + línea LED (identidad de taller). */}
+          <div className="absolute inset-0 pointer-events-none opacity-[0.035]" style={{ backgroundImage: "repeating-linear-gradient(45deg, #000 0 1px, transparent 1px 7px)" }} />
+          <div className="absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-red-600 via-red-500/40 to-transparent" />
+          <div className="flex items-center gap-3 min-w-0 relative">
             <button onClick={() => setSidebarOpen(true)} className="md:hidden shrink-0 text-zinc-600 hover:text-zinc-900">
               <Menu size={22} />
             </button>
             <div className="min-w-0">
-              <h1 className="text-[18px] md:text-[22px] font-black text-zinc-900 leading-tight truncate">{sectionLabels[section]}</h1>
-              <p className="hidden sm:block text-[12px] text-zinc-400 font-medium mt-0.5">{t("headerSubtitle")}</p>
+              <h1 className="text-[18px] md:text-[22px] font-black text-zinc-900 leading-tight truncate tracking-tight">{sectionLabels[section]}</h1>
+              <p className="hidden sm:block text-[11px] text-zinc-400 font-semibold tracking-[0.14em] uppercase mt-0.5">{t("headerSubtitle")}</p>
             </div>
           </div>
-          <div className="flex items-center gap-2 text-zinc-400 shrink-0" title={t("autoRefreshTitle")}>
-            <RefreshCw size={13} className={refreshing ? "animate-spin text-zinc-500" : ""} />
-            {lastFullRefreshAt && (
-              <span className="hidden sm:inline text-[11px] font-semibold">{t("lastRefreshedAt", { time: timeAgo(lastFullRefreshAt, locale) })}</span>
+          <div className="flex items-center gap-2 md:gap-3 shrink-0 relative">
+            {/* Accesos rápidos a lo que pide atención (Facu: "que las cosas te lleven a algún lado"). */}
+            {errorLogsUnresolvedCount > 0 && section !== "errors" && (
+              <button type="button" onClick={() => setSection("errors")} className="hidden sm:inline-flex items-center gap-1.5 rounded-full bg-red-50 border border-red-200 text-red-700 px-2.5 py-1 text-[11px] font-bold hover:bg-red-100 transition-colors">
+                <span className="w-1.5 h-1.5 rounded-full bg-red-500 shadow-[0_0_6px_1px_rgba(239,68,68,0.8)]" /> {t("quickErrors", { n: errorLogsUnresolvedCount })}
+              </button>
             )}
+            {unreadSupportCount > 0 && section !== "support" && (
+              <button type="button" onClick={() => setSection("support")} className="hidden sm:inline-flex items-center gap-1.5 rounded-full bg-amber-50 border border-amber-200 text-amber-800 px-2.5 py-1 text-[11px] font-bold hover:bg-amber-100 transition-colors">
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-500" /> {t("quickSupport", { n: unreadSupportCount })}
+              </button>
+            )}
+            <div className="flex items-center gap-2 text-zinc-400 rounded-full bg-zinc-50 border border-zinc-200 px-2.5 py-1" title={t("autoRefreshTitle")}>
+              <span className="relative flex h-2 w-2">
+                <span className={`absolute inline-flex h-full w-full rounded-full ${refreshing ? "bg-sky-400 animate-ping" : "bg-emerald-400 animate-ping opacity-40"}`} />
+                <span className={`relative inline-flex h-2 w-2 rounded-full ${refreshing ? "bg-sky-500" : "bg-emerald-500"}`} />
+              </span>
+              {lastFullRefreshAt && (
+                <span className="hidden sm:inline text-[11px] font-semibold">{t("lastRefreshedAt", { time: timeAgo(lastFullRefreshAt, locale) })}</span>
+              )}
+            </div>
           </div>
         </header>
 
