@@ -95,6 +95,8 @@ type ActivityItem = {
   kind: "service" | "scan";
   label: string;
   sub: string;
+  assetId?: string | null;
+  assetLabel?: string;
   timestamp: string; // ISO-ish; service items use service_date (day only), scans use scanned_at (full timestamp)
 };
 
@@ -383,6 +385,8 @@ function DashboardPageInner() {
         return {
           id: `svc-${r.asset_id}-${r.service_date}-${r.service_type}`,
           kind: "service" as const,
+          assetId: r.asset_id ?? null,
+          assetLabel: label,
           label: t("activityServiceLogged", { asset: label }),
           sub: tServiceTypes(SERVICE_TYPE_KEYS[r.service_type] ?? "other"),
           timestamp: r.service_date,
@@ -401,6 +405,8 @@ function DashboardPageInner() {
         scanActivity = ((scanRows ?? []) as any[]).map((r) => ({
           id: `scan-${r.id}`,
           kind: "scan" as const,
+          assetId: r.asset_id ?? null,
+          assetLabel: assetLabelById[r.asset_id],
           label: t("activityQrScanned", { asset: assetLabelById[r.asset_id] ?? t("unknownAsset") }),
           sub: "",
           timestamp: r.scanned_at,
@@ -1135,16 +1141,17 @@ function DashboardPageInner() {
                 </div>
                 <div className="min-w-0 flex-1">
                   <p className="text-[12px] font-bold mb-2" style={{ color: healthArcColor }}>{healthStatusLabel}</p>
+                  {/* Facu (30/10/2026): cada línea lleva a su sección. */}
                   <ul className="space-y-1.5">
-                    <li className="flex items-center gap-1.5 text-[11px] text-zinc-600">
+                    <li><Link href="/dashboard/assets" className="flex items-center gap-1.5 text-[11px] text-zinc-600 hover:text-red-600 transition-colors">
                       <CheckCircle2 size={12} className="text-green-500 shrink-0" /> {t("healthCheckAssets", { count: totalAssets })}
-                    </li>
-                    <li className="flex items-center gap-1.5 text-[11px] text-zinc-600">
+                    </Link></li>
+                    <li><Link href="/dashboard/services" className="flex items-center gap-1.5 text-[11px] text-zinc-600 hover:text-red-600 transition-colors">
                       <CheckCircle2 size={12} className="text-green-500 shrink-0" /> {t("healthCheckServices", { count: totalServices })}
-                    </li>
-                    <li className="flex items-center gap-1.5 text-[11px] text-zinc-600">
+                    </Link></li>
+                    <li><Link href="/dashboard/scheduled" className="flex items-center gap-1.5 text-[11px] text-zinc-600 hover:text-red-600 transition-colors">
                       <Clock size={12} className="text-amber-500 shrink-0" /> {t("healthCheckPending", { count: reminders.length })}
-                    </li>
+                    </Link></li>
                   </ul>
                 </div>
               </div>
@@ -1331,8 +1338,11 @@ function DashboardPageInner() {
                 <p className="text-[12px] text-zinc-400 text-center py-6">{t("noActivityYet")}</p>
               ) : (
                 <div className="space-y-2.5">
+                  {/* Facu (30/10/2026): tocar una actividad abre ese equipo
+                      (servicio → Mis Servicios filtrado por el equipo;
+                      escaneo → Activos buscando ese equipo). */}
                   {recentActivity.map((act) => (
-                    <div key={act.id} className="flex items-start gap-2.5">
+                    <button key={act.id} type="button" onClick={() => router.push(act.kind === "service" && act.assetId ? `/dashboard/services?asset=${act.assetId}` : `/dashboard/assets?q=${encodeURIComponent(act.assetLabel ?? "")}`)} className="w-full text-left flex items-start gap-2.5 rounded-lg -mx-1 px-1 py-0.5 hover:bg-zinc-50 transition-colors">
                       <div className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 mt-0.5 ${act.kind === "service" ? "bg-green-50 text-green-600" : "bg-blue-50 text-blue-600"}`}>
                         {act.kind === "service" ? <CheckCircle2 size={12} /> : <QrCode size={12} />}
                       </div>
@@ -1341,7 +1351,7 @@ function DashboardPageInner() {
                         {act.sub && <p className="text-[10px] text-zinc-400">{act.sub}</p>}
                       </div>
                       <p className="text-[9.5px] text-zinc-400 shrink-0 whitespace-nowrap">{formatRelativeTime(act.timestamp)}</p>
-                    </div>
+                    </button>
                   ))}
                 </div>
               )}
