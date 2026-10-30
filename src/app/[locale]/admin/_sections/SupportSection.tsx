@@ -14,6 +14,8 @@ import {
 } from "../page";
 
 type SupportSectionProps = {
+  /** Atajo: abrir la ficha del Maintler de la conversación. */
+  onOpenMechanic: (mechanicId: string) => void;
   t: (key: string, values?: Record<string, string | number>) => string;
   locale: string;
 
@@ -54,6 +56,7 @@ type SupportSectionProps = {
 };
 
 export default function SupportSection({
+  onOpenMechanic,
   t, locale,
   supportLoading, supportConversations,
   supportSearch, setSupportSearch,
@@ -184,7 +187,7 @@ export default function SupportSection({
                     <X size={16} />
                   </button>
                   <div className="min-w-0 flex-1">
-                    <p className="text-[13px] font-bold text-zinc-900 truncate">{activeThread.mechanic?.name ?? t("unknownMechanic")}</p>
+                    <button type="button" onClick={() => onOpenMechanic(activeThread.mechanicId)} className="text-[13px] font-bold text-zinc-900 truncate hover:text-red-600 transition-colors text-left block max-w-full" title={t("openMechanicCard")}>{activeThread.mechanic?.name ?? t("unknownMechanic")}</button>
                     <p className="text-[11px] text-zinc-400 truncate">{activeThread.mechanic?.email ?? ""}</p>
                   </div>
                   {confirmClearThread ? (

@@ -2329,7 +2329,9 @@
     "viewAssetTitle": "Ver o equipamento (histórico completo)",
     "viewServicesTitle": "Ver os serviços deste equipamento",
     "filteringByAsset": "Equipamento: {asset}",
-    "clearFilter": "Remover filtro"
+    "clearFilter": "Remover filtro",
+    "openMechanicCard": "Abrir a ficha do Maintler",
+    "analyticsGeoOpenCountry": "Ver os Maintlers deste país"
   },
   "ReportIssueModal": {
     "title": "Reportar um problema",

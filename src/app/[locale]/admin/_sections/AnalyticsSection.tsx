@@ -12,6 +12,8 @@ import {
 } from "../page";
 
 type AnalyticsSectionProps = {
+  /** Atajo: país → Maintlers de ese país. */
+  onOpenCountry: (country: string) => void;
   t: (key: string, values?: Record<string, string | number>) => string;
   tProfessionTypes: (key: string) => string;
 
@@ -32,6 +34,7 @@ function countryFlag(code: string): string {
 }
 
 export default function AnalyticsSection({
+  onOpenCountry,
   t, tProfessionTypes,
   analyticsData, analyticsLoading, analyticsFrom, setAnalyticsFrom, analyticsTo, setAnalyticsTo,
   assetLabel,
@@ -206,7 +209,7 @@ export default function AnalyticsSection({
                         <div className="space-y-2">
                           {tally.byCountry.slice(0, 8).map((c) => (
                             <div key={c.country} className="flex items-center gap-2">
-                              <span className="text-[12px] font-semibold text-zinc-700 w-10 shrink-0">{countryFlag(c.country)} {c.country}</span>
+                              <button type="button" onClick={() => onOpenCountry(c.country)} className="text-[12px] font-semibold text-zinc-700 w-10 shrink-0 text-left hover:text-red-600 transition-colors" title={t("analyticsGeoOpenCountry")}>{countryFlag(c.country)} {c.country}</button>
                               <div className="flex-1 h-1.5 bg-zinc-100 rounded-full overflow-hidden"><div className="h-full bg-red-500 rounded-full" style={{ width: `${Math.round((c.count / max) * 100)}%` }} /></div>
                               <span className="text-[11px] font-black text-zinc-900 w-8 text-right shrink-0">{c.count}</span>
                             </div>

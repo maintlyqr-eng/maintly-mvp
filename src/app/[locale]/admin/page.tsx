@@ -2637,6 +2637,9 @@ export default function AdminPage() {
   const visibleAccounts = useMemo(() => {
     const q = accountSearch.trim().toLowerCase();
     if (!q) return accounts;
+    // Atajo desde Analytics ("Dónde pesa Maintly"): "país:AU" filtra por país de registro o última conexión.
+    const pm = q.match(/^(?:país|pais|country):\s*([a-z]{2})$/);
+    if (pm) { const cc = pm[1].toUpperCase(); return accounts.filter((a) => (a.signup_country ?? "").toUpperCase() === cc || (a.last_seen_country ?? "").toUpperCase() === cc); }
     return accounts.filter((a) => [a.name, a.email, a.workshop_name].filter(Boolean).join(" ").toLowerCase().includes(q));
   }, [accounts, accountSearch]);
 
@@ -3297,6 +3300,7 @@ export default function AdminPage() {
               visibleQr={visibleQr} assetsById={assetsById} assets={assets}
               assetLabel={assetLabel}
               setShowGenerateModal={setShowGenerateModal} confirmUnlinkQr={confirmUnlinkQr}
+              onOpenAsset={(a) => { setAssetSearch(a.vin_serial || a.nickname || a.model || ""); setSection("assets"); }}
             />
           )}
 
@@ -3320,6 +3324,7 @@ export default function AdminPage() {
               handleSaveSupportNotes={handleSaveSupportNotes}
               threadDraft={threadDraft} setThreadDraft={setThreadDraft}
               handleSendThreadReply={handleSendThreadReply} threadSending={threadSending}
+              onOpenMechanic={(id) => { const acc = accounts.find((x) => x.id === id); if (acc) openDetail(acc); }}
             />
           )}
 
@@ -3389,6 +3394,7 @@ export default function AdminPage() {
               analyticsFrom={analyticsFrom} setAnalyticsFrom={setAnalyticsFrom}
               analyticsTo={analyticsTo} setAnalyticsTo={setAnalyticsTo}
               assetLabel={assetLabel}
+              onOpenCountry={(country) => { setAccountSearch(`país:${country}`); setSection("accounts"); }}
             />
           )}
 

@@ -28,6 +28,8 @@ type QrSectionProps = {
   assets: AssetRow[];
 
   assetLabel: (a: { nickname: string | null; brand: string | null; model: string | null }) => string;
+  /** Atajo: equipo asignado → Activos buscándolo. */
+  onOpenAsset: (a: AssetRow) => void;
 
   setShowGenerateModal: (v: boolean) => void;
   confirmUnlinkQr: (q: QrRow) => void;
@@ -37,7 +39,7 @@ export default function QrSection({
   t,
   totalQR, assignedQR,
   qrSearch, setQrSearch, qrStatusFilter, setQrStatusFilter,
-  visibleQr, assetsById, assets,
+  visibleQr, assetsById, assets, onOpenAsset,
   assetLabel,
   setShowGenerateModal, confirmUnlinkQr,
 }: QrSectionProps) {
@@ -106,11 +108,16 @@ export default function QrSection({
                 const label = asset ? (asset.nickname || [asset.brand, asset.model].filter(Boolean).join(" ") || t("unnamedAsset")) : null;
                 return (
                   <tr key={q.code} className="hover:bg-zinc-50/80 transition-colors">
-                    <td className="px-7 py-4 text-[12px] font-mono font-bold text-zinc-800">{q.code}</td>
+                    <td className="px-7 py-4 text-[12px] font-mono font-bold text-zinc-800">
+                      {/* Código → página pública del equipo (o del sticker vacío). */}
+                      <a href={`/asset/${q.code}`} target="_blank" rel="noopener noreferrer" className="hover:text-red-600 hover:underline underline-offset-2 transition-colors">{q.code}</a>
+                    </td>
                     <td className="px-7 py-4">
                       {q.asset_id ? <Pill tone="blue">{t("assignedPill")}</Pill> : <Pill tone="emerald">{t("availablePill")}</Pill>}
                     </td>
-                    <td className="px-7 py-4 text-[12px] text-zinc-500">{label ?? "—"}</td>
+                    <td className="px-7 py-4 text-[12px] text-zinc-500">
+                      {asset ? <button type="button" onClick={() => onOpenAsset(asset)} className="hover:text-red-600 hover:underline underline-offset-2 transition-colors text-left">{label}</button> : "—"}
+                    </td>
                     <td className="px-7 py-4 text-[12px] text-zinc-400">{formatDate(q.created_at)}</td>
                     <td className="px-7 py-4 text-right">
                       {q.asset_id && (

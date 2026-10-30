@@ -2329,7 +2329,9 @@
     "viewAssetTitle": "View asset (full history)",
     "viewServicesTitle": "View this asset's services",
     "filteringByAsset": "Asset: {asset}",
-    "clearFilter": "Clear filter"
+    "clearFilter": "Clear filter",
+    "openMechanicCard": "Open the Maintler's card",
+    "analyticsGeoOpenCountry": "See Maintlers from this country"
   },
   "ReportIssueModal": {
     "title": "Report an issue",
