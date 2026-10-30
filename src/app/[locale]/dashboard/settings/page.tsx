@@ -60,6 +60,7 @@ type SpecialtyRow = { asset_type: string; services_count: number };
 export default function SettingsPage() {
   const router = useRouter();
   const t = useTranslations("DashboardSettingsPage");
+  const tOff = useTranslations("Offline");
   const tProfessionTypes = useTranslations("ProfessionTypes");
   const [checkingAuth, setCheckingAuth] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -906,6 +907,11 @@ export default function SettingsPage() {
 
           {/* ── APP INSTALABLE (etapa A, 28/10/2026) ── */}
           <AppInstallCard />
+          <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm p-6 mb-6">
+            <h2 className="text-[14px] font-black text-zinc-900 mb-1">{tOff("syncTitle")}</h2>
+            <p className="text-[12px] text-zinc-400 mb-3">{tOff("syncHint")}</p>
+            <Link href="/dashboard/sync" prefetch={false} className="inline-flex items-center gap-1.5 rounded-xl border border-zinc-200 bg-white px-3 py-2 text-[12px] font-bold text-zinc-700 hover:bg-zinc-50">{tOff("syncOpen")}</Link>
+          </div>
 
           {/* ── PASSWORD ── */}
           <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm p-6 mb-6">

@@ -2787,6 +2787,25 @@
     "retry": "Retry",
     "uploadingN": "Uploading {n}…",
     "syncing": "Syncing…",
-    "needsSignal": "this section needs a connection to load and save changes"
+    "needsSignal": "this section needs a connection to load and save changes",
+    "syncTitle": "Sync",
+    "backToPanel": "Back to panel",
+    "version": "App version",
+    "network": "Network",
+    "user": "User",
+    "localOwner": "Local data owner",
+    "lastPull": "Last download",
+    "syncError": "Last error",
+    "localData": "Data saved on this device",
+    "pullNow": "Download now",
+    "queue": "Changes to upload",
+    "uploadNow": "Upload now",
+    "queueEmpty": "No pending changes.",
+    "failed": "Failed",
+    "pending": "Pending",
+    "attempts": "attempts",
+    "discard": "Discard",
+    "syncHint": "What this device has saved and which changes are still to upload.",
+    "syncOpen": "View sync"
   }
 }

@@ -2787,6 +2787,25 @@
     "retry": "Reintentar",
     "uploadingN": "Subiendo {n}…",
     "syncing": "Sincronizando…",
-    "needsSignal": "esta sección necesita señal para cargar y guardar cambios"
+    "needsSignal": "esta sección necesita señal para cargar y guardar cambios",
+    "syncTitle": "Sincronización",
+    "backToPanel": "Volver al panel",
+    "version": "Versión de la app",
+    "network": "Red",
+    "user": "Usuario",
+    "localOwner": "Dueño de los datos locales",
+    "lastPull": "Última bajada",
+    "syncError": "Último error",
+    "localData": "Datos guardados en este dispositivo",
+    "pullNow": "Bajar ahora",
+    "queue": "Cambios por subir",
+    "uploadNow": "Subir ahora",
+    "queueEmpty": "No hay cambios pendientes.",
+    "failed": "Falló",
+    "pending": "Pendiente",
+    "attempts": "intentos",
+    "discard": "Descartar",
+    "syncHint": "Qué tiene guardado este dispositivo y qué cambios faltan subir.",
+    "syncOpen": "Ver sincronización"
   }
 }
