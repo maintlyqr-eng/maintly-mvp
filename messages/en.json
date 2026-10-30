@@ -2807,5 +2807,18 @@
     "discard": "Discard",
     "syncHint": "What this device has saved and which changes are still to upload.",
     "syncOpen": "View sync"
+  },
+  "HeroActivity": {
+    "label": "Recent activity",
+    "asset": "New asset registered",
+    "service": "Maintenance logged",
+    "scan": "QR code scanned",
+    "maintler": "New Maintler"
+  },
+  "ScanDemo": {
+    "label": "Demo",
+    "step1": "Asset identified",
+    "step2": "History available",
+    "step3": "Last maintenance: 3 days ago"
   }
 }

@@ -1,5 +1,9 @@
 "use client";
 
+import ScanDemo from "@/components/ScanDemo";
+import CountUp from "@/components/CountUp";
+import HeroActivity from "@/components/HeroActivity";
+import HeroMapPulse from "@/components/HeroMapPulse";
 import Image from "next/image";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -134,7 +138,7 @@ export default function HomePage() {
   // get_public_stats() is a security-definer function (migration 016) that
   // only ever returns three counts, never any row-level data.
   useEffect(() => {
-    supabase.rpc("get_public_stats").then(({ data }) => {
+    const load = () => supabase.rpc("get_public_stats").then(({ data }) => {
       const row = data?.[0];
       if (row) {
         setStats({
@@ -144,6 +148,11 @@ export default function HomePage() {
         });
       }
     });
+    load();
+    // Facu (30/10/2026): que se actualicen solas, con transición discreta
+    // cuando cambia un número (ver CountUp).
+    const id = setInterval(load, 60_000);
+    return () => clearInterval(id);
   }, []);
 
   async function handleLogout() {
@@ -229,13 +238,9 @@ export default function HomePage() {
     <div className="flex flex-wrap items-center justify-center gap-3 text-zinc-500" style={{marginTop:'0.4vh'}}>
       <ShieldCheck className="text-red-500 shrink-0" style={{width:'clamp(11px,0.9vw,14px)', height:'clamp(11px,0.9vw,14px)'}} />
       <span style={{fontSize:'clamp(10px,0.8vw,12px)'}}>{t("trustBarText")}</span>
-      <div className="flex -space-x-2">
-        {["#dc2626","#1d4ed8","#16a34a","#d97706","#7c3aed"].map((color, i) => (
-          <div key={i} className="rounded-full border-2 border-white flex items-center justify-center text-white font-black" style={{background:color, width:'clamp(18px,1.6vw,22px)', height:'clamp(18px,1.6vw,22px)', fontSize:'clamp(6px,0.5vw,8px)'}}>
-            {["JM","AS","RK","LP","TW"][i]}
-          </div>
-        ))}
-      </div>
+      {/* Facu (30/10/2026): antes había 5 avatares con iniciales inventadas;
+          ahora va actividad real de la plataforma (sin datos privados). */}
+      <HeroActivity className="ml-1" />
       <a
         href="/asset/demogen001"
         target="_blank"
@@ -248,21 +253,24 @@ export default function HomePage() {
     </div>
   );
 
+  // Facu (30/10/2026): "hasta que crezcan, los pondría en una sección
+  // secundaria; el protagonista debería ser lo que resolvés". Barra clara y
+  // discreta en vez del bloque negro; los números se actualizan solos.
   const statsGrid = (
-    <div className="w-full max-w-[680px] grid grid-cols-2 md:grid-cols-4 rounded-2xl overflow-hidden bg-zinc-900 shadow-lg" style={{marginTop:'0.5vh'}}>
+    <div className="w-full max-w-[680px] grid grid-cols-2 md:grid-cols-4 rounded-xl overflow-hidden bg-white/70 backdrop-blur border border-zinc-200/80 shadow-sm" style={{marginTop:'0.5vh'}}>
       {[
-        { icon: Globe, value: stats ? stats.machines.toLocaleString() : "—", label: t("statMachines") },
-        { icon: FileText, value: stats ? stats.services.toLocaleString() : "—", label: t("statServices") },
-        { icon: Wrench, value: stats ? stats.mechanics.toLocaleString() : "—", label: t("statMechanics") },
-        { icon: TrendingUp, value: null, label: t("statGrowing") },
+        { icon: Globe, value: stats?.machines ?? null, label: t("statMachines") },
+        { icon: FileText, value: stats?.services ?? null, label: t("statServices") },
+        { icon: Wrench, value: stats?.mechanics ?? null, label: t("statMechanics") },
+        { icon: TrendingUp, value: undefined, label: t("statGrowing") },
       ].map(({ icon: Icon, value, label }, i) => (
-        <div key={label} className={["flex flex-row items-center justify-center gap-1.5 px-2 border-white/10", i % 2 === 0 ? "border-r" : "", i < 2 ? "border-b" : "", "md:border-b-0", i < 3 ? "md:border-r" : "md:border-r-0"].filter(Boolean).join(" ")} style={{paddingTop:'clamp(6px,0.8vh,11px)', paddingBottom:'clamp(6px,0.8vh,11px)'}}>
-          <Icon className="text-red-500 shrink-0" style={{width:'clamp(13px,1.1vw,17px)', height:'clamp(13px,1.1vw,17px)'}} />
-          <div className="flex flex-col items-start leading-none">
-            {value !== null && (
-              <p className="font-black text-white leading-none" style={{fontSize:'clamp(13px,1.3vw,18px)'}}>{value}</p>
+        <div key={label} className={["flex flex-row items-center justify-center gap-1.5 px-2 border-zinc-200/70", i % 2 === 0 ? "border-r" : "", i < 2 ? "border-b" : "", "md:border-b-0", i < 3 ? "md:border-r" : "md:border-r-0"].filter(Boolean).join(" ")} style={{paddingTop:'clamp(4px,0.6vh,8px)', paddingBottom:'clamp(4px,0.6vh,8px)'}}>
+          <Icon className="text-red-500 shrink-0" style={{width:'clamp(11px,0.9vw,14px)', height:'clamp(11px,0.9vw,14px)'}} />
+          <div className="flex flex-row items-baseline gap-1.5 leading-none">
+            {value !== undefined && (
+              <CountUp value={value} className="font-black text-zinc-900 leading-none" style={{fontSize:'clamp(11px,1vw,14px)'}} />
             )}
-            <p className="text-zinc-400 font-semibold uppercase tracking-wide leading-tight" style={{fontSize:'clamp(8px,0.55vw,8.5px)', marginTop: value !== null ? '1px' : '0'}}>{label}</p>
+            <p className="text-zinc-500 font-semibold uppercase tracking-wide leading-tight" style={{fontSize:'clamp(7.5px,0.5vw,8.5px)'}}>{label}</p>
           </div>
         </div>
       ))}
@@ -316,6 +324,7 @@ export default function HomePage() {
            completa en la sección de hero de abajo, no esta) ── */}
       <div className="hidden md:block absolute inset-0 z-0">
         <Image src="/images/fondo.jpg" alt="MaintlyQR background" fill priority sizes="100vw" quality={90} className="object-cover object-center" />
+        <HeroMapPulse />
       </div>
       <div className="hidden md:block absolute inset-0 z-0 bg-white/15 pointer-events-none" />
 
@@ -593,14 +602,17 @@ export default function HomePage() {
           tiene su propia sección arriba) */}
       <section className="hidden md:flex relative z-10 flex-col items-center text-center px-4 flex-1 min-h-0" style={{paddingTop:'1vh'}}>
 
-        <a href="/" aria-label={t("homeAriaLabel")} className="transition-transform duration-300 ease-out hover:scale-[1.3] active:scale-95">
+        {/* Facu (30/10/2026): "que el engranaje que tiene el QR adentro gire
+            despacio". Dos capas: el engranaje completo gira (una vuelta cada
+            50 s, lineal) y encima va el disco del centro con el QR, quieto,
+            así el código sigue siendo escaneable. Un poco más chico que
+            antes para darle aire al título. Respeta "reducir movimiento". */}
+        <a href="/" aria-label={t("homeAriaLabel")} className="relative block transition-transform duration-300 ease-out hover:scale-[1.3] active:scale-95 cursor-pointer drop-shadow-[0_8px_24px_rgba(0,0,0,0.15)]"
+           style={{ width: 'clamp(120px,min(16.5vw,20vh),260px)', height: 'clamp(120px,min(16.5vw,20vh),260px)', marginBottom: '0.6vh' }}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src="/images/qr-gear-real.png"
-            alt="MaintlyQR"
-            className="object-contain drop-shadow-[0_8px_24px_rgba(0,0,0,0.15)] cursor-pointer"
-            style={{ width: 'clamp(130px,min(19vw,22.5vh),300px)', height: 'clamp(130px,min(19vw,22.5vh),300px)', marginBottom: '0.6vh' }}
-          />
+          <img src="/images/qr-gear-real.png" alt="" className="absolute inset-0 w-full h-full object-contain mly-gear-spin" />
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/images/qr-gear-center.png" alt="MaintlyQR" className="absolute inset-0 w-full h-full object-contain" />
         </a>
 
         <h1 className="font-black leading-[0.98] tracking-tighter text-zinc-900 uppercase" style={{fontSize:'clamp(36px,min(7.2vw,8.8vh),74px)'}}>
@@ -621,13 +633,10 @@ export default function HomePage() {
 
           {/* SCAN QR */}
           <div className="flex-1 bg-zinc-900 flex flex-col items-center text-center px-7 rounded-l-2xl" style={{paddingTop:'0.9vh', paddingBottom:'0.9vh'}}>
-            <div className="rounded-full bg-red-600/15 border border-red-600/30 flex items-center justify-center mb-3" style={{width:'clamp(40px,4vw,56px)', height:'clamp(40px,4vw,56px)'}}>
-              <Camera className="text-red-500" style={{width:'clamp(18px,1.8vw,26px)', height:'clamp(18px,1.8vw,26px)'}} />
-            </div>
-            <h2 className="font-black tracking-[0.06em] text-white mb-1 uppercase" style={{fontSize:'clamp(10px,0.7vw,12px)'}}>{t("scanCardTitle")}</h2>
-            <p className="text-zinc-400 leading-tight flex-1" style={{fontSize:'clamp(9px,0.7vw,11px)', marginBottom:'1.5vh'}}>
-              {t("scanCardDescriptionLine1")}<br />{t("scanCardDescriptionLine2")}
-            </p>
+            <h2 className="font-black tracking-[0.06em] text-white mb-1.5 uppercase" style={{fontSize:'clamp(10px,0.7vw,12px)'}}>{t("scanCardTitle")}</h2>
+            {/* Facu (30/10/2026): demo animada del escaneo en lugar del ícono
+                de cámara + texto: explica el producto sin leer. */}
+            <div className="w-full flex-1 flex items-center" style={{marginBottom:'1.2vh'}}><ScanDemo /></div>
             <button
               onClick={openCamera}
               className="w-full rounded-xl bg-red-600 hover:bg-red-500 active:scale-[0.98] transition-all text-white flex items-center justify-center gap-2 shadow-lg shadow-red-900/30 font-black tracking-[0.1em] uppercase"

@@ -95,3 +95,23 @@ html.mly-wco .sticky.top-0 {
 
 /* Barrita de progreso fina mientras una pantalla del panel arranca. */
 @keyframes mlyBar { 0% { transform: translateX(-100%); } 100% { transform: translateX(300%); } }
+
+/* Engranaje de la portada: gira lento y continuo (ver page.tsx). */
+@keyframes mlyGearSpin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+.mly-gear-spin { animation: mlyGearSpin 50s linear infinite; transform-origin: 49.1% 48.1%; will-change: transform; }
+@media (prefers-reduced-motion: reduce) { .mly-gear-spin { animation: none; } }
+
+/* Mapa de la portada: pulso de los puntos (ver HeroMapPulse.tsx). */
+@keyframes mlyDotPulse { 0% { transform: scale(0.6); opacity: 0.9; } 70% { transform: scale(2.2); opacity: 0; } 100% { transform: scale(2.2); opacity: 0; } }
+.mly-dot { animation: mlyDotPulse 5s ease-out infinite; transform-box: fill-box; transform-origin: center; }
+@media (prefers-reduced-motion: reduce) { .mly-map-pulse { display: none; } }
+
+/* Demo de escaneo de la portada (ScanDemo.tsx): ciclo de 7 s. */
+@keyframes mlyDemoLine { 0% { top: 0; opacity: 0; } 5% { opacity: 1; } 30% { top: calc(100% - 2px); opacity: 1; } 34% { opacity: 0; } 100% { top: 0; opacity: 0; } }
+.mly-demo-line { animation: mlyDemoLine 7s ease-in-out infinite; top: 0; }
+@keyframes mlyDemoStep { 0% { opacity: 0; transform: translateX(6px); } 6% { opacity: 1; transform: translateX(0); } 88% { opacity: 1; } 100% { opacity: 0; } }
+.mly-demo-step { opacity: 0; animation: mlyDemoStep 7s ease-out infinite; }
+.mly-demo-step-1 { animation-delay: 2.4s; }
+.mly-demo-step-2 { animation-delay: 3.4s; }
+.mly-demo-step-3 { animation-delay: 4.4s; }
+@media (prefers-reduced-motion: reduce) { .mly-demo-line { display: none; } .mly-demo-step { animation: none; opacity: 1; } }

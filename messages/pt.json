@@ -2807,5 +2807,18 @@
     "discard": "Descartar",
     "syncHint": "O que este dispositivo tem salvo e quais alterações faltam enviar.",
     "syncOpen": "Ver sincronização"
+  },
+  "HeroActivity": {
+    "label": "Atividade recente",
+    "asset": "Novo equipamento registrado",
+    "service": "Manutenção registrada",
+    "scan": "Código QR escaneado",
+    "maintler": "Novo Maintler"
+  },
+  "ScanDemo": {
+    "label": "Demonstração",
+    "step1": "Equipamento identificado",
+    "step2": "Histórico disponível",
+    "step3": "Última manutenção: há 3 dias"
   }
 }
